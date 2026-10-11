@@ -61,11 +61,11 @@ pub fn render() -> &'static str {
             <div class="divider-line"></div>
           </div>
 
-          <div class="comparison-column mkey-col">
+          <div class="comparison-column kora-col">
             <div class="col-header">
-              <span class="col-tag good">MKEY TỰ ĐỘNG MỞ RỘNG</span>
+              <span class="col-tag good">KORA TỰ ĐỘNG MỞ RỘNG</span>
             </div>
-            <div class="display-box mkey-display" id="macroOutputDisplay">không<span class="cursor"></span></div>
+            <div class="display-box kora-display" id="macroOutputDisplay">không<span class="cursor"></span></div>
             <div class="display-caption" id="macroOutputCaption">Tự động nhận diện từ viết tắt: <code>ko</code> &rarr; <strong>không</strong>.</div>
           </div>
         </div>
@@ -94,7 +94,7 @@ pub fn render() -> &'static str {
         <div class="macro-table-header">
           <div class="macro-table-title-area">
             <h3 class="macro-table-title">Ví dụ các quy tắc gõ tắt tham khảo</h3>
-            <p class="macro-table-subtitle">Minh họa 3 cơ chế gõ tắt MKey hỗ trợ &mdash; nhấp vào bất kỳ dòng nào để xem cách hoạt động</p>
+            <p class="macro-table-subtitle">Minh họa 3 cơ chế gõ tắt Kora hỗ trợ &mdash; nhấp vào bất kỳ dòng nào để xem cách hoạt động</p>
           </div>
           <div class="macro-table-filter">
             <button class="macro-filter-btn active" data-filter="all">Tất cả (10)</button>
@@ -209,7 +209,7 @@ pub fn render() -> &'static str {
         <div class="macro-table-footer">
           <div class="macro-footer-tip">
             <span class="tip-icon">💡</span>
-            <span class="tip-text"><strong>Bạn nắm toàn quyền chủ động:</strong> MKey không cài sẵn bất kỳ từ viết tắt nào làm phiền bạn. Bạn hoàn toàn tự do thêm mới, sửa hoặc xóa quy tắc gõ tắt theo thói quen cá nhân trong Bảng điều khiển.</span>
+            <span class="tip-text"><strong>Bạn nắm toàn quyền chủ động:</strong> Kora không cài sẵn bất kỳ từ viết tắt nào làm phiền bạn. Bạn hoàn toàn tự do thêm mới, sửa hoặc xóa quy tắc gõ tắt theo thói quen cá nhân trong Bảng điều khiển.</span>
           </div>
 
           <!-- Macro Caution Warning -->

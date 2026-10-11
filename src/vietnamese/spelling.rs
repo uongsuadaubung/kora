@@ -215,58 +215,8 @@ pub fn is_valid_vietnamese_components(
     }
 
     // 2. Validate onset + vowel orthography
-    if !onset.is_empty() && !d_stroke {
-        let first_vowel_base = vowels[0].base;
-
-        match onset {
-            [(c, _)] if c.eq_ignore_ascii_case(&'q') => {
-                if first_vowel_base != BaseVowel::U {
-                    return false;
-                }
-            }
-            [(c, _)] if c.eq_ignore_ascii_case(&'k') => {
-                if !matches!(first_vowel_base, BaseVowel::I | BaseVowel::Y | BaseVowel::E) {
-                    return false;
-                }
-            }
-            [(c, _)] if c.eq_ignore_ascii_case(&'c') => {
-                if matches!(first_vowel_base, BaseVowel::I | BaseVowel::Y | BaseVowel::E) {
-                    return false;
-                }
-            }
-            [(c0, _), (c1, _)]
-                if c0.eq_ignore_ascii_case(&'g') && c1.eq_ignore_ascii_case(&'h') =>
-            {
-                if !matches!(first_vowel_base, BaseVowel::I | BaseVowel::E) {
-                    return false;
-                }
-            }
-            [(c0, _), (c1, _), (c2, _)]
-                if c0.eq_ignore_ascii_case(&'n')
-                    && c1.eq_ignore_ascii_case(&'g')
-                    && c2.eq_ignore_ascii_case(&'h') =>
-            {
-                if !matches!(first_vowel_base, BaseVowel::I | BaseVowel::E) {
-                    return false;
-                }
-            }
-            [(c0, _), (c1, _)]
-                if c0.eq_ignore_ascii_case(&'n') && c1.eq_ignore_ascii_case(&'g') =>
-            {
-                if matches!(first_vowel_base, BaseVowel::I | BaseVowel::E) {
-                    return false;
-                }
-            }
-            [(c, _)]
-                if c.eq_ignore_ascii_case(&'g')
-                    // 'g' + 'i' is the valid 'gi' glide (gió, giờ, giúp)
-                    // but 'g' + 'e' / 'ê' is invalid (must use 'gh')
-                    && first_vowel_base == BaseVowel::E =>
-            {
-                return false;
-            }
-            _ => {}
-        }
+    if !is_valid_onset_vowel_orthography(onset, d_stroke, vowels[0].base) {
+        return false;
     }
 
     // Special glides:
@@ -297,9 +247,27 @@ pub fn is_valid_vietnamese_components(
             return false;
         }
 
+        let is_qu = (onset.len() == 2
+            && onset[0].0.eq_ignore_ascii_case(&'q')
+            && onset[1].0.eq_ignore_ascii_case(&'u'))
+            || (onset.len() == 1
+                && onset[0].0.eq_ignore_ascii_case(&'q')
+                && !vowels.is_empty()
+                && vowels[0].base == BaseVowel::U);
+
         match coda.len() {
             1 => {
                 let c = coda[0].0.to_ascii_lowercase();
+                if !is_valid_coda_start_for_vowels(is_qu, vowels_to_check, c) {
+                    return false;
+                }
+                // In completed syllable, front vowel 'i' never takes single 'c' (must be 'ch': thích, lịch, ích).
+                if vowels_to_check.len() == 1
+                    && vowels_to_check[0].base == BaseVowel::I
+                    && c == 'c'
+                {
+                    return false;
+                }
                 if c == 'k' {
                     if !is_special_k_coda_allowed_completed(onset, d_stroke, vowels_to_check) {
                         return false;
@@ -504,4 +472,105 @@ pub fn can_vowels_accept_coda(vowels: &[VowelLetter]) -> bool {
         }
         _ => false,
     }
+}
+
+/// Validates whether an onset consonant and the first vowel base satisfy Vietnamese orthography rules.
+#[inline]
+pub fn is_valid_onset_vowel_orthography(
+    onset: &[(char, bool)],
+    d_stroke: bool,
+    first_vowel_base: BaseVowel,
+) -> bool {
+    if onset.is_empty() || d_stroke {
+        return true;
+    }
+
+    match onset {
+        [(c, _)] if c.eq_ignore_ascii_case(&'q') => first_vowel_base == BaseVowel::U,
+        [(c, _)] if c.eq_ignore_ascii_case(&'k') => {
+            matches!(first_vowel_base, BaseVowel::I | BaseVowel::Y | BaseVowel::E)
+        }
+        [(c, _)] if c.eq_ignore_ascii_case(&'c') => {
+            !matches!(first_vowel_base, BaseVowel::I | BaseVowel::Y | BaseVowel::E)
+        }
+        [(c0, _), (c1, _)] if c0.eq_ignore_ascii_case(&'g') && c1.eq_ignore_ascii_case(&'h') => {
+            matches!(first_vowel_base, BaseVowel::I | BaseVowel::E)
+        }
+        [(c0, _), (c1, _), (c2, _)]
+            if c0.eq_ignore_ascii_case(&'n')
+                && c1.eq_ignore_ascii_case(&'g')
+                && c2.eq_ignore_ascii_case(&'h') =>
+        {
+            matches!(first_vowel_base, BaseVowel::I | BaseVowel::E)
+        }
+        [(c0, _), (c1, _)] if c0.eq_ignore_ascii_case(&'n') && c1.eq_ignore_ascii_case(&'g') => {
+            !matches!(first_vowel_base, BaseVowel::I | BaseVowel::E | BaseVowel::Y)
+        }
+        [(c, _)]
+            if c.eq_ignore_ascii_case(&'g')
+                // 'g' + 'i' is the valid 'gi' glide (gió, giờ, giúp)
+                // but 'g' + 'e' / 'ê' / 'y' is invalid (must use 'gh' for e/ê; gy doesn't exist)
+                && matches!(first_vowel_base, BaseVowel::E | BaseVowel::Y) =>
+        {
+            false
+        }
+        // Non-Vietnamese onsets with 'y': by, dy, ry, phy, khy do not exist in Vietnamese
+        // (Vietnamese uses bi, di, ri, phi, khi).
+        [(c, _)]
+            if matches!(c.to_ascii_lowercase(), 'b' | 'd' | 'r')
+                && first_vowel_base == BaseVowel::Y =>
+        {
+            false
+        }
+        [(c0, _), (c1, _)]
+            if (c0.eq_ignore_ascii_case(&'p') && c1.eq_ignore_ascii_case(&'h')
+                || c0.eq_ignore_ascii_case(&'k') && c1.eq_ignore_ascii_case(&'h'))
+                && first_vowel_base == BaseVowel::Y =>
+        {
+            false
+        }
+        _ => true,
+    }
+}
+
+/// Validates whether a specific single coda consonant can legitimately begin a coda following this vowel cluster.
+#[inline]
+pub fn is_valid_coda_start_for_vowels(
+    onset_is_qu: bool,
+    vowels: &[VowelLetter],
+    coda_ch: char,
+) -> bool {
+    let c = coda_ch.to_ascii_lowercase();
+    match vowels.len() {
+        1 => {
+            let v = vowels[0].base;
+            // Single 'y' only accepts codas if onset is 'qu' (quýt, quỳnh, quỵch).
+            // Without 'qu', single 'y' (lý, mỹ, tỷ, kỳ, hy, sỹ) never takes codas in Vietnamese.
+            if v == BaseVowel::Y {
+                return onset_is_qu && matches!(c, 't' | 'n' | 'c');
+            }
+        }
+        2 => {
+            let v0 = vowels[0].base;
+            let v1 = vowels[1].base;
+            // 'oo' in Vietnamese only accepts 2-letter coda 'ng' (xoong, boong), never single 'c', 'm', 'p', 't'
+            if v0 == BaseVowel::O && v1 == BaseVowel::O {
+                return c == 'n'; // to allow typing 'ng' in xoong, boong
+            }
+            // 'oe' only accepts 't' (khoét, loét) or 'n' (hoen)
+            if v0 == BaseVowel::O && v1 == BaseVowel::E {
+                return c == 't' || c == 'n';
+            }
+            // 'uy' accepts 'n' (huynh), 't' (quýt), 'p' (tuýp), 'c' (quỵch), never 'm'
+            if v0 == BaseVowel::U && v1 == BaseVowel::Y {
+                return matches!(c, 'n' | 't' | 'p' | 'c');
+            }
+            // 'uê' only accepts 'n' (for nh in huênh) or 'c' (for ch in nghuệch)
+            if v0 == BaseVowel::U && v1 == BaseVowel::E {
+                return c == 'n' || c == 'c';
+            }
+        }
+        _ => {}
+    }
+    true
 }

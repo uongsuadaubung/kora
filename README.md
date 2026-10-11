@@ -1,195 +1,130 @@
-# MKey — Bộ gõ tiếng Việt thế hệ mới bằng Rust
+# Kora — Hệ sinh thái Bàn phím & Bộ gõ thế hệ mới bằng Rust
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)]()
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
-> 🚀 **MKey Rust Engine:** Bộ gõ tiếng Việt thế hệ mới được viết bằng **Rust**, tập trung hoàn toàn vào sự chuẩn xác, tốc độ và độ mượt mà khi gõ văn bản hàng ngày. Loại bỏ hoàn toàn biến toàn cục dễ vỡ, buffer corruption và các lỗi xung đột dấu kinh điển.  
+> 🚀 **Kora Core Engine:** Hệ sinh thái tiện ích bàn phím toàn diện (*Advanced Keyboard Suite*) viết bằng **Rust thuần** và Win32 GDI native: tích hợp Bộ gõ Tiếng Việt chuẩn xác cao, Đổi phím (Key Remap), Khóa phím chuyên dụng (Key Blocker), Không gian làm việc đa ứng dụng (Multi-Profile Workspace) và Giả lập âm thanh phím cơ WASAPI phòng thu.  
 > 📖 **Tài liệu kiến trúc chi tiết:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## ⚡ Hiệu năng Kỷ lục & Số liệu Landing Page (Highlights)
+## 🌟 Vì sao lại là "Kora"? (The Story Behind the Name)
 
-> *"Gõ nhanh như chớp, nhẹ như lông vũ — Bộ gõ tiếng Việt duy nhất hoạt động dưới 1 MB RAM."*
+Ban đầu, dự án tập trung vào mục tiêu xây dựng một bộ gõ tiếng Việt siêu nhẹ, chuẩn xác và không lỗi vặt bằng ngôn ngữ Rust.
+
+Tuy nhiên, trong quá trình phát triển, quy mô ứng dụng đã vượt xa một bộ gõ thông thường:
+- Quản lý hồ sơ theo từng ứng dụng (*Multi-Profile App Detection*)
+- Đổi phím vật lý (*Key Remapping*)
+- Khóa phím thông minh chống bấm nhầm khi chơi game & làm việc (*Key Disabling*)
+- Giả lập âm thanh bàn phím cơ 48kHz (*WASAPI Mechanical Sound FX*)
+- Mở rộng viết tắt đa quy tắc (*Smart Macro Expander*)
+
+Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của một **Hệ sinh thái bàn phím đa năng, hiện đại và tinh tế**. Đằng sau cái tên 4 chữ cái ngắn gọn là 4 tầng ý nghĩa sâu sắc:
+
+1. 🎵 **Âm thanh (Acoustics & Sound FX)**  
+   *Kora* là tên một loại nhạc cụ dây truyền thống nổi tiếng với âm sắc trong trẻo, mộc mạc và thanh thoát. Đây là hình ảnh đại diện cho tính năng giả lập âm thanh phím cơ của Kora — biến từng nhịp gõ phím hằng ngày thành một trải nghiệm âm thanh sống động và giàu cảm xúc.
+
+2. 🌐 **Không gian (Workspace & Multi-Profile)**  
+   Trong triết học Hy Lạp cổ đại, *Chōra* hay *Kora* (χώρα) có nghĩa là *"khoảng không gian / miền đất mở"* — nơi vạn vật định hình và phát triển. Điều này đồng điệu với triết lý kiến trúc *Multi-Profile* của Kora: mỗi ứng dụng, mỗi trò chơi (Game, IDE, Office, Graphic Tool) là một không gian làm việc độc lập, tự động biến đổi cấu hình phím tối ưu theo ngữ cảnh.
+
+3. 🛡️ **Lớp vỏ bảo vệ kiên cố (Kernel Shield & Key Blocking)**  
+   Trong tiếng Nhật, *Kōra* (甲羅) có nghĩa là chiếc mai rùa vững chắc. Kora hoạt động như một lớp khiên bảo vệ ở tầng nhân cấp thấp (*Windows Hook*): lọc sạch thao tác phím thừa, chặn phím bấm nhầm khi chơi game (khóa phím Windows, Insert, Caps Lock), ngăn ngừa xung đột dấu và giữ cho luồng thao tác luôn an toàn, liền mạch.
+
+4. ⚡ **Tối giản & Quốc tế (Minimalist & Global)**  
+   Bắt đầu bằng chữ **K** mạnh mẽ (*Keyboard / Kernel*) và kết thúc bằng nguyên âm mở `-a`, **Kora** mang phong cách của những công cụ phần mềm hiện đại thế hệ mới (như *Figma, Raycast, Sora*): phát âm dứt khoát, dễ nhớ và tự nhiên trên phạm vi toàn cầu.
+
+---
+
+## ⚡ Hiệu năng Kỷ lục & Số liệu Thực tế (Highlights)
+
+> *"Gõ nhanh như chớp, nhẹ như lông vũ — Hoạt động mượt mà dưới 1 MB RAM."*
 
 | Chỉ số (Metric) | Kết quả đo đạc thực tế (Benchmark) | Ý nghĩa đối với người dùng & Game thủ |
 | :--- | :--- | :--- |
 | 🚀 **Tốc độ xử lý (Throughput)** | **~11.000.000 – 14.000.000 ký tự / giây** | Xử lý lên tới 14 triệu phím/giây, không bao giờ bị nghẽn phím khi gõ cực nhanh |
 | ⏱️ **Độ trễ phản hồi (Latency)** | **~0.07 – 0.09 microsecond / phím** (70 – 90 ns) | Phản hồi siêu thanh trong 70 nano-giây, nhanh gấp **150.000 lần** ngưỡng mắt người nhận biết |
-| 💾 **Bộ nhớ RAM (Chạy ngầm)** | **< 1 MB** (Tắt Sound: 0.5 – 0.9 MB) / **~1.5 MB** (Bật Sound) | Nhẹ không đối thủ; Task Manager chỉ hiện ~1.5 MB khi bật âm thanh phím cơ |
-| 🖥️ **Bộ nhớ RAM (Control Panel mở)** | **~3.5 – 4.5 MB RAM** | Toàn bộ giao diện Win32 native siêu gọn nhẹ, không dùng WebView/Electron cồng kềnh |
+| 💾 **Bộ nhớ RAM (Chạy ngầm)** | **< 1 MB** (0.5 – 0.9 MB) | Nhẹ không đối thủ; hoạt động ổn định và cực kỳ tiết kiệm tài nguyên |
+| 🖥️ **Bộ nhớ RAM (Control Panel mở)** | **~1.5 MB** | Toàn bộ giao diện Win32 native siêu gọn nhẹ, không dùng WebView/Electron cồng kềnh |
 | 🔊 **Giả lập phím cơ (Sound Engine)** | **Tích hợp Native WASAPI (13 switches)** | Âm thanh phím cơ 48 kHz studio tích hợp sẵn, không cần cài thêm phần mềm ngoài |
-| 📦 **Dung lượng file thực thi (.exe)** | **~549 KB** | Siêu nhỏ gọn (chứa trọn bộ gõ, GUI native, WASAPI engine & switch loader) |
+| 📦 **Dung lượng file thực thi (.exe)** | **~1 MB** | Siêu nhỏ gọn (chứa trọn bộ gõ, GUI native, WASAPI engine & switch loader) |
 | 🛡️ **Runtime Dependencies** | **0 dependencies (Pure Rust)** | 100% Rust thuần giao tiếp trực tiếp Windows API, không rủi ro bảo mật bên thứ 3 |
 | 🎮 **Hiện tượng khựng phím (Stutter)** | **Zero Input Lag / Zero GC Pause** | Không có Garbage Collector (GC) thu gom rác gây trễ nhịp khi chơi game đỉnh cao |
 
-### 🏆 So sánh với các bộ gõ tiếng Việt thông thường
+### 🏆 So sánh với các công cụ truyền thống
 
-| Tiêu chí | MKey (Rust Native) | Bộ gõ C/C++ truyền thống (UniKey/EVKey) | Bộ gõ nền tảng Web / Electron |
+| Tiêu chí | Kora (Rust Native) | Bộ gõ C/C++ truyền thống (UniKey/EVKey) | Bộ gõ nền tảng Web / Electron |
 | :--- | :--- | :---: | :---: |
-| **Dung lượng file thực thi (.exe)** | **~549 KB** | 1 MB – 5 MB | 80 MB – 150 MB |
-| **Mức chiếm dụng RAM khi chạy ngầm** | **< 1 MB** (hoặc **~1.5 MB** khi bật Sound) | 1.5 MB – 4 MB | 100 MB – 300 MB |
+| **Dung lượng file thực thi (.exe)** | **~1 MB** | 1 MB – 5 MB | 80 MB – 150 MB |
+| **Mức chiếm dụng RAM khi chạy ngầm** | **< 1 MB** | 1.5 MB – 4 MB | 100 MB – 300 MB |
 | **Độ trễ xử lý phím** | **~0.07 µs** (70 ns) | 1.0 – 3.0 µs | 10 – 30 ms (có độ trễ) |
-| **Giả lập âm thanh phím cơ** | **Tích hợp sẵn (~1.5 MB RAM, 0ms lag)** | Không có | Phải cài Mechvibes (+150~300 MB RAM) |
+| **Giả lập âm thanh phím cơ** | **Tích hợp sẵn (0ms lag, siêu nhẹ)** | Không có | Phải cài Mechvibes (+150~300 MB RAM) |
 | **Khựng khung hình (Micro-stutter)** | **Hoàn toàn KHÔNG (Zero GC)** | Hiếm gặp | Thường xuyên do GC / Event loop |
-| **Cơ chế khôi phục từ tiếng Anh** | **Tự động theo ngữ âm** | Thoát dấu thủ công / Danh sách thô | Dễ xung đột phím |
-| **Công nghệ khôi phục Backspace** | **SSOT Replay tất định** | Phỏng đoán ký tự xóa (dễ vỡ) | Phỏng đoán |
+| **Multi-Profile theo ứng dụng/game** | **Tự động nhận diện + Kế thừa Delta** | Không có | Rất hiếm / Nặng nề |
+| **Đổi phím (Remap) & Khóa phím (Disable)** | **Tích hợp sẵn per-profile** | Không có | Cần cài thêm PowerToys |
+
+---
+
+## 💎 Các Trụ cột Tính năng Chính
+
+### 1. Không gian làm việc Đa hồ sơ (Multi-Profile Workspace & Live Inheritance)
+- **Tự động nhận diện ứng dụng (Auto-Detection)**: Kora liên tục giám sát cửa sổ hoạt động (foreground window) để tự động kích hoạt cấu hình tương ứng (Game, IDE, Office, Graphic, Browser).
+- **Mô hình kế thừa phân tầng (Delta Inheritance)**: Profile con tự động kế thừa thiết lập từ hồ sơ `Toàn hệ thống (Global)` và chỉ lưu các giá trị thay đổi riêng biệt (override/mute).
+- **Cách ly phím tắt thông minh**: Mỗi profile có thể chọn dùng chung phím tắt chuyển chế độ gõ từ Global hoặc tùy biến phím tắt riêng (ví dụ `Ctrl + Shift` cho văn phòng, `Alt + Z` hoặc vô hiệu hóa cho Game).
+
+### 2. Đổi phím (Key Remapping) & Khóa phím (Key Blocker)
+- **Đổi phím vật lý trực tiếp**: Gán phím bất kỳ sang phím khác (ví dụ: `Caps Lock ➔ Ctrl`, `Insert ➔ Delete`, `F1 ➔ Escape`).
+- **Khóa phím an toàn (Gaming Guard)**: Vô hiệu hóa phím bấm nhầm khi chơi game (khóa phím `Left/Right Windows`, `Insert`, `Caps Lock`, `F1`, `Scroll Lock`) mà không gửi bất kỳ tín hiệu nào về hệ điều hành hay game.
+- **Bắt phím trực tiếp (Physical Key Capture)**: Giao diện bấm phím trực quan trên bàn phím thực tế để tự động nhận diện mã Virtual Key.
+
+### 3. Bộ gõ Tiếng Việt Chuẩn xác cao (Next-Gen Vietnamese Engine)
+- **Hỗ trợ đầy đủ các kiểu gõ**: Telex, VNI, Simple Telex.
+- **Deterministic Replay Buffer (SSOT)**: Quản lý chuỗi phím thô chính xác tuyệt đối, xóa ký tự qua `Backspace` không bao giờ bị lỗi vỡ dấu hay xuất hiện ký tự ma.
+- **Thông minh bỏ qua tiếng Anh (Smart English Bypass)**: Tự động nhận diện từ tiếng Anh phổ biến (`fix`, `server`, `first`, `word`,...) và khôi phục nguyên bản khi nhấn phím cách.
+- **Khôi phục từ xuyên khoảng trắng (Backspace across space)**: Cho phép lùi qua dấu cách để sửa lại từ vừa gõ mà không cần gõ lại từ đầu.
+
+### 4. Gõ tắt Đa quy tắc (Smart Macro & Text Expander)
+- **3 chế độ kích hoạt**: Toàn từ (Normal), Bắt đầu từ (Start), Cuối từ (End).
+- **Bảo toàn viết hoa/thường (Casing Preservation)**: `ko` ➔ `không`, `Ko` ➔ `Không`, `KO` ➔ `KHÔNG`.
+- **Hỗ trợ gõ tắt cả trong chế độ tiếng Anh**.
+
+### 5. Giả lập Âm thanh Phím cơ Chuẩn Studio (WASAPI Sound Engine)
+- **Giao tiếp phần cứng trực tiếp**: Windows Audio Session API (WASAPI) chuẩn **48.000 Hz, 32-bit Float**.
+- **13 Bộ Switch danh tiếng thế giới**: *Cherry MX Blue, Brown, Red, Black, Alps SKCM Blue, Holy Panda, IBM Buckling Spring, Gateron Ink Black, Durock Alpaca, NovelKeys Cream, Kailh Box Navy, Topre, Typewriter*.
+- **Định tuyến âm thanh từng phím**: Phân tách âm thanh riêng cho `Spacebar`, `Enter`, `Backspace`, `Esc`, `Shift`, `Arrows`...
+- **Zero-Cost khi tắt**: Luồng âm thanh ngủ sâu, giải phóng 100% RAM và trả lại tài nguyên cho hệ thống.
 
 ---
 
 ## ⚡ Bắt đầu nhanh (Quick Start)
 
 ### Yêu cầu
-- [Rust toolchain](https://rustup.rs/) (khuyến nghị phiên bản 1.75 trở lên)
+- [Rust toolchain](https://rustup.rs/) (phiên bản 1.75 trở lên)
 - Hệ điều hành: Windows 10 / 11
 
-### Chạy kiểm thử (Automated Tests)
-Hệ thống được bảo đảm bởi bộ kiểm thử tự động toàn diện (Unit, Integration, Spelling, Macro, Language/i18n, Undo Toggle, Casing, Mode Switch, Glides, Performance Throughput):
+### Chạy kiểm thử tự động (Automated Tests)
+Hệ thống được bảo đảm bởi 72+ kịch bản kiểm thử tự động toàn diện:
 ```bash
 cargo test
 ```
 
 ### Biên dịch bản phát hành (Build Release)
+Bạn có thể chạy trực tiếp tập lệnh tự động kiểm tra tiến trình, tắt bản cũ và build bản mới:
+```cmd
+build.bat
+```
+Hoặc dùng lệnh Cargo chuẩn:
 ```bash
 cargo build --release
 ```
-Tập tin thực thi sau khi biên dịch nằm tại: `target/release/MKey.exe`.
-
----
-
-## 💎 Đặc điểm Kiến trúc & Tính năng Cốt lõi
-
-1. **Phím tắt chuyển nhanh Tiếng Việt / Tiếng Anh (`Ctrl + Shift`):**
-   - Hỗ trợ chuyển đổi tức thì giữa chế độ gõ Tiếng Việt và Tiếng Anh chỉ bằng tổ hợp `Ctrl + Shift`.
-   - Cơ chế cách ly hoàn toàn (Smart Arming/Disarming): Nếu nhấn tổ hợp khác như `Ctrl + Shift + P` (IDE), `Ctrl + Shift + Esc` (Task Manager), hay phím tắt bất kỳ thì cơ chế chuyển chế độ tự động vô hiệu hóa, không bao giờ cướp phím tắt của phần mềm khác.
-
-2. **Deterministic Replay Buffer (Single Source of Truth):**
-   - Bộ đệm `TypingBuffer` luôn coi chuỗi phím thô (`raw_keys`) là nguồn sự thật duy nhất.
-   - Khi bấm phím `Backspace`, engine không "đoán mò" ký tự xóa mà tua lại từ đầu chuỗi phím thô qua State Machine, loại bỏ 100% lỗi "dấu ma" hay vỡ ký tự.
-
-3. **Unified Linguistic Modifiers (Nguồn sự thật ngữ âm tập trung):**
-   - Toàn bộ quy tắc đặt dấu thanh (`s, f, r, x, j, z`), dấu mũ (`aa, ee, oo`), dấu móc (`w`), phụ âm đ (`dd`), và cơ chế Undo toggle (gõ phím lặp lại để hủy dấu) được tập trung tại `NucleusState::apply_telex_modifier` và `apply_vni_modifier`.
-   - Đảm bảo tính nhất quán tuyệt đối giữa gõ dấu sớm (`toán`), gõ dấu tự do ở cuối từ (`toans`), hoặc gõ từ có âm đệm (`quán`, `hoàng`).
-
-4. **Tự động khôi phục từ tiếng Anh (English Word Auto-Restoration):**
-   - Khi gõ các từ tiếng Anh có chứa bẫy dấu Telex (`fix`, `Fix`, `FIX`, `user`, `server`, `first`, `word`), engine tự động phát hiện và khôi phục về từ tiếng Anh nguyên bản khi bấm dấu cách hoặc phím ngắt từ.
-   - Các từ tiếng Việt hợp lệ kết thúc bằng phím dấu (`mã`, `sĩ`, `bõ`) không bị khôi phục nhầm.
-
-5. **Khôi phục từ xuyên khoảng trắng (Backspace across space):**
-   - Bấm `Backspace` xóa dấu cách sẽ tự động nạp lại từ trước đó vào bộ đệm để người dùng chỉnh sửa tiếp tục mà không cần gõ lại từ đầu.
-   - Bộ nhớ lịch sử được giới hạn cứng (`MAX_HISTORY_WORDS = 50`) để ngăn ngừa rò rỉ bộ nhớ khi gõ văn bản dài.
-
-6. **Bộ gõ tắt thông minh (Smart Macro Expansion):**
-   - Tự động biến đổi hoa/thường theo từ gốc:
-     - `ko` $\to$ `không`
-     - `Ko` $\to$ `Không`
-     - `KO` $\to$ `KHÔNG`
-   - Tra cứu linh hoạt cả từ thô (`ddc`) lẫn từ hiển thị (`đc`).
-
-7. **Bộ giả lập âm thanh phím cơ nguyên bản (Native WASAPI Sound Engine):**
-   - **Tích hợp phần cứng trực tiếp:** Sử dụng trực tiếp Windows Audio Session API (WASAPI Shared Mode) ở chuẩn âm thanh phòng thu **48.000 Hz, 32-bit Float**. Loại bỏ hoàn toàn sự phụ thuộc vào các phần mềm cồng kềnh như Mechvibes (vốn ngốn 150 – 300 MB RAM do chạy Electron).
-   - **13 Bộ Switch danh tiếng thế giới sẵn có:**
-     1. *Alps SKCM Blue* (Clicky vintage cổ điển)
-     2. *Cherry MX Black* (Linear nặng đầm tay)
-     3. *Cherry MX Blue* (Clicky giòn giã huyền thoại)
-     4. *Cherry MX Brown* (Tactile êm ái đa dụng)
-     5. *Cherry MX Red* (Linear mượt mà, siêu nhẹ)
-     6. *Durock Alpaca* (Linear cao cấp, siêu êm)
-     7. *Gateron Ink Black* (Linear âm trầm, thocky)
-     8. *Holy Panda* (Tactile khấc nảy đỉnh cao)
-     9. *IBM Buckling Spring* (Âm thanh bàn phím cơ Model M huyền thoại)
-     10. *Kailh Box Navy* (Thick click bar siêu đanh)
-     11. *NovelKeys Cream* (Chất âm linear ấm áp đặc trưng)
-     12. *Topre* (Phím điện dung êm ái, tĩnh lặng)
-     13. *Typewriter* (Máy đánh chữ kim loại hoài cổ)
-   - **Định tuyến âm thanh từng phím thông minh (Multi-Key Tagging $O(1)$):** Phân tách và phát đúng âm thanh đặc trưng riêng cho từng phím: `Spacebar`, `Backspace`, `Enter`, `Esc`, `Shift`, `Delete`, `Arrows`...
-   - **Bộ trộn đa âm SIMD Polyphonic Mixer:** Hỗ trợ phát đồng thời tới **16 giọng (voices)** cùng lúc bằng bộ tích lũy SIMD Float, không bao giờ bị cắt tiếng hay nuốt âm khi gõ tốc độ cao.
-   - **Tiết kiệm tài nguyên tuyệt đối (Zero-Cost on Disable):**
-     - *Khi Bật:* Chỉ tải duy nhất 1 switch đang chọn vào RAM (~0.8 MB). 12 switch còn lại nằm yên trên đĩa (0 byte RAM).
-     - *Khi Tắt:* Giải phóng 100% dữ liệu âm thanh, đóng phiên WASAPI, trả RAM vật lý cho Windows qua `trim_working_set`, luồng âm thanh ngủ sâu (0% CPU, 0 wakeups/giây).
-   - **Tùy biến không giới hạn (Custom Soundpacks):** Người dùng có thể dễ dàng thêm bất kỳ bộ switch nào bằng cách tạo thư mục chứa các file `.wav` tại `%USERPROFILE%\.config\mkey\switches\<Tên Switch>\`.
-
----
-
-## 🎮 Lộ trình phát triển & Tính năng mở rộng
-
-### Chế độ chơi game (WASD Exclusion / Game Mode)
-Khi chơi game (CS, Valorant, Genshin, v.v.), người dùng nhấn các phím di chuyển `W, A, S, D`. Nếu quên tắt tiếng Việt, `W` có thể biến thành `ư`, `S` có thể nuốt phím để đợi bỏ dấu sắc.
-- Người dùng có thể dùng ngay phím tắt **`Ctrl + Shift`** vừa được trang bị để tắt gõ tiếng Việt trước khi vào game.
-- Dự kiến tính năng tự động: **Danh sách đen tự động loại trừ (Blacklist / Exclude apps)** tự động nhận diện cửa sổ game đang active để tự ngắt tiếng Việt và tự bật lại khi quay về ứng dụng văn phòng/trình duyệt.
-
-### Bảng mã truyền thống (Legacy Charset Transcoder)
-- Bổ sung bộ chuyển mã (Transcoder) sang các bảng mã cổ như TCVN3 (ABC), VNI-Windows, CP1258 để phục vụ các phần mềm kế toán, kỹ thuật cũ (AutoCAD, phần mềm khai thuế).
-
-### Worker Thread ghi Log bất đồng bộ (Async Logger)
-- Chuyển toàn bộ việc ghi file nhật ký chẩn đoán `mkey_debug.log` sang worker thread chạy nền thông qua kênh `mpsc`, đảm bảo luồng Hook Windows đạt độ trễ tuyệt đối dưới 0.1ms.
-
----
-
-## 📂 Cấu trúc Thư mục Dự án
-
-```
-MKey/
-├── Cargo.toml
-├── src/
-│   ├── main.rs                  # Entry point ứng dụng (GUI & Win32 Hook Loop)
-│   ├── lib.rs                   # Thư viện MKey public API
-│   ├── language/                # Phân hệ Đa ngôn ngữ (i18n & Localization)
-│   │   ├── mod.rs               # Language enum & LanguageStrings dictionary
-│   │   ├── vi.rs                # Bản dịch Tiếng Việt (Default)
-│   │   └── en.rs                # Bản dịch Tiếng Anh (English)
-│   ├── platform/
-│   │   ├── mod.rs               # Platform facade
-│   │   ├── process.rs           # Đơn phiên chạy (Single-instance Mutex)
-│   │   ├── registry.rs          # Đọc/ghi Windows Registry (Run key Autostart)
-│   │   └── win32/               # Tách lớp native Win32 FFI & Hook
-│   │       ├── mod.rs           # Low-Level Keyboard & Mouse Hook, Windows Message Loop
-│   │       ├── types.rs         # Win32 FFI structs (INPUT, MSG, POINT) & constants
-│   │       ├── injector.rs      # Tổng hợp phím SendInput (Unicode & Backspace)
-│   │       └── app_detect.rs    # Nhận diện tiến trình active & browser Omnibox
-│   ├── engine/
-│   │   ├── mod.rs               # VietnameseEngine điều phối trung tâm
-│   │   ├── buffer.rs            # TypingBuffer quản lý chuỗi phím thô (SSOT)
-│   │   ├── history.rs           # WordHistory Ring Buffer VecDeque quản lý từ
-│   │   ├── macro_table.rs       # Bảng gõ tắt 3 tầng (Normal, Start, End) & Casing
-│   │   ├── action.rs            # EngineAction (Passthrough, Replace, Consume)
-│   │   ├── config.rs            # EngineConfig cấu hình bộ gõ
-│   │   └── config_store.rs      # Tải/lưu cấu hình config.ini & bảng macro ra đĩa
-│   ├── ui/
-│   │   ├── mod.rs               # Hệ thống Win32 UI facade & message pump
-│   │   ├── theme.rs             # Dark/Light theme, Windows 11 UxTheme, GDI brush cache
-│   │   ├── paint.rs             # Custom GDI rendering: card bo góc & container
-│   │   ├── wnd_proc.rs          # Window Procedures & Message router
-│   │   ├── colors.rs            # Bảng màu định nghĩa giao diện
-│   │   ├── components/          # Controls Win32 thuần (Button, Checkbox, ListView, Tab...)
-│   │   └── views/               # Control Panel & System Tray Context Menu
-│   └── vietnamese/
-│       ├── mod.rs               # Export module xử lý tiếng Việt
-│       ├── onset.rs             # Quản lý phụ âm đầu (OnsetState, phím đ)
-│       ├── nucleus.rs           # Quản lý nguyên âm, dấu thanh, dấu mũ, dấu móc
-│       ├── coda.rs              # Quản lý phụ âm cuối (CodaState, kiểm soát chính tả)
-│       ├── state.rs             # Máy trạng thái âm tiết: Empty -> Onset -> Nucleus -> Coda
-│       ├── modifier.rs          # Xử lý phím biến âm Telex / VNI tập trung
-│       ├── syllable.rs          # Cấu trúc âm tiết tiếng Việt
-│       ├── spelling.rs          # Quy tắc ngữ âm học & ghép vần tiếng Việt
-│       └── charset.rs           # Bảng ký tự, nguyên âm, dấu thanh, dấu phụ
-├── tests/
-│   ├── comprehensive_test.rs    # Kiểm thử kịch bản gõ phức hợp & benchmark thông lượng
-│   ├── config_test.rs           # Kiểm thử lưu trữ cấu hình & registry autostart
-│   ├── engine_test.rs           # Kiểm thử chuyên sâu bộ đệm, macro & phục hồi từ
-│   ├── language_test.rs         # Kiểm thử phân hệ đa ngôn ngữ & từ điển i18n
-│   └── spelling_test.rs         # Kiểm thử quy tắc ngữ âm học & ghép vần tiếng Việt
-└── docs/
-    └── ARCHITECTURE.md          # Tài liệu đặc tả kiến trúc kỹ thuật toàn diện
-```
+Tập tin thực thi sau khi biên dịch nằm tại: `target/release/Kora.exe`.
 
 ---
 
 ## 👨‍💻 Tác giả phát triển
 - **Mạnh Kiên** (`manhkien13041997@gmail.com`)
-- Phiên bản **MKey Rust Native Edition** (2026).
+- Phiên bản **Kora Rust Native Edition** (2026).
 
 ## 📜 Giấy phép
 - Phân phối theo giấy phép mã nguồn mở **GPL-3.0**.

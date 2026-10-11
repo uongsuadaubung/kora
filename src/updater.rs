@@ -1,11 +1,11 @@
-//! Automatic update checker for MKey using native system curl.exe
+//! Automatic update checker for Kora using native system curl.exe
 //! Queries GitHub Releases to detect newer versions and displays interactive update prompts.
 
 use std::process::Command;
 
-pub const GITHUB_REPO: &str = "uongsuadaubung/mkey";
-pub const GITHUB_API_URL: &str = "https://api.github.com/repos/uongsuadaubung/mkey/releases/latest";
-pub const GITHUB_RELEASES_URL: &str = "https://github.com/uongsuadaubung/mkey/releases/latest";
+pub const GITHUB_REPO: &str = "uongsuadaubung/kora";
+pub const GITHUB_API_URL: &str = "https://api.github.com/repos/uongsuadaubung/kora/releases/latest";
+pub const GITHUB_RELEASES_URL: &str = "https://github.com/uongsuadaubung/kora/releases/latest";
 
 /// Status of the version check
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub enum UpdateStatus {
     Error(String),
 }
 
-/// Checks GitHub for newer versions of MKey using system curl.exe
+/// Checks GitHub for newer versions of Kora using system curl.exe
 pub fn check_for_updates() -> UpdateStatus {
     let current_version = env!("CARGO_PKG_VERSION");
 
@@ -82,7 +82,7 @@ fn run_curl_api() -> std::io::Result<String> {
             "--max-time",
             "10",
             "-H",
-            "User-Agent: MKey-Updater",
+            "User-Agent: Kora-Updater",
             GITHUB_API_URL,
         ])
         .output()?;
@@ -110,7 +110,7 @@ fn run_curl_redirect() -> std::io::Result<String> {
             "--max-time",
             "10",
             "-H",
-            "User-Agent: MKey-Updater",
+            "User-Agent: Kora-Updater",
             GITHUB_RELEASES_URL,
         ])
         .output()?;
@@ -185,9 +185,9 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
     use crate::platform::win32::types::{
         IDYES, MB_ICONINFORMATION, MB_ICONWARNING, MB_OK, MB_YESNO, MessageBoxW,
     };
-    use crate::ui::components::to_wide;
+    use crate::ui::win32::to_wide;
 
-    let is_vi = crate::language::current_language() == crate::language::Language::Vietnamese;
+    let strings = crate::language::current();
 
     match status {
         UpdateStatus::NewVersionAvailable {
@@ -195,22 +195,11 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
             latest_version,
             release_url,
         } => {
-            let msg = if is_vi {
-                format!(
-                    "Đã có phiên bản mới: {}\n(Phiên bản hiện tại của bạn: v{})\n\nBạn có muốn mở trang GitHub để tải về không?",
-                    latest_version, current_version
-                )
-            } else {
-                format!(
-                    "A new version is available: {}\n(Your current version: v{})\n\nWould you like to open the GitHub release page to download it?",
-                    latest_version, current_version
-                )
-            };
-            let title = if is_vi {
-                "Cập nhật MKey"
-            } else {
-                "MKey Update"
-            };
+            let msg = strings
+                .update_available_msg
+                .replace("{latest}", latest_version)
+                .replace("{current}", current_version);
+            let title = strings.update_title;
 
             let ret = unsafe {
                 MessageBoxW(
@@ -228,19 +217,10 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
             }
         }
         UpdateStatus::UpToDate(current_version) => {
-            let msg = if is_vi {
-                format!(
-                    "Bạn đang sử dụng phiên bản mới nhất (v{}).",
-                    current_version
-                )
-            } else {
-                format!("You are using the latest version (v{}).", current_version)
-            };
-            let title = if is_vi {
-                "Cập nhật MKey"
-            } else {
-                "MKey Update"
-            };
+            let msg = strings
+                .update_latest_msg
+                .replace("{current}", current_version);
+            let title = strings.update_title;
 
             unsafe {
                 MessageBoxW(
@@ -252,16 +232,10 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
             }
         }
         UpdateStatus::Error(err) => {
-            let msg = if is_vi {
-                format!("Không thể kiểm tra phiên bản mới:\n{}", err)
-            } else {
-                format!("Failed to check for updates:\n{}", err)
-            };
-            let title = if is_vi {
-                "Lỗi cập nhật MKey"
-            } else {
-                "MKey Update Error"
-            };
+            let msg = strings
+                .update_error_msg
+                .replace("{error}", err);
+            let title = strings.update_error_title;
 
             unsafe {
                 MessageBoxW(
@@ -300,17 +274,17 @@ mod tests {
 
     #[test]
     fn test_parse_json_tag_and_url() {
-        let json = r#"{"tag_name":"v0.3.5","html_url":"https://github.com/uongsuadaubung/mkey/releases/tag/v0.3.5"}"#;
+        let json = r#"{"tag_name":"v0.3.5","html_url":"https://github.com/uongsuadaubung/kora/releases/tag/v0.3.5"}"#;
         assert_eq!(parse_tag_name(json), Some("v0.3.5".to_string()));
         assert_eq!(
             parse_html_url(json),
-            Some("https://github.com/uongsuadaubung/mkey/releases/tag/v0.3.5".to_string())
+            Some("https://github.com/uongsuadaubung/kora/releases/tag/v0.3.5".to_string())
         );
     }
 
     #[test]
     fn test_parse_location_header() {
-        let headers = "HTTP/1.1 302 Found\r\nLocation: https://github.com/uongsuadaubung/mkey/releases/tag/v0.4.0\r\nContent-Length: 0";
+        let headers = "HTTP/1.1 302 Found\r\nLocation: https://github.com/uongsuadaubung/kora/releases/tag/v0.4.0\r\nContent-Length: 0";
         assert_eq!(parse_tag_from_location(headers), Some("v0.4.0".to_string()));
     }
 }

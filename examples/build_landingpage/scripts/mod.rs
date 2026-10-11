@@ -1,4 +1,4 @@
-//! JavaScript scripts coordinator
+﻿//! JavaScript scripts coordinator
 
 pub mod audio;
 pub mod macro_demo;

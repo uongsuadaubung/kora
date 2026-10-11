@@ -1,28 +1,39 @@
-//! Debounced background file saver for EngineConfig and MacroTable
+//! Debounced background file saver for EngineConfig, MacroTable, and ProfileManager
 
-use super::codec::serialize_config_and_macros;
+use super::codec::serialize_config_all;
 use super::paths::get_config_path;
 use crate::engine::config::EngineConfig;
 use crate::engine::macro_table::MacroTable;
+use crate::engine::profile::ProfileManager;
 use std::fs;
 use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-/// Serializes EngineConfig and MacroTable into unified INI format and saves to disk
-pub fn save_config_and_macros(config: &EngineConfig, macros: &MacroTable) -> std::io::Result<()> {
+/// Serializes EngineConfig, MacroTable, and ProfileManager into unified INI format and saves to disk
+pub fn save_config_all(
+    config: &EngineConfig,
+    macros: &MacroTable,
+    profiles: &ProfileManager,
+) -> std::io::Result<()> {
     let path = get_config_path();
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
 
-    let out = serialize_config_and_macros(config, macros);
+    let out = serialize_config_all(config, macros, profiles);
     fs::write(&path, out)?;
 
     Ok(())
 }
 
+/// Serializes EngineConfig and MacroTable into unified INI format and saves to disk
+pub fn save_config_and_macros(config: &EngineConfig, macros: &MacroTable) -> std::io::Result<()> {
+    let dummy_profiles = ProfileManager::new();
+    save_config_all(config, macros, &dummy_profiles)
+}
+
 struct DebounceState {
-    pending: Option<(EngineConfig, MacroTable)>,
+    pending: Option<(EngineConfig, MacroTable, ProfileManager)>,
     last_request: Instant,
     shutdown: bool,
 }
@@ -41,7 +52,7 @@ fn get_debouncer() -> &'static (Mutex<DebounceState>, Condvar) {
         );
 
         let _ = std::thread::Builder::new()
-            .name("mkey-config-debouncer".to_string())
+            .name("kora-config-debouncer".to_string())
             .spawn(|| {
                 let (lock, cvar) = get_debouncer();
                 let debounce_duration = Duration::from_millis(500);
@@ -54,8 +65,8 @@ fn get_debouncer() -> &'static (Mutex<DebounceState>, Condvar) {
                     }
 
                     if state.shutdown {
-                        if let Some((cfg, mac)) = state.pending.take() {
-                            let _ = save_config_and_macros(&cfg, &mac);
+                        if let Some((cfg, mac, prof)) = state.pending.take() {
+                            let _ = save_config_all(&cfg, &mac, &prof);
                         }
                         break;
                     }
@@ -68,10 +79,10 @@ fn get_debouncer() -> &'static (Mutex<DebounceState>, Condvar) {
                         continue;
                     }
 
-                    if let Some((cfg, mac)) = state.pending.take() {
+                    if let Some((cfg, mac, prof)) = state.pending.take() {
                         drop(state);
-                        if let Err(e) = save_config_and_macros(&cfg, &mac) {
-                            eprintln!("[MKey] Lỗi lưu cấu hình: {e}");
+                        if let Err(e) = save_config_all(&cfg, &mac, &prof) {
+                            eprintln!("[Kora] Lỗi lưu cấu hình: {e}");
                         }
                     }
                 }
@@ -81,12 +92,29 @@ fn get_debouncer() -> &'static (Mutex<DebounceState>, Condvar) {
     })
 }
 
-/// Requests an asynchronous, debounced save of EngineConfig and MacroTable to disk.
-/// Multiple rapid calls (e.g. from hotkeys or sliders) are coalesced into a single write after 500ms of inactivity.
+/// Requests an asynchronous, debounced save of EngineConfig, MacroTable, and ProfileManager to disk.
+pub fn save_config_all_debounced(
+    config: &EngineConfig,
+    macros: &MacroTable,
+    profiles: &ProfileManager,
+) {
+    let (lock, cvar) = get_debouncer();
+    let mut state = lock.lock().unwrap();
+    state.pending = Some((config.clone(), macros.clone(), profiles.clone()));
+    state.last_request = Instant::now();
+    cvar.notify_one();
+}
+
+/// Requests an asynchronous, debounced save of EngineConfig and MacroTable to disk (legacy helper).
 pub fn save_config_and_macros_debounced(config: &EngineConfig, macros: &MacroTable) {
     let (lock, cvar) = get_debouncer();
     let mut state = lock.lock().unwrap();
-    state.pending = Some((config.clone(), macros.clone()));
+    let profiles = state
+        .pending
+        .as_ref()
+        .map(|(_, _, p)| p.clone())
+        .unwrap_or_default();
+    state.pending = Some((config.clone(), macros.clone(), profiles));
     state.last_request = Instant::now();
     cvar.notify_one();
 }
@@ -95,8 +123,8 @@ pub fn save_config_and_macros_debounced(config: &EngineConfig, macros: &MacroTab
 pub fn flush_config_debounced() {
     if let Some((lock, _)) = DEBOUNCER.get() {
         let mut state = lock.lock().unwrap();
-        if let Some((cfg, mac)) = state.pending.take() {
-            let _ = save_config_and_macros(&cfg, &mac);
+        if let Some((cfg, mac, prof)) = state.pending.take() {
+            let _ = save_config_all(&cfg, &mac, &prof);
         }
     }
 }

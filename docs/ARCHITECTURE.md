@@ -1,6 +1,6 @@
-# MKey Rust Engine — Tài liệu Kỹ thuật & Kiến trúc Hệ thống
+﻿# Kora Rust Engine — Tài liệu Kỹ thuật & Kiến trúc Hệ thống
 
-Tài liệu này mô tả chi tiết kiến trúc bên trong, luồng xử lý dữ liệu, máy trạng thái ngữ âm học và các thuật toán cốt lõi của **MKey Engine** được viết bằng Rust.
+Tài liệu này mô tả chi tiết kiến trúc bên trong, luồng xử lý dữ liệu, máy trạng thái ngữ âm học và các thuật toán cốt lõi của **Kora Engine** được viết bằng Rust.
 
 ---
 
@@ -19,11 +19,11 @@ flowchart TD
     end
 
     subgraph UI_Layer ["2. Tầng Giao diện Native Win32 (UI Layer)"]
-        WndProc["Window Procedure Router (src/ui/wnd_proc.rs)"]
-        CtrlPanel["Control Panel Views (src/ui/views/)"]
-        ThemeEngine["Theme & GDI Renderer (src/ui/theme.rs, paint.rs, colors.rs)"]
-        Components["Native Components & Subclassing (src/ui/components/)"]
-        TrayMenu["System Tray Context Menu"]
+        WndProc["Window Procedure & Reflection (src/ui/wnd_proc/)"]
+        CtrlPanel["Control Panel & Dialogs (src/ui/views/)"]
+        ThemeEngine["Theme & Tokens (src/ui/theme.rs, colors.rs, tokens.rs)"]
+        Components["Autonomous UI Components (src/ui/components/)"]
+        TrayMenu["System Tray Subsystem (src/ui/tray/)"]
     end
 
     subgraph Engine_Layer ["3. Tầng Điều phối (Engine Coordinator Layer)"]
@@ -101,8 +101,11 @@ flowchart TD
       *(Ví dụ: gõ nhầm `tjee`, Backspace 3 lần về `t` thì phục hồi thành công `Onset('t')` vì `eval.rendered("t") == last_rendered("t")`)*.
     - **Triệt tiêu lỗi Ký tự ma (Ghost Character Bug Elimination - ví dụ `eer`):**
       Nếu kết quả diễn giải lại không khớp với chuỗi thực tế đang có trên màn hình (ví dụ: gõ `error` ra `eror`, Backspace 2 lần còn `er`; nếu diễn giải `['e', 'r']` sẽ ra `ẻ` có độ dài 1 khác với `er` có độ dài 2 trên màn hình), engine **bắt buộc duy trì trạng thái `Passthrough`** với chuỗi `"er"`. Điều này ngăn chặn việc engine gửi thiếu Backspace khi người dùng gõ tiếp ký tự sau đó (tránh lỗi `e` + `er` = `eer`), đảm bảo tính bất biến đồng bộ tuyệt đối giữa bộ gõ và OS.
-  - **Bảo lưu Phụ âm Đôi lặp phím dấu (Geminate Consonants Preservation):**
-    - Khi nhận diện chuyển tiếp sang `Passthrough` do người dùng gõ lặp phím dấu thanh (như `rr`, `ss`, `ff` trong `error`, `pass`, `off`), `feed_key` bảo lưu nguyên vẹn toàn bộ mảng `raw_keys` và gán trạng thái `is_passthrough = true`, xuất ra trực tiếp các từ tiếng Anh có phụ âm kép chuẩn xác mà không bị nuốt phím (chi tiết ngữ âm học tại [LINGUISTIC_RESEARCH_SMART_BYPASS.md](file:///c:/Users/uongsuadaubung/Desktop/mkey/docs/LINGUISTIC_RESEARCH_SMART_BYPASS.md#53-xử-lý-phụ-âm-đôi-lặp-phím-dấu-telex-modifier-geminate-consonants-rr-ss-ff)).
+  - **Cơ chế Hoàn tác Dấu thanh Chuẩn Unikey (Classic Unikey Undo Toggle & Passthrough):**
+    - Khi người dùng gõ lặp phím dấu thanh (như `s, f, r, x, j`), `feed_key` triệt tiêu dấu thanh (`tone = None`), trả về 1 ký tự nguyên bản và chuyển ngay sang trạng thái `Passthrough`.
+    - Ví dụ: `te` + `s` $\to$ `té` + `s` $\to$ `tes` (vào `Passthrough`), gõ tiếp `t` $\to$ `test`; `ca` + `r` $\to$ `cả` + `r` $\to$ `car`; `ba` + `r` $\to$ `bar`.
+    - Người dùng gõ các từ tiếng Anh có phụ âm đôi trùng phím dấu theo đúng quy ước Telex kinh điển: `passs` $\to$ `pass`, `errror` $\to$ `error`, `offf` $\to$ `off`.
+    - Chuỗi phím hiệu dụng được đồng bộ chuẩn xác với trạng thái hiển thị, giúp mọi thao tác Backspace hay gõ tiếp diễn ra hoàn toàn mượt mà.
 - **Bộ đệm Hiển thị Tái sử dụng (Zero-Allocation `last_rendered` Caching):**
   - Lưu trữ trực tiếp trường `last_rendered: String` tái sử dụng dung lượng bộ đệm.
   - Khi gõ phím `Passthrough`, engine đẩy trực tiếp ký tự vào `last_rendered` mà không gọi `state.render()`, loại bỏ hoàn toàn việc cấp phát heap rải rác trên từng phím gõ.
@@ -175,12 +178,19 @@ flowchart TD
 
 ---
 
-### 2.4. `Spelling Guard` — Tự động Khôi phục Từ Tiếng Anh (`restore_on_wrong_spelling`)
-- **File:** `src/engine/mod.rs` & `src/vietnamese/spelling.rs`
+### 2.4. `Spelling Guard` & Hệ thống Phonotactics Đa Tầng (`restore_on_wrong_spelling`)
+- **Files:** `src/engine/mod.rs`, `src/engine/buffer.rs`, & `src/vietnamese/spelling.rs`
 - Khắc phục nhược điểm kinh điển của bộ gõ tiếng Việt khi người dùng gõ từ tiếng Anh chứa các phím dấu Telex (`s, f, r, x, j, w`):
-  - `fix` $\rightarrow$ tạm thời hiển thị `fĩ` trên màn hình.
-  - Khi người dùng nhấn phím ngắt từ (`Space`): Engine phân tích âm tiết. Vì tiếng Việt không tồn tại âm tiết `fĩ` (phụ âm đầu `f` không kết hợp dấu ngã `ĩ`), hệ thống tự động phát ra lệnh `Replace`: lùi lại 2 ký tự xóa `fĩ` và xuất trả `fix `.
-  - Hỗ trợ toàn diện các từ phổ biến: `fix`, `fox`, `fax`, `first`, `server`, `user`, `word`, `win`...
+  1. **Tầng 1 (Phụ âm đầu Onset):** Phụ âm ngoại lai (`f, j, w, z`) hoặc cụm phụ âm tiếng Anh (`pr, pl, cl, cr, br, bl, fl, gl, dr, sk, sm, sn, str, spr...`) thoát sang `Passthrough` ngay lập tức từ chữ cái thứ 2 (`format`, `project`, `client`...).
+  2. **Tầng 2 (Chính tả Phụ âm + Nguyên âm):** Chặn ngay các kết hợp phi tiếng Việt (`ce, ci, cy, ge, gy, qa, ka, ko, by, dy, ry, phy, khy, gh/ngh + back vowel`) $\to$ `center`, `cinema`, `city`, `get`, `gym`, `by`, `byte`, `python`, `qatar`, `karaoke` thoát `Passthrough` ngay ở nguyên âm đầu.
+  3. **Tầng 3 (Tổ hợp Nguyên âm):** Các nguyên âm kép không có trong tiếng Việt (`ea, ou, io, ey, ei...`) thoát `Passthrough` ngay lập tức: `team`, `sound`, `round`, `action`, `lion`.
+  4. **Tầng 4 (Tương thích Nguyên âm & Phụ âm cuối):**
+     - Các vần không nhận phụ âm cuối (`ai, ao, au, ay, oi, ui...`) $\to$ `mail`, `point`, `auto` vào `Passthrough`.
+     - Vần `oo` chỉ nhận `ng` (`xoong`, `boong`), từ chối `t, m, p, c` $\to$ `boot`, `room`, `zoom` vào `Passthrough`.
+     - Vần `oe` chỉ nhận `t, n` (`khoét`, `hoen`), từ chối `m` $\to$ `poem` vào `Passthrough`.
+     - Vần `y` khi không có phụ âm `qu` từ chối mọi phụ âm cuối $\to$ `sync`, `system` vào `Passthrough`.
+  5. **Tầng 5 (Hoàn tác Tức thì trên màn hình - Instant Rollback):**
+     - Khi một từ tiếng Anh vô tình tạo thành âm tiết tiếng Việt tạm thời (như `card` $\to$ `cả` + `d`, `server` $\to$ `sẻ` + `v`), ngay khi gõ phụ âm tiếp theo (`d` hoặc `v`), engine tự động phát lệnh `Replace` hoàn tác trực tiếp chuỗi thô (`card`, `server`) ngay trên màn hình mà **không cần người dùng phải bấm Space**.
   - Không làm ảnh hưởng đến các từ tiếng Việt hợp lệ có kết thúc bằng phím `x` như: `mã` (`max`), `sĩ` (`six`), `bõ` (`box`), `sẽ` (`sex`), `tã` (`tax`).
 
 ---
@@ -205,16 +215,30 @@ flowchart TD
 
 ---
 
-### 2.6. `ConfigStore` & Khởi động cùng Hệ điều hành (Windows Autostart)
+### 2.6. `ProfileManager` — Multi-Profile Workspace Hub & Quy tắc Kế thừa 3 Nhóm
+- **Files:** `src/engine/profile/mod.rs`, `src/engine/profile/manager.rs`, `src/engine/profile/model.rs`
+- **Mô hình kiến trúc Root vs Child Profile:**
+  - **Profile Toàn Hệ Thống (`Root` / `Global`):** Là nguồn chân lý duy nhất (Single Source of Truth), luôn chạy nền mặc định cho mọi ứng dụng chưa có profile riêng. Không kế thừa từ bất kỳ ai.
+  - **Profile Con (`Child`):** Đại diện cho một ứng dụng cụ thể (VD: `CS2`, `VS Code`, `Photoshop`), tự động kích hoạt qua `Active App Tracker` khi cửa sổ ứng dụng foreground thay đổi.
+- **Phân định rõ ràng 3 Nhóm Hành vi Kế thừa:**
+  1. **Nhóm Lựa chọn (Select / ComboBox / Hotkey):** Kế thừa động hoặc Tự chọn (`Inherit` vs `Specific`). Mặc định tự động ăn theo Root theo thời gian thực; khi người dùng chọn một giá trị cụ thể, nó chuyển sang ghi đè riêng cho app đó.
+  2. **Nhóm Checkbox 3 Trạng thái Ngữ cảnh (Tri-State Contextual Checkbox):** Tận dụng kiểu `Option<bool>` trong Rust kết hợp với nhãn mở ngoặc động `(Kế thừa Global: Bật / Tắt)` khi ở trạng thái `None`. Mỗi lần click sẽ xoay vòng `Kế thừa (None)` $\to$ `Bật riêng (Some(true))` $\to$ `Tắt riêng (Some(false))` $\to$ `Kế thừa (None)`. Vừa cho phép app con tùy biến độc lập, vừa minh bạch và dễ dàng quay về kế thừa bất kỳ lúc nào.
+  3. **Nhóm Bảng Dữ liệu (Macro, Remap, Disable):** Kế thừa động theo mô hình Delta (Live Delta Overlay):
+     $$\text{ActiveRules}_{\text{App}} = (\text{GlobalRules} \setminus \text{MutedRules}_{\text{App}}) \cup \text{OverriddenRules}_{\text{App}} \cup \text{AppSpecificRules}$$
+     Profile con không sao chép dữ liệu thô, mọi từ/phím mới ở Root tự động xuất hiện ở profile con, và profile con có thể thêm riêng, ghi đè hoặc vô hiệu hóa từng dòng cụ thể.
+
+---
+
+### 2.7. `ConfigStore` & Khởi động cùng Hệ điều hành (Windows Autostart)
 - **Files:** `src/engine/config_store.rs`, `src/platform/registry.rs`
 - **Tách biệt Trách nhiệm Lưu trữ (Separation of Concerns):**
   - Cấu hình gõ phím (`EngineConfig`) và danh mục Macro được lưu trữ vào file `config.ini` qua `ConfigStore`.
   - Thuộc tính `show_dialog_on_startup: bool` ("Bật hội thoại này khi khởi động") được lưu trong mục `[system]` của file cấu hình.
-  - Trạng thái **Khởi động cùng Windows (Autostart)** được tách rời hoàn toàn khỏi `EngineConfig`, được truy vấn và cấu hình trực tiếp với Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\MKey`) qua module `src/platform/registry.rs`. Khi chạy tự khởi động với flag `--autostart`, ứng dụng chỉ hiển thị cửa sổ nếu `show_dialog_on_startup == true`.
+  - Trạng thái **Khởi động cùng Windows (Autostart)** được tách rời hoàn toàn khỏi `EngineConfig`, được truy vấn và cấu hình trực tiếp với Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Kora`) qua module `src/platform/registry.rs`. Khi chạy tự khởi động với flag `--autostart`, ứng dụng chỉ hiển thị cửa sổ nếu `show_dialog_on_startup == true`.
 
 ---
 
-### 2.7. `Language` — Phân hệ Đa ngôn ngữ & Bản địa hóa (i18n / Localization)
+### 2.8. `Language` — Phân hệ Đa ngôn ngữ & Bản địa hóa (i18n / Localization)
 - **Files:** `src/language/mod.rs`, `src/language/vi.rs`, `src/language/en.rs`
 - **Triệt tiêu Hardcoded Text & Đảm bảo Type-Safety:**
   - Toàn bộ chuỗi văn bản giao diện (tiêu đề cửa sổ, nhãn, nút bấm, placeholder gõ tắt, tray context menu, tooltip) được tập trung tại struct `LanguageStrings` với kiểu `&'static str` (Zero Runtime Allocation).
@@ -223,7 +247,7 @@ flowchart TD
 
 ---
 
-### 2.8. `Platform & Win32 Injector` — Tầng Giao tiếp Hệ điều hành Cấp thấp
+### 2.9. `Platform & Win32 Injector` — Tầng Giao tiếp Hệ điều hành Cấp thấp
 - **Files:** `src/platform/win32/mod.rs`, `src/platform/win32/injector.rs`, `src/platform/win32/app_detect.rs`
 - **Kỹ thuật Tổng hợp Phím Nguyên tử (`SendInput`) trên Stack Buffer:**
   - Chuỗi phím xóa lùi (`VK_BACK`) và ký tự Unicode mới được gom và gửi qua một lời gọi `SendInput` nguyên tử.
@@ -240,10 +264,11 @@ flowchart TD
 
 ---
 
-### 2.9. `Native Win32 UI & Theming` — Phân hệ Giao diện Thuần Native
-- **Files:** `src/ui/mod.rs`, `src/ui/paint.rs`, `src/ui/theme.rs`, `src/ui/colors.rs`, `src/ui/wnd_proc.rs`
+### 2.10. `Native Win32 UI & Theming` — Phân hệ Giao diện Thuần Native
+- **Files:** `src/ui/mod.rs`, `src/ui/win32.rs`, `src/ui/theme.rs`, `src/ui/tokens.rs`, `src/ui/components/`, `src/ui/views/`, `src/ui/tray/`, `src/ui/wnd_proc/`
+- **Tài liệu đặc tả kiến trúc UI:** Chi tiết kiến trúc UI Component tự chủ, cơ chế Message Reflection `OCM_*`, Window-Bound State qua `GWLP_USERDATA` và hướng dẫn viết component mới được tài liệu hóa chuyên sâu tại [UI_COMPONENT_ARCHITECTURE.md](file:///c:/Users/uongsuadaubung/Desktop/kora/docs/UI_COMPONENT_ARCHITECTURE.md).
 - **Kiến trúc GDI Thuần (Pure Win32 GDI):**
-  - Không sử dụng WebView, Electron hay framework giao diện cồng kềnh. Toàn bộ các thành phần hiển thị (card bo góc, tab bar, nút bấm, bảng danh sách ListView) được kết xuất trực tiếp qua Windows GDI và UxTheme.
+  - Không sử dụng WebView, Electron hay framework giao diện cồng kềnh. Toàn bộ các thành phần hiển thị (card bo góc, tab bar, nút bấm, bảng danh sách ListView, ActionTable) được kết xuất trực tiếp qua Windows GDI và UxTheme.
 - **Khử chớp nháy (Double Buffering):**
   - Mọi thao tác vẽ container và thẻ card được thực hiện trên một Memory Device Context (`CreateCompatibleDC`, `CreateCompatibleBitmap`) trước khi đẩy ra màn hình bằng `BitBlt` trong thông điệp `WM_PAINT`, mang lại trải nghiệm thị giác mượt mà 100%.
 - **Cơ chế Subclassing Điều khiển Win32 (`SetWindowSubclass`):**
@@ -255,7 +280,7 @@ flowchart TD
 
 ## 3. Kỹ thuật Tối ưu hóa Hiệu năng & Triệt tiêu Cấp phát Bộ nhớ (Zero-Allocation Engineering)
 
-Để đạt được kỷ lục thông lượng **~10.960.000 phím/giây** và độ trễ cực thấp **~0.09 microsecond / phím** (91 ns) trên bản Release, kiến trúc MKey Engine áp dụng các kỹ thuật tối ưu hóa cấp phát bộ nhớ (Zero-Allocation) và thân thiện với bộ nhớ đệm CPU (Cache-Friendly):
+Để đạt được kỷ lục thông lượng **~10.960.000 phím/giây** và độ trễ cực thấp **~0.09 microsecond / phím** (91 ns) trên bản Release, kiến trúc Kora Engine áp dụng các kỹ thuật tối ưu hóa cấp phát bộ nhớ (Zero-Allocation) và thân thiện với bộ nhớ đệm CPU (Cache-Friendly):
 
 ```mermaid
 flowchart LR
@@ -339,7 +364,7 @@ flowchart LR
   - Tự động phát hiện và phục hồi kết nối (Self-healing reconnect) khi người dùng cắm hoặc rút tai nghe/loa ngoài mà không gây crash ứng dụng.
 - **Quản lý Bộ nhớ Theo Nhu cầu (On-Demand Loading) & Ngủ sâu (Deep Sleep):**
   - **Tải theo nhu cầu:** Dù hệ thống có 13 bộ switch danh tiếng (hoặc hàng chục soundpack tùy chỉnh), `SoundBank::load_from_disk` chỉ nạp duy nhất các file `.wav` của switch đang được chọn vào RAM (~0.8 MB).
-  - **Giải phóng triệt để khi Tắt:** Khi người dùng tắt âm thanh (hoặc khởi động ở chế độ tắt), MKey gọi `SoundBank::empty()` giải phóng 100% các vector mẫu sóng, đóng phiên WASAPI, đồng thời kích hoạt `trim_working_set()` yêu cầu Windows Kernel thu hồi trang nhớ vật lý. Luồng âm thanh chuyển sang trạng thái dừng chờ vô hạn trên `receiver.recv()` (0% CPU, 0 context switch, 0 byte phụ trội).
+  - **Giải phóng triệt để khi Tắt:** Khi người dùng tắt âm thanh (hoặc khởi động ở chế độ tắt), Kora gọi `SoundBank::empty()` giải phóng 100% các vector mẫu sóng, đóng phiên WASAPI, đồng thời kích hoạt `trim_working_set()` yêu cầu Windows Kernel thu hồi trang nhớ vật lý. Luồng âm thanh chuyển sang trạng thái dừng chờ vô hạn trên `receiver.recv()` (0% CPU, 0 context switch, 0 byte phụ trội).
 - **Phân tách Nhãn Phím Tránh Xung đột ($O(1)$ Key Tagging):**
   - Định nghĩa `KeyTag` enum (Normal, Esc, Space, Enter, Backspace, Delete, Shift, v.v.).
   - Bảng ánh xạ Virtual-Key sang KeyTag `vk_to_tag` chạy trong thời gian $O(1)$.
@@ -350,7 +375,7 @@ flowchart LR
 ## 4. Bản đồ File Mã nguồn (Codebase Directory Map)
 
 ```
-MKey/
+Kora/
 ├── Cargo.toml                  # Khai báo cấu hình dự án Rust & dependencies
 ├── src/
 │   ├── lib.rs                  # Export library API
@@ -359,22 +384,27 @@ MKey/
 │   │   ├── mod.rs              # Language enum, LanguageStrings dictionary & switcher
 │   │   ├── vi.rs               # Bản dịch Tiếng Việt (Default)
 │   │   └── en.rs               # Bản dịch Tiếng Anh (English)
+│   ├── logger/                 # Hạ tầng Chẩn đoán & Ghi log Bất đồng bộ (Async Diagnostic Logger)
+│   │   └── mod.rs              # AsyncLogWriter (Zero latency worker thread) & current_timestamp_str
 │   ├── engine/                 # Phân hệ điều phối gõ phím
 │   │   ├── mod.rs              # VietnameseEngine coordinator
 │   │   ├── action.rs           # Định nghĩa EngineAction (Passthrough, Replace, Consume)
 │   │   ├── buffer.rs           # TypingBuffer & Thuật toán SSOT evaluate_keys
 │   │   ├── config.rs           # EngineConfig (Telex, VNI, language, show_dialog_on_startup...)
-│   │   ├── config_store.rs     # Tải/lưu cấu hình config.ini & bảng macro ra đĩa
+│   │   ├── config_store/       # Tải/lưu cấu hình config.ini & bảng macro ra đĩa (debounced)
 │   │   ├── history.rs          # WordHistory Ring Buffer VecDeque quản lý từ
-│   │   └── macro_table.rs      # Bảng gõ tắt 3 tầng (Normal, Start, End) & Casing
-│   ├── ui/                     # Phân hệ Giao diện Native Win32
-│   │   ├── mod.rs              # UI Manager facade, Show/Hide control panel
+│   │   ├── macro_table.rs      # Bảng gõ tắt 3 tầng (Normal, Start, End) & Casing
+│   │   └── profile/            # Hệ thống quản lý đa cấu hình (Profiles: Gaming, Code, Office...)
+│   ├── ui/                     # Phân hệ Giao diện Native Win32 (xem docs/UI_COMPONENT_ARCHITECTURE.md)
+│   │   ├── mod.rs              # Khởi tạo UI, đăng ký Window Class
+│   │   ├── win32.rs            # Win32 FFI bindings, types, constants & OCM_* reflection
 │   │   ├── theme.rs            # Dark/Light theme, Windows 11 UxTheme, GDI brush cache
-│   │   ├── paint.rs            # Custom GDI rendering: card bo góc & container
-│   │   ├── wnd_proc.rs         # Window Procedures & Message router (WM_PAINT, WM_COMMAND...)
 │   │   ├── colors.rs           # Bảng màu định nghĩa UI (Dark/Light palette)
-│   │   ├── components/         # Button, CheckBox, ComboBox, ListView, TabBar, TextBox...
-│   │   └── views/              # Control Panel layout & System Tray Context Menu
+│   │   ├── tokens.rs           # Design tokens (spacing, typography, border radius)
+│   │   ├── components/         # ActionTable, PushButton, CheckBox, ComboBox, Label, ListBox, ListView...
+│   │   ├── views/              # Control Panel layout & Modal Dialogs (dialogs/)
+│   │   ├── tray/               # Gom cụm System Tray Icon, Loader & Context Menu Handler
+│   │   └── wnd_proc/           # Window Procedures & Message Reflector Router
 │   ├── vietnamese/             # Phân hệ Ngữ âm học tiếng Việt
 │   │   ├── mod.rs              # Vietnamese module export
 │   │   ├── charset.rs          # Bảng mã ký tự, nguyên âm cơ bản, dấu thanh, dấu mũ
@@ -432,4 +462,4 @@ cargo test --test spelling_test
 cargo build --release
 ```
 File thực thi độc lập sẽ được tạo tại:
-`target/release/MKey.exe`
+`target/release/Kora.exe`

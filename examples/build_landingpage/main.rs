@@ -1,4 +1,4 @@
-mod components;
+﻿mod components;
 mod scripts;
 mod styles;
 
@@ -6,7 +6,7 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    println!("=== Building MKey Landing Page ===");
+    println!("=== Building Kora Landing Page ===");
 
     let out_dir = Path::new("landing-page");
     if !out_dir.exists() {

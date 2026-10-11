@@ -1,23 +1,23 @@
 # ==============================================================================
-# MKey — Script tự động tải thư mục switches từ GitHub về thư mục config
+# Kora — Script tự động tải thư mục switches từ GitHub về thư mục config
 # ==============================================================================
 
 [CmdletBinding()]
 param(
-    [string]$RepoZipUrl = "https://github.com/uongsuadaubung/mkey/archive/refs/heads/main.zip"
+    [string]$RepoZipUrl = "https://github.com/uongsuadaubung/kora/archive/refs/heads/main.zip"
 )
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "   MKey — Tự động cài đặt gói âm thanh phím cơ        " -ForegroundColor Cyan
+Write-Host "   Kora — Tự động cài đặt gói âm thanh phím cơ        " -ForegroundColor Cyan
 Write-Host "======================================================" -ForegroundColor Cyan
 
-$configDir = Join-Path $env:USERPROFILE ".config\mkey"
+$configDir = Join-Path $env:USERPROFILE ".config\kora"
 $switchesDir = Join-Path $configDir "switches"
 $tempGuid = [guid]::NewGuid().ToString("N")
-$tempZip = Join-Path $env:TEMP "mkey-repo-$tempGuid.zip"
-$tempExtract = Join-Path $env:TEMP "mkey-extract-$tempGuid"
+$tempZip = Join-Path $env:TEMP "kora-repo-$tempGuid.zip"
+$tempExtract = Join-Path $env:TEMP "kora-extract-$tempGuid"
 
 try {
     # 1. Tạo thư mục cấu hình nếu chưa tồn tại
@@ -47,10 +47,10 @@ try {
 
     Write-Host ""
     Write-Host "======================================================" -ForegroundColor Green
-    Write-Host "   ĐÃ CÀI ĐẶT THÀNH CÔNG GÓI ÂM THANH CHO MKEY!       " -ForegroundColor Green
+    Write-Host "   ĐÃ CÀI ĐẶT THÀNH CÔNG GÓI ÂM THANH CHO KORA!       " -ForegroundColor Green
     Write-Host "======================================================" -ForegroundColor Green
     Write-Host "Đường dẫn: $switchesDir" -ForegroundColor Gray
-    Write-Host "Bây giờ bạn chỉ cần mở Bảng điều khiển MKey, bật 'Âm thanh gõ phím cơ' và trải nghiệm!" -ForegroundColor Cyan
+    Write-Host "Bây giờ bạn chỉ cần mở Bảng điều khiển Kora, bật 'Âm thanh gõ phím cơ' và trải nghiệm!" -ForegroundColor Cyan
     Write-Host ""
 }
 catch {

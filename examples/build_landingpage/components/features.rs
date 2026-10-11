@@ -1,4 +1,4 @@
-//! Features & soundpack guide component
+﻿//! Features & soundpack guide component
 
 pub fn render() -> &'static str {
     r####"  <!-- Key Features -->
@@ -7,7 +7,7 @@ pub fn render() -> &'static str {
       <div class="section-header">
         <div class="section-chip">TÍNH NĂNG NỔI BẬT</div>
         <h2 class="section-title">Gõ văn bản tự nhiên, không gián đoạn</h2>
-        <p class="section-subtitle">MKey hiểu cách bạn gõ hàng ngày và tự động xử lý chuẩn xác, để bạn không còn phải bực mình vì lỗi nhảy chữ hay nuốt phím.</p>
+        <p class="section-subtitle">Kora hiểu cách bạn gõ hàng ngày và tự động xử lý chuẩn xác, để bạn không còn phải bực mình vì lỗi nhảy chữ hay nuốt phím.</p>
       </div>
 
       <div class="specs-grid">
@@ -46,7 +46,7 @@ pub fn render() -> &'static str {
         <div class="spec-card">
           <span class="spec-tag">TỰ ĐỘNG</span>
           <div class="spec-title">Tự động khôi phục phím khi gõ sai từ</div>
-          <div class="spec-desc">Khi bạn gõ nhầm phím hoặc tổ hợp ký tự không có thật trong tiếng Việt, MKey tự động hoàn lại các ký tự thô ban đầu, ngăn chặn việc nuốt phím hoặc tạo ra ký tự rác khó chịu.</div>
+          <div class="spec-desc">Khi bạn gõ nhầm phím hoặc tổ hợp ký tự không có thật trong tiếng Việt, Kora tự động hoàn lại các ký tự thô ban đầu, ngăn chặn việc nuốt phím hoặc tạo ra ký tự rác khó chịu.</div>
           <div class="feature-demo-screen" data-feature="restore">
             <div class="feature-screen-top">
               <span class="screen-dot"></span>
@@ -62,7 +62,7 @@ pub fn render() -> &'static str {
         <div class="spec-card">
           <span class="spec-tag">TIỆN LỢI</span>
           <div class="spec-title">Sửa dấu sau khi đã bấm phím cách</div>
-          <div class="spec-desc">Nếu lỡ gõ sang từ tiếp theo mới nhận ra từ trước bị thiếu dấu, bạn chỉ cần bấm Backspace lùi về từ cũ rồi gõ phím dấu. MKey sẽ tự động thêm dấu vào từ trước giúp bạn gõ tiếp ngay mà không phải xóa đi gõ lại từ đầu.</div>
+          <div class="spec-desc">Nếu lỡ gõ sang từ tiếp theo mới nhận ra từ trước bị thiếu dấu, bạn chỉ cần bấm Backspace lùi về từ cũ rồi gõ phím dấu. Kora sẽ tự động thêm dấu vào từ trước giúp bạn gõ tiếp ngay mà không phải xóa đi gõ lại từ đầu.</div>
           <div class="feature-demo-screen" data-feature="backspace">
             <div class="feature-screen-top">
               <span class="screen-dot"></span>
@@ -119,8 +119,8 @@ pub fn render() -> &'static str {
       <div class="soundpack-guide-card" id="sound-guide">
         <div class="guide-header">
           <div class="guide-badge">HƯỚNG DẪN CÀI ĐẶT GÓI ÂM THANH</div>
-          <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho MKey</h3>
-          <p class="guide-subtitle">File chạy MKey được tối ưu siêu nhẹ (~549 KB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
+          <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho Kora</h3>
+          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~549 KB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
         </div>
 
         <div class="guide-steps-grid">
@@ -132,11 +132,11 @@ pub fn render() -> &'static str {
               <div class="guide-path-box">
                 <div class="path-label">1 dòng lệnh tự động (PowerShell):</div>
                 <div class="path-code-wrapper">
-                  <code>irm https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.ps1 | iex</code>
-                  <button class="btn-copy-mini" data-copy="irm https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.ps1 | iex" title="Sao chép lệnh">Copy</button>
+                  <code>irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex</code>
+                  <button class="btn-copy-mini" data-copy="irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex" title="Sao chép lệnh">Copy</button>
                 </div>
               </div>
-              <p class="guide-mini-alt">Hoặc tải file chạy tự động: <a href="https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.bat" download>install-soundpack.bat</a></p>
+              <p class="guide-mini-alt">Hoặc tải file chạy tự động: <a href="https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.bat" download>install-soundpack.bat</a></p>
             </div>
           </div>
 
@@ -144,16 +144,16 @@ pub fn render() -> &'static str {
             <div class="step-num">2</div>
             <div class="step-content">
               <strong>Hoặc copy thủ công từ GitHub</strong>
-              <p>Nếu bạn đã clone hoặc tải mã nguồn MKey từ GitHub, chỉ cần copy thư mục <code>switches</code> vào thư mục config:</p>
-              <a href="https://github.com/uongsuadaubung/mkey/tree/main/switches" target="_blank" class="btn-step-action">
+              <p>Nếu bạn đã clone hoặc tải mã nguồn Kora từ GitHub, chỉ cần copy thư mục <code>switches</code> vào thư mục config:</p>
+              <a href="https://github.com/uongsuadaubung/kora/tree/main/switches" target="_blank" class="btn-step-action">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                 <span>Xem thư mục switches trên GitHub</span>
               </a>
               <div class="guide-path-box" style="margin-top: 12px;">
                 <div class="path-label">Thư mục đích:</div>
                 <div class="path-code-wrapper">
-                  <code>%USERPROFILE%\.config\mkey\switches\</code>
-                  <button class="btn-copy-mini" data-copy="%USERPROFILE%\.config\mkey\switches" title="Sao chép đường dẫn">Copy</button>
+                  <code>%USERPROFILE%\.config\kora\switches\</code>
+                  <button class="btn-copy-mini" data-copy="%USERPROFILE%\.config\kora\switches" title="Sao chép đường dẫn">Copy</button>
                 </div>
               </div>
             </div>
@@ -163,7 +163,7 @@ pub fn render() -> &'static str {
             <div class="step-num">3</div>
             <div class="step-content">
               <strong>Tự động mở khóa &amp; Trải nghiệm</strong>
-              <p>Ngay khi thư mục <code>switches\</code> xuất hiện trong config, MKey sẽ <strong>tự động mở khóa cụm Giả lập âm thanh phím cơ</strong> ngay trong Tab Bộ gõ: cho phép tích chọn bật âm thanh, chọn switch yêu thích (Alps SKCM Blue, Holy Panda...), bấm "Nghe thử" và kéo thanh chỉnh âm lượng trực quan.</p>
+              <p>Ngay khi thư mục <code>switches\</code> xuất hiện trong config, Kora sẽ <strong>tự động mở khóa cụm Giả lập âm thanh phím cơ</strong> ngay trong Tab Bộ gõ: cho phép tích chọn bật âm thanh, chọn switch yêu thích (Alps SKCM Blue, Holy Panda...), bấm "Nghe thử" và kéo thanh chỉnh âm lượng trực quan.</p>
               <div class="guide-status-note">
                 <span class="note-dot"></span>
                 <span>Tự động quét &amp; mở khóa 13 bộ switch có sẵn ngay trong Tab Bộ gõ.</span>
@@ -187,7 +187,7 @@ pub fn render() -> &'static str {
             <div class="custom-sound-badge">TÙY BIẾN KHÔNG GIỚI HẠN</div>
             <h4 class="custom-sound-title">Tự tạo gói âm thanh theo sở thích của riêng bạn</h4>
             <p class="custom-sound-desc">
-              Bạn không hề bị giới hạn trong 13 bộ switch có sẵn! MKey cho phép bạn đưa <strong>bất kỳ file âm thanh nào bạn thích</strong> vào sử dụng — từ tiếng gõ phím cơ custom, máy đánh chữ cổ điển, meme hài hước, cho đến âm thanh anime, lồng tiếng troll :))) Chỉ cần tạo một thư mục mới trong <code>%USERPROFILE%\.config\mkey\switches\&lt;Tên_Gói&gt;\</code> và thả các file <code>.wav</code> vào, MKey sẽ tự động nhận diện ngay trong Bảng điều khiển.
+              Bạn không hề bị giới hạn trong 13 bộ switch có sẵn! Kora cho phép bạn đưa <strong>bất kỳ file âm thanh nào bạn thích</strong> vào sử dụng — từ tiếng gõ phím cơ custom, máy đánh chữ cổ điển, meme hài hước, cho đến âm thanh anime, lồng tiếng troll :))) Chỉ cần tạo một thư mục mới trong <code>%USERPROFILE%\.config\kora\switches\&lt;Tên_Gói&gt;\</code> và thả các file <code>.wav</code> vào, Kora sẽ tự động nhận diện ngay trong Bảng điều khiển.
             </p>
           </div>
 
@@ -295,7 +295,7 @@ pub fn render() -> &'static str {
                   <div class="naming-row-full">
                     <p><strong>Áp dụng cho:</strong> Toàn bộ chữ cái (A-Z), chữ số (0-9) và các dấu câu.</p>
                     <p><strong>Tên file chuẩn:</strong> Đánh số thứ tự <code>1.wav</code>, <code>2.wav</code>, <code>3.wav</code>, <code>4.wav</code>, <code>5.wav</code>... (hoặc bất kỳ tên file nào không trùng với 18 phím cố định ở trên).</p>
-                    <p class="row-subtext">💡 <strong>Tự động luân phiên:</strong> Khi bạn để nhiều file số (1.wav, 2.wav...), MKey sẽ tự động đổi tiếng luân phiên sau mỗi lần gõ phím. Nếu bất kỳ phím chức năng nào không có file riêng, MKey sẽ tự động phát âm thanh gõ thường này làm mặc định.</p>
+                    <p class="row-subtext">💡 <strong>Tự động luân phiên:</strong> Khi bạn để nhiều file số (1.wav, 2.wav...), Kora sẽ tự động đổi tiếng luân phiên sau mỗi lần gõ phím. Nếu bất kỳ phím chức năng nào không có file riêng, Kora sẽ tự động phát âm thanh gõ thường này làm mặc định.</p>
                   </div>
                 </div>
               </div>

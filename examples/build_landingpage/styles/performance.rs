@@ -1,4 +1,4 @@
-//! Telemetry dashboard & benchmark showcase styling
+﻿//! Telemetry dashboard & benchmark showcase styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

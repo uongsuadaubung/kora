@@ -1,4 +1,4 @@
-//! Specs grid, typing demos, soundpack guide & accordions styling
+﻿//! Specs grid, typing demos, soundpack guide & accordions styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

@@ -1,4 +1,4 @@
-//! Head component: HTML Doctype, Meta tags, SEO, Fonts, CSS link
+﻿//! Head component: HTML Doctype, Meta tags, SEO, Fonts, CSS link
 
 pub fn render() -> &'static str {
     r####"<!DOCTYPE html>
@@ -6,7 +6,7 @@ pub fn render() -> &'static str {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MKey — Bộ gõ tiếng Việt cho Windows</title>
+  <title>Kora — Bộ gõ tiếng Việt cho Windows</title>
   <meta name="description" content="Bộ gõ tiếng Việt hiện đại viết bằng Rust. Tự động nhận diện từ tiếng Anh, không nuốt phím kép (pass, error), không nhân đôi chữ trên trình duyệt, tiêu thụ dưới 2 MB RAM.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -1,4 +1,4 @@
-//! Section headers styling
+﻿//! Section headers styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

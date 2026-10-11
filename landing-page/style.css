@@ -1,5 +1,5 @@
-/* ==========================================================================
-   MKey Landing Page — Titanium & Obsidian Monochrome (Apple Pro / Linear.app)
+﻿/* ==========================================================================
+   Kora Landing Page — Titanium & Obsidian Monochrome (Apple Pro / Linear.app)
    ========================================================================== */
 
 :root {
@@ -1256,7 +1256,7 @@ body {
   border-color: rgba(244, 63, 94, 0.15);
 }
 
-.comparison-column.mkey-col {
+.comparison-column.kora-col {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.035);
   box-shadow: 0 0 40px rgba(255, 255, 255, 0.03);
@@ -1300,7 +1300,7 @@ body {
   text-decoration-color: #f43f5e;
 }
 
-.mkey-display {
+.kora-display {
   color: #ffffff;
 }
 
@@ -1449,7 +1449,7 @@ body {
 
 .feature-col { width: 30%; color: var(--text-secondary); }
 .legacy-th { width: 35%; color: #94a3b8; }
-.mkey-th { width: 35%; color: #ffffff; background: rgba(255, 255, 255, 0.04); }
+.kora-th { width: 35%; color: #ffffff; background: rgba(255, 255, 255, 0.04); }
 
 .comparison-table td {
   padding: 24px;
@@ -1512,7 +1512,7 @@ body {
   font-size: 0.9rem;
 }
 
-.mkey-td {
+.kora-td {
   background: rgba(255, 255, 255, 0.02);
   color: var(--text-primary);
   font-size: 0.9rem;

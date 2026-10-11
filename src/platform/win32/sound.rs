@@ -105,7 +105,7 @@ pub fn init_sound(enabled: bool, profile: &str, volume: u8) {
 
     let prof = profile.to_string();
     thread::Builder::new()
-        .name("mkey-wasapi-audio".into())
+        .name("kora-wasapi-audio".into())
         .spawn(move || {
             wasapi_audio_worker(receiver, enabled, prof, volume);
         })

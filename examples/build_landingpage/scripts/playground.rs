@@ -1,4 +1,4 @@
-//! Preset selection logic and interactive live input simulator
+﻿//! Preset selection logic and interactive live input simulator
 
 pub fn render() -> &'static str {
     r####"  // ==========================================================================
@@ -13,8 +13,8 @@ pub fn render() -> &'static str {
     legacyDisplay.textContent = data.legacy;
     legacyCaption.innerHTML = data.legacyCaption;
 
-    mkeyDisplay.innerHTML = data.mkey + '<span class="cursor"></span>';
-    mkeyCaption.innerHTML = data.mkeyCaption;
+    koraDisplay.innerHTML = data.kora + '<span class="cursor"></span>';
+    koraCaption.innerHTML = data.koraCaption;
 
     presetButtons.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.word === wordKey);
@@ -50,29 +50,29 @@ pub fn render() -> &'static str {
     const lower = val.toLowerCase();
     let legacySimulation = val;
 
-    // Simulate legacy IME vs MKey behavior
-    let mkeySimulation = val;
-    let mkeyExplain = `Bảo toàn từ bạn gõ: <strong>${escapeHtml(val)}</strong>`;
+    // Simulate legacy IME vs Kora behavior
+    let koraSimulation = val;
+    let koraExplain = `Bảo toàn từ bạn gõ: <strong>${escapeHtml(val)}</strong>`;
 
     // Smart Macro Simulation: ko -> không, Ko -> Không, KO -> KHÔNG
     if (val === 'ko') {
-      mkeySimulation = 'không';
-      mkeyExplain = `Gõ tắt thông minh: <strong>ko</strong> &rarr; <strong>không</strong>`;
+      koraSimulation = 'không';
+      koraExplain = `Gõ tắt thông minh: <strong>ko</strong> &rarr; <strong>không</strong>`;
       legacySimulation = 'ko';
     } else if (val === 'Ko') {
-      mkeySimulation = 'Không';
-      mkeyExplain = `Tự động viết hoa: <strong>Ko</strong> &rarr; <strong>Không</strong>`;
+      koraSimulation = 'Không';
+      koraExplain = `Tự động viết hoa: <strong>Ko</strong> &rarr; <strong>Không</strong>`;
       legacySimulation = 'Ko';
     } else if (val === 'KO') {
-      mkeySimulation = 'KHÔNG';
-      mkeyExplain = `Tự động viết hoa toàn bộ: <strong>KO</strong> &rarr; <strong>KHÔNG</strong>`;
+      koraSimulation = 'KHÔNG';
+      koraExplain = `Tự động viết hoa toàn bộ: <strong>KO</strong> &rarr; <strong>KHÔNG</strong>`;
       legacySimulation = 'KO';
     } else if (lower === 'hieuer') {
-      mkeySimulation = 'hiểu';
-      mkeyExplain = `Tự động ghép đúng dấu: <strong>hiểu</strong>`;
+      koraSimulation = 'hiểu';
+      koraExplain = `Tự động ghép đúng dấu: <strong>hiểu</strong>`;
     } else if (lower.includes('hieuer')) {
-      mkeySimulation = val.replace(/hieuer/gi, 'hiểu');
-      mkeyExplain = `Tự động ghép đúng dấu: <strong>${escapeHtml(mkeySimulation)}</strong>`;
+      koraSimulation = val.replace(/hieuer/gi, 'hiểu');
+      koraExplain = `Tự động ghép đúng dấu: <strong>${escapeHtml(koraSimulation)}</strong>`;
     }
 
     // Simulate legacy IME swallowing double consonants or breaking words
@@ -91,8 +91,8 @@ pub fn render() -> &'static str {
       ? `Bị nuốt chữ hoặc gõ sai: <strong>${escapeHtml(legacySimulation)}</strong>`
       : `Bộ gõ truyền thống`;
 
-    mkeyDisplay.innerHTML = escapeHtml(mkeySimulation) + '<span class="cursor"></span>';
-    mkeyCaption.innerHTML = mkeyExplain;
+    koraDisplay.innerHTML = escapeHtml(koraSimulation) + '<span class="cursor"></span>';
+    koraCaption.innerHTML = koraExplain;
   });
 
   clearBtn.addEventListener('click', () => {

@@ -1,6 +1,6 @@
 //! Native Win32 Popup / Context Menu Component
 
-use super::window::to_wide;
+use crate::ui::win32::to_wide;
 use std::ptr::null_mut;
 
 #[link(name = "user32")]

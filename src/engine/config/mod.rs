@@ -8,12 +8,13 @@ pub use hotkey::*;
 pub use input_method::*;
 pub use theme::*;
 
-/// Configuration options for the Vietnamese engine
+/// Unified configuration options for the Vietnamese engine and application preferences.
+///
+/// Aliased as [`AppConfig`] to reflect its role as the root application configuration.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineConfig {
+    // --- 1. Typing Engine Core Settings ---
     pub method: InputMethod,
-    pub theme: UiTheme,
-    pub language: crate::language::Language,
     /// Bật/tắt chế độ gõ tiếng Việt (true: bật gõ tiếng Việt, false: tiếng Anh)
     pub enabled: bool,
     /// Tự động khôi phục phím nếu gõ sai chính tả
@@ -28,21 +29,39 @@ pub struct EngineConfig {
     pub use_macro_in_english_mode: bool,
     /// Khôi phục từ khi bấm Backspace xoá dấu cách
     pub remember_history_across_space: bool,
+
+    // --- 2. Mode Switch Hotkey ---
     /// Bật/tắt sử dụng phím tắt chuyển chế độ
     pub switch_key_enabled: bool,
     /// Phím chuyển chế độ (mặc định Ctrl + Shift, hoặc bất kỳ phím nào người dùng cài đặt)
     pub switch_key: Hotkey,
     /// Tương thích ngược: true nếu switch_key là Ctrl + Shift
     pub switch_with_ctrl_shift: bool,
+
+    // --- 2.5 Key Remapping & Disabling ---
+    /// Bật/tắt tính năng đổi phím (Key Remapping)
+    pub remap_enabled: bool,
+    /// Bật/tắt tính năng khóa/vô hiệu hóa phím (Disable Keys)
+    pub disable_enabled: bool,
+
+    // --- 3. Sound Effects (WASAPI) ---
     /// Bật/tắt âm thanh phím cơ
     pub sound_enabled: bool,
-    /// Tên profile switch phím cơ (tương ứng với tên thư mục trong ~/.config/mkey/switches/)
+    /// Tên profile switch phím cơ (tương ứng với tên thư mục trong ~/.config/kora/switches/)
     pub sound_profile: String,
     /// Âm lượng phím cơ (0% - 100%)
     pub sound_volume: u8,
+
+    // --- 4. Application & UI Preferences ---
+    /// Giao diện ứng dụng (Auto / Light / Dark)
+    pub theme: UiTheme,
+    /// Ngôn ngữ giao diện (Tiếng Việt / English)
+    pub language: crate::language::Language,
     /// Bật hội thoại này khi khởi động cùng Windows
     pub show_dialog_on_startup: bool,
-    /// Bật chế độ debug log (ghi nhận vết từng phím, trạng thái state machine và output để chẩn đoán lỗi)
+
+    // --- 5. Diagnostics & Logging ---
+    /// Bật chế độ debug log (ghi nhận vết từng phím, trạng thái state machine và output)
     pub debug: bool,
     /// Đường dẫn file lưu nhật ký debug log trên ổ đĩa
     pub debug_file_path: Option<String>,
@@ -64,12 +83,14 @@ impl Default for EngineConfig {
             switch_key_enabled: true,
             switch_key: Hotkey::default(),
             switch_with_ctrl_shift: true,
+            remap_enabled: true,
+            disable_enabled: true,
             sound_enabled: false,
             sound_profile: "Holy Panda".to_string(),
             sound_volume: 50,
             show_dialog_on_startup: true,
             debug: false,
-            debug_file_path: Some("mkey_debug.log".to_string()),
+            debug_file_path: Some("kora_debug.log".to_string()),
         }
     }
 }

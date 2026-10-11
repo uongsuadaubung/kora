@@ -8,8 +8,10 @@ use super::{
     onset::OnsetState,
     spelling::{
         can_vowels_accept_coda, is_special_k_coda_allowed_during_typing, is_valid_coda_pair,
-        is_valid_coda_start, is_valid_intermediate_vowel_combination, is_valid_onset,
-        is_valid_onset_extension, is_valid_vietnamese_components, is_valid_vowel_combination,
+        is_valid_coda_start, is_valid_coda_start_for_vowels,
+        is_valid_intermediate_vowel_combination, is_valid_onset, is_valid_onset_extension,
+        is_valid_onset_vowel_orthography, is_valid_vietnamese_components,
+        is_valid_vowel_combination,
     },
     syllable::Syllable,
 };
@@ -446,6 +448,11 @@ impl SyllableState {
 
         // 2. Incoming vowel -> Transition from Onset to Nucleus!
         if config.method.has_standalone_w() && ch_lower == 'w' {
+            if !is_valid_onset_vowel_orthography(&onset.chars, onset.is_d_stroke, BaseVowel::U) {
+                let mut raw = InlineList::from(onset.render().as_str());
+                raw.push(key.ch);
+                return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
+            }
             // e.g. "tw" -> "tư" in Standard Telex
             let nucleus = NucleusState::from_single(
                 Some(onset),
@@ -467,6 +474,11 @@ impl SyllableState {
         }
 
         if let Some((base_vowel, diacritic, tone)) = decompose_vowel(key.ch) {
+            if !is_valid_onset_vowel_orthography(&onset.chars, onset.is_d_stroke, base_vowel) {
+                let mut raw = InlineList::from(onset.render().as_str());
+                raw.push(key.ch);
+                return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
+            }
             // If onset was capitalized (e.g. quick consonant "Qu", "Ph", "Gi") and this vowel is also uppercase,
             // promote entire onset to uppercase for ALL CAPS words (e.g. "QUA", "PHONG")
             let mut onset_promoted = false;
@@ -699,7 +711,13 @@ impl SyllableState {
             && nucleus.onset.as_ref().is_some_and(|o| {
                 is_special_k_coda_allowed_during_typing(&o.chars, o.is_d_stroke, &nucleus.vowels)
             });
-        let can_accept_coda = can_vowels_accept_coda(&nucleus.vowels);
+        let is_onset_qu = nucleus.onset.as_ref().is_some_and(|o| {
+            o.chars.len() == 2
+                && o.chars[0].0.eq_ignore_ascii_case(&'q')
+                && o.chars[1].0.eq_ignore_ascii_case(&'u')
+        });
+        let can_accept_coda = can_vowels_accept_coda(&nucleus.vowels)
+            && is_valid_coda_start_for_vowels(is_onset_qu, &nucleus.vowels, key.ch);
         let is_stop = matches!(key.ch.to_ascii_lowercase(), 'c' | 'p' | 't' | 'k');
         let tone_incompatible = config.restore_on_wrong_spelling
             && is_stop

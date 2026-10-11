@@ -1,4 +1,4 @@
-use mkey::{
+use kora::{
     EngineConfig, InputMethod, MacroTable, UiTheme, get_config_path, parse_config_and_macros,
 };
 
@@ -14,6 +14,52 @@ fn test_default_config_has_macro_disabled() {
         config.show_dialog_on_startup,
         "show_dialog_on_startup should default to true"
     );
+}
+
+#[test]
+fn test_textbox_composite() {
+    use kora::ui::components::textbox::TextBox;
+    use kora::ui::win32::*;
+    use std::ptr::null_mut;
+
+    unsafe {
+        let parent = CreateWindowExW(
+            0,
+            to_wide("STATIC").as_ptr(),
+            null_mut(),
+            0x80000000,
+            0, 0, 300, 300,
+            0, 0, 0, null_mut(),
+        );
+        assert!(parent != 0);
+
+        let tb = TextBox::create(parent, 101, "initial", "placeholder", 10, 10, 120, 28, 0)
+            .expect("TextBox should create successfully");
+
+        assert_eq!(tb.id(), 101);
+        assert_eq!(tb.get_text(), "initial");
+
+        // Test SetText / GetText via method
+        tb.set_text("updated text");
+        assert_eq!(tb.get_text(), "updated text");
+        assert!(!tb.is_empty());
+
+        // Test Win32 standard API forwarding via container HWND
+        let mut buf = [0u16; 64];
+        let copied = GetWindowTextW(tb.hwnd(), buf.as_mut_ptr(), 64);
+        assert!(copied > 0);
+        let win_text = String::from_utf16_lossy(&buf[..copied as usize]);
+        assert_eq!(win_text, "updated text");
+
+        SetWindowTextW(tb.hwnd(), to_wide("via win32 set").as_ptr());
+        assert_eq!(tb.get_text(), "via win32 set");
+
+        tb.clear();
+        assert!(tb.is_empty());
+
+        DestroyWindow(tb.hwnd());
+        DestroyWindow(parent);
+    }
 }
 
 #[test]
@@ -67,7 +113,7 @@ vn = Việt Nam
     assert!(config.sound_enabled);
     assert_eq!(config.sound_profile, "NovelKeys Cream");
     assert_eq!(config.sound_volume, 85);
-    assert_eq!(config.language, mkey::Language::English);
+    assert_eq!(config.language, kora::Language::English);
     assert!(!config.show_dialog_on_startup);
     assert!(config.debug);
     assert_eq!(config.theme, UiTheme::Dark);
@@ -82,7 +128,7 @@ vn = Việt Nam
 fn test_config_store_roundtrip() {
     let config = EngineConfig {
         method: InputMethod::SimpleTelex1,
-        language: mkey::Language::English,
+        language: kora::Language::English,
         use_macro: false,
         show_dialog_on_startup: false,
         theme: UiTheme::Dark,
@@ -97,11 +143,11 @@ fn test_config_store_roundtrip() {
     macros.insert("rust", "ngôn ngữ Rust");
 
     // Serialize to INI string and parse back
-    let ini_str = mkey::serialize_config_and_macros(&config, &macros);
+    let ini_str = kora::serialize_config_and_macros(&config, &macros);
     let (loaded_config, loaded_macros) = parse_config_and_macros(&ini_str);
 
     assert_eq!(loaded_config.method, InputMethod::SimpleTelex1);
-    assert_eq!(loaded_config.language, mkey::Language::English);
+    assert_eq!(loaded_config.language, kora::Language::English);
     assert!(!loaded_config.use_macro);
     assert!(!loaded_config.show_dialog_on_startup);
     assert_eq!(loaded_config.theme, UiTheme::Dark);
@@ -124,7 +170,7 @@ fn test_config_store_roundtrip() {
 
 #[test]
 fn test_inspect_sound_banks() {
-    if let Some(switches_dir) = mkey::engine::config_store::get_switches_dir()
+    if let Some(switches_dir) = kora::engine::config_store::get_switches_dir()
         && let Ok(entries) = std::fs::read_dir(&switches_dir)
     {
         for entry in entries.flatten() {
@@ -143,9 +189,9 @@ fn test_inspect_sound_banks() {
                             .file_stem()
                             .map(|s| s.to_string_lossy().to_ascii_lowercase())
                             .unwrap_or_default();
-                        match mkey::platform::win32::match_file_tag(&stem) {
-                            Some(mkey::platform::win32::KeyTag::Space) => space_files.push(fname),
-                            Some(mkey::platform::win32::KeyTag::Backspace) => {
+                        match kora::platform::win32::match_file_tag(&stem) {
+                            Some(kora::platform::win32::KeyTag::Space) => space_files.push(fname),
+                            Some(kora::platform::win32::KeyTag::Backspace) => {
                                 backspace_files.push(fname)
                             }
                             None => normal_files.push(fname),
@@ -176,7 +222,7 @@ fn test_inspect_sound_banks() {
 
 #[test]
 fn test_exact_match_file_tag() {
-    use mkey::platform::win32::{KeyTag, match_file_tag};
+    use kora::platform::win32::{KeyTag, match_file_tag};
 
     // Strict 1:1 match for all 18 canonical keys
     assert_eq!(match_file_tag("space"), Some(KeyTag::Space));
@@ -211,7 +257,7 @@ fn test_exact_match_file_tag() {
 
 #[test]
 fn test_custom_switch_hotkey() {
-    use mkey::Hotkey;
+    use kora::Hotkey;
 
     // Default: Ctrl + Shift
     let def_hk = Hotkey::default();
@@ -250,7 +296,7 @@ switch_key = ctrl_space
     config2.switch_key_enabled = false;
     config2.switch_key = Hotkey::new(true, false, false, false, 0x20); // Ctrl + Space
     let macros2 = MacroTable::new();
-    let serialized = mkey::serialize_config_and_macros(&config2, &macros2);
+    let serialized = kora::serialize_config_and_macros(&config2, &macros2);
     assert!(serialized.contains("switch_key_enabled = false"));
     assert!(serialized.contains("switch_key = ctrl_space"));
 

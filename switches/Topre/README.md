@@ -1,13 +1,13 @@
-# Soundpack: Topre
+﻿# Soundpack: Topre
 
-- **Nhà sản xuất / Thiết kế**: Topre Corporation
-- **Phân loại**: Electro-capacitive Switch
-- **Tác giả thu âm**: Hai Nguyen (Mechvibes)
-- **Giấy phép (License)**: [MIT License](https://github.com/hainguyents13/mechvibes/blob/main/LICENSE)
-- **Nguồn gốc / Repository**: https://github.com/hainguyents13/mechvibes
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Topre Corporation
+- **PhÃ¢n loáº¡i**: Electro-capacitive Switch
+- **TÃ¡c giáº£ thu Ã¢m**: Hai Nguyen (Mechvibes)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/hainguyents13/mechvibes/blob/main/LICENSE)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/hainguyents13/mechvibes
 
-## Giới thiệu & Đặc trưng âm thanh
-Bàn phím cơ điện dung cao cấp Nhật Bản (Realforce / HHKB), âm thanh bụp bụp rất trầm và thư giãn.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+BÃ n phÃ­m cÆ¡ Ä‘iá»‡n dung cao cáº¥p Nháº­t Báº£n (Realforce / HHKB), Ã¢m thanh bá»¥p bá»¥p ráº¥t tráº§m vÃ  thÆ° giÃ£n.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

@@ -1,0 +1,2418 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kora - Keyboard Hub (Toàn Diện & Đầy Đủ 100%)</title>
+  <style>
+    :root {
+      --bg-window: #1E1E1E;
+      --bg-sidebar: #252526;
+      --bg-card: #2D2D30;
+      --bg-card-header: #28282B;
+      --bg-input: #333337;
+      --text-primary: #F1F1F1;
+      --text-secondary: #9E9E9E;
+      --border: #3E3E42;
+      --border-subtle: #333336;
+      --tab-active-bg: #3E3E42;
+      --accent: #0078D4;
+      --accent-hover: #1684D8;
+      --danger: #F44747;
+      --font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body.light-theme {
+      --bg-window: #F8F8F8;
+      --bg-sidebar: #F0F0F0;
+      --bg-card: #FFFFFF;
+      --bg-card-header: #FAFAFA;
+      --bg-input: #FFFFFF;
+      --text-primary: #1E1E1E;
+      --text-secondary: #6E6E6E;
+      --border: #E0E0E0;
+      --border-subtle: #E8E8E8;
+      --tab-active-bg: #E4E4E4;
+      --accent: #0066CC;
+      --accent-hover: #0078D4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: #111;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 12.5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .top-toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+
+    .top-toolbar button {
+      background: #2D2D30;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .top-toolbar button:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Main Window */
+    .app-window {
+      width: 820px;
+      height: 590px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Title Bar */
+    .titlebar {
+      height: 38px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .titlebar-logo {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 11px;
+    }
+
+    /* Layout: 2 Columns */
+    .window-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 230px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-title {
+      padding: 12px 14px 6px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-add-profile {
+      background: var(--accent);
+      border: none;
+      color: white;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+      transition: all 0.15s;
+    }
+
+    .btn-add-profile:hover {
+      background: var(--accent-hover);
+      transform: scale(1.05);
+    }
+
+    .profile-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .profile-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s;
+    }
+
+    .profile-item:hover {
+      background: var(--tab-active-bg);
+    }
+
+    .profile-item.active {
+      background: var(--tab-active-bg);
+      border-color: var(--border);
+    }
+
+    .profile-item-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .profile-item-name {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .profile-item-desc {
+      font-size: 10.5px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge-root {
+      font-size: 9px;
+      background: #0078D422;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 1px 5px;
+      border-radius: 10px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sidebar-footer-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .sidebar-footer-btn:hover, .sidebar-footer-btn.active {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+    }
+
+    /* Right Main Area */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-window);
+      overflow: hidden;
+    }
+
+    .profile-banner {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card-header);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Sub Tabs Header */
+    .subtabs {
+      display: flex;
+      padding: 0 20px;
+      background: var(--bg-card-header);
+      border-bottom: 1px solid var(--border);
+      gap: 22px;
+    }
+
+    .subtab {
+      padding: 8px 2px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .subtab:hover {
+      color: var(--text-primary);
+    }
+
+    .subtab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Content Area */
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* General Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type="text"], select {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 5px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      color: white;
+    }
+
+    .btn-danger {
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: #E8112315;
+      border-color: var(--danger);
+    }
+
+    label.check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-primary);
+    }
+
+    .key-badge {
+      display: inline-block;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .chip-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .chip {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2px 9px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .chip-close {
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+
+    .chip-close:hover {
+      color: var(--danger);
+    }
+
+    /* ===================================== */
+    /* MACRO DETAIL VIEW ELEMENTS            */
+    /* ===================================== */
+    .macro-input-box {
+      background: var(--bg-card-header);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .input-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .input-field-group label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    .macro-table-container {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-input);
+      min-height: 190px;
+    }
+
+    .macro-table-header {
+      background: var(--bg-card-header);
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 120px 1fr 140px 80px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .macro-table-body {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .macro-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 140px 80px;
+      padding: 7px 12px;
+      align-items: center;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .macro-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .macro-row.selected {
+      background: var(--tab-active-bg);
+      border-color: var(--accent);
+    }
+
+    .type-badge {
+      display: inline-block;
+      font-size: 10.5px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text-secondary);
+    }
+
+    /* Remap Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .data-table th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      background: var(--bg-card-header);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 6px 10px;
+      font-size: 11.5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-footer {
+      height: 42px;
+      background: var(--bg-card-header);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+
+    /* ===================================== */
+    /* MODAL: ADD PROFILE DIALOG             */
+    /* ===================================== */
+    .modal-backdrop {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-window {
+      width: 500px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 13.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close-btn {
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 16px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .modal-close-btn:hover {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+    }
+
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 480px;
+      overflow-y: auto;
+    }
+
+    .preset-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .preset-card {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .preset-card:hover {
+      border-color: var(--accent);
+      background: var(--tab-active-bg);
+    }
+
+    .preset-card.selected {
+      border-color: var(--accent);
+      background: rgba(0, 120, 212, 0.15);
+    }
+
+    .preset-card-icon {
+      font-size: 18px;
+      margin-bottom: 3px;
+    }
+
+    .preset-card-title {
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .running-apps-box {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      margin-top: 4px;
+    }
+
+    .running-apps-search {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      background: var(--bg-card-header);
+    }
+
+    .running-apps-list {
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .app-item {
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.1s;
+    }
+
+    .app-item:hover {
+      background: var(--accent);
+      color: white;
+    }
+
+    .app-item:hover .app-item-exe {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .app-item-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .app-item-exe {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+
+    .icon-picker-bar {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 4px 0;
+    }
+
+    .icon-option {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .icon-option:hover, .icon-option.selected {
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-toolbar">
+    <button onclick="toggleTheme()">🌓 Đổi Giao diện Sáng/Tối</button>
+    <button onclick="openAddProfileModal()" style="background:var(--accent); color:white; border-color:var(--accent);">
+      ➕ Thêm Profile Mới (Modal)
+    </button>
+    <span style="color: #999; font-size: 12px;">Đầy đủ 100% cả 4 Tab (Macro chi tiết có form Sửa/Xóa/Thêm) + Popup nút ➕</span>
+  </div>
+
+  <div class="app-window" id="mainWindow">
+    <!-- Titlebar -->
+    <div class="titlebar">
+      <div class="titlebar-brand">
+        <div class="titlebar-logo">K</div>
+        <span>Kora Keyboard Hub (v0.4.0)</span>
+      </div>
+      <div style="font-size: 11.5px; color: var(--text-secondary);">
+        Hồ sơ: <b id="titleActiveProf" style="color:var(--text-primary)">🌐 Toàn hệ thống</b>
+      </div>
+    </div>
+
+    <!-- Window Body -->
+    <div class="window-body">
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-title">
+          <span>HỒ SƠ (PROFILES)</span>
+          <button class="btn-add-profile" title="Thêm Profile Mới" onclick="openAddProfileModal()">➕</button>
+        </div>
+
+        <div class="profile-tree" id="profileTree">
+          <!-- Profiles injected here -->
+        </div>
+
+        <!-- Sidebar footer -->
+        <div class="sidebar-footer">
+          <div class="sidebar-footer-btn" id="btnSystemSettings" onclick="openSystemSettings()">
+            <span>⚙️</span> Cài đặt chung hệ thống
+          </div>
+          <div class="sidebar-footer-btn" id="btnAbout" onclick="openAbout()">
+            <span>ℹ️</span> Thông tin & Tác giả
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Main Panel -->
+      <div class="main-area">
+
+        <!-- Banner -->
+        <div class="profile-banner">
+          <div>
+            <h2 id="profBannerTitle" style="font-size: 14.5px; font-weight: 700;">🌐 Toàn hệ thống</h2>
+            <p id="profBannerSub" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+              Cấu hình nền mặc định cho mọi ứng dụng trên máy tính
+            </p>
+          </div>
+          <div style="display:flex; gap: 8px;">
+            <button class="btn btn-danger" id="btnDelProf" style="display:none;" onclick="deleteActiveProfile()">Xóa Profile</button>
+          </div>
+        </div>
+
+        <!-- Subtabs -->
+        <div class="subtabs" id="subtabContainer">
+          <div class="subtab active" onclick="switchSubTab('typing')">⌨️ Bộ gõ & Phím tắt</div>
+          <div class="subtab" onclick="switchSubTab('remap')">🔄 Đổi & Khóa phím</div>
+          <div class="subtab" onclick="switchSubTab('sound')">🔊 Âm thanh gõ</div>
+          <div class="subtab" onclick="switchSubTab('macro')">⚡ Gõ tắt (Macro)</div>
+        </div>
+
+        <!-- Main Tab Content Body -->
+        <div class="tab-content" id="tabContentArea">
+          <!-- Dynamic Content -->
+        </div>
+
+        <!-- Footer -->
+        <div class="panel-footer">
+          <span style="font-size: 11.5px; color: var(--text-secondary);" id="footerStatusText">
+            Trạng thái: <b>Đang áp dụng tự động</b> khi chuyển cửa sổ
+          </span>
+          <button class="btn btn-primary" onclick="alert('Đã lưu cấu hình thành công!')">Áp dụng</button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL DIALOG: THÊM HỒ SƠ ỨNG DỤNG MỚI                -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="addProfileModal">
+      <div class="modal-window">
+        <!-- Header -->
+        <div class="modal-header">
+          <h3>
+            <span style="background:var(--accent); color:white; border-radius:4px; padding:2px 6px; font-size:12px;">+</span>
+            Thêm Hồ Sơ Ứng Dụng Mới
+          </h3>
+          <span class="modal-close-btn" onclick="closeAddProfileModal()">✕</span>
+        </div>
+
+        <!-- Body -->
+        <div class="modal-body">
+          <div style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border);">
+            💡 Hồ sơ mới tạo sẽ <b>tự động kế thừa toàn bộ thiết lập</b> từ Toàn hệ thống. Bạn chỉ cần chỉnh sửa các phím hoặc cài đặt muốn ghi đè riêng cho ứng dụng này.
+          </div>
+          
+          <!-- 1. Profile Name & Icon Picker -->
+          <div style="display:flex; gap: 10px;">
+            <div style="width: 50px;">
+              <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Icon:</label>
+              <div id="selectedIconBox" style="width:100%; height:32px; background:var(--bg-input); border:1px solid var(--border); border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer;" onclick="toggleIconPicker()">
+                ⚡
+              </div>
+            </div>
+
+            <div style="flex: 1;">
+              <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:4px;">Tên gợi nhớ:</label>
+              <input type="text" id="inputProfName" placeholder="VD: Valorant, Figma, Photoshop..." style="width: 100%;">
+            </div>
+          </div>
+
+          <!-- Mini Icon Picker list (toggled) -->
+          <div class="icon-picker-bar" id="iconPickerBar" style="display:none;">
+            <span class="icon-option" onclick="pickIcon('🎮')">🎮</span>
+            <span class="icon-option" onclick="pickIcon('💻')">💻</span>
+            <span class="icon-option" onclick="pickIcon('📝')">📝</span>
+            <span class="icon-option" onclick="pickIcon('🎨')">🎨</span>
+            <span class="icon-option" onclick="pickIcon('🌐')">🌐</span>
+            <span class="icon-option" onclick="pickIcon('⚡')">⚡</span>
+            <span class="icon-option" onclick="pickIcon('🎧')">🎧</span>
+            <span class="icon-option" onclick="pickIcon('🚀')">🚀</span>
+            <span class="icon-option" onclick="pickIcon('💬')">💬</span>
+          </div>
+
+          <!-- 3. Target Executable Process -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Tiến trình ứng dụng (.exe):</label>
+              <button class="btn" style="padding:2px 8px; font-size:11px;" onclick="promptBrowseExe()">📁 Chọn file .exe...</button>
+            </div>
+            <input type="text" id="inputProcessExe" placeholder="VD: Photoshop.exe hoặc chọn danh sách bên dưới" style="width: 100%;">
+          </div>
+
+          <!-- 4. Pick from Running Windows Apps -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="font-size:11px; font-weight:600; color:var(--text-secondary);">Hoặc click chọn từ ứng dụng đang chạy:</label>
+              <span style="font-size:11px; color:var(--accent); cursor:pointer;" onclick="refreshRunningApps()">🔄 Quét lại</span>
+            </div>
+
+            <div class="running-apps-box">
+              <div class="running-apps-search">
+                <span style="color:var(--text-secondary);">🔍</span>
+                <input type="text" id="searchAppInput" placeholder="Tìm kiếm ứng dụng đang mở..." style="border:none; background:transparent; padding:2px 4px; width:100%; font-size:11.5px;" oninput="filterRunningApps(this.value)">
+              </div>
+
+              <div class="running-apps-list" id="runningAppsList">
+                <div class="app-item" onclick="chooseRunningApp('Valorant', 'VALORANT-Win64-Shipping.exe', '🎮')">
+                  <div class="app-item-left"><span>🎮</span> <span>Valorant</span></div>
+                  <div class="app-item-exe">VALORANT-Win64-Shipping.exe</div>
+                </div>
+
+                <div class="app-item" onclick="chooseRunningApp('Adobe Photoshop 2026', 'Photoshop.exe', '🎨')">
+                  <div class="app-item-left"><span>🎨</span> <span>Adobe Photoshop 2026</span></div>
+                  <div class="app-item-exe">Photoshop.exe</div>
+                </div>
+
+                <div class="app-item" onclick="chooseRunningApp('Discord', 'Discord.exe', '💬')">
+                  <div class="app-item-left"><span>💬</span> <span>Discord</span></div>
+                  <div class="app-item-exe">Discord.exe</div>
+                </div>
+
+                <div class="app-item" onclick="chooseRunningApp('Google Chrome', 'chrome.exe', '🌐')">
+                  <div class="app-item-left"><span>🌐</span> <span>Google Chrome</span></div>
+                  <div class="app-item-exe">chrome.exe</div>
+                </div>
+
+                <div class="app-item" onclick="chooseRunningApp('Windows Terminal', 'WindowsTerminal.exe', '⚡')">
+                  <div class="app-item-left"><span>⚡</span> <span>Windows Terminal</span></div>
+                  <div class="app-item-exe">WindowsTerminal.exe</div>
+                </div>
+
+                <div class="app-item" onclick="chooseRunningApp('Spotify Music', 'Spotify.exe', '🎧')">
+                  <div class="app-item-left"><span>🎧</span> <span>Spotify</span></div>
+                  <div class="app-item-exe">Spotify.exe</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);">
+            Hỗ trợ nhận diện tự động tiến trình chạy ngầm
+          </span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeAddProfileModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" onclick="confirmCreateProfile()">Tạo Profile</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL 2: THÊM QUY TẮC ĐỔI PHÍM (REMAP DIALOG)        -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="remapModal">
+      <div class="modal-window" style="width: 480px;">
+        <div class="modal-header">
+          <h3>
+            <span style="background:var(--accent); color:white; border-radius:4px; padding:2px 6px; font-size:12px;">🔄</span>
+            Thêm Quy Tắc Đổi Phím (Key Remap)
+          </h3>
+          <span class="modal-close-btn" onclick="closeRemapModal()">✕</span>
+        </div>
+
+        <div class="modal-body">
+          <div style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border);">
+            💡 Nhấn trực tiếp phím trên bàn phím của bạn vào ô bên dưới hoặc chọn từ danh sách.
+          </div>
+
+          <!-- 2 Key Input Box with Arrow -->
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px;">
+            <!-- Key From -->
+            <div style="flex:1;">
+              <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+                KHI BẤM PHÍM:
+              </label>
+              <div id="boxKeyFrom" style="height:38px; background:var(--bg-input); border:2px dashed var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:13px; font-weight:bold; cursor:pointer;" onclick="listenKey('from')">
+                <span id="txtKeyFrom" style="color:var(--accent);">Caps Lock</span>
+              </div>
+              <small style="color:var(--text-secondary); font-size:10.5px; margin-top:3px; display:block;">Click vào ô để bấm phím</small>
+            </div>
+
+            <div style="font-size:22px; color:var(--accent); font-weight:bold; padding-top:14px;">➜</div>
+
+            <!-- Key To -->
+            <div style="flex:1;">
+              <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+                SẼ HOẠT ĐỘNG NHƯ:
+              </label>
+              <div id="boxKeyTo" style="height:38px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:13px; font-weight:bold; cursor:pointer;" onclick="listenKey('to')">
+                <span id="txtKeyTo">Escape</span>
+              </div>
+              <small style="color:var(--text-secondary); font-size:10.5px; margin-top:3px; display:block;">Click vào ô để bấm phím</small>
+            </div>
+          </div>
+
+          <!-- Quick Suggestions -->
+          <div style="margin-top:10px;">
+            <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:6px;">
+              Các cặp đổi phím phổ biến:
+            </label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setRemapPair('Caps Lock', 'Ctrl')">Caps Lock ➜ Ctrl</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setRemapPair('Caps Lock', 'Escape')">Caps Lock ➜ Escape</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setRemapPair('Insert', 'Delete')">Insert ➜ Delete</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setRemapPair('F1', 'Escape')">F1 ➜ Escape</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);" id="txtRemapTargetContext">Áp dụng cho: <b>...</b></span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeRemapModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" onclick="confirmSaveRemap()">Xác nhận đổi phím</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL 3: KHÓA / VÔ HIỆU HÓA PHÍM (DISABLE DIALOG)    -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="disableModal">
+      <div class="modal-window" style="width: 480px;">
+        <div class="modal-header">
+          <h3>
+            <span style="background:var(--danger); color:white; border-radius:4px; padding:2px 6px; font-size:12px;">🚫</span>
+            Khóa / Vô Hiệu Hóa Phím
+          </h3>
+          <span class="modal-close-btn" onclick="closeDisableModal()">✕</span>
+        </div>
+
+        <div class="modal-body">
+          <div style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border);">
+            ⚠️ Khi bị khóa, phím này sẽ <b>không gửi bất kỳ tín hiệu nào</b> về Windows hoặc Game khi bạn nhấn vào nó.
+          </div>
+
+          <!-- Key to disable display box -->
+          <div style="margin-top:8px;">
+            <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+              PHÍM CẦN KHÓA:
+            </label>
+            <div id="boxKeyDisable" style="height:42px; background:var(--bg-input); border:2px dashed var(--danger); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:14px; font-weight:bold; cursor:pointer;" onclick="listenDisableKey()">
+              <span id="txtKeyDisable" style="color:var(--danger);">Left Windows</span>
+            </div>
+            <small style="color:var(--text-secondary); font-size:10.5px; margin-top:3px; display:block;">Click vào khung phía trên rồi bấm phím bạn muốn khóa</small>
+          </div>
+
+          <!-- Quick Chips to disable -->
+          <div style="margin-top:12px;">
+            <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:6px;">
+              Hoặc click chọn nhanh các phím hay bị bấm nhầm:
+            </label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('Left Windows')">🚫 Left Windows</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('Right Windows')">🚫 Right Windows</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('Insert')">🚫 Insert (Ghi đè chữ)</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('Caps Lock')">🚫 Caps Lock</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('F1')">🚫 F1 (Trợ giúp)</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="setDisableKeyInput('Scroll Lock')">🚫 Scroll Lock</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);" id="txtDisableTargetContext">Áp dụng cho: <b>...</b></span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeDisableModal()">Hủy bỏ</button>
+            <button class="btn btn-danger" style="background:var(--danger); color:white; border-color:var(--danger);" onclick="confirmSaveDisable()">Khóa phím này</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL 4: PHÍM CHUYỂN ĐỔI E ⇄ V (HOTKEY DIALOG)       -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="hotkeyModal">
+      <div class="modal-window" style="width: 440px;">
+        <div class="modal-header">
+          <h3>
+            <span style="background:var(--accent); color:white; border-radius:4px; padding:2px 6px; font-size:12px;">⌨️</span>
+            Phím Tắt Chuyển Đổi Tiếng Việt ⇄ Tiếng Anh
+          </h3>
+          <span class="modal-close-btn" onclick="closeHotkeyModal()">✕</span>
+        </div>
+
+        <div class="modal-body">
+          <div style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border);">
+            💡 Nhấn tổ hợp phím bạn muốn gán làm phím chuyển đổi hoặc chọn nhanh phím tắt gợi ý bên dưới.
+          </div>
+
+          <!-- Hotkey display box -->
+          <div style="margin-top:10px;">
+            <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+              TỔ HỢP PHÍM ĐƯỢC CHỌN:
+            </label>
+            <div id="boxHotkeyDisplay" style="height:46px; background:var(--bg-input); border:2px dashed var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:15px; font-weight:bold; cursor:pointer;" onclick="listenHotkey()">
+              <span id="txtHotkeyDisplay" style="color:var(--accent);">Ctrl + Shift</span>
+            </div>
+            <small style="color:var(--text-secondary); font-size:10.5px; margin-top:3px; display:block;">Click vào khung phía trên rồi bấm tổ hợp phím của bạn</small>
+          </div>
+
+          <!-- Quick Suggestions -->
+          <div style="margin-top:12px;">
+            <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:6px;">
+              Các tổ hợp phím thông dụng:
+            </label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn" style="font-size:11px; padding:4px 9px;" onclick="setHotkeyPreset('Ctrl + Shift')">Ctrl + Shift (Mặc định)</button>
+              <button class="btn" style="font-size:11px; padding:4px 9px;" onclick="setHotkeyPreset('Alt + Z')">Alt + Z (Tiện tay trái)</button>
+              <button class="btn" style="font-size:11px; padding:4px 9px;" onclick="setHotkeyPreset('Windows + Space')">Win + Space</button>
+              <button class="btn" style="font-size:11px; padding:4px 9px;" onclick="setHotkeyPreset('Shift + Space')">Shift + Space</button>
+              <button class="btn" id="btnInheritHotkey" style="font-size:11px; padding:4px 9px; display:none;" onclick="setHotkeyPreset('inherit')">🌐 Kế thừa Toàn hệ thống</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);" id="txtHotkeyTargetContext">Áp dụng cho: <b>...</b></span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeHotkeyModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" onclick="confirmSaveHotkey()">Lưu phím tắt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // State database
+    const profiles = {
+      global: {
+        id: 'global',
+        name: 'Toàn hệ thống',
+        process: 'Mọi ứng dụng (Mặc định)',
+        icon: '🌐',
+        isRoot: true,
+        mode: 'vietnamese',
+        method: 'telex',
+        hotkey: 'Ctrl + Shift',
+        smartSpell: true,
+        freeTyping: true,
+        remaps: [
+          { from: 'Caps Lock', to: 'Ctrl' },
+          { from: 'Scroll Lock', to: 'Mute Volume' }
+        ],
+        disabled: ['Insert'],
+        soundEnabled: true,
+        soundPack: 'Mechanical Cherry Blue (Clicky)',
+        soundVol: 80,
+        macroRule: 'global',
+        useMacro: true,
+        macroInEnglish: true,
+        macros: [
+          { key: 'vn', val: 'Việt Nam', type: 'Bình thường' },
+          { key: 'dc', val: 'được', type: 'Bình thường' },
+          { key: 'ko', val: 'không', type: 'Bình thường' },
+          { key: 'Kora', val: 'Kora Vietnamese Input Method', type: 'Đầu từ' },
+          { key: 'email', val: 'manhkien13041997@gmail.com', type: 'Bình thường' }
+        ]
+      },
+      cs2: {
+        id: 'cs2',
+        name: 'Counter-Strike 2',
+        process: 'cs2.exe',
+        icon: '🎮',
+        isRoot: false,
+        mode: 'english',
+        method: 'inherit',
+        hotkey: 'inherit',
+        smartSpell: true,
+        freeTyping: false,
+        soundEnabled: false,
+        soundPack: 'inherit',
+        soundVol: 0,
+        useMacro: true,
+        macroInEnglish: false,
+        mutedMacros: ['vn', 'dc'],
+        overriddenMacros: {},
+        appMacros: [{ key: 'gg', val: 'Good Game! Well played.', type: 'Bình thường' }],
+        // Remap & Disable Cách 2
+        mutedRemaps: ['Scroll Lock'],
+        overriddenRemaps: {},
+        appRemaps: [],
+        unmutedDisabled: [],
+        appDisabled: ['Left Windows', 'Right Windows', 'Caps Lock']
+      },
+      vscode: {
+        id: 'vscode',
+        name: 'Visual Studio Code',
+        process: 'Code.exe',
+        icon: '💻',
+        isRoot: false,
+        mode: 'inherit',
+        method: 'inherit',
+        hotkey: 'inherit',
+        smartSpell: false,
+        freeTyping: true,
+        soundEnabled: true,
+        soundPack: 'Typing Mechanical Quiet',
+        soundVol: 60,
+        useMacro: true,
+        macroInEnglish: true,
+        mutedMacros: [],
+        overriddenMacros: {
+          'email': { val: 'kien.manh@rust-coder.io', type: 'Bình thường' }
+        },
+        appMacros: [
+          { key: 'fn', val: 'pub fn new() -> Self {\n    Self {}\n}', type: 'Bình thường' },
+          { key: 'st', val: 'pub struct MyModel {}', type: 'Bình thường' }
+        ],
+        // Remap & Disable Cách 2
+        mutedRemaps: [],
+        overriddenRemaps: {
+          'Caps Lock': 'Escape'
+        },
+        appRemaps: [{ from: 'F1', to: 'F5' }],
+        unmutedDisabled: ['Insert'], // Mở khóa phím Insert trong VS Code
+        appDisabled: []
+      },
+      word: {
+        id: 'word',
+        name: 'Microsoft Word',
+        process: 'WINWORD.EXE',
+        icon: '📝',
+        isRoot: false,
+        mode: 'vietnamese',
+        method: 'telex',
+        hotkey: 'inherit',
+        smartSpell: true,
+        freeTyping: true,
+        soundEnabled: true,
+        soundPack: 'inherit',
+        soundVol: 80,
+        useMacro: true,
+        macroInEnglish: false,
+        mutedMacros: [],
+        overriddenMacros: {},
+        appMacros: [],
+        mutedRemaps: [],
+        overriddenRemaps: {},
+        appRemaps: [],
+        unmutedDisabled: [],
+        appDisabled: []
+      }
+    };
+
+    let activeProfileId = 'global';
+    let activeSubTab = 'typing';
+    let isGlobalSettingsView = false;
+    let selectedMacroIndex = -1;
+    let currentSelectedIcon = '🎮';
+    let currentPreset = 'custom';
+
+    function renderSidebar() {
+      const tree = document.getElementById('profileTree');
+      tree.innerHTML = Object.values(profiles).map(p => `
+        <div class="profile-item ${activeProfileId === p.id && !isGlobalSettingsView ? 'active' : ''}" onclick="selectProfile('${p.id}')">
+          <span class="profile-item-icon">${p.icon}</span>
+          <div style="flex:1; min-width:0;">
+            <div class="profile-item-name">${p.name}</div>
+            <div class="profile-item-desc">${p.process}</div>
+          </div>
+          ${p.isRoot ? '<span class="badge-root">Root</span>' : ''}
+        </div>
+      `).join('');
+    }
+
+    function selectProfile(id) {
+      activeProfileId = id;
+      isGlobalSettingsView = false;
+      document.getElementById('btnSystemSettings').classList.remove('active');
+      document.getElementById('btnAbout').classList.remove('active');
+      document.getElementById('subtabContainer').style.display = 'flex';
+      selectedMacroIndex = -1;
+      renderSidebar();
+      renderCurrentTab();
+    }
+
+    function switchSubTab(tab) {
+      activeSubTab = tab;
+      const tabs = document.querySelectorAll('.subtab');
+      tabs.forEach((el, idx) => {
+        const names = ['typing', 'remap', 'sound', 'macro'];
+        el.classList.toggle('active', names[idx] === tab);
+      });
+      selectedMacroIndex = -1;
+      renderCurrentTab();
+    }
+
+    function renderCurrentTab() {
+      const p = profiles[activeProfileId];
+      const area = document.getElementById('tabContentArea');
+
+      // Update Header info
+      document.getElementById('titleActiveProf').innerText = `${p.icon} ${p.name}`;
+      document.getElementById('profBannerTitle').innerText = `${p.icon} ${p.name}`;
+      document.getElementById('profBannerSub').innerText = p.isRoot 
+        ? 'Cấu hình nền mặc định cho mọi ứng dụng trên máy tính' 
+        : `Áp dụng khi tiến trình ${p.process} đang được kích hoạt`;
+      document.getElementById('btnDelProf').style.display = p.isRoot ? 'none' : 'block';
+
+      // 1. TAB TYPING
+      if (activeSubTab === 'typing') {
+        area.innerHTML = `
+          <div class="card">
+            <div class="card-title">Thiết lập Bộ gõ tiếng Việt</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div>
+                <label style="display:block; font-size:11.5px; font-weight:600; margin-bottom:4px;">Chế độ ngôn ngữ:</label>
+                <select style="width:100%;">
+                  ${!p.isRoot ? '<option ' + (p.mode === 'inherit' ? 'selected' : '') + '>Kế thừa Toàn hệ thống</option>' : ''}
+                  <option ${p.mode === 'vietnamese' ? 'selected' : ''}>Tiếng Việt [V]</option>
+                  <option ${p.mode === 'english' ? 'selected' : ''}>Tiếng Anh [E]</option>
+                </select>
+              </div>
+              <div>
+                <label style="display:block; font-size:11.5px; font-weight:600; margin-bottom:4px;">Kiểu gõ dấu:</label>
+                <select style="width:100%;">
+                  ${!p.isRoot ? '<option ' + (p.method === 'inherit' ? 'selected' : '') + '>Kế thừa Toàn hệ thống</option>' : ''}
+                  <option ${p.method === 'telex' ? 'selected' : ''}>Telex chuẩn</option>
+                  <option ${p.method === 'vni' ? 'selected' : ''}>VNI</option>
+                  <option ${p.method === 'simple' ? 'selected' : ''}>Simple Telex</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Phím chuyển đổi E ⇄ V</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span style="font-weight:600;">Phím tắt hiện tại:</span>
+                <span class="key-badge" style="margin-left: 8px;">
+                  ${p.hotkey === 'inherit' ? `Kế thừa (${profiles.global.hotkey})` : p.hotkey}
+                </span>
+                ${!p.isRoot && p.hotkey !== 'inherit' ? '<span class="type-badge" style="color:var(--warning); margin-left:6px;">✏️ Ghi đè</span>' : ''}
+              </div>
+              <div style="display:flex; gap:6px;">
+                ${!p.isRoot && p.hotkey !== 'inherit' ? '<button class="btn" onclick="restoreGlobalHotkey()">Khôi phục</button>' : ''}
+                <button class="btn btn-primary" onclick="openHotkeyModal()">
+                  ${p.hotkey === 'inherit' && !p.isRoot ? 'Tùy biến cho app này' : 'Đổi phím'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">Tính năng gõ thông minh</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label class="check-row">
+                <input type="checkbox" ${p.smartSpell ? 'checked' : ''}> 
+                Bật kiểm tra chính tả thông minh & Tự khôi phục từ khi lùi/thoát
+              </label>
+              <label class="check-row">
+                <input type="checkbox" ${p.freeTyping ? 'checked' : ''}> 
+                Cho phép đặt dấu tự do (không phụ thuộc từ điển)
+              </label>
+            </div>
+          </div>
+        `;
+      } 
+      // 2. TAB REMAP & DISABLE (CÁCH 2: LIVE INHERITANCE + OVERRIDE & MUTE)
+      else if (activeSubTab === 'remap') {
+        const isRoot = p.isRoot;
+
+        area.innerHTML = `
+          ${!isRoot ? `
+            <div class="card" style="background:var(--bg-card-header); border-left:3px solid var(--accent); padding:10px 14px;">
+              <div style="font-weight:600; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🔗 Kế thừa quy tắc phím từ Toàn hệ thống</span>
+                <span style="font-size:11px; color:var(--text-secondary);">Tự động đồng bộ</span>
+              </div>
+              <div style="font-size:11.5px; color:var(--text-secondary); margin-top:3px;">
+                Mọi quy tắc đổi phím và khóa phím ở Toàn hệ thống đều có hiệu lực ở đây. Bạn có thể <b>Tắt riêng</b>, <b>Ghi đè phím đích</b> hoặc <b>Chặn thêm phím mới</b> cho ứng dụng này.
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- KEY REMAPPING CARD -->
+          <div class="card">
+            <div class="card-title">
+              <span>Bảng Đổi Phím (Key Remapping)</span>
+              <button class="btn btn-primary" onclick="addOrOverrideRemap()">+ Đổi phím</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:130px;">Phím bấm</th>
+                  <th style="width:30px;"></th>
+                  <th>Hoạt động như</th>
+                  <th style="width:140px;">Nguồn gốc</th>
+                  <th style="width:130px; text-align:right;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${renderRemapRowsCách2(p)}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- KEY DISABLING CARD (TABLE LISTVIEW FORMAT) -->
+          <div class="card">
+            <div class="card-title">
+              <span>Bảng Khóa / Vô hiệu hóa phím (Disable Keys)</span>
+              <button class="btn btn-primary" onclick="addAppDisableKey()">+ Chặn phím</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:160px;">Phím bị chặn</th>
+                  <th>Trạng thái</th>
+                  <th style="width:140px;">Nguồn gốc</th>
+                  <th style="width:130px; text-align:right;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${renderDisableTableRowsCách2(p)}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      // 3. TAB SOUND
+      else if (activeSubTab === 'sound') {
+        area.innerHTML = `
+          <div class="card">
+            <div class="card-title">
+              <span>Âm thanh gõ phím cơ (Typing Sound)</span>
+              <label class="check-row" style="font-weight:600;">
+                <input type="checkbox" id="chkSound" ${p.soundEnabled ? 'checked' : ''} onchange="toggleSound(this.checked)"> Bật âm thanh
+              </label>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px; margin-top:10px;">
+              <div>
+                <label style="display:block; font-size:11.5px; font-weight:600; margin-bottom:4px;">Gói âm thanh (Soundpack):</label>
+                <select style="width:100%;" ${!p.soundEnabled ? 'disabled' : ''}>
+                  ${!p.isRoot ? '<option>Kế thừa Toàn hệ thống</option>' : ''}
+                  <option selected>Mechanical Cherry Blue (Clicky tiếng đanh giòn)</option>
+                  <option>Mechanical Cherry Brown (Tactile đầm tay)</option>
+                  <option>Typing Mechanical Quiet (Êm dịu ban đêm)</option>
+                  <option>Retro Typewriter (Máy đánh chữ cổ điển)</option>
+                </select>
+              </div>
+
+              <div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                  <label style="font-size:11.5px; font-weight:600;">Âm lượng:</label>
+                  <span id="lblVol" style="font-weight:bold; color:var(--accent);">${p.soundVol}%</span>
+                </div>
+                <input type="range" min="0" max="100" value="${p.soundVol}" style="width:100%;" ${!p.soundEnabled ? 'disabled' : ''} oninput="document.getElementById('lblVol').innerText = this.value + '%'">
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      // 4. TAB MACRO (CÁCH 2: LIVE INHERITANCE + OVERRIDE & MUTE)
+      else if (activeSubTab === 'macro') {
+        const isRoot = p.isRoot;
+        
+        // Calculate merged macros for Cách 2
+        // Global list
+        const globalMacros = profiles.global.macros || [];
+        
+        // In child profile:
+        // p.mutedMacros: list of keys muted in this app (e.g. ['dc'])
+        // p.overriddenMacros: list of macros overriding global (e.g. { key: 'vn', val: 'Vietnam' })
+        // p.appMacros: list of macros created exclusively for this app (e.g. { key: 'fn', val: '...' })
+        
+        const muted = p.mutedMacros || [];
+        const overrides = p.overriddenMacros || [];
+        const appSpecific = p.appMacros || [];
+
+        area.innerHTML = `
+          ${!isRoot ? `
+            <div class="card" style="background:var(--bg-card-header); border-left:3px solid var(--accent); padding:10px 14px;">
+              <div style="font-weight:600; font-size:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span>🔗 Mô hình kế thừa động (Live Inheritance)</span>
+                <span style="font-size:11px; color:var(--text-secondary);">Tự động đồng bộ với Toàn hệ thống</span>
+              </div>
+              <div style="font-size:11.5px; color:var(--text-secondary); margin-top:3px;">
+                Tất cả từ gõ tắt của Toàn hệ thống đều có hiệu lực trong app này. Bạn có thể <b>Tắt riêng</b> từng từ hoặc <b>Ghi đè</b> nội dung mà không ảnh hưởng tới các app khác.
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label class="check-row" style="font-weight:600;">
+                <input type="checkbox" id="chkUseMacro" ${p.useMacro ? 'checked' : ''} onchange="toggleMacroMaster(this.checked)"> Bật tính năng gõ tắt (Macro)
+              </label>
+              <label class="check-row" style="color:var(--text-secondary);" id="lblMacroEn">
+                <input type="checkbox" ${p.macroInEnglish ? 'checked' : ''}> Cho phép gõ tắt cả khi ở chế độ Tiếng Anh [E]
+              </label>
+            </div>
+          </div>
+
+          <!-- Add / Edit Toolbar Box -->
+          <div class="macro-input-box" id="macroInputCard" style="${!p.useMacro ? 'opacity:0.4; pointer-events:none;' : ''}">
+            <div class="input-field-group" style="width: 125px;">
+              <label>Từ viết tắt:</label>
+              <input type="text" id="txtMacroKey" placeholder="VD: vn, dc, fn" autocomplete="off">
+            </div>
+
+            <div class="input-field-group" style="flex: 1;">
+              <label>Nội dung thay thế:</label>
+              <input type="text" id="txtMacroVal" placeholder="VD: Việt Nam, được, function()" autocomplete="off">
+            </div>
+
+            <div class="input-field-group" style="width: 135px;">
+              <label>Quy tắc gõ:</label>
+              <select id="selMacroType">
+                <option value="normal">Bình thường</option>
+                <option value="start">Đầu từ</option>
+                <option value="end">Cuối từ</option>
+              </select>
+            </div>
+
+            <div style="align-self: flex-end; display: flex; gap: 6px;">
+              <button class="btn btn-primary" id="btnAddMacro" onclick="addOrOverrideMacro()">
+                ${isRoot ? '➕ Thêm' : '➕ Thêm từ mới'}
+              </button>
+
+              <div id="editButtonGroup" style="display: none; gap: 6px;">
+                <button class="btn btn-primary" onclick="saveEditMacro()">Lưu</button>
+                <button class="btn btn-danger" onclick="deleteMacroEntry()">Xóa</button>
+                <button class="btn" onclick="cancelEditMode()">Hủy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Macro Table ListView (Cách 2 Display) -->
+          <div class="macro-table-container" id="macroTableContainer" style="${!p.useMacro ? 'opacity:0.4;' : ''}">
+            <div class="macro-table-header" style="grid-template-columns: 100px 1fr 140px 130px;">
+              <span>Viết tắt</span>
+              <span>Nội dung thay thế</span>
+              <span>Nguồn gốc</span>
+              <span style="text-align: right;">Hành động</span>
+            </div>
+            
+            <div class="macro-table-body" id="macroTableBody">
+              ${renderMacroRowsCách2(p)}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // ==========================================
+    // CÁCH 2: REMAP & DISABLE HANDLERS
+    // ==========================================
+    function renderRemapRowsCách2(p) {
+      if (p.isRoot) {
+        const list = p.remaps || [];
+        if (list.length === 0) {
+          return '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-secondary);">Chưa có quy tắc đổi phím nào</td></tr>';
+        }
+        return list.map((r, i) => `
+          <tr>
+            <td><span class="key-badge">${r.from}</span></td>
+            <td style="color:var(--text-secondary);">➜</td>
+            <td><span class="key-badge">${r.to}</span></td>
+            <td><span class="type-badge" style="color:var(--accent);">🌐 Toàn hệ thống</span></td>
+            <td style="text-align:right;"><button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="deleteGlobalRemap(${i})">Xóa</button></td>
+          </tr>
+        `).join('');
+      }
+
+      // Child profile
+      const globalRemaps = profiles.global.remaps || [];
+      const muted = p.mutedRemaps || [];
+      const overrides = p.overriddenRemaps || {};
+      const appSpecific = p.appRemaps || [];
+
+      let html = '';
+
+      // 1. Global inherited remaps
+      globalRemaps.forEach(g => {
+        const isMuted = muted.includes(g.from);
+        const isOverridden = overrides[g.from] !== undefined;
+        const targetKey = isOverridden ? overrides[g.from] : g.to;
+
+        html += `
+          <tr style="${isMuted ? 'opacity:0.45; background:rgba(0,0,0,0.15);' : ''}">
+            <td><span class="key-badge" style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">${g.from}</span></td>
+            <td style="color:var(--text-secondary);">➜</td>
+            <td><span class="key-badge" style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">${targetKey}</span></td>
+            <td>
+              ${isMuted ? '<span class="type-badge" style="color:var(--danger); border:1px solid var(--danger);">🚫 Đã tắt trong app</span>' :
+                (isOverridden ? '<span class="type-badge" style="color:var(--warning); border:1px solid var(--warning);">✏️ Ghi đè Global</span>' :
+                '<span class="type-badge">🌐 Kế thừa Global</span>')}
+            </td>
+            <td style="text-align:right;">
+              ${isMuted ? `
+                <button class="btn btn-primary" style="padding:2px 8px; font-size:11px;" onclick="unmuteRemap('${g.from}')">Bật lại</button>
+              ` : `
+                ${isOverridden ? `<button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="restoreGlobalRemap('${g.from}')" title="Khôi phục phím gốc Global">Khôi phục</button>` : ''}
+                <button class="btn btn-danger" style="padding:2px 6px; font-size:10.5px;" onclick="muteRemap('${g.from}')" title="Không đổi phím này trong app">🚫 Tắt</button>
+              `}
+            </td>
+          </tr>
+        `;
+      });
+
+      // 2. App specific remaps
+      appSpecific.forEach((r, i) => {
+        html += `
+          <tr>
+            <td><span class="key-badge" style="color:#4EC9B0;">${r.from}</span></td>
+            <td style="color:var(--text-secondary);">➜</td>
+            <td><span class="key-badge" style="color:#4EC9B0;">${r.to}</span></td>
+            <td><span class="type-badge" style="color:#4EC9B0; border:1px solid #4EC9B0;">✨ Riêng app này</span></td>
+            <td style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="deleteAppRemap(${i})">Xóa</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      return html;
+    }
+
+    function renderDisableTableRowsCách2(p) {
+      if (p.isRoot) {
+        const list = p.disabled || [];
+        if (list.length === 0) return '<tr><td colspan="4" style="text-align:center; padding:12px; color:var(--text-secondary);">Không có phím nào bị chặn toàn máy</td></tr>';
+        return list.map((k, i) => `
+          <tr>
+            <td><span class="key-badge" style="color:var(--danger); border-color:var(--danger);">🚫 ${k}</span></td>
+            <td style="color:var(--text-secondary);">Bị chặn hoàn toàn trên toàn máy tính</td>
+            <td><span class="type-badge" style="color:var(--accent);">🌐 Toàn hệ thống</span></td>
+            <td style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="delGlobalDisable(${i})">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Child profile
+      const globalDisabled = profiles.global.disabled || [];
+      const unmuted = p.unmutedDisabled || []; // Phím mà Global chặn nhưng app này muốn mở khóa
+      const appDisabled = p.appDisabled || [];
+
+      let html = '';
+
+      // 1. Global disabled keys
+      globalDisabled.forEach(k => {
+        const isAllowedInApp = unmuted.includes(k);
+        html += `
+          <tr style="${isAllowedInApp ? 'opacity:0.55; background:rgba(0,0,0,0.15);' : ''}">
+            <td>
+              <span class="key-badge" style="${isAllowedInApp ? 'text-decoration:line-through; color:var(--text-secondary);' : 'color:var(--danger); border-color:var(--danger);'}">
+                🚫 ${k}
+              </span>
+            </td>
+            <td style="${isAllowedInApp ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">
+              ${isAllowedInApp ? 'Đã cho phép sử dụng bình thường trong app này' : 'Bị chặn tín hiệu (theo Toàn hệ thống)'}
+            </td>
+            <td>
+              ${isAllowedInApp 
+                ? '<span class="type-badge" style="color:var(--success); border:1px solid var(--success);">🟢 Mở khóa riêng app</span>' 
+                : '<span class="type-badge">🌐 Kế thừa Global</span>'}
+            </td>
+            <td style="text-align:right;">
+              ${isAllowedInApp 
+                ? `<button class="btn btn-primary" style="padding:2px 8px; font-size:11px;" onclick="lockGlobalDisableInApp('${k}')">Khóa lại</button>` 
+                : `<button class="btn" style="padding:2px 8px; font-size:11px;" onclick="unlockGlobalDisableInApp('${k}')" title="Cho phép bấm phím này khi vào app">Mở khóa</button>`}
+            </td>
+          </tr>
+        `;
+      });
+
+      // 2. App specific disabled keys
+      appDisabled.forEach((k, i) => {
+        html += `
+          <tr>
+            <td><span class="key-badge" style="color:#4EC9B0; border-color:#4EC9B0;">🚫 ${k}</span></td>
+            <td>Bị chặn hoàn toàn khi ở trong app này</td>
+            <td><span class="type-badge" style="color:#4EC9B0; border:1px solid:#4EC9B0;">✨ Riêng app này</span></td>
+            <td style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="removeAppDisableKey(${i})">Xóa</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      if (!html) html = '<tr><td colspan="4" style="text-align:center; padding:12px; color:var(--text-secondary);">Không có phím nào bị chặn trong ứng dụng này</td></tr>';
+      return html;
+    }
+
+    // Remap handlers
+    function muteRemap(from) {
+      const p = profiles[activeProfileId];
+      if (!p.mutedRemaps) p.mutedRemaps = [];
+      if (!p.mutedRemaps.includes(from)) p.mutedRemaps.push(from);
+      renderCurrentTab();
+    }
+
+    function unmuteRemap(from) {
+      const p = profiles[activeProfileId];
+      if (p.mutedRemaps) {
+        p.mutedRemaps = p.mutedRemaps.filter(k => k !== from);
+      }
+      renderCurrentTab();
+    }
+
+    function restoreGlobalRemap(from) {
+      const p = profiles[activeProfileId];
+      if (p.overriddenRemaps && p.overriddenRemaps[from]) {
+        delete p.overriddenRemaps[from];
+      }
+      renderCurrentTab();
+    }
+
+    function deleteGlobalRemap(i) {
+      profiles.global.remaps.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    function deleteAppRemap(i) {
+      const p = profiles[activeProfileId];
+      p.appRemaps.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    // ==========================================
+    // REMAP MODAL CONTROLLERS & KEYBOARD LISTENER
+    // ==========================================
+    let listeningTarget = null; // 'from' | 'to' | 'disable'
+
+    function addOrOverrideRemap() {
+      openRemapModal();
+    }
+
+    function openRemapModal() {
+      const p = profiles[activeProfileId];
+      document.getElementById('txtRemapTargetContext').innerHTML = `Áp dụng cho: <b>${p.icon} ${p.name}</b>`;
+      document.getElementById('txtKeyFrom').innerText = 'Caps Lock';
+      document.getElementById('txtKeyTo').innerText = 'Ctrl';
+      resetKeyListeningStyles();
+      document.getElementById('remapModal').style.display = 'flex';
+    }
+
+    function closeRemapModal() {
+      document.getElementById('remapModal').style.display = 'none';
+      stopListeningKey();
+    }
+
+    function setRemapPair(from, to) {
+      document.getElementById('txtKeyFrom').innerText = from;
+      document.getElementById('txtKeyTo').innerText = to;
+      stopListeningKey();
+    }
+
+    function listenKey(target) {
+      listeningTarget = target;
+      resetKeyListeningStyles();
+      if (target === 'from') {
+        const b = document.getElementById('boxKeyFrom');
+        b.style.borderColor = 'var(--accent)';
+        b.style.background = 'rgba(0, 120, 212, 0.15)';
+        document.getElementById('txtKeyFrom').innerText = 'Hãy nhấn phím...';
+      } else if (target === 'to') {
+        const b = document.getElementById('boxKeyTo');
+        b.style.borderColor = 'var(--accent)';
+        b.style.background = 'rgba(0, 120, 212, 0.15)';
+        document.getElementById('txtKeyTo').innerText = 'Hãy nhấn phím...';
+      }
+    }
+
+    function resetKeyListeningStyles() {
+      const bf = document.getElementById('boxKeyFrom');
+      const bt = document.getElementById('boxKeyTo');
+      if (bf) { bf.style.border = '1px solid var(--border)'; bf.style.background = 'var(--bg-input)'; }
+      if (bt) { bt.style.border = '1px solid var(--border)'; bt.style.background = 'var(--bg-input)'; }
+    }
+
+    function stopListeningKey() {
+      listeningTarget = null;
+      resetKeyListeningStyles();
+    }
+
+    function confirmSaveRemap() {
+      const f = document.getElementById('txtKeyFrom').innerText.trim();
+      const t = document.getElementById('txtKeyTo').innerText.trim();
+      if (!f || !t || f.includes('Hãy nhấn') || t.includes('Hãy nhấn')) {
+        alert('Vui lòng chọn hoặc nhấn đủ cả 2 phím!');
+        return;
+      }
+
+      const p = profiles[activeProfileId];
+      if (p.isRoot) {
+        if (!p.remaps) p.remaps = [];
+        // Replace if exists, or push
+        const exIdx = p.remaps.findIndex(r => r.from.toLowerCase() === f.toLowerCase());
+        if (exIdx >= 0) p.remaps[exIdx].to = t;
+        else p.remaps.push({ from: f, to: t });
+      } else {
+        const isGlobal = (profiles.global.remaps || []).some(g => g.from.toLowerCase() === f.toLowerCase());
+        if (isGlobal) {
+          if (!p.overriddenRemaps) p.overriddenRemaps = {};
+          p.overriddenRemaps[f] = t;
+          unmuteRemap(f);
+        } else {
+          if (!p.appRemaps) p.appRemaps = [];
+          const exIdx = p.appRemaps.findIndex(r => r.from.toLowerCase() === f.toLowerCase());
+          if (exIdx >= 0) p.appRemaps[exIdx].to = t;
+          else p.appRemaps.push({ from: f, to: t });
+        }
+      }
+
+      closeRemapModal();
+      renderCurrentTab();
+    }
+
+    // ==========================================
+    // DISABLE KEYS MODAL CONTROLLERS
+    // ==========================================
+    function addAppDisableKey() {
+      openDisableModal();
+    }
+
+    function openDisableModal() {
+      const p = profiles[activeProfileId];
+      document.getElementById('txtDisableTargetContext').innerHTML = `Khóa trong: <b>${p.icon} ${p.name}</b>`;
+      document.getElementById('txtKeyDisable').innerText = 'Left Windows';
+      document.getElementById('disableModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function closeDisableModal() {
+      document.getElementById('disableModal').style.display = 'none';
+      stopListeningKey();
+    }
+
+    function setDisableKeyInput(key) {
+      document.getElementById('txtKeyDisable').innerText = key;
+      stopListeningKey();
+    }
+
+    function listenDisableKey() {
+      listeningTarget = 'disable';
+      const b = document.getElementById('boxKeyDisable');
+      b.style.borderColor = 'var(--danger)';
+      b.style.background = 'rgba(232, 17, 35, 0.15)';
+      document.getElementById('txtKeyDisable').innerText = 'Hãy nhấn phím cần khóa...';
+    }
+
+    function confirmSaveDisable() {
+      const k = document.getElementById('txtKeyDisable').innerText.trim();
+      if (!k || k.includes('Hãy nhấn')) {
+        alert('Vui lòng chọn hoặc nhấn phím muốn khóa!');
+        return;
+      }
+
+      const p = profiles[activeProfileId];
+      if (p.isRoot) {
+        if (!p.disabled) p.disabled = [];
+        if (!p.disabled.includes(k)) p.disabled.push(k);
+      } else {
+        if (!p.appDisabled) p.appDisabled = [];
+        if (!p.appDisabled.includes(k)) p.appDisabled.push(k);
+        // If it was unmuted, remove from unmuted
+        lockGlobalDisableInApp(k);
+      }
+
+      closeDisableModal();
+      renderCurrentTab();
+    }
+
+    // Global Key Listener for modal capturing
+    window.addEventListener('keydown', (e) => {
+      if (!listeningTarget) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Convert code/key to friendly label
+      let name = e.key;
+      if (e.code === 'CapsLock') name = 'Caps Lock';
+      else if (e.code === 'MetaLeft' || e.code === 'OSLeft') name = 'Left Windows';
+      else if (e.code === 'MetaRight' || e.code === 'OSRight') name = 'Right Windows';
+      else if (e.code === 'ControlLeft') name = 'Left Ctrl';
+      else if (e.code === 'ControlRight') name = 'Right Ctrl';
+      else if (e.code === 'AltLeft') name = 'Left Alt';
+      else if (e.code === 'AltRight') name = 'Right Alt';
+      else if (e.code === 'ShiftLeft') name = 'Left Shift';
+      else if (e.code === 'ShiftRight') name = 'Right Shift';
+      else if (e.code === 'Escape') name = 'Escape';
+      else if (e.code === 'Insert') name = 'Insert';
+      else if (e.code === 'Delete') name = 'Delete';
+      else if (e.code === 'Backspace') name = 'Backspace';
+      else if (e.code === 'Space') name = 'Space';
+      else if (e.code === 'ScrollLock') name = 'Scroll Lock';
+      else if (e.code === 'Pause') name = 'Pause';
+      else if (name.length === 1) name = name.toUpperCase();
+
+      if (listeningTarget === 'hotkey') {
+        let parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Windows');
+
+        let keyName = e.key;
+        if (['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
+          // If only modifier is pressed, show them
+          if (parts.length > 0) {
+            document.getElementById('txtHotkeyDisplay').innerText = parts.join(' + ');
+          }
+          return;
+        }
+
+        if (e.code === 'Space') keyName = 'Space';
+        else if (e.code === 'CapsLock') keyName = 'Caps Lock';
+        else if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+        if (!parts.includes(keyName)) parts.push(keyName);
+        document.getElementById('txtHotkeyDisplay').innerText = parts.join(' + ');
+        stopListeningKey();
+        return;
+      }
+
+      if (listeningTarget === 'from') {
+        document.getElementById('txtKeyFrom').innerText = name;
+        listenKey('to'); // Auto switch to 'to' key
+      } else if (listeningTarget === 'to') {
+        document.getElementById('txtKeyTo').innerText = name;
+        stopListeningKey();
+      } else if (listeningTarget === 'disable') {
+        document.getElementById('txtKeyDisable').innerText = name;
+        stopListeningKey();
+      }
+    });
+
+    // ==========================================
+    // HOTKEY MODAL CONTROLLERS
+    // ==========================================
+    function openHotkeyModal() {
+      const p = profiles[activeProfileId];
+      const isRoot = p.isRoot;
+
+      document.getElementById('txtHotkeyTargetContext').innerHTML = `Áp dụng cho: <b>${p.icon} ${p.name}</b>`;
+      document.getElementById('btnInheritHotkey').style.display = isRoot ? 'none' : 'inline-flex';
+
+      const currentVal = p.hotkey === 'inherit' ? profiles.global.hotkey : p.hotkey;
+      document.getElementById('txtHotkeyDisplay').innerText = currentVal || 'Ctrl + Shift';
+      resetHotkeyBoxStyle();
+      document.getElementById('hotkeyModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function closeHotkeyModal() {
+      document.getElementById('hotkeyModal').style.display = 'none';
+      stopListeningKey();
+    }
+
+    function setHotkeyPreset(preset) {
+      if (preset === 'inherit') {
+        document.getElementById('txtHotkeyDisplay').innerText = `Kế thừa (${profiles.global.hotkey})`;
+      } else {
+        document.getElementById('txtHotkeyDisplay').innerText = preset;
+      }
+      stopListeningKey();
+    }
+
+    function listenHotkey() {
+      listeningTarget = 'hotkey';
+      const b = document.getElementById('boxHotkeyDisplay');
+      b.style.borderColor = 'var(--accent)';
+      b.style.background = 'rgba(0, 120, 212, 0.15)';
+      document.getElementById('txtHotkeyDisplay').innerText = 'Hãy bấm tổ hợp phím...';
+    }
+
+    function resetHotkeyBoxStyle() {
+      const b = document.getElementById('boxHotkeyDisplay');
+      if (b) {
+        b.style.border = '2px dashed var(--accent)';
+        b.style.background = 'var(--bg-input)';
+      }
+    }
+
+    function confirmSaveHotkey() {
+      const text = document.getElementById('txtHotkeyDisplay').innerText.trim();
+      if (!text || text.includes('Hãy bấm')) {
+        alert('Vui lòng chọn hoặc bấm tổ hợp phím hợp lệ!');
+        return;
+      }
+
+      const p = profiles[activeProfileId];
+      if (text.startsWith('Kế thừa')) {
+        p.hotkey = 'inherit';
+      } else {
+        p.hotkey = text;
+      }
+
+      closeHotkeyModal();
+      renderCurrentTab();
+    }
+
+    function restoreGlobalHotkey() {
+      profiles[activeProfileId].hotkey = 'inherit';
+      renderCurrentTab();
+    }
+
+    // Disable keys handlers
+    function unlockGlobalDisableInApp(k) {
+      const p = profiles[activeProfileId];
+      if (!p.unmutedDisabled) p.unmutedDisabled = [];
+      if (!p.unmutedDisabled.includes(k)) p.unmutedDisabled.push(k);
+      renderCurrentTab();
+    }
+
+    function lockGlobalDisableInApp(k) {
+      const p = profiles[activeProfileId];
+      if (p.unmutedDisabled) {
+        p.unmutedDisabled = p.unmutedDisabled.filter(item => item !== k);
+      }
+      renderCurrentTab();
+    }
+
+    function delGlobalDisable(i) {
+      profiles.global.disabled.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    function removeAppDisableKey(i) {
+      const p = profiles[activeProfileId];
+      p.appDisabled.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    // ==========================================
+    // CÁCH 2: MACRO HANDLERS
+    // ==========================================
+    function renderMacroRowsCách2(p) {
+      if (p.isRoot) {
+        // Global view: standard table
+        const list = p.macros || [];
+        if (list.length === 0) {
+          return '<div style="text-align:center; padding:30px; color:var(--text-secondary);">Chưa có từ gõ tắt nào</div>';
+        }
+        return list.map((item, idx) => `
+          <div class="macro-row ${selectedMacroIndex === idx ? 'selected' : ''}" style="grid-template-columns: 100px 1fr 140px 130px;" onclick="selectMacroRow(${idx})">
+            <div><span class="key-badge">${item.key}</span></div>
+            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:10px;">${item.val}</div>
+            <div><span class="type-badge" style="color:var(--accent);">🌐 Toàn hệ thống</span></div>
+            <div style="text-align:right;"><button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="event.stopPropagation(); deleteGlobalMacro(${idx})">Xóa</button></div>
+          </div>
+        `).join('');
+      }
+
+      // Child Profile View (Overlay + Mute + Override)
+      const globalList = profiles.global.macros || [];
+      const muted = p.mutedMacros || [];
+      const overrides = p.overriddenMacros || {}; // { 'key': { val: '...', type: '...' } }
+      const appSpecific = p.appMacros || [];
+
+      let rowsHtml = '';
+
+      // 1. Render all Global items (showing their status in this app)
+      globalList.forEach(g => {
+        const isMuted = muted.includes(g.key);
+        const isOverridden = overrides[g.key] !== undefined;
+        const currentVal = isOverridden ? overrides[g.key].val : g.val;
+
+        rowsHtml += `
+          <div class="macro-row" style="grid-template-columns: 100px 1fr 140px 130px; ${isMuted ? 'opacity:0.45; background:rgba(0,0,0,0.15);' : ''}">
+            <div>
+              <span class="key-badge" style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">
+                ${g.key}
+              </span>
+            </div>
+            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:10px; ${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">
+              ${currentVal}
+            </div>
+            <div>
+              ${isMuted ? '<span class="type-badge" style="color:var(--danger); border:1px solid var(--danger);">🚫 Đã tắt trong app</span>' :
+                (isOverridden ? '<span class="type-badge" style="color:var(--warning); border:1px solid var(--warning);">✏️ Ghi đè Global</span>' :
+                '<span class="type-badge">🌐 Kế thừa Global</span>')}
+            </div>
+            <div style="text-align:right; display:flex; justify-content:flex-end; gap:4px;">
+              ${isMuted ? `
+                <button class="btn btn-primary" style="padding:2px 8px; font-size:11px;" onclick="unmuteMacro('${g.key}')">Bật lại</button>
+              ` : `
+                ${isOverridden ? `<button class="btn" style="padding:2px 6px; font-size:10.5px;" title="Khôi phục giá trị của Global" onclick="restoreGlobalMacro('${g.key}')">Khôi phục</button>` : ''}
+                <button class="btn btn-danger" style="padding:2px 6px; font-size:10.5px;" onclick="muteMacro('${g.key}')" title="Không dùng từ này khi ở trong app">🚫 Tắt</button>
+              `}
+            </div>
+          </div>
+        `;
+      });
+
+      // 2. Render App-specific new items
+      appSpecific.forEach((item, idx) => {
+        rowsHtml += `
+          <div class="macro-row" style="grid-template-columns: 100px 1fr 140px 130px;">
+            <div><span class="key-badge" style="color:#4EC9B0;">${item.key}</span></div>
+            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-right:10px;">${item.val}</div>
+            <div><span class="type-badge" style="color:#4EC9B0; border:1px solid #4EC9B0;">✨ Riêng app này</span></div>
+            <div style="text-align:right;">
+              <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="deleteAppSpecificMacro(${idx})">Xóa</button>
+            </div>
+          </div>
+        `;
+      });
+
+      return rowsHtml;
+    }
+
+    function muteMacro(key) {
+      const p = profiles[activeProfileId];
+      if (!p.mutedMacros) p.mutedMacros = [];
+      if (!p.mutedMacros.includes(key)) p.mutedMacros.push(key);
+      renderCurrentTab();
+    }
+
+    function unmuteMacro(key) {
+      const p = profiles[activeProfileId];
+      if (p.mutedMacros) {
+        p.mutedMacros = p.mutedMacros.filter(k => k !== key);
+      }
+      renderCurrentTab();
+    }
+
+    function restoreGlobalMacro(key) {
+      const p = profiles[activeProfileId];
+      if (p.overriddenMacros && p.overriddenMacros[key]) {
+        delete p.overriddenMacros[key];
+      }
+      renderCurrentTab();
+    }
+
+    function deleteGlobalMacro(idx) {
+      profiles.global.macros.splice(idx, 1);
+      renderCurrentTab();
+    }
+
+    function deleteAppSpecificMacro(idx) {
+      const p = profiles[activeProfileId];
+      p.appMacros.splice(idx, 1);
+      renderCurrentTab();
+    }
+
+    function addOrOverrideMacro() {
+      const key = document.getElementById('txtMacroKey').value.trim();
+      const val = document.getElementById('txtMacroVal').value.trim();
+      const sel = document.getElementById('selMacroType');
+      const typeStr = sel.options[sel.selectedIndex].text;
+      if (!key || !val) {
+        alert('Vui lòng điền đủ từ viết tắt và nội dung thay thế!');
+        return;
+      }
+
+      const p = profiles[activeProfileId];
+      if (p.isRoot) {
+        if (!p.macros) p.macros = [];
+        p.macros.push({ key, val, type: typeStr });
+      } else {
+        // If matches a global key -> override it
+        const isGlobal = (profiles.global.macros || []).some(g => g.key === key);
+        if (isGlobal) {
+          if (!p.overriddenMacros) p.overriddenMacros = {};
+          p.overriddenMacros[key] = { val, type: typeStr };
+          // If was muted, unmute it
+          unmuteMacro(key);
+        } else {
+          // New app specific
+          if (!p.appMacros) p.appMacros = [];
+          p.appMacros.push({ key, val, type: typeStr });
+        }
+      }
+
+      document.getElementById('txtMacroKey').value = '';
+      document.getElementById('txtMacroVal').value = '';
+      renderCurrentTab();
+    }
+
+    function toggleMacroMaster(enabled) {
+      profiles[activeProfileId].useMacro = enabled;
+      renderCurrentTab();
+    }
+
+    // ==========================================
+    // MODAL DIALOG CONTROLLERS
+    // ==========================================
+    function openAddProfileModal() {
+      document.getElementById('addProfileModal').style.display = 'flex';
+      document.getElementById('inputProfName').value = '';
+      document.getElementById('inputProcessExe').value = '';
+      choosePreset('custom');
+      pickIcon('⚡');
+    }
+
+    function closeAddProfileModal() {
+      document.getElementById('addProfileModal').style.display = 'none';
+    }
+
+    function toggleIconPicker() {
+      const bar = document.getElementById('iconPickerBar');
+      bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function pickIcon(icon) {
+      currentSelectedIcon = icon;
+      document.getElementById('selectedIconBox').innerText = icon;
+      document.getElementById('iconPickerBar').style.display = 'none';
+    }
+
+    function choosePreset(preset) {
+      currentPreset = preset;
+      document.querySelectorAll('.preset-card').forEach(el => el.classList.remove('selected'));
+      if (preset === 'gaming') {
+        document.getElementById('presetGaming').classList.add('selected');
+        pickIcon('🎮');
+      } else if (preset === 'coding') {
+        document.getElementById('presetCoding').classList.add('selected');
+        pickIcon('💻');
+      } else if (preset === 'office') {
+        document.getElementById('presetOffice').classList.add('selected');
+        pickIcon('📝');
+      } else {
+        document.getElementById('presetCustom').classList.add('selected');
+        pickIcon('⚡');
+      }
+    }
+
+    function chooseRunningApp(name, exe, appIcon) {
+      document.getElementById('inputProfName').value = name.replace(/^[^\s]+\s*/, '');
+      document.getElementById('inputProcessExe').value = exe;
+      if (appIcon) pickIcon(appIcon);
+      // Mặc định luôn là Kế thừa Toàn hệ thống trừ khi user chủ động chọn preset khác
+      choosePreset('custom');
+    }
+
+    function promptBrowseExe() {
+      const path = prompt('Chọn đường dẫn file .exe (Giả lập mở File Explorer):', 'C:\\Program Files\\ExampleApp\\app.exe');
+      if (path) {
+        const exeName = path.split('\\').pop();
+        document.getElementById('inputProcessExe').value = exeName;
+        if (!document.getElementById('inputProfName').value) {
+          document.getElementById('inputProfName').value = exeName.replace('.exe', '');
+        }
+      }
+    }
+
+    function filterRunningApps(keyword) {
+      const q = keyword.toLowerCase();
+      document.querySelectorAll('.app-item').forEach(el => {
+        const text = el.innerText.toLowerCase();
+        el.style.display = text.includes(q) ? 'flex' : 'none';
+      });
+    }
+
+    function refreshRunningApps() {
+      const list = document.getElementById('runningAppsList');
+      list.style.opacity = '0.4';
+      setTimeout(() => {
+        list.style.opacity = '1';
+        alert('Đã cập nhật danh sách ứng dụng đang hoạt động!');
+      }, 200);
+    }
+
+    function confirmCreateProfile() {
+      const name = document.getElementById('inputProfName').value.trim();
+      const exe = document.getElementById('inputProcessExe').value.trim();
+      if (!name || !exe) {
+        alert('Vui lòng điền đủ Tên gợi nhớ và Tên tiến trình .exe!');
+        return;
+      }
+
+      const id = 'prof_' + Date.now();
+
+      let newProfile = {
+        id,
+        name,
+        process: exe,
+        icon: currentSelectedIcon,
+        isRoot: false,
+        mode: 'inherit',
+        method: 'inherit',
+        hotkey: 'inherit',
+        smartSpell: true,
+        freeTyping: true,
+        remaps: [],
+        disabled: [],
+        soundEnabled: true,
+        soundPack: 'inherit',
+        soundVol: 80,
+        macroRule: 'inherit',
+        useMacro: true,
+        macroInEnglish: false,
+        macros: []
+      };
+
+      profiles[id] = newProfile;
+      closeAddProfileModal();
+      selectProfile(id);
+    }
+
+    // Remap / Disable / Sound Handlers
+    function addRemap() {
+      const f = prompt('Phím gốc (VD: Caps Lock):', 'Caps Lock');
+      if (!f) return;
+      const t = prompt('Sẽ đổi thành (VD: Ctrl, Escape):', 'Ctrl');
+      if (!t) return;
+      profiles[activeProfileId].remaps.push({ from: f, to: t });
+      renderCurrentTab();
+    }
+
+    function delRemap(i) {
+      profiles[activeProfileId].remaps.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    function addDisable() {
+      const k = prompt('Chặn phím nào (VD: Left Windows, Insert):', 'Left Windows');
+      if (!k) return;
+      profiles[activeProfileId].disabled.push(k);
+      renderCurrentTab();
+    }
+
+    function delDisable(i) {
+      profiles[activeProfileId].disabled.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    function toggleSound(checked) {
+      profiles[activeProfileId].soundEnabled = checked;
+      renderCurrentTab();
+    }
+
+    function deleteActiveProfile() {
+      if (confirm('Bạn có chắc muốn xóa Profile này?')) {
+        delete profiles[activeProfileId];
+        selectProfile('global');
+      }
+    }
+
+    // Global settings & About
+    function openSystemSettings() {
+      isGlobalSettingsView = true;
+      document.querySelectorAll('.profile-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('btnSystemSettings').classList.add('active');
+      document.getElementById('btnAbout').classList.remove('active');
+      document.getElementById('subtabContainer').style.display = 'none';
+
+      document.getElementById('profBannerTitle').innerText = '⚙️ Cài đặt chung hệ thống';
+      document.getElementById('profBannerSub').innerText = 'Cấu hình khởi động và giao diện của phần mềm Kora';
+      document.getElementById('btnDelProf').style.display = 'none';
+
+      document.getElementById('tabContentArea').innerHTML = `
+        <div class="card">
+          <div class="card-title">Hệ thống Windows</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label class="check-row"><input type="checkbox" checked> Khởi động cùng Windows</label>
+            <label class="check-row"><input type="checkbox" checked> Chạy dưới quyền Administrator (hỗ trợ game & app đồ họa)</label>
+            <label class="check-row"><input type="checkbox" checked> Bật thông báo khay hệ thống khi chuyển profile</label>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Giao diện (Theme) & Ngôn ngữ</div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div>
+              <label style="display:block; font-size:11.5px; margin-bottom:4px;">Chủ đề màu sắc:</label>
+              <select style="width:100%;"><option>Tối (Fluent Dark)</option><option>Sáng (Fluent Light)</option><option>Tự động theo Windows</option></select>
+            </div>
+            <div>
+              <label style="display:block; font-size:11.5px; margin-bottom:4px;">Ngôn ngữ hiển thị:</label>
+              <select style="width:100%;"><option>Tiếng Việt</option><option>English</option></select>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function openAbout() {
+      isGlobalSettingsView = true;
+      document.querySelectorAll('.profile-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('btnAbout').classList.add('active');
+      document.getElementById('btnSystemSettings').classList.remove('active');
+      document.getElementById('subtabContainer').style.display = 'none';
+
+      document.getElementById('profBannerTitle').innerText = 'ℹ️ Thông tin phần mềm';
+      document.getElementById('profBannerSub').innerText = 'Kora - Bộ gõ tiếng Việt siêu nhẹ, hiệu năng cao viết bằng Rust';
+      document.getElementById('btnDelProf').style.display = 'none';
+
+      document.getElementById('tabContentArea').innerHTML = `
+        <div class="card" style="text-align:center; padding:24px;">
+          <div style="width:48px; height:48px; background:var(--accent); color:white; font-size:24px; font-weight:bold; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:10px;">M</div>
+          <h3 style="font-size:16px;">Kora v0.4.0</h3>
+          <p style="color:var(--text-secondary); margin-top:4px;">Tác giả: <b>Mạnh Kiên</b> (manhkien13041997@gmail.com)</p>
+          <p style="color:var(--text-secondary); margin-top:2px;">Engine: Pure Rust, Zero-dependency, Native Win32 API</p>
+          <div style="margin-top:14px;">
+            <button class="btn btn-primary" onclick="window.open('https://github.com')">Github Repository</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+    }
+
+    // Init
+    renderSidebar();
+    renderCurrentTab();
+  </script>
+</body>
+</html>

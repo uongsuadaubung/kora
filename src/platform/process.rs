@@ -26,9 +26,9 @@ unsafe extern "system" {
     fn SetForegroundWindow(hWnd: isize) -> i32;
 }
 
-/// Ensures only a single instance of MKey is running.
+/// Ensures only a single instance of Kora is running.
 /// If an instance is already active and `is_cli` is false:
-/// - Brings the existing MKey Control Panel to the foreground.
+/// - Brings the existing Kora Control Panel to the foreground.
 /// - Returns `false` (signaling that the secondary instance should exit).
 ///
 /// Returns `true` if this is the primary instance.
@@ -36,14 +36,14 @@ pub fn ensure_single_instance(is_cli: bool) -> bool {
     #[cfg(target_os = "windows")]
     unsafe {
         const ERROR_ALREADY_EXISTS: u32 = 183;
-        let mutex_name: Vec<u16> = OsStr::new("Local\\MKey_SingleInstance_Mutex")
+        let mutex_name: Vec<u16> = OsStr::new("Local\\Kora_SingleInstance_Mutex")
             .encode_wide()
             .chain(Some(0))
             .collect();
         let _h_mutex = CreateMutexW(std::ptr::null_mut(), 1, mutex_name.as_ptr());
 
         if GetLastError() == ERROR_ALREADY_EXISTS && !is_cli {
-            let class_name: Vec<u16> = OsStr::new("MKeyControlPanelClass")
+            let class_name: Vec<u16> = OsStr::new("KoraControlPanelClass")
                 .encode_wide()
                 .chain(Some(0))
                 .collect();

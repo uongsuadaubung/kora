@@ -1,12 +1,12 @@
-//! MKey Combinatorial Stress Test & Fuzzing Tool - Simple Telex Focus
+//! Kora Combinatorial Stress Test & Fuzzing Tool - Simple Telex Focus
 //!
 //! Đọc danh sách từ tiếng Việt từ file input.txt (hoặc đối số dòng lệnh),
 //! phân tích cấu trúc ngữ âm của từng từ (phụ âm đầu, nguyên âm, phụ âm cuối, dấu thanh, dấu mũ/móc/trăng),
 //! sinh toàn bộ các tổ hợp gõ phím kiểu Simple Telex (gõ chuẩn, gõ tự do, gõ dấu qua phụ âm cuối, gõ đ tự do),
-//! và kiểm tra tự động xem từng tổ hợp có tái tạo chính xác từ gốc trên engine MKey hay không.
+//! và kiểm tra tự động xem từng tổ hợp có tái tạo chính xác từ gốc trên engine Kora hay không.
 
-use mkey::vietnamese::charset::{BaseVowel, Diacritic, Tone, decompose_vowel};
-use mkey::{EngineAction, EngineConfig, InputMethod, VietnameseEngine};
+use kora::vietnamese::charset::{BaseVowel, Diacritic, Tone, decompose_vowel};
+use kora::{EngineAction, EngineConfig, InputMethod, VietnameseEngine};
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
@@ -462,7 +462,7 @@ fn test_keystrokes(
 
 fn main() {
     println!("======================================================================");
-    println!("        MKey Combinatorial Stress Test & Fuzz Engine (Simple Telex)   ");
+    println!("        Kora Combinatorial Stress Test & Fuzz Engine (Simple Telex)   ");
     println!("======================================================================");
 
     let args: Vec<String> = env::args().collect();

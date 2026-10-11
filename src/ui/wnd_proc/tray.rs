@@ -3,9 +3,8 @@
 use crate::engine::config::InputMethod;
 use crate::engine::{EngineConfig, config_store};
 use crate::platform::win32::ENGINE_INSTANCE;
-use crate::ui::components::POINT;
-use crate::ui::components::window::*;
-use crate::ui::views::*;
+use crate::ui::win32::*;
+use crate::ui::tray::handler::*;
 use crate::ui::{UI_MANAGER, show_control_panel, update_tray_icon};
 
 const WM_DESTROY: u32 = 0x0002;
@@ -49,11 +48,14 @@ pub fn handle_menu_command(cmd: u32) {
     match cmd {
         IDM_TOGGLE_VIET => {
             let is_viet = {
-                let mut guard = ENGINE_INSTANCE.lock().unwrap();
-                if let Some(ref mut engine) = *guard {
+                if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                    && let Some(ref mut engine) = *guard
+                {
                     let res = engine.toggle_enabled();
-                    let _ =
-                        config_store::save_config_and_macros(engine.config(), &engine.macro_table);
+                    config_store::save_config_and_macros_debounced(
+                        engine.config(),
+                        &engine.macro_table,
+                    );
                     res
                 } else {
                     false
@@ -119,8 +121,9 @@ pub unsafe extern "system" fn tray_helper_wnd_proc(
             if event == WM_LBUTTONUP {
                 // Single click -> Toggle Vietnamese / English
                 let is_viet = {
-                    let mut guard = ENGINE_INSTANCE.lock().unwrap();
-                    if let Some(ref mut engine) = *guard {
+                    if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                        && let Some(ref mut engine) = *guard
+                    {
                         let res = engine.toggle_enabled();
                         config_store::save_config_and_macros_debounced(
                             engine.config(),
@@ -143,8 +146,9 @@ pub unsafe extern "system" fn tray_helper_wnd_proc(
                 }
 
                 let config = {
-                    let guard = ENGINE_INSTANCE.lock().unwrap();
-                    if let Some(ref engine) = *guard {
+                    if let Ok(guard) = ENGINE_INSTANCE.lock()
+                        && let Some(ref engine) = *guard
+                    {
                         engine.config().clone()
                     } else {
                         EngineConfig::default()

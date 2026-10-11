@@ -3,7 +3,7 @@
 
 # Logs
 *.log
-mkey_debug.log
+kora_debug.log
 
 # OS temporary files
 .DS_Store

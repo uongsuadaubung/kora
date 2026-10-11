@@ -3,8 +3,8 @@
 version = 4
 
 [[package]]
-name = "mkey"
-version = "0.4.0"
+name = "kora"
+version = "0.5.0"
 dependencies = [
  "winres",
 ]

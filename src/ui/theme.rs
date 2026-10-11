@@ -1,8 +1,8 @@
-//! MKey UI Theme Engine & Dark Mode Integration
+//! Kora UI Theme Engine & Dark Mode Integration
 
 use crate::engine::config::UiTheme;
 use crate::ui::colors::ThemePalette;
-use crate::ui::components::window::*;
+use crate::ui::win32::*;
 use crate::ui::views::ControlPanelControls;
 use std::ptr::null_mut;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
@@ -11,11 +11,28 @@ static PANEL_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static TAB_CARD_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static INPUT_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static BORDER_BRUSH: AtomicIsize = AtomicIsize::new(0);
+static SIDEBAR_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static CURRENT_IS_DARK: AtomicBool = AtomicBool::new(false);
 static IS_APPLYING_THEME: AtomicBool = AtomicBool::new(false);
 
 pub fn is_current_dark() -> bool {
     CURRENT_IS_DARK.load(Ordering::Relaxed)
+}
+
+static APP_FONT_NORMAL: AtomicIsize = AtomicIsize::new(0);
+static APP_FONT_BOLD: AtomicIsize = AtomicIsize::new(0);
+
+pub fn set_app_fonts(normal: isize, bold: isize) {
+    APP_FONT_NORMAL.store(normal, Ordering::Relaxed);
+    APP_FONT_BOLD.store(bold, Ordering::Relaxed);
+}
+
+pub fn get_app_font_normal() -> isize {
+    APP_FONT_NORMAL.load(Ordering::Relaxed)
+}
+
+pub fn get_app_font_bold() -> isize {
+    APP_FONT_BOLD.load(Ordering::Relaxed)
 }
 
 pub fn get_panel_bg_brush() -> isize {
@@ -30,10 +47,14 @@ pub fn get_input_bg_brush() -> isize {
     INPUT_BG_BRUSH.load(Ordering::Relaxed)
 }
 
+pub fn get_sidebar_bg_brush() -> isize {
+    SIDEBAR_BG_BRUSH.load(Ordering::Relaxed)
+}
+
 /// Resolves whether dark mode should be active given the theme setting
 pub fn resolve_is_dark(theme: UiTheme) -> bool {
     match theme {
-        UiTheme::Auto => crate::ui::components::is_windows_dark_taskbar(),
+        UiTheme::Auto => crate::ui::tray::is_windows_dark_taskbar(),
         UiTheme::Light => false,
         UiTheme::Dark => true,
     }
@@ -50,6 +71,14 @@ pub fn recreate_theme_brushes(is_dark: bool) {
     );
     if old_panel != 0 {
         unsafe { DeleteObject(old_panel) };
+    }
+
+    let old_sidebar = SIDEBAR_BG_BRUSH.swap(
+        unsafe { CreateSolidBrush(palette.bg_sidebar) },
+        Ordering::Relaxed,
+    );
+    if old_sidebar != 0 {
+        unsafe { DeleteObject(old_sidebar) };
     }
 
     let old_tab = TAB_CARD_BRUSH.swap(
@@ -96,7 +125,14 @@ unsafe extern "system" fn enum_child_theme_proc(child: isize, lparam: isize) -> 
         let theme_w = to_wide(theme_str);
 
         if class_name.eq_ignore_ascii_case("Button") {
-            SetWindowTheme(child, theme_w.as_ptr(), null_mut());
+            let style = GetWindowLongW(child, -16 /* GWL_STYLE */) as u32;
+            let is_owner_draw = (style & 0x0000000F) == 0x0000000B; // BS_OWNERDRAW
+            if is_owner_draw {
+                let empty = to_wide(" ");
+                SetWindowTheme(child, empty.as_ptr(), empty.as_ptr());
+            } else {
+                SetWindowTheme(child, theme_w.as_ptr(), null_mut());
+            }
             InvalidateRect(child, null_mut(), 1);
         } else if class_name.eq_ignore_ascii_case("ComboBox")
             || class_name.eq_ignore_ascii_case("Edit")
@@ -150,8 +186,10 @@ pub fn apply_ui_theme(hwnd: isize, controls: &ControlPanelControls, is_dark: boo
         InvalidateRect(controls.tab_bar.hwnd(), null_mut(), 1);
         UpdateWindow(controls.tab_bar.hwnd());
 
-        // Theme ListView
+        // Theme ListViews
         controls.tab_macro.list_macro.apply_theme(is_dark);
+        controls.tab_remap.list_remap.apply_theme(is_dark);
+        controls.tab_remap.list_disable.apply_theme(is_dark);
 
         // Recursively invalidate and redraw entire dialog and all child controls cleanly
         RedrawWindow(

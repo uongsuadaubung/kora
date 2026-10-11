@@ -1,4 +1,4 @@
-//! Native Win32 Window Component & Helper Functions
+//! Native Win32 FFI Bindings, GDI Types, and Platform Helper Functions
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
@@ -41,10 +41,54 @@ pub struct RECT {
 }
 
 #[repr(C)]
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct POINT {
     pub x: i32,
     pub y: i32,
+}
+
+#[repr(C)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct SIZE {
+    pub cx: i32,
+    pub cy: i32,
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+pub struct NMHDR {
+    pub hwnd_from: isize,
+    pub id_from: usize,
+    pub code: u32,
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+pub struct NMCUSTOMDRAW {
+    pub hdr: NMHDR,
+    pub dw_draw_stage: u32,
+    pub hdc: isize,
+    pub rc: RECT,
+    pub dw_item_spec: usize,
+    pub u_item_state: u32,
+    pub l_item_lparam: isize,
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub struct NMLVCUSTOMDRAW {
+    pub nmcd: NMCUSTOMDRAW,
+    pub clr_text: u32,
+    pub clr_text_bk: u32,
+    pub i_sub_item: i32,
+    pub dw_item_type: u32,
+    pub clr_face: u32,
+    pub i_icon_effect: i32,
+    pub i_icon_phase: i32,
+    pub i_part_id: i32,
+    pub i_state_id: i32,
+    pub rc_text: RECT,
+    pub u_align: u32,
 }
 
 pub const GWLP_WNDPROC: i32 = -4;
@@ -71,9 +115,12 @@ unsafe extern "system" {
     ) -> isize;
     pub fn DestroyWindow(h_wnd: isize) -> i32;
     pub fn ShowWindow(h_wnd: isize, n_cmd_show: i32) -> i32;
+    pub fn IsWindowVisible(h_wnd: isize) -> i32;
     pub fn EnableWindow(h_wnd: isize, b_enable: i32) -> i32;
+    pub fn IsWindowEnabled(h_wnd: isize) -> i32;
     pub fn SetForegroundWindow(h_wnd: isize) -> i32;
     pub fn GetFocus() -> isize;
+    pub fn SetFocus(h_wnd: isize) -> isize;
     pub fn LoadCursorW(h_instance: isize, lp_cursor_name: usize) -> isize;
     pub fn SetCursor(h_cursor: isize) -> isize;
     pub fn GetSystemMetrics(n_index: i32) -> i32;
@@ -119,6 +166,7 @@ unsafe extern "system" {
     pub fn GetDC(h_wnd: isize) -> isize;
     pub fn ReleaseDC(h_wnd: isize, hdc: isize) -> i32;
     pub fn SetWindowLongPtrW(h_wnd: isize, n_index: i32, dw_new_long: isize) -> isize;
+    pub fn GetWindowLongPtrW(h_wnd: isize, n_index: i32) -> isize;
     pub fn CallWindowProcW(
         lp_prev_wnd_func: unsafe extern "system" fn(isize, u32, usize, isize) -> isize,
         h_wnd: isize,
@@ -138,9 +186,11 @@ unsafe extern "system" {
         width: i32,
         height: i32,
     ) -> i32;
+    pub fn Ellipse(hdc: isize, left: i32, top: i32, right: i32, bottom: i32) -> i32;
     pub fn MoveToEx(hdc: isize, x: i32, y: i32, lppt: *mut POINT) -> i32;
     pub fn LineTo(hdc: isize, x: i32, y: i32) -> i32;
     pub fn GetWindowTextW(h_wnd: isize, lp_string: *mut u16, n_max_count: i32) -> i32;
+    pub fn GetWindowTextLengthW(h_wnd: isize) -> i32;
 
     pub fn DrawTextW(
         hdc: isize,
@@ -148,6 +198,12 @@ unsafe extern "system" {
         cch_text: i32,
         lprc: *mut RECT,
         format: u32,
+    ) -> i32;
+    pub fn GetTextExtentPoint32W(
+        hdc: isize,
+        lp_string: *const u16,
+        c: i32,
+        psizl: *mut SIZE,
     ) -> i32;
     pub fn BeginPaint(h_wnd: isize, lp_paint: *mut PAINTSTRUCT) -> isize;
     pub fn EndPaint(h_wnd: isize, lp_paint: *const PAINTSTRUCT) -> i32;
@@ -160,12 +216,121 @@ unsafe extern "system" {
     pub fn SetWindowTextW(h_wnd: isize, lp_string: *const u16) -> i32;
     pub fn GetWindowLongW(h_wnd: isize, n_index: i32) -> i32;
     pub fn GetDlgCtrlID(h_wnd: isize) -> i32;
+    pub fn GetDlgItem(h_dummy: isize, n_id_dlg_item: i32) -> isize;
+    pub fn PostMessageW(h_wnd: isize, msg: u32, w_param: usize, l_param: isize) -> i32;
     pub fn EnumChildWindows(
         h_wnd_parent: isize,
         lp_enum_func: Option<unsafe extern "system" fn(isize, isize) -> i32>,
         l_param: isize,
     ) -> i32;
+    pub fn GetCursorPos(lp_point: *mut POINT) -> i32;
+    pub fn WindowFromPoint(point: POINT) -> isize;
+    pub fn TrackMouseEvent(lp_event_track: *mut TRACKMOUSEEVENT) -> i32;
+    pub fn PostQuitMessage(n_exit_code: i32);
+    pub fn CreateCompatibleDC(hdc: isize) -> isize;
+    pub fn CreateCompatibleBitmap(hdc: isize, cx: i32, cy: i32) -> isize;
+    pub fn DeleteDC(hdc: isize) -> i32;
+    pub fn BitBlt(
+        hdc_dest: isize,
+        x_dest: i32,
+        y_dest: i32,
+        w: i32,
+        h: i32,
+        hdc_src: isize,
+        x_src: i32,
+        y_src: i32,
+        rop: u32,
+    ) -> i32;
+    pub fn SetScrollInfo(hwnd: isize, n_bar: i32, lpsi: *const SCROLLINFO, redraw: i32) -> i32;
+    pub fn GetScrollInfo(hwnd: isize, n_bar: i32, lpsi: *mut SCROLLINFO) -> i32;
+    pub fn SetCapture(h_wnd: isize) -> isize;
+    pub fn ReleaseCapture() -> i32;
 }
+
+#[repr(C)]
+pub struct SCROLLINFO {
+    pub cb_size: u32,
+    pub f_mask: u32,
+    pub n_min: i32,
+    pub n_max: i32,
+    pub n_page: u32,
+    pub n_pos: i32,
+    pub n_track_pos: i32,
+}
+pub const SB_HORZ: i32 = 0;
+pub const SB_VERT: i32 = 1;
+pub const SB_CTL: i32 = 2;
+pub const SB_BOTH: i32 = 3;
+
+pub const SIF_RANGE: u32 = 0x0001;
+pub const SIF_PAGE: u32 = 0x0002;
+pub const SIF_POS: u32 = 0x0004;
+pub const SIF_DISABLENOSCROLL: u32 = 0x0008;
+pub const SIF_TRACKPOS: u32 = 0x0010;
+pub const SIF_ALL: u32 = SIF_RANGE | SIF_PAGE | SIF_POS | SIF_TRACKPOS;
+
+pub const SB_LINEUP: u32 = 0;
+pub const SB_LINEDOWN: u32 = 1;
+pub const SB_PAGEUP: u32 = 2;
+pub const SB_PAGEDOWN: u32 = 3;
+pub const SB_THUMBPOSITION: u32 = 4;
+pub const SB_THUMBTRACK: u32 = 5;
+
+pub const SRCCOPY: u32 = 0x00CC0020;
+pub const WM_PAINT: u32 = 0x000F;
+pub const WM_VSCROLL: u32 = 0x0115;
+pub const WM_HSCROLL: u32 = 0x0114;
+pub const WM_MOUSEWHEEL: u32 = 0x020A;
+pub const CS_VREDRAW: u32 = 0x0001;
+pub const CS_HREDRAW: u32 = 0x0002;
+pub const CS_DBLCLKS: u32 = 0x0008;
+
+#[repr(C)]
+#[allow(clippy::upper_case_acronyms)]
+pub struct TRACKMOUSEEVENT {
+    pub cb_size: u32,
+    pub dw_flags: u32,
+    pub hwnd_track: isize,
+    pub dw_hover_time: u32,
+}
+pub const TME_LEAVE: u32 = 0x00000002;
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub struct DRAWITEMSTRUCT {
+    pub ctl_type: u32,
+    pub ctl_id: u32,
+    pub item_id: u32,
+    pub item_action: u32,
+    pub item_state: u32,
+    pub hwnd_item: isize,
+    pub hdc: isize,
+    pub rc_item: RECT,
+    pub item_data: usize,
+}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub struct MEASUREITEMSTRUCT {
+    pub ctl_type: u32,
+    pub ctl_id: u32,
+    pub item_id: u32,
+    pub item_width: u32,
+    pub item_height: u32,
+    pub item_data: usize,
+}
+
+pub const GWLP_USERDATA: i32 = -21;
+
+// Win32 Standard Message Reflection (OCM_*) Constants
+pub const OCM_BASE: u32 = 0x2000;
+pub const OCM_NOTIFY: u32 = OCM_BASE + 0x004E; // WM_NOTIFY
+pub const OCM_COMMAND: u32 = OCM_BASE + 0x0111; // WM_COMMAND
+pub const OCM_DRAWITEM: u32 = OCM_BASE + 0x002B; // WM_DRAWITEM
+pub const OCM_MEASUREITEM: u32 = OCM_BASE + 0x002C; // WM_MEASUREITEM
+pub const OCM_CTLCOLORSTATIC: u32 = OCM_BASE + 0x0138;
+pub const OCM_CTLCOLOREDIT: u32 = OCM_BASE + 0x0133;
+pub const OCM_CTLCOLORLISTBOX: u32 = OCM_BASE + 0x0134;
 
 #[link(name = "comctl32")]
 unsafe extern "system" {
@@ -202,10 +367,14 @@ pub struct PAINTSTRUCT {
     pub rgb_reserved: [u8; 32],
 }
 
+pub const DT_LEFT: u32 = 0x00000000;
 pub const DT_CENTER: u32 = 0x00000001;
 pub const DT_VCENTER: u32 = 0x00000004;
+pub const DT_WORDBREAK: u32 = 0x00000010;
 pub const DT_SINGLELINE: u32 = 0x00000020;
+pub const DT_NOPREFIX: u32 = 0x00000800;
 pub const PS_SOLID: i32 = 0;
+pub const PS_DASH: i32 = 1;
 pub const PS_NULL: i32 = 5;
 
 pub const IDC_ARROW: usize = 32512;
@@ -214,8 +383,8 @@ pub const IDC_HAND: usize = 32649;
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn GetModuleHandleW(lp_module_name: *const u16) -> isize;
-    fn GetProcAddress(h_module: isize, lp_proc_name: *const u8) -> *const ();
+    pub fn GetModuleHandleW(lp_module_name: *const u16) -> isize;
+    pub fn GetProcAddress(h_module: isize, lp_proc_name: *const u8) -> *const ();
 }
 
 #[link(name = "uxtheme")]
@@ -247,6 +416,7 @@ pub const CBS_CHECKEDHOT: i32 = 6;
 pub const CBS_CHECKEDPRESSED: i32 = 7;
 pub const CBS_CHECKEDDISABLED: i32 = 8;
 pub const WS_DISABLED: u32 = 0x08000000;
+pub const WM_SETFONT: u32 = 0x0030;
 pub const WM_GETFONT: u32 = 0x0031;
 
 /// Sets native Windows uxtheme preferred application mode (Windows 10 1903+ / Windows 11)
@@ -356,10 +526,14 @@ pub fn init_common_controls() {
 }
 
 pub const WS_OVERLAPPED: u32 = 0x00000000;
+pub const WS_CHILD: u32 = 0x40000000;
+pub const WS_VISIBLE: u32 = 0x10000000;
 pub const WS_CAPTION: u32 = 0x00C00000;
 pub const WS_SYSMENU: u32 = 0x00080000;
 pub const WS_MINIMIZEBOX: u32 = 0x00020000;
 pub const WS_CLIPCHILDREN: u32 = 0x02000000;
+pub const WS_TABSTOP: u32 = 0x00010000;
+pub const WS_VSCROLL: u32 = 0x00200000;
 pub const WS_EX_DLGMODALFRAME: u32 = 0x00000001;
 pub const WS_EX_CONTROLPARENT: u32 = 0x00010000;
 pub const WS_EX_APPWINDOW: u32 = 0x00040000;
@@ -388,6 +562,7 @@ pub const CLEARTYPE_QUALITY: u32 = 5;
 pub const DEFAULT_CHARSET: u32 = 1;
 pub const FW_NORMAL: i32 = 400;
 pub const FW_SEMIBOLD: i32 = 600;
+pub const FW_BOLD: i32 = 700;
 
 pub fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0)).collect()

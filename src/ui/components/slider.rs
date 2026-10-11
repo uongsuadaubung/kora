@@ -1,33 +1,9 @@
 //! Native Win32 Trackbar / Slider Component
 //! Uses msctls_trackbar32 from comctl32.dll for smooth native Windows slider controls.
 
-use super::window::to_wide;
+use crate::ui::win32::*;
 use std::ptr::null_mut;
 
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn CreateWindowExW(
-        dw_ex_style: u32,
-        lp_class_name: *const u16,
-        lp_window_name: *const u16,
-        dw_style: u32,
-        x: i32,
-        y: i32,
-        n_width: i32,
-        n_height: i32,
-        h_wnd_parent: isize,
-        h_menu: isize,
-        h_instance: isize,
-        lp_param: *mut std::ffi::c_void,
-    ) -> isize;
-    fn SendMessageW(h_wnd: isize, msg: u32, w_param: usize, l_param: isize) -> isize;
-    fn EnableWindow(h_wnd: isize, b_enable: i32) -> i32;
-    fn IsWindowEnabled(h_wnd: isize) -> i32;
-}
-
-const WS_CHILD: u32 = 0x40000000;
-const WS_VISIBLE: u32 = 0x10000000;
-const WS_TABSTOP: u32 = 0x00010000;
 const TBS_HORZ: u32 = 0x0000;
 const TBS_AUTOTICKS: u32 = 0x0001;
 
@@ -84,6 +60,24 @@ impl Slider {
         Some(Self { hwnd, id })
     }
 
+    /// Declarative helper: creates a Slider with initial value in 1 line
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_value(
+        parent: isize,
+        id: u32,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        min: u32,
+        max: u32,
+        initial_value: u32,
+    ) -> Option<Self> {
+        let slider = Self::create(parent, id, x, y, width, height, min, max)?;
+        slider.set_pos(initial_value);
+        Some(slider)
+    }
+
     #[inline]
     pub fn hwnd(&self) -> isize {
         self.hwnd
@@ -106,11 +100,21 @@ impl Slider {
 
     pub fn set_enabled(&self, enabled: bool) {
         unsafe {
-            EnableWindow(self.hwnd, if enabled { 1 } else { 0 });
+            EnableWindow(self.hwnd, enabled as i32);
         }
     }
 
     pub fn is_enabled(&self) -> bool {
         unsafe { IsWindowEnabled(self.hwnd) != 0 }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        unsafe { IsWindowVisible(self.hwnd) != 0 }
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        unsafe {
+            ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
+        }
     }
 }

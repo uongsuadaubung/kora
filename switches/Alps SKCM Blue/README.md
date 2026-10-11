@@ -1,13 +1,13 @@
-# Soundpack: Alps SKCM Blue
+﻿# Soundpack: Alps SKCM Blue
 
-- **Nhà sản xuất / Thiết kế**: Alps Electric
-- **Phân loại**: Vintage Clicky Mechanical Switch
-- **Tác giả thu âm**: tplai (kbsim)
-- **Giấy phép (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
-- **Nguồn gốc / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/alps/tplai/skcm_blue
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Alps Electric
+- **PhÃ¢n loáº¡i**: Vintage Clicky Mechanical Switch
+- **TÃ¡c giáº£ thu Ã¢m**: tplai (kbsim)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/alps/tplai/skcm_blue
 
-## Giới thiệu & Đặc trưng âm thanh
-Thu âm từ bàn phím vintage Apple Extended Keyboard sử dụng switch Alps xanh huyền thoại.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Thu Ã¢m tá»« bÃ n phÃ­m vintage Apple Extended Keyboard sá»­ dá»¥ng switch Alps xanh huyá»n thoáº¡i.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

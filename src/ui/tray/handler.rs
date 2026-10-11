@@ -1,9 +1,9 @@
-//! System Tray Handler & Popup Context Menu for MKey
+//! System Tray Handler & Popup Context Menu for Kora
 
 use crate::engine::{EngineConfig, config::InputMethod};
-use crate::ui::components::{
-    PopupMenu, TrayIcon, get_small_icon_size, load_icon_from_memory, safe_destroy_icon,
-};
+use super::icon::TrayIcon;
+use super::loader::{get_small_icon_size, load_icon_from_memory, safe_destroy_icon};
+use crate::ui::components::PopupMenu;
 
 pub const WM_TRAY_MESSAGE: u32 = 0x8001; // WM_USER + 1
 pub const TRAY_ICON_ID: u32 = 1001;

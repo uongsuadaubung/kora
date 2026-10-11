@@ -41,6 +41,44 @@ static CACHED_APP_KIND: AtomicU8 = AtomicU8::new(0);
 static CACHED_FOCUS_HWND: AtomicIsize = AtomicIsize::new(0);
 static CACHED_FIX_TYPE: AtomicU8 = AtomicU8::new(0);
 
+/// Retrieves the executable file name (e.g., "cs2.exe") for a given process ID
+pub fn get_process_name_for_pid(pid: u32) -> String {
+    if pid == 0 {
+        return String::new();
+    }
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle != 0 {
+            let mut buf = [0u16; 1024];
+            let mut size = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(handle, 0, buf.as_mut_ptr(), &mut size);
+            CloseHandle(handle);
+
+            if ok != 0 && size > 0 {
+                let full_path = String::from_utf16_lossy(&buf[..size as usize]);
+                full_path.rsplit('\\').next().unwrap_or("").to_lowercase()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        }
+    }
+}
+
+/// Retrieves the executable file name of the current foreground active window
+pub fn get_foreground_process_name() -> String {
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg == 0 {
+            return String::new();
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, &mut pid);
+        get_process_name_for_pid(pid)
+    }
+}
+
 pub fn get_app_kind_for_pid(pid: u32) -> AppKind {
     let cached_pid = CACHED_PID.load(Ordering::Relaxed);
     if cached_pid == pid {

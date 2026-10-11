@@ -4,59 +4,15 @@ pub mod config;
 pub mod config_store;
 pub mod history;
 pub mod macro_table;
+pub mod profile;
 
 use action::EngineAction;
 use buffer::{RawKey, TypingBuffer};
 pub use config::EngineConfig;
 use history::WordHistory;
+use crate::logger::{AsyncLogWriter, current_timestamp_str};
 use macro_table::MacroTable;
-use std::sync::mpsc::{Sender, channel};
-
-/// Non-blocking asynchronous log worker that writes debug logs to disk on a dedicated thread,
-/// preventing any I/O disk stalls on the Windows low-level hook thread.
-#[derive(Debug, Clone)]
-pub struct AsyncLogWriter {
-    sender: Option<Sender<String>>,
-}
-
-impl AsyncLogWriter {
-    pub fn new(path: Option<String>) -> Self {
-        if let Some(path) = path {
-            let (tx, rx) = channel::<String>();
-            let file = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&path);
-
-            if let Ok(mut file) = file {
-                let _ = std::thread::Builder::new()
-                    .name("mkey-async-logger".to_string())
-                    .spawn(move || {
-                        use std::io::Write;
-                        while let Ok(msg) = rx.recv() {
-                            let _ = writeln!(file, "{}", msg);
-                            let _ = file.flush();
-                        }
-                    });
-                Self { sender: Some(tx) }
-            } else {
-                Self { sender: None }
-            }
-        } else {
-            Self { sender: None }
-        }
-    }
-
-    pub fn write_line(&self, line: String) {
-        if let Some(ref sender) = self.sender {
-            let _ = sender.send(line);
-        }
-    }
-
-    pub fn is_active(&self) -> bool {
-        self.sender.is_some()
-    }
-}
+pub use profile::ProfileManager;
 
 /// Clean, stateful, thread-safe Vietnamese Input Engine.
 #[derive(Debug, Clone)]
@@ -64,6 +20,7 @@ pub struct VietnameseEngine {
     config: EngineConfig,
     pub buffer: TypingBuffer,
     pub macro_table: MacroTable,
+    pub profile_manager: ProfileManager,
     history: WordHistory,
     auto_uppercase_next: bool,
     pub debug_log: Vec<String>,
@@ -81,12 +38,13 @@ impl VietnameseEngine {
         let log_writer = if config.debug {
             AsyncLogWriter::new(config.debug_file_path.clone())
         } else {
-            AsyncLogWriter { sender: None }
+            AsyncLogWriter::disabled()
         };
         Self {
             config,
             buffer: TypingBuffer::new(),
             macro_table: MacroTable::with_defaults(),
+            profile_manager: ProfileManager::new(),
             history: WordHistory::new(),
             auto_uppercase_next: false,
             debug_log: Vec::new(),
@@ -102,11 +60,80 @@ impl VietnameseEngine {
         &mut self.config
     }
 
+    pub fn active_profile_id(&self) -> &str {
+        &self.profile_manager.active_id
+    }
+
+    pub fn effective_config(&self) -> EngineConfig {
+        self.profile_manager.resolve_effective_config(&self.profile_manager.active_id, &self.config)
+    }
+
+    pub fn effective_remaps(&self) -> Vec<profile::KeyRemapRule> {
+        self.profile_manager.resolve_effective_remaps(&self.profile_manager.active_id)
+    }
+
+    pub fn effective_disabled(&self) -> Vec<u32> {
+        self.profile_manager.resolve_effective_disabled(&self.profile_manager.active_id)
+    }
+
+    pub fn effective_macros(&self) -> Vec<crate::engine::macro_table::MacroEntry> {
+        self.profile_manager.resolve_effective_macros(
+            &self.profile_manager.active_id,
+            &self.macro_table.get_sorted_entries(),
+        )
+    }
+
+    pub fn switch_profile_by_process(&mut self, exe_name: &str) -> (bool, String) {
+        let (changed, new_id) = self.profile_manager.set_active_by_process(exe_name);
+        if changed {
+            self.reset();
+            if self.config.debug {
+                self.log_debug(format!(
+                    "[PROFILE] Switched active profile to '{}' (process: {})",
+                    new_id, exe_name
+                ));
+            }
+        }
+        (changed, new_id)
+    }
+
     /// Chuyển đổi qua lại giữa chế độ gõ Tiếng Việt và Tiếng Anh (trả về trạng thái mới: true là Tiếng Việt, false là Tiếng Anh)
+    /// If the active child profile pins a mode, the toggle flips that profile's mode; otherwise the global one.
     pub fn toggle_enabled(&mut self) -> bool {
-        self.config.enabled = !self.config.enabled;
+        let new_state = !self.effective_config().enabled;
+        let active_id = self.profile_manager.active_id.clone();
+        match self.profile_manager.get_profile_mut(&active_id) {
+            Some(p) if !p.is_root && p.mode != profile::LanguageMode::Inherit => {
+                p.mode = if new_state {
+                    profile::LanguageMode::Vietnamese
+                } else {
+                    profile::LanguageMode::English
+                };
+            }
+            _ => self.config.enabled = new_state,
+        }
         self.reset();
-        self.config.enabled
+        new_state
+    }
+
+    /// Macro table of the active profile: the global table unless the child has macro deltas
+    fn active_macro_table(&self) -> std::borrow::Cow<'_, MacroTable> {
+        match self.profile_manager.get_profile(&self.profile_manager.active_id) {
+            Some(p)
+                if !p.is_root
+                    && (!p.muted_macros.is_empty()
+                        || !p.overridden_macros.is_empty()
+                        || !p.app_macros.is_empty()) =>
+            {
+                let mut table = MacroTable::new();
+                for e in self.effective_macros() {
+                    table.insert_typed_no_cache(e.key, e.value, e.macro_type);
+                }
+                table.rebuild_cache();
+                std::borrow::Cow::Owned(table)
+            }
+            _ => std::borrow::Cow::Borrowed(&self.macro_table),
+        }
     }
 
     pub fn log_debug(&mut self, msg: impl Into<String>) {
@@ -159,6 +186,8 @@ impl VietnameseEngine {
 
     /// Feed a character into the engine with hardware Shift & CapsLock state.
     pub fn on_key(&mut self, ch: char, is_shift: bool, is_caps: bool) -> EngineAction {
+        // Settings of the active (foreground app) profile, resolved over the global config
+        let cfg = self.effective_config();
         let prev_state_summary = if self.config.debug {
             self.buffer.state.summary()
         } else {
@@ -167,7 +196,7 @@ impl VietnameseEngine {
         let mut is_upper = is_shift ^ is_caps;
 
         // Auto-uppercase first letter after period or newline
-        if self.config.auto_uppercase_first_char
+        if cfg.auto_uppercase_first_char
             && self.auto_uppercase_next
             && ch.is_alphabetic()
             && self.buffer.is_empty()
@@ -177,12 +206,12 @@ impl VietnameseEngine {
         }
 
         // Word break characters: space, enter, punctuation
-        if ch.is_whitespace() || is_word_break(ch, self.config.bracket_w) {
-            return self.handle_word_break(ch);
+        if ch.is_whitespace() || is_word_break(ch, cfg.bracket_w) {
+            return self.handle_word_break(ch, &cfg);
         }
 
-        if !self.config.enabled {
-            if self.config.use_macro && self.config.use_macro_in_english_mode {
+        if !cfg.enabled {
+            if cfg.use_macro && cfg.use_macro_in_english_mode {
                 if ch.is_alphanumeric() {
                     self.buffer.raw_keys.push(RawKey { ch, is_upper });
                     self.buffer.emitted_len += 1;
@@ -203,7 +232,7 @@ impl VietnameseEngine {
             let is_same_as_raw = rendered
                 .chars()
                 .eq(self.buffer.raw_keys.iter().map(|k| k.ch));
-            let should_restore = self.config.restore_on_wrong_spelling
+            let should_restore = cfg.restore_on_wrong_spelling
                 && !is_same_as_raw
                 && !self.buffer.state.is_valid_spelling();
 
@@ -216,7 +245,7 @@ impl VietnameseEngine {
                 self.buffer.clear();
                 self.buffer.raw_keys.push(raw_key);
                 let (next_state, _) =
-                    crate::vietnamese::SyllableState::Empty.feed_key(raw_key, 0, &self.config);
+                    crate::vietnamese::SyllableState::Empty.feed_key(raw_key, 0, &cfg);
                 self.buffer.state = next_state;
                 self.buffer.last_rendered.push(ch);
                 self.buffer.emitted_len = ch.len_utf16();
@@ -235,7 +264,7 @@ impl VietnameseEngine {
             let (test_state, _) =
                 self.buffer
                     .state
-                    .feed_key(raw_key, self.buffer.emitted_len, &self.config);
+                    .feed_key(raw_key, self.buffer.emitted_len, &cfg);
             if matches!(test_state, crate::vietnamese::SyllableState::Passthrough(_))
                 || self.buffer.is_passthrough
             {
@@ -246,7 +275,7 @@ impl VietnameseEngine {
             }
         }
 
-        let action = self.buffer.feed_key(raw_key, &self.config);
+        let action = self.buffer.feed_key(raw_key, &cfg);
 
         if self.config.debug {
             let next_state_summary = self.buffer.state.summary();
@@ -268,14 +297,14 @@ impl VietnameseEngine {
         action
     }
 
-    fn handle_word_break(&mut self, ch: char) -> EngineAction {
+    fn handle_word_break(&mut self, ch: char, cfg: &EngineConfig) -> EngineAction {
         // Update auto-uppercase trigger
-        if self.config.auto_uppercase_first_char && (ch == '.' || ch == '\n' || ch == '\r') {
+        if cfg.auto_uppercase_first_char && (ch == '.' || ch == '\n' || ch == '\r') {
             self.auto_uppercase_next = true;
         }
 
         // Check Macro expansion before clearing buffer
-        if self.config.use_macro && !self.buffer.is_empty() {
+        if cfg.use_macro && !self.buffer.is_empty() {
             let rendered = self.buffer.rendered();
             let is_space = ch == ' ';
             let allow_start = is_space;
@@ -284,19 +313,19 @@ impl VietnameseEngine {
             let is_same = rendered
                 .chars()
                 .eq(self.buffer.raw_keys.iter().map(|k| k.ch));
-            let expanded = self
-                .macro_table
+            let macro_table = self.active_macro_table();
+            let expanded = macro_table
                 .expand_word(rendered, allow_start, allow_end)
                 .or_else(|| {
                     if !is_same {
                         let current_word: String =
                             self.buffer.raw_keys.iter().map(|k| k.ch).collect();
-                        self.macro_table
-                            .expand_word(&current_word, allow_start, allow_end)
+                        macro_table.expand_word(&current_word, allow_start, allow_end)
                     } else {
                         None
                     }
                 });
+            drop(macro_table);
 
             if let Some(mut output) = expanded {
                 let backspaces = self.buffer.emitted_len;
@@ -323,7 +352,7 @@ impl VietnameseEngine {
         }
 
         // Restore raw keys if the word is an invalid Vietnamese syllable
-        if self.config.restore_on_wrong_spelling && !self.buffer.is_empty() {
+        if cfg.restore_on_wrong_spelling && !self.buffer.is_empty() {
             let is_same = self.buffer.rendered().chars().eq(self
                 .buffer
                 .raw_keys
@@ -396,9 +425,10 @@ impl VietnameseEngine {
 
     /// Feed a backspace event
     pub fn on_backspace(&mut self) -> EngineAction {
-        if !self.config.enabled {
-            if self.config.use_macro
-                && self.config.use_macro_in_english_mode
+        let cfg = self.effective_config();
+        if !cfg.enabled {
+            if cfg.use_macro
+                && cfg.use_macro_in_english_mode
                 && !self.buffer.is_empty()
             {
                 self.buffer.raw_keys.pop();
@@ -424,7 +454,7 @@ impl VietnameseEngine {
 
         if self.buffer.is_empty() {
             let mut restored_word = None;
-            if self.config.remember_history_across_space
+            if cfg.remember_history_across_space
                 && let Some(restored) = self.history.pop_backspace()
                 && let Some((raw_keys, is_raw_restored)) = restored
             {
@@ -436,7 +466,7 @@ impl VietnameseEngine {
                 } else {
                     // Replay previous word into buffer
                     for k in raw_keys {
-                        self.buffer.feed_key(k, &self.config);
+                        self.buffer.feed_key(k, &cfg);
                     }
                     self.buffer.is_restored_across_space = true;
                 }
@@ -450,7 +480,7 @@ impl VietnameseEngine {
             return EngineAction::Passthrough;
         }
 
-        self.buffer.handle_backspace(&self.config);
+        self.buffer.handle_backspace(&cfg);
         if self.config.debug {
             let now_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
             self.log_debug(format!(
@@ -504,30 +534,4 @@ fn is_word_break(c: char, bracket_w: bool) -> bool {
             | '|'
             | '-'
     )
-}
-
-/// Helper trả về chuỗi thời gian hiện tại chính xác đến mili-giây
-pub fn current_timestamp_str() -> String {
-    #[cfg(target_os = "windows")]
-    {
-        use crate::platform::win32::types::{GetLocalTime, SystemTime};
-
-        let mut st = std::mem::MaybeUninit::<SystemTime>::zeroed();
-        unsafe {
-            GetLocalTime(st.as_mut_ptr());
-            let st = st.assume_init();
-            format!(
-                "{:04}-{:02}-{:02} {:02}:{:02}:{:02}.{:03}",
-                st.year, st.month, st.day, st.hour, st.minute, st.second, st.milliseconds
-            )
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-        format!("{}.{:03}", now.as_secs(), now.subsec_millis())
-    }
 }

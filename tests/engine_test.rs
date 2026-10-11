@@ -1,4 +1,4 @@
-use mkey::{EngineAction, EngineConfig, InputMethod, VietnameseEngine};
+use kora::{EngineAction, EngineConfig, InputMethod, VietnameseEngine};
 
 /// Helper to simulate typing a string and collecting the rendered output on screen
 fn simulate_typing(engine: &mut VietnameseEngine, text: &str) -> String {
@@ -87,6 +87,25 @@ fn test_undo_tone_toggle() {
     assert_eq!(simulate_typing(&mut engine, "toanss "), "toans ");
     // Gõ phím 'z' xóa dấu -> "toan"
     assert_eq!(simulate_typing(&mut engine, "toansz "), "toan ");
+
+    // Gõ "tesst" ra "test" (collapse -sst -> -st)
+    assert_eq!(simulate_typing(&mut engine, "tesst"), "test");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "Tesst"), "Test");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "TESST"), "TEST");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "besst"), "best");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "lisst"), "list");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "cosst"), "cost");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "posst"), "post");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "musst"), "must");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "test "), "tét ");
 }
 
 #[test]
@@ -164,7 +183,7 @@ fn test_macro_expansion() {
 
 #[test]
 fn test_macro_table_file_persistence() {
-    use mkey::engine::macro_table::MacroTable;
+    use kora::engine::macro_table::MacroTable;
 
     let mut table = MacroTable::new();
     table.insert("ko", "không");
@@ -488,8 +507,8 @@ fn test_backspace_on_error_does_not_produce_eer() {
         eng.on_backspace();
     };
 
-    // 1. Gõ "error" -> ra "error" (Smart English Bypass giữ nguyên phụ âm kép rr)
-    for ch in "error".chars() {
+    // 1. Gõ "errror" -> ra "error" (gõ 3 chữ 'r' để hủy dấu và lấy chữ 'rr' theo Unikey)
+    for ch in "errror".chars() {
         type_key(&mut engine, ch, &mut screen);
     }
     assert_eq!(screen, "error");
@@ -697,13 +716,9 @@ fn test_undo_toggle_backspace_recovery() {
         }
         EngineAction::Consume => {}
     }
-    assert_eq!(screen, "bajj");
-
-    // 4. Backspace xóa 2 chữ 'j' vừa phục hồi -> màn hình còn "ba", buffer phải quay về "ba"
-    screen.pop();
-    engine.on_backspace();
     assert_eq!(screen, "baj");
 
+    // 4. Backspace xóa chữ 'j' vừa phục hồi -> màn hình còn "ba", buffer phải quay về "ba"
     screen.pop();
     engine.on_backspace();
     assert_eq!(screen, "ba");
@@ -979,7 +994,7 @@ fn test_simple_telex_vs_standard_telex() {
 
 #[test]
 fn test_taskbar_theme_detection() {
-    use mkey::ui::components::is_windows_dark_taskbar;
+    use kora::ui::tray::is_windows_dark_taskbar;
 
     // Checks that registry query runs smoothly and returns a bool
     let is_dark = is_windows_dark_taskbar();
@@ -988,7 +1003,7 @@ fn test_taskbar_theme_detection() {
 
 #[test]
 fn test_optimized_png_icon_loading() {
-    use mkey::ui::components::{load_icon_from_memory, safe_destroy_icon};
+    use kora::ui::tray::{load_icon_from_memory, safe_destroy_icon};
 
     static VIET_BYTES: &[u8] = include_bytes!("../assets/vi.ico");
     static ENG_BYTES: &[u8] = include_bytes!("../assets/en.ico");
@@ -1124,7 +1139,7 @@ fn test_macro_master_switch_and_sub_options() {
 
 #[test]
 fn test_macro_type_customization_and_single_character_guard() {
-    use mkey::engine::macro_table::MacroType;
+    use kora::engine::macro_table::MacroType;
 
     let mut engine = VietnameseEngine::new(EngineConfig {
         use_macro: true,
@@ -1146,7 +1161,7 @@ fn test_macro_type_customization_and_single_character_guard() {
 
     // Với bộ gõ VNI: 'w' đứng một mình là 'w ', 'wa ' là 'qua ':
     let mut engine_vni = VietnameseEngine::new(EngineConfig {
-        method: mkey::engine::config::InputMethod::Vni,
+        method: kora::engine::config::InputMethod::Vni,
         use_macro: true,
         ..Default::default()
     });
@@ -1204,7 +1219,7 @@ fn test_macro_type_customization_and_single_character_guard() {
 
 #[test]
 fn test_macro_type_serialization_and_roundtrip() {
-    use mkey::engine::macro_table::{MacroTable, MacroType};
+    use kora::engine::macro_table::{MacroTable, MacroType};
 
     let mut table = MacroTable::new();
     table.insert_typed("f", "ph", MacroType::StartConsonant);
@@ -1519,19 +1534,115 @@ fn test_hieuer_to_hieu() {
     engine.reset();
     assert_eq!(simulate_typing(&mut engine, "keue"), "kêu");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "pass"), "pass");
+    assert_eq!(simulate_typing(&mut engine, "passs"), "pass");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "pass "), "pass ");
+    assert_eq!(simulate_typing(&mut engine, "passs "), "pass ");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "password"), "password");
+    assert_eq!(simulate_typing(&mut engine, "passsword"), "password");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "password "), "password ");
+    assert_eq!(simulate_typing(&mut engine, "passsword "), "password ");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "error"), "error");
+    assert_eq!(simulate_typing(&mut engine, "errror"), "error");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "error "), "error ");
+    assert_eq!(simulate_typing(&mut engine, "errror "), "error ");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "off "), "off ");
+    assert_eq!(simulate_typing(&mut engine, "offf "), "off ");
     engine.reset();
-    assert_eq!(simulate_typing(&mut engine, "coffee "), "coffee ");
+    assert_eq!(simulate_typing(&mut engine, "cofffee "), "coffee ");
 }
+
+#[test]
+fn test_orthography_instant_passthrough_english_words() {
+    let mut engine = VietnameseEngine::new(EngineConfig::default());
+
+    // 1. Invalid Onset + Vowel combinations in Vietnamese (ce, ci, cy, ge, gy, qa, ka, ko, by, dy, ry, phy, khy):
+    // "center": 'c' followed by 'e' immediately escapes to Passthrough!
+    assert_eq!(simulate_typing(&mut engine, "center "), "center ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "cinema "), "cinema ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "city "), "city ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "cycle "), "cycle ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "cell "), "cell ");
+    engine.reset();
+    // "get": 'g' followed by 'e' immediately escapes to Passthrough (no temporary 'gét'):
+    assert_eq!(simulate_typing(&mut engine, "get "), "get ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "general "), "general ");
+    engine.reset();
+    // "gym": 'g' followed by 'y' immediately escapes to Passthrough (Vietnamese has no gy):
+    assert_eq!(simulate_typing(&mut engine, "gym "), "gym ");
+    engine.reset();
+    // "by", "byte": 'b' followed by 'y' immediately escapes to Passthrough (Vietnamese has no by):
+    assert_eq!(simulate_typing(&mut engine, "by "), "by ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "byte "), "byte ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "dynamic "), "dynamic ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "rhythm "), "rhythm ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "physics "), "physics ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "python "), "python ");
+    engine.reset();
+    // "qatar": 'q' followed by 'a' immediately escapes to Passthrough (q must precede u in Vietnamese):
+    assert_eq!(simulate_typing(&mut engine, "qatar "), "qatar ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "karaoke "), "karaoke ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "korea "), "korea ");
+    engine.reset();
+
+    // 2. Vowel-Coda Constraints (oo + m/t/p, oe + m, y + coda without qu):
+    assert_eq!(simulate_typing(&mut engine, "sync "), "sync ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "system "), "system ");
+    engine.reset();
+    // "poem": 'oe' does not accept 'm' -> immediately escapes to Passthrough:
+    assert_eq!(simulate_typing(&mut engine, "poem "), "poem ");
+    engine.reset();
+    // "boot": trong Telex 'oo' ra 'ô', gõ 'ooo' để hoàn tác 'oo', 'oo' không nhận 't'/'m' -> Passthrough:
+    assert_eq!(simulate_typing(&mut engine, "booot "), "boot ");
+    engine.reset();
+    // "foot": từ bắt đầu bằng phụ âm 'f' vào thẳng Passthrough nên gõ "foot" ra "foot" trực tiếp:
+    assert_eq!(simulate_typing(&mut engine, "foot "), "foot ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "rooot "), "root ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "rooom "), "room ");
+    engine.reset();
+
+    // 3. Valid Vietnamese words with these consonants are completely unaffected:
+    // 'k' with e, i, y:
+    assert_eq!(simulate_typing(&mut engine, "kes "), "ké ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "kim "), "kim ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "kyf "), "kỳ ");
+    engine.reset();
+    // 'c' with a, o, u:
+    assert_eq!(simulate_typing(&mut engine, "cas "), "cá ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "con "), "con ");
+    engine.reset();
+    // 'gh' with e, i:
+    assert_eq!(simulate_typing(&mut engine, "ghes "), "ghé ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ghi "), "ghi ");
+    engine.reset();
+    // 'g' with a, o, u, i (gi glide):
+    assert_eq!(simulate_typing(&mut engine, "gas "), "gá ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "giof "), "giò ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "giowf "), "giờ ");
+    engine.reset();
+    // 'oo' with 'ng' (xoong, boong) gõ 3 chữ 'o' trong Telex để ra 'oo':
+    assert_eq!(simulate_typing(&mut engine, "xooong "), "xoong ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "booong "), "boong ");
+}
+

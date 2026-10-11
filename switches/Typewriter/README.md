@@ -1,13 +1,13 @@
-# Soundpack: Typewriter
+﻿# Soundpack: Typewriter
 
-- **Nhà sản xuất / Thiết kế**: Vintage Mechanical Typewriter
-- **Phân loại**: Mechanical Carriage & Typebar
-- **Tác giả thu âm**: Freesound Community / Public Domain
-- **Giấy phép (License)**: [Creative Commons 0 / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/)
-- **Nguồn gốc / Repository**: https://freesound.org
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Vintage Mechanical Typewriter
+- **PhÃ¢n loáº¡i**: Mechanical Carriage & Typebar
+- **TÃ¡c giáº£ thu Ã¢m**: Freesound Community / Public Domain
+- **Giáº¥y phÃ©p (License)**: [Creative Commons 0 / Public Domain](https://creativecommons.org/publicdomain/zero/1.0/)
+- **Nguá»“n gá»‘c / Repository**: https://freesound.org
 
-## Giới thiệu & Đặc trưng âm thanh
-Thu âm từ máy đánh chữ cơ học cổ điển với tiếng gõ búa kim loại và cần gạt sang dòng.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Thu Ã¢m tá»« mÃ¡y Ä‘Ã¡nh chá»¯ cÆ¡ há»c cá»• Ä‘iá»ƒn vá»›i tiáº¿ng gÃµ bÃºa kim loáº¡i vÃ  cáº§n gáº¡t sang dÃ²ng.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

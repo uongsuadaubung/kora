@@ -1,4 +1,4 @@
-//! Interface gallery & philosophy styling
+﻿//! Interface gallery & philosophy styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

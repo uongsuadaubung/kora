@@ -1,31 +1,32 @@
-//! MKey Pure Win32 UI System
+//! Kora Pure Win32 UI System
 //! Fully componentized, lightweight, zero-dependency native Windows UI.
 
 pub mod colors;
 pub mod components;
-pub mod paint;
 pub mod theme;
+pub mod tokens;
+pub mod tray;
 pub mod views;
+pub mod win32;
 pub mod wnd_proc;
 
-pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
+pub use win32::*;
 
-use crate::ui::components::load_icon_from_memory;
-use crate::ui::components::window::*;
+pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
+pub use tokens::*;
+
+use crate::engine::profile::AppProfile;
 use crate::ui::theme::recreate_theme_brushes;
-use crate::ui::views::{ControlPanelControls, TrayHandler};
+use crate::ui::tray::{get_small_icon_size, load_icon_from_memory, TrayHandler};
+use crate::ui::views::ControlPanelControls;
 use crate::ui::wnd_proc::{control_panel_wnd_proc, tray_helper_wnd_proc};
 use std::ptr::null_mut;
 use std::sync::Mutex;
 
 static APP_ICO_BYTES: &[u8] = include_bytes!("../../assets/icon.ico");
 
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn LoadCursorW(h_instance: isize, lp_cursor_name: usize) -> isize;
-}
-
 pub static UI_MANAGER: Mutex<Option<UiState>> = Mutex::new(None);
+
 
 pub struct UiState {
     pub h_helper: isize,
@@ -36,19 +37,80 @@ pub struct UiState {
     pub hfont_bold: isize,
 }
 
+impl UiState {
+    pub fn on_command(&mut self, hwnd: isize, control_id: u32, notify_code: u32) -> bool {
+        let handled = self.controls.on_command(hwnd, control_id, notify_code);
+        if control_id == crate::ui::tokens::id::IDC_COMBO_TYPING_MODE {
+            if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
+                && let Some(ref engine) = *guard
+            {
+                self.tray.set_vietnamese_mode(engine.effective_config().enabled);
+            }
+        } else if control_id == crate::ui::tokens::id::IDC_COMBO_THEME
+            || control_id == crate::ui::tokens::id::IDC_COMBO_LANG
+        {
+            self.tray.refresh_icon();
+        }
+        handled
+    }
+}
+
 pub fn show_control_panel() {
-    let (cfg, macros) = {
+    let (cfg, selected_profile, is_active, all_profiles, active_id, remaps, disabled, macros) = {
         if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
             if let Some(ref engine) = *guard {
+                let sel_id = engine.profile_manager.selected_id.clone();
+                let act_id = engine.profile_manager.active_id.clone();
+                let is_act = sel_id == act_id;
+                let prof = engine
+                    .profile_manager
+                    .get_profile(&sel_id)
+                    .cloned()
+                    .unwrap_or_else(|| engine.profile_manager.global_profile.clone());
+                let all: Vec<AppProfile> = engine
+                    .profile_manager
+                    .all_profiles()
+                    .into_iter()
+                    .cloned()
+                    .collect();
+                let r = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
+                let d = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
+                let m = engine
+                    .profile_manager
+                    .resolve_macro_items_for_ui(&sel_id, &engine.macro_table.get_sorted_entries());
                 (
                     Some(engine.config().clone()),
-                    engine.macro_table.get_sorted_entries(),
+                    Some(prof),
+                    is_act,
+                    all,
+                    act_id,
+                    r,
+                    d,
+                    m,
                 )
             } else {
-                (None, Vec::new())
+                (
+                    None,
+                    None,
+                    false,
+                    Vec::new(),
+                    String::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                )
             }
         } else {
-            (None, Vec::new())
+            (
+                None,
+                None,
+                false,
+                Vec::new(),
+                String::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )
         }
     };
 
@@ -64,12 +126,25 @@ pub fn show_control_panel() {
                 SetWindowTextW(ui.h_panel, to_wide(strings.window_title).as_ptr());
                 let is_dark = resolve_is_dark(c.theme);
                 apply_ui_theme(ui.h_panel, &ui.controls, is_dark);
+
+                if let Some(ref prof) = selected_profile {
+                    let all_refs: Vec<&AppProfile> = all_profiles.iter().collect();
+                    ui.controls
+                        .load_profile_data(prof, is_active, c, &all_refs, &active_id);
+                }
             }
-            ui.controls.populate_macros(&macros);
+            ui.controls.tab_remap.populate_remaps(&remaps);
+            ui.controls.tab_remap.populate_disabled(&disabled);
+            ui.controls.populate_macro_items(&macros);
             ui.controls
-                .update_tab_visibility(ui.controls.tab_bar.get_cur_sel());
-            ShowWindow(ui.h_panel, SW_SHOW);
-            SetForegroundWindow(ui.h_panel);
+                .update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(
+                    ui.controls.tab_bar.get_cur_sel(),
+                ));
+            let h_panel = ui.h_panel;
+            InvalidateRect(h_panel, null_mut(), 0);
+            drop(ui_guard);
+            ShowWindow(h_panel, SW_SHOW);
+            SetForegroundWindow(h_panel);
         }
     }
 }
@@ -80,7 +155,7 @@ pub fn update_tray_icon(is_vietnamese: bool) {
     {
         ui.tray.set_vietnamese_mode(is_vietnamese);
         ui.controls
-            .header
+            .tab_typing
             .combo_mode
             .set_selected(if is_vietnamese { 0 } else { 1 });
     }
@@ -90,8 +165,8 @@ pub fn update_tray_icon(is_vietnamese: bool) {
 pub fn init_ui() -> bool {
     init_common_controls();
 
-    let class_helper_name = to_wide("MKeyHelperClass");
-    let class_panel_name = to_wide("MKeyControlPanelClass");
+    let class_helper_name = to_wide("KoraHelperClass");
+    let class_panel_name = to_wide("KoraControlPanelClass");
 
     let (cfg_theme, cfg_lang, init_config) = {
         let guard = crate::platform::win32::ENGINE_INSTANCE.lock().unwrap();
@@ -124,9 +199,10 @@ pub fn init_ui() -> bool {
         wc_helper.h_cursor = LoadCursorW(0, IDC_ARROW);
         RegisterClassExW(&wc_helper);
 
-        // 2. Load Application Icons for Taskbar and Title Bar
+        // 2. Load Application Icons for Taskbar and Title Bar (DPI-aware)
+        let (sm_w, sm_h) = get_small_icon_size();
         let hicon_big = load_icon_from_memory(APP_ICO_BYTES, 32, 32).unwrap_or(0);
-        let hicon_sm = load_icon_from_memory(APP_ICO_BYTES, 16, 16).unwrap_or(0);
+        let hicon_sm = load_icon_from_memory(APP_ICO_BYTES, sm_w, sm_h).unwrap_or(0);
 
         // Register Control Panel Window Class
         let mut wc_panel: WNDCLASSEXW = std::mem::zeroed();
@@ -164,12 +240,25 @@ pub fn init_ui() -> bool {
         let tray = TrayHandler::new(h_helper);
 
         // 5. Create Fonts (Segoe UI 9pt normal, 9pt semibold)
-        let hfont_normal = create_app_font(9, FW_NORMAL);
-        let hfont_bold = create_app_font(9, FW_SEMIBOLD);
+        let hfont_normal = create_app_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_NORMAL);
+        let hfont_bold = create_app_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_SEMIBOLD);
+        crate::ui::theme::set_app_fonts(hfont_normal, hfont_bold);
 
         // 6. Create Control Panel Window with WS_EX_APPWINDOW to display on Windows Taskbar
-        let panel_width = 460;
-        let panel_height = 540;
+        // Ensure client area is exactly 820x590 for 2-column multi-profile layout
+        let mut rc = RECT {
+            left: 0,
+            top: 0,
+            right: crate::ui::tokens::layout::WINDOW_CLIENT_WIDTH,
+            bottom: crate::ui::tokens::layout::WINDOW_CLIENT_HEIGHT,
+        };
+        AdjustWindowRect(
+            &mut rc,
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+            0,
+        );
+        let panel_width = rc.right - rc.left;
+        let panel_height = rc.bottom - rc.top;
         let h_panel = CreateWindowExW(
             WS_EX_APPWINDOW | WS_EX_CONTROLPARENT,
             class_panel_name.as_ptr(),
@@ -198,8 +287,22 @@ pub fn init_ui() -> bool {
             SendMessageW(h_panel, WM_SETICON, ICON_SMALL, hicon_sm);
         }
 
-        // Center on screen
-        center_window(h_panel, panel_width, panel_height);
+        // Center and guarantee exact client area (820x590) regardless of OS non-client frame metrics
+        let mut client_rc = RECT::default();
+        GetClientRect(h_panel, &mut client_rc);
+        let actual_w = client_rc.right - client_rc.left;
+        let actual_h = client_rc.bottom - client_rc.top;
+        let target_w = if actual_w < crate::ui::tokens::layout::WINDOW_CLIENT_WIDTH {
+            panel_width + (crate::ui::tokens::layout::WINDOW_CLIENT_WIDTH - actual_w)
+        } else {
+            panel_width
+        };
+        let target_h = if actual_h < crate::ui::tokens::layout::WINDOW_CLIENT_HEIGHT {
+            panel_height + (crate::ui::tokens::layout::WINDOW_CLIENT_HEIGHT - actual_h)
+        } else {
+            panel_height
+        };
+        center_window(h_panel, target_w, target_h);
 
         // Create all components inside Control Panel
         let controls = match ControlPanelControls::create(h_panel, hfont_normal, hfont_bold) {
@@ -219,8 +322,8 @@ pub fn init_ui() -> bool {
         // Apply theme styling across all controls
         apply_ui_theme(h_panel, &controls, is_dark);
 
-        // Initial tab visibility
-        controls.update_tab_visibility(0);
+        // Initial view mode: Profile Tab 0 (Typing)
+        controls.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(0));
 
         let mut ui_guard = UI_MANAGER.lock().unwrap();
         *ui_guard = Some(UiState {
@@ -231,6 +334,14 @@ pub fn init_ui() -> bool {
             hfont_normal,
             hfont_bold,
         });
+
+        if let Some(ref ui) = *ui_guard {
+            SetWindowLongPtrW(
+                h_panel,
+                GWLP_USERDATA,
+                &ui.controls as *const _ as isize,
+            );
+        }
 
         true
     }

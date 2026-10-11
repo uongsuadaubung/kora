@@ -2,12 +2,15 @@
 //! Native Win32 Fluent Design Segmented Control with smooth pill animations and hover states.
 
 use crate::ui::colors::ThemePalette;
-use crate::ui::components::window::*;
+use crate::ui::tokens::{borders, radii};
+use crate::ui::win32::*;
 use std::ptr::null_mut;
-use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, Once};
 
 const WS_CHILD: u32 = 0x40000000;
 const WS_VISIBLE: u32 = 0x10000000;
+const WM_CREATE: u32 = 0x0001;
+const WM_DESTROY: u32 = 0x0002;
 const WM_PAINT: u32 = 0x000F;
 const WM_ERASEBKGND: u32 = 0x0014;
 const WM_LBUTTONDOWN: u32 = 0x0201;
@@ -16,27 +19,33 @@ const WM_MOUSELEAVE: u32 = 0x02A3;
 const WM_SETCURSOR: u32 = 0x0020;
 const WM_COMMAND: u32 = 0x0111;
 
-static TAB_CUR_SEL: AtomicUsize = AtomicUsize::new(0);
-static TAB_HOVER: AtomicIsize = AtomicIsize::new(-1);
-static TAB_FONT_NORMAL: AtomicIsize = AtomicIsize::new(0);
-static TAB_FONT_BOLD: AtomicIsize = AtomicIsize::new(0);
-static TAB_PARENT: AtomicIsize = AtomicIsize::new(0);
-static TAB_CONTROL_ID: AtomicUsize = AtomicUsize::new(0);
+pub type TabBarCallback = Arc<dyn Fn(usize) + Send + Sync>;
 
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn TrackMouseEvent(lp_event_track: *mut TRACKMOUSEEVENT) -> i32;
+pub struct TabBarState {
+    pub tabs: Vec<String>,
+    pub cur_sel: usize,
+    pub hover_idx: isize,
+    pub font_normal: isize,
+    pub font_bold: isize,
+    pub parent: isize,
+    pub control_id: u32,
+    pub on_change: Option<TabBarCallback>,
 }
 
-#[repr(C)]
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-struct TRACKMOUSEEVENT {
-    cb_size: u32,
-    dw_flags: u32,
-    hwnd_track: isize,
-    dw_hover_time: u32,
+static REGISTER_CLASS_ONCE: Once = Once::new();
+const CLASS_NAME: &str = "KoraTabBarClass";
+
+fn ensure_class_registered() {
+    REGISTER_CLASS_ONCE.call_once(|| unsafe {
+        let class_name_w = to_wide(CLASS_NAME);
+        let mut wc: WNDCLASSEXW = std::mem::zeroed();
+        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
+        wc.lpfn_wnd_proc = Some(tab_bar_wnd_proc);
+        wc.lpsz_class_name = class_name_w.as_ptr();
+        wc.h_cursor = LoadCursorW(0, IDC_ARROW);
+        RegisterClassExW(&wc);
+    });
 }
-const TME_LEAVE: u32 = 0x00000002;
 
 unsafe extern "system" fn tab_bar_wnd_proc(
     hwnd: isize,
@@ -44,6 +53,27 @@ unsafe extern "system" fn tab_bar_wnd_proc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
+    let state_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<TabBarState> };
+
+    if msg == WM_CREATE {
+        return 0;
+    }
+
+    if msg == WM_DESTROY {
+        if !state_ptr.is_null() {
+            unsafe {
+                drop(Arc::from_raw(state_ptr));
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+            }
+        }
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+    }
+
+    if state_ptr.is_null() {
+        return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) };
+    }
+    let state_mutex = unsafe { &*state_ptr };
+
     match msg {
         WM_ERASEBKGND => 1,
         WM_MOUSEMOVE => {
@@ -60,9 +90,23 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                 let w = rc.right - rc.left;
                 if w > 0 {
                     let x = (lparam & 0xFFFF) as i32;
-                    let tab_w = (w - 6) / 4;
-                    let idx = ((x - 3) / tab_w.max(1)).clamp(0, 3) as isize;
-                    if TAB_HOVER.swap(idx, Ordering::Relaxed) != idx {
+                    let changed = if let Ok(mut g) = state_mutex.lock() {
+                        let num_tabs = g.tabs.len();
+                        if num_tabs > 0 {
+                            let track_padding = 3;
+                            let available_w = (w - (track_padding * 2)).max(1);
+                            let tab_w = (available_w / num_tabs as i32).max(1);
+                            let idx = ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as isize;
+                            let old = g.hover_idx;
+                            g.hover_idx = idx;
+                            old != idx
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    };
+                    if changed {
                         InvalidateRect(hwnd, null_mut(), 0);
                     }
                 }
@@ -70,7 +114,14 @@ unsafe extern "system" fn tab_bar_wnd_proc(
             0
         }
         WM_MOUSELEAVE => {
-            if TAB_HOVER.swap(-1, Ordering::Relaxed) != -1 {
+            let changed = if let Ok(mut g) = state_mutex.lock() {
+                let old = g.hover_idx;
+                g.hover_idx = -1;
+                old != -1
+            } else {
+                false
+            };
+            if changed {
                 unsafe {
                     InvalidateRect(hwnd, null_mut(), 0);
                 }
@@ -84,20 +135,44 @@ unsafe extern "system" fn tab_bar_wnd_proc(
             1
         }
         WM_LBUTTONDOWN => {
+            let mut rc = RECT::default();
             unsafe {
-                let mut rc = RECT::default();
                 GetClientRect(hwnd, &mut rc);
-                let w = rc.right - rc.left;
-                if w > 0 {
-                    let x = (lparam & 0xFFFF) as i32;
-                    let tab_w = (w - 6) / 4;
-                    let idx = ((x - 3) / tab_w.max(1)).clamp(0, 3) as usize;
-                    if TAB_CUR_SEL.swap(idx, Ordering::Relaxed) != idx {
+            }
+            let w = rc.right - rc.left;
+            if w > 0 {
+                let x = (lparam & 0xFFFF) as i32;
+                let (changed, new_idx, parent, id, cb) = if let Ok(mut g) = state_mutex.lock() {
+                    let num_tabs = g.tabs.len();
+                    if num_tabs > 0 {
+                        let track_padding = 3;
+                        let available_w = (w - (track_padding * 2)).max(1);
+                        let tab_w = (available_w / num_tabs as i32).max(1);
+                        let idx = ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as usize;
+                        let old = g.cur_sel;
+                        if old != idx {
+                            g.cur_sel = idx;
+                            (true, idx, g.parent, g.control_id, g.on_change.clone())
+                        } else {
+                            (false, idx, 0, 0, None)
+                        }
+                    } else {
+                        (false, 0, 0, 0, None)
+                    }
+                } else {
+                    (false, 0, 0, 0, None)
+                };
+
+                if changed {
+                    unsafe {
                         InvalidateRect(hwnd, null_mut(), 0);
-                        let parent = TAB_PARENT.load(Ordering::Relaxed);
-                        let id = TAB_CONTROL_ID.load(Ordering::Relaxed);
-                        if parent != 0 {
-                            SendMessageW(parent, WM_COMMAND, id & 0xFFFF, hwnd);
+                    }
+                    if let Some(cb) = cb {
+                        cb(new_idx);
+                    }
+                    if parent != 0 {
+                        unsafe {
+                            SendMessageW(parent, WM_COMMAND, (id & 0xFFFF) as usize, hwnd);
                         }
                     }
                 }
@@ -114,23 +189,25 @@ unsafe extern "system" fn tab_bar_wnd_proc(
 
                     let is_dark = crate::ui::is_current_dark();
                     let palette = ThemePalette::get(is_dark);
-                    let cur_sel = TAB_CUR_SEL.load(Ordering::Relaxed);
-                    let hover_idx = TAB_HOVER.load(Ordering::Relaxed);
-                    let font_normal = TAB_FONT_NORMAL.load(Ordering::Relaxed);
-                    let font_bold = TAB_FONT_BOLD.load(Ordering::Relaxed);
 
-                    // 0. Fill the entire control rect with the window background so corners outside the pill blend invisibly
+                    let (tabs, cur_sel, hover_idx, font_normal, font_bold) = if let Ok(g) = state_mutex.lock() {
+                        (g.tabs.clone(), g.cur_sel, g.hover_idx, g.font_normal, g.font_bold)
+                    } else {
+                        (Vec::new(), 0, -1, 0, 0)
+                    };
+
+                    // 0. Fill the entire control rect with the window background
                     let brush_bg = CreateSolidBrush(palette.bg_window);
                     FillRect(hdc, &rc, brush_bg);
                     DeleteObject(brush_bg);
 
                     // 1. Paint Outer Segmented Track Pill
                     let brush_track = CreateSolidBrush(palette.tab_track_bg);
-                    let pen_track = CreatePen(PS_SOLID, 1, palette.tab_track_border);
+                    let pen_track = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_track_border);
                     let old_brush = SelectObject(hdc, brush_track);
                     let old_pen = SelectObject(hdc, pen_track);
 
-                    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 12, 12);
+                    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radii::RADIUS_PILL, radii::RADIUS_PILL);
 
                     SelectObject(hdc, old_brush);
                     SelectObject(hdc, old_pen);
@@ -138,66 +215,38 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                     DeleteObject(pen_track);
 
                     // 2. Draw Tabs
-                    let tab_titles = crate::language::current().tab_titles();
-                    let num_tabs = tab_titles.len() as i32;
-                    let track_padding = 3;
-                    let available_w = (rc.right - rc.left) - (track_padding * 2);
-                    let tab_w = available_w / num_tabs;
+                    let num_tabs = tabs.len() as i32;
+                    if num_tabs > 0 {
+                        let track_padding = 3;
+                        let available_w = (rc.right - rc.left) - (track_padding * 2);
+                        let tab_w = available_w / num_tabs;
 
-                    SetBkMode(hdc, TRANSPARENT);
+                        SetBkMode(hdc, TRANSPARENT);
 
-                    for (i, title) in tab_titles.iter().enumerate() {
-                        let i_i32 = i as i32;
-                        let item_left = track_padding + i_i32 * tab_w;
-                        let item_right = if i == tab_titles.len() - 1 {
-                            rc.right - track_padding
-                        } else {
-                            item_left + tab_w
-                        };
-                        let item_top = track_padding;
-                        let item_bottom = rc.bottom - track_padding;
+                        for (i, title) in tabs.iter().enumerate() {
+                            let i_i32 = i as i32;
+                            let item_left = track_padding + i_i32 * tab_w;
+                            let item_right = if i == tabs.len() - 1 {
+                                rc.right - track_padding
+                            } else {
+                                item_left + tab_w
+                            };
+                            let item_top = track_padding;
+                            let item_bottom = rc.bottom - track_padding;
 
-                        let mut item_rc = RECT {
-                            left: item_left,
-                            top: item_top,
-                            right: item_right,
-                            bottom: item_bottom,
-                        };
+                            let mut item_rc = RECT {
+                                left: item_left,
+                                top: item_top,
+                                right: item_right,
+                                bottom: item_bottom,
+                            };
 
-                        if i == cur_sel {
-                            // Active Tab Pill
-                            let h_active_br = CreateSolidBrush(palette.tab_active_bg);
-                            let h_active_pen = CreatePen(PS_SOLID, 1, palette.tab_active_border);
-                            let ob = SelectObject(hdc, h_active_br);
-                            let op = SelectObject(hdc, h_active_pen);
-
-                            RoundRect(
-                                hdc,
-                                item_rc.left,
-                                item_rc.top,
-                                item_rc.right,
-                                item_rc.bottom,
-                                8,
-                                8,
-                            );
-
-                            SelectObject(hdc, ob);
-                            SelectObject(hdc, op);
-                            DeleteObject(h_active_br);
-                            DeleteObject(h_active_pen);
-
-                            // Text
-                            if font_bold != 0 {
-                                SelectObject(hdc, font_bold);
-                            }
-                            SetTextColor(hdc, palette.text_primary);
-                        } else {
-                            // Inactive Tab (with subtle hover)
-                            if hover_idx == i as isize {
-                                let h_hvr_br = CreateSolidBrush(palette.tab_hover_bg);
-                                let h_null_pen = CreatePen(PS_NULL, 0, 0);
-                                let ob = SelectObject(hdc, h_hvr_br);
-                                let op = SelectObject(hdc, h_null_pen);
+                            if i == cur_sel {
+                                // Active Tab Pill
+                                let h_active_br = CreateSolidBrush(palette.tab_active_bg);
+                                let h_active_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_active_border);
+                                let ob = SelectObject(hdc, h_active_br);
+                                let op = SelectObject(hdc, h_active_pen);
 
                                 RoundRect(
                                     hdc,
@@ -205,30 +254,69 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                                     item_rc.top,
                                     item_rc.right,
                                     item_rc.bottom,
-                                    8,
-                                    8,
+                                    radii::RADIUS_CARD,
+                                    radii::RADIUS_CARD,
                                 );
 
                                 SelectObject(hdc, ob);
                                 SelectObject(hdc, op);
-                                DeleteObject(h_hvr_br);
-                                DeleteObject(h_null_pen);
+                                DeleteObject(h_active_br);
+                                DeleteObject(h_active_pen);
+
+                                // Text & Underline indicator
+                                if font_bold != 0 {
+                                    SelectObject(hdc, font_bold);
+                                }
+                                SetTextColor(hdc, palette.accent);
+
+                                let line_rc = RECT {
+                                    left: item_rc.left + 4,
+                                    top: item_rc.bottom - 2,
+                                    right: item_rc.right - 4,
+                                    bottom: item_rc.bottom,
+                                };
+                                let line_br = CreateSolidBrush(palette.accent);
+                                FillRect(hdc, &line_rc, line_br);
+                                DeleteObject(line_br);
+                            } else {
+                                // Inactive Tab (with subtle hover)
+                                if hover_idx == i as isize {
+                                    let h_hvr_br = CreateSolidBrush(palette.tab_hover_bg);
+                                    let h_null_pen = CreatePen(PS_NULL, 0, 0);
+                                    let ob = SelectObject(hdc, h_hvr_br);
+                                    let op = SelectObject(hdc, h_null_pen);
+
+                                    RoundRect(
+                                        hdc,
+                                        item_rc.left,
+                                        item_rc.top,
+                                        item_rc.right,
+                                        item_rc.bottom,
+                                        radii::RADIUS_CARD,
+                                        radii::RADIUS_CARD,
+                                    );
+
+                                    SelectObject(hdc, ob);
+                                    SelectObject(hdc, op);
+                                    DeleteObject(h_hvr_br);
+                                    DeleteObject(h_null_pen);
+                                }
+
+                                if font_normal != 0 {
+                                    SelectObject(hdc, font_normal);
+                                }
+                                SetTextColor(hdc, palette.text_secondary);
                             }
 
-                            if font_normal != 0 {
-                                SelectObject(hdc, font_normal);
-                            }
-                            SetTextColor(hdc, palette.text_secondary);
+                            let title_w = to_wide(title);
+                            DrawTextW(
+                                hdc,
+                                title_w.as_ptr(),
+                                title.encode_utf16().count() as i32,
+                                &mut item_rc,
+                                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                            );
                         }
-
-                        let title_w = to_wide(title);
-                        DrawTextW(
-                            hdc,
-                            title_w.as_ptr(),
-                            title.encode_utf16().count() as i32,
-                            &mut item_rc,
-                            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-                        );
                     }
 
                     EndPaint(hwnd, &ps);
@@ -240,8 +328,10 @@ unsafe extern "system" fn tab_bar_wnd_proc(
     }
 }
 
+#[derive(Clone)]
 pub struct TabBar {
     hwnd: isize,
+    state: Arc<Mutex<TabBarState>>,
 }
 
 impl TabBar {
@@ -255,27 +345,28 @@ impl TabBar {
         height: i32,
         hfont_normal: isize,
         hfont_bold: isize,
+        tabs: &[impl AsRef<str>],
     ) -> Option<Self> {
-        let class_name = to_wide("MKeyTabBarClass");
+        ensure_class_registered();
 
-        unsafe {
-            TAB_CUR_SEL.store(0, Ordering::Relaxed);
-            TAB_HOVER.store(-1, Ordering::Relaxed);
-            TAB_FONT_NORMAL.store(hfont_normal, Ordering::Relaxed);
-            TAB_FONT_BOLD.store(hfont_bold, Ordering::Relaxed);
-            TAB_PARENT.store(parent, Ordering::Relaxed);
-            TAB_CONTROL_ID.store(id as usize, Ordering::Relaxed);
+        let state = Arc::new(Mutex::new(TabBarState {
+            tabs: tabs.iter().map(|s| s.as_ref().to_string()).collect(),
+            cur_sel: 0,
+            hover_idx: -1,
+            font_normal: hfont_normal,
+            font_bold: hfont_bold,
+            parent,
+            control_id: id,
+            on_change: None,
+        }));
 
-            let mut wc: WNDCLASSEXW = std::mem::zeroed();
-            wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-            wc.lpfn_wnd_proc = Some(tab_bar_wnd_proc);
-            wc.lpsz_class_name = class_name.as_ptr();
-            wc.h_cursor = LoadCursorW(0, IDC_ARROW);
-            RegisterClassExW(&wc);
+        let raw_state = Arc::into_raw(state.clone());
+        let class_name_w = to_wide(CLASS_NAME);
 
-            let hwnd = CreateWindowExW(
+        let hwnd = unsafe {
+            CreateWindowExW(
                 0,
-                class_name.as_ptr(),
+                class_name_w.as_ptr(),
                 to_wide("TabBar").as_ptr(),
                 WS_CHILD | WS_VISIBLE,
                 x,
@@ -286,10 +377,21 @@ impl TabBar {
                 id as isize,
                 0,
                 null_mut(),
-            );
+            )
+        };
 
-            if hwnd != 0 { Some(Self { hwnd }) } else { None }
+        if hwnd == 0 {
+            unsafe {
+                drop(Arc::from_raw(raw_state));
+            }
+            return None;
         }
+
+        unsafe {
+            SetWindowLongPtrW(hwnd, GWLP_USERDATA, raw_state as isize);
+        }
+
+        Some(Self { hwnd, state })
     }
 
     pub fn hwnd(&self) -> isize {
@@ -297,15 +399,53 @@ impl TabBar {
     }
 
     pub fn get_cur_sel(&self) -> usize {
-        TAB_CUR_SEL.load(Ordering::Relaxed)
+        if let Ok(g) = self.state.lock() {
+            g.cur_sel
+        } else {
+            0
+        }
     }
 
     pub fn set_cur_sel(&self, index: usize) {
-        if index < crate::language::current().tab_titles().len() {
-            TAB_CUR_SEL.store(index, Ordering::Relaxed);
+        let changed = if let Ok(mut g) = self.state.lock() {
+            if index < g.tabs.len() && g.cur_sel != index {
+                g.cur_sel = index;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        if changed {
             unsafe {
                 InvalidateRect(self.hwnd, null_mut(), 0);
             }
+        }
+    }
+
+    pub fn set_tabs(&self, tabs: &[impl AsRef<str>]) {
+        if let Ok(mut g) = self.state.lock() {
+            g.tabs = tabs.iter().map(|s| s.as_ref().to_string()).collect();
+            if g.cur_sel >= g.tabs.len() {
+                g.cur_sel = 0;
+            }
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
+    pub fn set_on_change<F: Fn(usize) + Send + Sync + 'static>(&self, f: F) {
+        if let Ok(mut g) = self.state.lock() {
+            g.on_change = Some(Arc::new(f));
+        }
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        let cmd = if visible { SW_SHOW } else { SW_HIDE };
+        unsafe {
+            ShowWindow(self.hwnd, cmd);
         }
     }
 }

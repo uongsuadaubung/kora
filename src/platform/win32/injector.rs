@@ -180,3 +180,35 @@ pub fn send_backspaces(count: usize) {
 pub fn send_unicode_string(text: &str) {
     send_replace(0, text);
 }
+
+/// Sends a simulated hardware virtual-key event (Key Down or Key Up) with MAGIC_EXTRA_INFO
+pub fn send_vk_event(vk: u32, is_up: bool) {
+    let mut flags = 0;
+    if is_up {
+        flags |= KEYEVENTF_KEYUP;
+    }
+    let is_extended = matches!(
+        vk,
+        0x21 | 0x22 | 0x23 | 0x24 | 0x25 | 0x26 | 0x27 | 0x28 | 0x2D | 0x2E | 0x5B | 0x5C | 0x5D | 0x90 | 0xAD | 0xAE | 0xAF | 0xB0 | 0xB1 | 0xB2 | 0xB3
+    );
+    if is_extended {
+        flags |= super::types::KEYEVENTF_EXTENDEDKEY;
+    }
+
+    let input = INPUT {
+        r#type: INPUT_KEYBOARD,
+        u: INPUT_UNION {
+            ki: KEYBDINPUT {
+                w_vk: vk as u16,
+                w_scan: 0,
+                dw_flags: flags,
+                time: 0,
+                dw_extra_info: MAGIC_EXTRA_INFO,
+            },
+        },
+    };
+    unsafe {
+        SendInput(1, &input, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+

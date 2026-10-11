@@ -1,4 +1,4 @@
-//! Comparison table styling
+﻿//! Comparison table styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================
@@ -28,7 +28,7 @@ pub fn render() -> &'static str {
 
 .feature-col { width: 30%; color: var(--text-secondary); }
 .legacy-th { width: 35%; color: #94a3b8; }
-.mkey-th { width: 35%; color: #ffffff; background: rgba(255, 255, 255, 0.04); }
+.kora-th { width: 35%; color: #ffffff; background: rgba(255, 255, 255, 0.04); }
 
 .comparison-table td {
   padding: 24px;
@@ -91,7 +91,7 @@ pub fn render() -> &'static str {
   font-size: 0.9rem;
 }
 
-.mkey-td {
+.kora-td {
   background: rgba(255, 255, 255, 0.02);
   color: var(--text-primary);
   font-size: 0.9rem;

@@ -1,18 +1,15 @@
-//! MKey Win32 Window Procedures & Message Handlers
+//! Kora Win32 Window Procedures & Message Handlers
 
 pub mod colors;
 pub mod commands;
-pub mod macro_events;
 pub mod tray;
 
 pub use tray::{handle_menu_command, tray_helper_wnd_proc};
 
 use crate::platform::win32::ENGINE_INSTANCE;
-use crate::ui::UI_MANAGER;
-use crate::ui::components::window::*;
-use crate::ui::paint::paint_control_panel;
+use crate::ui::win32::*;
+use crate::ui::views::control_panel::paint_control_panel;
 use crate::ui::theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
-use crate::ui::views::IDC_LIST_MACRO;
 
 const WM_PAINT: u32 = 0x000F;
 const WM_CLOSE: u32 = 0x0010;
@@ -20,6 +17,8 @@ const WM_ERASEBKGND: u32 = 0x0014;
 const WM_SHOWWINDOW: u32 = 0x0018;
 const WM_SETTINGCHANGE: u32 = 0x001A;
 const WM_SETCURSOR: u32 = 0x0020;
+const WM_DRAWITEM: u32 = 0x002B;
+const WM_MEASUREITEM: u32 = 0x002C;
 const WM_NOTIFY: u32 = 0x004E;
 const WM_COMMAND: u32 = 0x0111;
 const WM_HSCROLL: u32 = 0x0114;
@@ -27,14 +26,7 @@ const WM_CTLCOLOREDIT: u32 = 0x0133;
 const WM_CTLCOLORLISTBOX: u32 = 0x0134;
 const WM_CTLCOLORSTATIC: u32 = 0x0138;
 
-#[repr(C)]
-#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-struct NMHDR {
-    hwnd_from: isize,
-    id_from: usize,
-    code: u32,
-}
-
+/// Control Panel Dialog window procedure
 /// Control Panel Dialog window procedure
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "system" fn control_panel_wnd_proc(
@@ -43,25 +35,19 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
+    // 1. Direct Lock-Free Window State Access via GWLP_USERDATA
+    let controls_ptr = unsafe {
+        GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls
+    };
+    let controls = if !controls_ptr.is_null() {
+        unsafe { Some(&*controls_ptr) }
+    } else {
+        None
+    };
+
     match msg {
         WM_ERASEBKGND => 1,
-        WM_SHOWWINDOW => {
-            if wparam != 0 {
-                // Window is being shown -> refresh with latest engine config & ensure tab controls are visible
-                if let Ok(ui_guard) = UI_MANAGER.try_lock()
-                    && let Some(ref ui) = *ui_guard
-                {
-                    if let Ok(guard) = ENGINE_INSTANCE.lock()
-                        && let Some(ref engine) = *guard
-                    {
-                        ui.controls.load_config(engine.config());
-                    }
-                    ui.controls
-                        .update_tab_visibility(ui.controls.tab_bar.get_cur_sel());
-                }
-            }
-            0
-        }
+        WM_SHOWWINDOW => 0,
         WM_PAINT => {
             unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -74,36 +60,59 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             }
             0
         }
+        WM_MEASUREITEM => {
+            let mis = unsafe { &mut *(lparam as *mut MEASUREITEMSTRUCT) };
+            if let Some(c) = controls {
+                if c.on_measure_item(mis) {
+                    return 1;
+                }
+            }
+            0
+        }
+        WM_DRAWITEM => {
+            let dis = unsafe { &*(lparam as *const DRAWITEMSTRUCT) };
+            // Message Reflection: Forward OCM_DRAWITEM directly to child control
+            if dis.hwnd_item != 0 {
+                let res = unsafe { SendMessageW(dis.hwnd_item, OCM_DRAWITEM, wparam, lparam) };
+                if res != 0 {
+                    return 1;
+                }
+            }
+            0
+        }
         WM_SETTINGCHANGE => {
             let cfg_theme = {
-                let guard = ENGINE_INSTANCE.lock().unwrap();
-                guard
-                    .as_ref()
-                    .map(|e| e.config().theme)
-                    .unwrap_or(crate::engine::config::UiTheme::Auto)
+                if let Ok(guard) = ENGINE_INSTANCE.lock()
+                    && let Some(ref engine) = *guard
+                {
+                    engine.config().theme
+                } else {
+                    crate::engine::config::UiTheme::Auto
+                }
             };
             if cfg_theme == crate::engine::config::UiTheme::Auto
-                && let Ok(ui_guard) = UI_MANAGER.try_lock()
-                && let Some(ref ui) = *ui_guard
+                && let Some(c) = controls
             {
                 let is_dark = resolve_is_dark(cfg_theme);
-                apply_ui_theme(ui.h_panel, &ui.controls, is_dark);
+                apply_ui_theme(hwnd, c, is_dark);
             }
             0
         }
         WM_HSCROLL => {
-            commands::handle_hscroll(lparam);
+            if let Some(c) = controls {
+                c.on_hscroll(lparam);
+            }
             0
         }
-        WM_COMMAND => commands::handle_command(hwnd, wparam),
+        WM_COMMAND => commands::handle_command(hwnd, wparam, lparam, controls),
         WM_NOTIFY => {
             let nmhdr = unsafe { &*(lparam as *const NMHDR) };
-            if nmhdr.id_from == IDC_LIST_MACRO as usize
-                && (nmhdr.code == 0xFFFFFFFE || nmhdr.code == 0xFFFFFFFD)
-                && let Ok(ui_guard) = UI_MANAGER.try_lock()
-                && let Some(ref ui) = *ui_guard
-            {
-                macro_events::handle_macro_list_notify(ui);
+            // Message Reflection: Forward OCM_NOTIFY directly to child component
+            if nmhdr.hwnd_from != 0 {
+                let res = unsafe { SendMessageW(nmhdr.hwnd_from, OCM_NOTIFY, wparam, lparam) };
+                if res != 0 {
+                    return res;
+                }
             }
             0
         }

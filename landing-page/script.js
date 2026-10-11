@@ -1,5 +1,5 @@
-// ==========================================================================
-// MKey Landing Page — Interactive Demo & Web Audio Sound Synthesizer
+﻿// ==========================================================================
+// Kora Landing Page — Interactive Demo & Web Audio Sound Synthesizer
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,27 +8,27 @@ document.addEventListener('DOMContentLoaded', () => {
     'error': {
       legacy: 'eror',
       legacyCaption: 'Phím <code>r</code> thứ hai bị hiểu nhầm là lệnh hủy dấu, nuốt mất chữ thành <strong>eror</strong>.',
-      mkey: 'error',
-      mkeyCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.'
+      kora: 'error',
+      koraCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.'
     },
     'pass': {
       legacy: 'pas',
       legacyCaption: 'Phím <code>s</code> thứ hai bị hiểu nhầm là lệnh hủy dấu, nuốt thành <strong>pas</strong> (phải gõ <code>passs</code>).',
-      mkey: 'pass',
-      mkeyCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên vẹn <strong>pass</strong>.'
+      kora: 'pass',
+      koraCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên vẹn <strong>pass</strong>.'
     },
     'coffee': {
       legacy: 'cofee',
       legacyCaption: 'Phím <code>f</code> thứ hai bị hiểu nhầm là lệnh hủy dấu, nuốt thành <strong>cofee</strong>.',
-      mkey: 'coffee',
-      mkeyCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên vẹn <strong>coffee</strong>.'
+      kora: 'coffee',
+      koraCaption: 'Tự nhận diện từ tiếng Anh, giữ nguyên vẹn <strong>coffee</strong>.'
     }
   };
 
   const legacyDisplay = document.getElementById('legacyOutput');
   const legacyCaption = document.getElementById('legacyCaption');
-  const mkeyDisplay = document.getElementById('mkeyOutput');
-  const mkeyCaption = document.getElementById('mkeyCaption');
+  const koraDisplay = document.getElementById('koraOutput');
+  const koraCaption = document.getElementById('koraCaption');
   const liveInput = document.getElementById('liveInput');
   const clearBtn = document.getElementById('clearBtn');
   const presetButtons = document.querySelectorAll('.preset-btn');
@@ -121,8 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
     legacyDisplay.textContent = data.legacy;
     legacyCaption.innerHTML = data.legacyCaption;
 
-    mkeyDisplay.innerHTML = data.mkey + '<span class="cursor"></span>';
-    mkeyCaption.innerHTML = data.mkeyCaption;
+    koraDisplay.innerHTML = data.kora + '<span class="cursor"></span>';
+    koraCaption.innerHTML = data.koraCaption;
 
     presetButtons.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.word === wordKey);
@@ -158,29 +158,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const lower = val.toLowerCase();
     let legacySimulation = val;
 
-    // Simulate legacy IME vs MKey behavior
-    let mkeySimulation = val;
-    let mkeyExplain = `Bảo toàn từ bạn gõ: <strong>${escapeHtml(val)}</strong>`;
+    // Simulate legacy IME vs Kora behavior
+    let koraSimulation = val;
+    let koraExplain = `Bảo toàn từ bạn gõ: <strong>${escapeHtml(val)}</strong>`;
 
     // Smart Macro Simulation: ko -> không, Ko -> Không, KO -> KHÔNG
     if (val === 'ko') {
-      mkeySimulation = 'không';
-      mkeyExplain = `Gõ tắt thông minh: <strong>ko</strong> &rarr; <strong>không</strong>`;
+      koraSimulation = 'không';
+      koraExplain = `Gõ tắt thông minh: <strong>ko</strong> &rarr; <strong>không</strong>`;
       legacySimulation = 'ko';
     } else if (val === 'Ko') {
-      mkeySimulation = 'Không';
-      mkeyExplain = `Tự động viết hoa: <strong>Ko</strong> &rarr; <strong>Không</strong>`;
+      koraSimulation = 'Không';
+      koraExplain = `Tự động viết hoa: <strong>Ko</strong> &rarr; <strong>Không</strong>`;
       legacySimulation = 'Ko';
     } else if (val === 'KO') {
-      mkeySimulation = 'KHÔNG';
-      mkeyExplain = `Tự động viết hoa toàn bộ: <strong>KO</strong> &rarr; <strong>KHÔNG</strong>`;
+      koraSimulation = 'KHÔNG';
+      koraExplain = `Tự động viết hoa toàn bộ: <strong>KO</strong> &rarr; <strong>KHÔNG</strong>`;
       legacySimulation = 'KO';
     } else if (lower === 'hieuer') {
-      mkeySimulation = 'hiểu';
-      mkeyExplain = `Tự động ghép đúng dấu: <strong>hiểu</strong>`;
+      koraSimulation = 'hiểu';
+      koraExplain = `Tự động ghép đúng dấu: <strong>hiểu</strong>`;
     } else if (lower.includes('hieuer')) {
-      mkeySimulation = val.replace(/hieuer/gi, 'hiểu');
-      mkeyExplain = `Tự động ghép đúng dấu: <strong>${escapeHtml(mkeySimulation)}</strong>`;
+      koraSimulation = val.replace(/hieuer/gi, 'hiểu');
+      koraExplain = `Tự động ghép đúng dấu: <strong>${escapeHtml(koraSimulation)}</strong>`;
     }
 
     // Simulate legacy IME swallowing double consonants or breaking words
@@ -199,8 +199,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `Bị nuốt chữ hoặc gõ sai: <strong>${escapeHtml(legacySimulation)}</strong>`
       : `Bộ gõ truyền thống`;
 
-    mkeyDisplay.innerHTML = escapeHtml(mkeySimulation) + '<span class="cursor"></span>';
-    mkeyCaption.innerHTML = mkeyExplain;
+    koraDisplay.innerHTML = escapeHtml(koraSimulation) + '<span class="cursor"></span>';
+    koraCaption.innerHTML = koraExplain;
   });
 
   clearBtn.addEventListener('click', () => {

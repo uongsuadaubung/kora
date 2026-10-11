@@ -251,7 +251,7 @@ impl MacroTable {
     /// Serialize all macros to configuration format
     pub fn save_to_str(&self) -> String {
         let mut s = String::from(
-            "# Bảng gõ tắt MKey\n# Cú pháp: <từ viết tắt>:<cụm từ thay thế>:<loại (normal/start/end)>\n",
+            "# Bảng gõ tắt Kora\n# Cú pháp: <từ viết tắt>:<cụm từ thay thế>:<loại (normal/start/end)>\n",
         );
         for entry in self.get_sorted_entries() {
             s.push_str(&format!(

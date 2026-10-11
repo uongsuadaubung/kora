@@ -1,8 +1,8 @@
-# Nghiên cứu Ngữ âm học Đối chiếu Tiếng Việt - Tiếng Anh và Cơ chế Nhận diện Xuyên suốt (On-the-fly Deterministic Bypass) trong Bộ gõ Tiếng Việt
+﻿# Nghiên cứu Ngữ âm học Đối chiếu Tiếng Việt - Tiếng Anh và Cơ chế Nhận diện Xuyên suốt (On-the-fly Deterministic Bypass) trong Bộ gõ Tiếng Việt
 
-**Tác giả:** Đội ngũ Kỹ thuật MKey  
+**Tác giả:** Đội ngũ Kỹ thuật Kora  
 **Phiên bản tài liệu:** 1.0  
-**Đối tượng:** Bộ gõ tiếng Việt thế hệ mới (MKey Engine)  
+**Đối tượng:** Bộ gõ tiếng Việt thế hệ mới (Kora Engine)  
 **Ngày công bố:** Tháng 10/2026  
 
 ---
@@ -15,7 +15,7 @@ Trong suốt hơn 30 năm phát triển của các bộ gõ tiếng Việt (Viet
 
 Cả hai cách tiếp cận trên đều gây ra trải nghiệm giật cục, biến dạng văn bản tức thời khi người dùng đang quan sát màn hình, và đặc biệt bất tiện đối với lập trình viên thường xuyên gõ xen kẽ từ khóa tiếng Anh và tiếng Việt.
 
-Tài liệu này trình bày cơ sở lý luận Ngữ âm học cấu trúc (Structural Phonology), Văn tự học Chữ Quốc ngữ (Vietnamese Orthography) đối chiếu với Ngữ âm học tiếng Anh (English Phonotactics), đồng thời công bố giải pháp **OtFB (On-the-fly Deterministic Bypass)** được triển khai trong MKey. Giải pháp này cho phép bộ gõ nhận diện từ tiếng Anh và chuyển trạng thái tức thời ngay trong luồng phím gõ (zero-latency, không phụ thuộc từ điển, độ phức tạp $O(1)$) mà **không làm mất chữ, không nhảy chữ, và bảo toàn 100% tính toàn vẹn của tiếng Việt (Zero False Positives)**.
+Tài liệu này trình bày cơ sở lý luận Ngữ âm học cấu trúc (Structural Phonology), Văn tự học Chữ Quốc ngữ (Vietnamese Orthography) đối chiếu với Ngữ âm học tiếng Anh (English Phonotactics), đồng thời công bố giải pháp **OtFB (On-the-fly Deterministic Bypass)** được triển khai trong Kora. Giải pháp này cho phép bộ gõ nhận diện từ tiếng Anh và chuyển trạng thái tức thời ngay trong luồng phím gõ (zero-latency, không phụ thuộc từ điển, độ phức tạp $O(1)$) mà **không làm mất chữ, không nhảy chữ, và bảo toàn 100% tính toàn vẹn của tiếng Việt (Zero False Positives)**.
 
 ---
 
@@ -131,7 +131,7 @@ Khi điều kiện này được thực thi nghiêm ngặt:
 
 ## 4. Hệ Tiên Đề Phân Loại 7 Tầng Ngữ Âm Đối Chiếu
 
-Hệ thống OtFB của MKey vận hành dựa trên 7 tầng rào chắn ngữ âm độc lập và tương hỗ:
+Hệ thống OtFB của Kora vận hành dựa trên 7 tầng rào chắn ngữ âm độc lập và tương hỗ:
 
 ```
 Luồng phím vào (Raw Key Stream)
@@ -232,32 +232,27 @@ Tuy nhiên, **ngay khi từ vựng được nối dài** bằng các cấu trúc
 
 OtFB phát hiện sự bất khả thi về mặt ngữ âm ngay ở ký tự nối tiếp, **tự động hoàn tác về chuỗi thô tiếng Anh ban đầu mà không làm phiền người dùng**.
 
-### 5.3. Xóa Bỏ Nỗi Đau 20 Năm của Dân Gõ Telex: Bài Toán Nuốt Phụ Âm Kép (`rr`, `ss`, `ff`)
+### 5.3. Cơ chế Hoàn tác Dấu thanh Chuẩn Unikey (Classic Unikey Undo Toggle & Passthrough)
 
-Trong suốt hơn hai thập kỷ qua (từ thời Unikey những năm 2000, Vietkey, cho đến EVKey hay OpenKey sau này), bất kỳ người Việt nào thường xuyên làm việc với máy tính — đặc biệt là lập trình viên, dịch giả và nhân sự văn phòng — đều từng trải qua cảm giác ức chế tột cùng khi gõ các từ tiếng Anh thông dụng có phụ âm kép:
-- Gõ `error` $\longrightarrow$ bị nuốt thành `eror`.
-- Gõ `password` $\longrightarrow$ bị nuốt thành `pasword`.
-- Gõ `class` $\longrightarrow$ bị nuốt thành `clas`.
-- Gõ `message` $\longrightarrow$ bị nuốt thành `mesage`.
-- Gõ `process` $\longrightarrow$ bị nuốt thành `proces`.
-- Gõ `off` $\longrightarrow$ bị nuốt thành `of`.
-- Gõ `coffee` $\longrightarrow$ bị nuốt thành `cofee`.
-
-#### 5.3.1. Nguồn gốc Lịch sử: Lỗ hổng Triết lý "Phím Dấu là Phím Chức năng Một chiều"
-Vì sao các bộ gõ truyền thống lại duy trì "căn bệnh" này suốt 20 năm mà không sửa?
-Nguyên nhân nằm ở sự bảo thủ trong mô hình máy trạng thái Telex cổ điển:
-1. **Quan niệm tiêu thụ phím:** Khi người dùng gõ `e` + `r` $\to$ ra `ẻ`. Bộ gõ coi phím `r` thứ nhất là *phím chức năng* (Function Key) và đã bị "tiêu thụ" vào âm tiết để tạo dấu Hỏi.
-2. **Quy ước Undo Toggle cơ học:** Khi người dùng bấm tiếp phím `r` thứ hai, bộ gõ coi đây là lệnh *Hoàn tác (Undo)* để xóa dấu Hỏi. Tuy nhiên, nó chỉ trả về ký tự cơ sở `e` cộng với chính phím hoàn tác hiện tại (`r`), cho ra chuỗi `er` ($1$ chữ `r` duy nhất). Phím `r` thứ nhất đã vĩnh viễn biến mất trong luồng xử lý!
-3. **Hệ quả cay đắng:** Muốn có được từ `pass`, người dùng buộc phải gõ **3 chữ s** (`p-a-s-s-s`); muốn có `error` phải gõ **3 chữ r** (`e-r-r-r-o-r`); muốn có `off` phải gõ **3 chữ f** (`o-f-f-f`). Nếu không, người dùng buộc phải liên tục bấm phím tắt bật/tắt [V] / [E] — một trải nghiệm đứt gãy luồng tư duy nghiêm trọng.
-
-#### 5.3.2. Căn Cứ Ngữ Âm Học Đối Chiếu: Đột Phá Triết Lý của MKey
-MKey giải quyết triệt để vấn đề này không bằng cách vá víu (hacky patch) mà dựa trên ba luận cứ Ngữ âm học cấu trúc vững chắc:
-1. **Tính Bất Khả Kháng của Phụ Âm Kép trong Chữ Quốc Ngữ:**  
-   Trong âm vận học tiếng Việt, **tuyệt đối không tồn tại bất kỳ từ nào có 2 phụ âm giống nhau đứng liền nhau** (No Geminate Consonants: `rr`, `ss`, `ff`, `bb`, `dd`, `gg`, `kk`, `ll`, `mm`, `nn`, `pp`, `tt`).
-2. **Ý đồ Người Dùng là Tuyệt Đối:**  
-   Khi người dùng đã chủ động bấm $2$ phím phụ âm liên tiếp sau một nguyên âm (`e` + `r` + `r`, `p` + `a` + `s` + `s`, `o` + `f` + `f`), mục đích của họ $100\%$ là biểu đạt phụ âm kép của từ tiếng Anh. Không có một người Việt Nam nào gõ `e-r-r` lại muốn nhận về một chữ `er` đơn độc!
-3. **Triết Lý "Tôn Trọng Tuyệt Đối Phím Vật Lý" (Physical Keystroke Invariance):**  
-   MKey từ bỏ tư duy "tiêu thụ phím". Mọi phím người dùng gõ đều được lưu trữ nguyên vẹn trong `raw_keys`. Ngay khi phím lặp dấu thanh xuất hiện sau nguyên âm, MKey nhận diện vi phạm hình thái học tiếng Việt, kích hoạt `Passthrough` và hoàn trả lập tức toàn bộ chuỗi phím thô đã gõ (`raw_keys = ['e', 'r', 'r']`), đẩy thẳng ra màn hình `err`, `pass`, `off` hoàn hảo!
+Trong thiết kế chuẩn mực của Telex kinh điển (Unikey):
+- **Phím dấu thanh là công tắc bật/tắt (Toggle):**
+  - Gõ phím dấu thanh lần 1: áp dụng dấu (`te` + `s` $\to$ `té`).
+  - Gõ phím dấu thanh lần 2: triệt tiêu dấu thanh (`tone = None`), trả về đúng **1 ký tự nguyên bản** và **chuyển ngay lập tức sang trạng thái `Passthrough`** (`té` + `s` $\to$ `tes`).
+- **Lợi ích cốt lõi:**
+  1. **Gõ tự nhiên các từ tiếng Anh kết thúc bằng tổ hợp phụ âm (`-st`, `-r`):**
+     - `t-e-s-s-t` $\to$ `test`.
+     - `b-e-s-s-t` $\to$ `best`.
+     - `l-i-s-s-t` $\to$ `list`.
+     - `c-o-s-s-t` $\to$ `cost`.
+     - `p-o-s-s-t` $\to$ `post`.
+     - `c-a-r-r` $\to$ `car`.
+     - `b-a-r-r` $\to$ `bar`.
+  2. **Bảo toàn quy ước Telex chuẩn cho phụ âm đôi:**
+     - Muốn gõ các từ tiếng Anh có phụ âm đôi trùng phím dấu: `passs` $\to$ `pass`, `errror` $\to$ `error`, `offf` $\to$ `off`.
+  3. **Không tạo xung đột giả:**
+     - Tránh hoàn toàn việc tự ý nhân đôi ký tự (như biến `carr` khi gõ `car` hay `tesst` khi gõ `test`), giữ cho hành vi của bộ gõ luôn nhất quán $100\%$ với thói quen sử dụng hàng chục năm của người dùng Unikey.
+  4. **Kết hợp cùng Hệ thống Phonotactics Đa Tầng:**
+     - Đối với các từ tiếng Anh có cấu trúc không thuộc ngữ âm tiếng Việt (`center`, `cinema`, `city`, `get`, `gym`, `by`, `python`, `project`, `client`, `team`, `sound`, `poem`, `boot`...), hệ thống tự động nhận diện và chuyển sang `Passthrough` ngay lập tức mà người dùng thậm chí không cần gõ phím hoàn tác.
 
 ### 5.4. Tính Bất biến của Phím Xóa lùi trong Trạng thái Ký tự Thô (Backspace Invariant in Passthrough)
 
@@ -265,13 +260,13 @@ Khi người dùng thao tác xóa lùi (Backspace) trên một từ tiếng Anh 
 - **Vấn đề lệch pha trạng thái (Desynchronization Problem):**  
   Nếu bộ đệm tự ý tái phân tích chuỗi phím thô còn lại qua hàm chiếu ngữ âm chuẩn (ví dụ khi xóa `or` trong `error` $\to$ còn `['e', 'r']`), thuật toán truyền thống sẽ diễn giải lại thành âm tiết tiếng Việt `ẻ` (độ dài $1$), trong khi màn hình ứng dụng của hệ điều hành đang hiển thị chuỗi ký tự thô `er` (độ dài $2$). Lệch pha này dẫn đến hiện tượng sinh ra ký tự ma (`"eer"`) khi người dùng gõ tiếp.
 - **Định lý Bất biến Đồng bộ (Screen-Buffer State Invariant):**  
-  > *Trong trạng thái `Passthrough`, bộ đệm chỉ được phép hoàn nguyên về âm tiết tiếng Việt có cấu trúc nếu và chỉ nếu chuỗi diễn giải lại ($\text{eval.rendered}$) trùng khớp chính xác $100\%$ với chuỗi ký tự thực tế còn lại trên màn hình ($\text{self.last_rendered}$). Nếu không trùng khớp, hệ thống bắt buộc duy trì trạng thái `Passthrough` để bảo toàn tính toàn vẹn với hệ điều hành (xem chi tiết kỹ thuật tại [ARCHITECTURE.md](file:///c:/Users/uongsuadaubung/Desktop/mkey/docs/ARCHITECTURE.md#21-typingbuffer--single-source-of-truth--pure-projection)).*
+  > *Trong trạng thái `Passthrough`, bộ đệm chỉ được phép hoàn nguyên về âm tiết tiếng Việt có cấu trúc nếu và chỉ nếu chuỗi diễn giải lại ($\text{eval.rendered}$) trùng khớp chính xác $100\%$ với chuỗi ký tự thực tế còn lại trên màn hình ($\text{self.last_rendered}$). Nếu không trùng khớp, hệ thống bắt buộc duy trì trạng thái `Passthrough` để bảo toàn tính toàn vẹn với hệ điều hành (xem chi tiết kỹ thuật tại [ARCHITECTURE.md](file:///c:/Users/uongsuadaubung/Desktop/kora/docs/ARCHITECTURE.md#21-typingbuffer--single-source-of-truth--pure-projection)).*
 
 ---
 
 ## 6. Hiện thực Hóa Kỹ thuật: Máy Trạng thái Bậc thấp (Low-Level Implementation)
 
-Giải pháp OtFB được tích hợp trực tiếp vào lõi của MKey với các đặc tính kỹ thuật:
+Giải pháp OtFB được tích hợp trực tiếp vào lõi của Kora với các đặc tính kỹ thuật:
 
 1. **Không phân bổ bộ nhớ động (Zero Heap Allocation):**  
    Toàn bộ cấu trúc `SyllableState`, `NucleusState`, `CodaState`, `InlineList<T, N>` đều nằm $100\%$ trên stack CPU, kích thước cố định, triển khai trait `Copy`.
@@ -284,7 +279,7 @@ Giải pháp OtFB được tích hợp trực tiếp vào lõi của MKey với 
 
 ## 7. Kết luận
 
-Cơ chế **Smart English Word Bypass on-the-fly (OtFB)** của MKey đã giải quyết triệt để sự xung đột kéo dài hàng thập kỷ giữa tiếng Việt và tiếng Anh trong các bộ gõ chữ Quốc ngữ. Bằng việc xây dựng hệ thống quy tắc dựa trên **Ngữ âm học cấu trúc hình thức** thay vì từ điển tĩnh:
+Cơ chế **Smart English Word Bypass on-the-fly (OtFB)** của Kora đã giải quyết triệt để sự xung đột kéo dài hàng thập kỷ giữa tiếng Việt và tiếng Anh trong các bộ gõ chữ Quốc ngữ. Bằng việc xây dựng hệ thống quy tắc dựa trên **Ngữ âm học cấu trúc hình thức** thay vì từ điển tĩnh:
 - Khả năng bao phủ là **hoàn toàn khép kín và toàn diện** đối với mọi từ tiếng Anh vi phạm quy tắc ngữ âm tiếng Việt.
 - Bảo vệ **100% tính toàn vẹn** của ngôn ngữ tiếng Việt (Zero False Positives).
 - Đem lại trải nghiệm gõ phím mượt mà, tự nhiên và hiện đại nhất cho người dùng Việt Nam trong kỷ nguyên số.

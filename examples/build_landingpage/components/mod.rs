@@ -1,4 +1,4 @@
-//! HTML Components coordinator
+﻿//! HTML Components coordinator
 
 pub mod comparison;
 pub mod download;

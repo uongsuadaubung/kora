@@ -1,4 +1,4 @@
-//! Interactive playground box styling
+﻿//! Interactive playground box styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================
@@ -156,7 +156,7 @@ pub fn render() -> &'static str {
   border-color: rgba(244, 63, 94, 0.15);
 }
 
-.comparison-column.mkey-col {
+.comparison-column.kora-col {
   border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.035);
   box-shadow: 0 0 40px rgba(255, 255, 255, 0.03);
@@ -200,7 +200,7 @@ pub fn render() -> &'static str {
   text-decoration-color: #f43f5e;
 }
 
-.mkey-display {
+.kora-display {
   color: #ffffff;
 }
 

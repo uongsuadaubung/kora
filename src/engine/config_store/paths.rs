@@ -1,29 +1,29 @@
-//! File paths and environment directories for MKey config and assets
+//! File paths and environment directories for Kora config and assets
 
 use std::fs;
 use std::path::PathBuf;
 
-/// Returns the absolute path to ~/.config/mkey/config.ini
+/// Returns the absolute path to ~/.config/kora/config.ini
 pub fn get_config_path() -> PathBuf {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home)
+    PathBuf::from(&home)
         .join(".config")
-        .join("mkey")
+        .join("kora")
         .join("config.ini")
 }
 
 /// Returns the path to the directory containing switch soundpacks if it exists.
-/// Checks ~/.config/mkey/switches, ~/.config/mkey/switchs, ./switches, ./switchs.
+/// Checks ~/.config/kora/switches, ./switches.
 pub fn get_switches_dir() -> Option<PathBuf> {
     let home = std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .unwrap_or_else(|_| ".".to_string());
-    let config_dir = PathBuf::from(home).join(".config").join("mkey");
+    let kora_config = PathBuf::from(&home).join(".config").join("kora");
     let candidates = [
-        config_dir.join("switches"),
-        config_dir.join("switchs"),
+        kora_config.join("switches"),
+        kora_config.join("switchs"),
         PathBuf::from("switches"),
         PathBuf::from("switchs"),
     ];

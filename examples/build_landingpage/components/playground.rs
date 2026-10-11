@@ -6,8 +6,8 @@ pub fn render() -> &'static str {
     <div class="container">
       <div class="section-header">
         <div class="section-chip">Trải nghiệm</div>
-        <h2 class="section-title">Xem cách MKey xử lý văn bản</h2>
-        <p class="section-subtitle">So sánh trực tiếp kết quả gõ các từ tiếng Anh thông dụng giữa MKey và các bộ gõ truyền thống.</p>
+        <h2 class="section-title">Xem cách Kora xử lý văn bản</h2>
+        <p class="section-subtitle">So sánh trực tiếp kết quả gõ các từ tiếng Anh thông dụng giữa Kora và các bộ gõ truyền thống.</p>
       </div>
 
       <div class="demo-box">
@@ -49,12 +49,12 @@ pub fn render() -> &'static str {
             <div class="divider-line"></div>
           </div>
 
-          <div class="comparison-column mkey-col">
+          <div class="comparison-column kora-col">
             <div class="col-header">
-              <span class="col-tag good">MKEY</span>
+              <span class="col-tag good">KORA</span>
             </div>
-            <div class="display-box mkey-display" id="mkeyOutput">error<span class="cursor"></span></div>
-            <div class="display-caption" id="mkeyCaption">Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.</div>
+            <div class="display-box kora-display" id="koraOutput">error<span class="cursor"></span></div>
+            <div class="display-caption" id="koraCaption">Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.</div>
           </div>
         </div>
 

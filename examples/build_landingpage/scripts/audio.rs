@@ -1,4 +1,4 @@
-//! Web Audio API Synthesizer: Mechanical switch sound simulation
+﻿//! Web Audio API Synthesizer: Mechanical switch sound simulation
 
 pub fn render() -> &'static str {
     r####"  // ==========================================================================

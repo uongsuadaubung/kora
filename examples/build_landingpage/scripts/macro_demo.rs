@@ -1,4 +1,4 @@
-//! Smart Macro interactive playground and table filters
+﻿//! Smart Macro interactive playground and table filters
 
 pub fn render() -> &'static str {
     r####"  // ==========================================================================

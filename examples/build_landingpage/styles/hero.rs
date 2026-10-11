@@ -1,4 +1,4 @@
-//! Hero section styling
+﻿//! Hero section styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

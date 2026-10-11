@@ -1,13 +1,13 @@
-# Soundpack: IBM Buckling Spring
+﻿# Soundpack: IBM Buckling Spring
 
-- **Nhà sản xuất / Thiết kế**: IBM
-- **Phân loại**: Vintage Buckling Spring Mechanism
-- **Tác giả thu âm**: tplai (kbsim)
-- **Giấy phép (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
-- **Nguồn gốc / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/ibm/tplai/buckling_spring
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: IBM
+- **PhÃ¢n loáº¡i**: Vintage Buckling Spring Mechanism
+- **TÃ¡c giáº£ thu Ã¢m**: tplai (kbsim)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/ibm/tplai/buckling_spring
 
-## Giới thiệu & Đặc trưng âm thanh
-Âm thanh lò xo uốn cong đặc trưng của bàn phím cơ biểu tượng IBM Model M sản xuất từ 1985.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Ã‚m thanh lÃ² xo uá»‘n cong Ä‘áº·c trÆ°ng cá»§a bÃ n phÃ­m cÆ¡ biá»ƒu tÆ°á»£ng IBM Model M sáº£n xuáº¥t tá»« 1985.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

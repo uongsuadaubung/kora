@@ -1,4 +1,4 @@
-//! Smart Macro demo & table styling
+﻿//! Smart Macro demo & table styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

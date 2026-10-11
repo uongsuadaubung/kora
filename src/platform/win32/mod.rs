@@ -2,11 +2,13 @@
 //! No external crates required — uses direct Win32 FFI bindings.
 
 pub mod app_detect;
+pub mod app_tracker;
 pub mod injector;
 pub mod sound;
 pub mod types;
 
 pub use app_detect::*;
+pub use app_tracker::*;
 pub use injector::*;
 pub use sound::*;
 pub use types::*;
@@ -56,6 +58,7 @@ fn is_modifier_vk(vk: u32) -> bool {
 }
 
 pub const WM_HOTKEY_CAPTURED: u32 = 0x8000 + 101;
+pub const WM_REMAP_KEY_CAPTURED: u32 = 0x8000 + 102;
 
 static HOTKEY_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOTKEY_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -67,6 +70,19 @@ static TRACKED_CTRL: AtomicBool = AtomicBool::new(false);
 static TRACKED_SHIFT: AtomicBool = AtomicBool::new(false);
 static TRACKED_ALT: AtomicBool = AtomicBool::new(false);
 static TRACKED_WIN: AtomicBool = AtomicBool::new(false);
+
+static REMAP_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
+static REMAP_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
+
+pub fn start_single_key_capture(hwnd: isize) {
+    REMAP_DIALOG_HWND.store(hwnd, Ordering::SeqCst);
+    REMAP_CAPTURE_ACTIVE.store(true, Ordering::SeqCst);
+}
+
+pub fn stop_single_key_capture() {
+    REMAP_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
+    REMAP_DIALOG_HWND.store(0, Ordering::SeqCst);
+}
 
 pub fn start_hotkey_capture(hwnd: isize) {
     HOTKEY_DIALOG_HWND.store(hwnd, Ordering::SeqCst);
@@ -121,6 +137,15 @@ pub fn clear_captured_hotkey() {
     TRACKED_WIN.store(false, Ordering::SeqCst);
 }
 
+pub fn set_captured_hotkey(hotkey: Option<crate::engine::config::Hotkey>, display: &str) {
+    if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
+        *guard = hotkey;
+    }
+    if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
+        *guard = display.to_string();
+    }
+}
+
 // Global thread-safe Engine instance accessed by the hook callback and UI
 pub static ENGINE_INSTANCE: Mutex<Option<VietnameseEngine>> = Mutex::new(None);
 static HOOK_HANDLE: Mutex<isize> = Mutex::new(0);
@@ -168,6 +193,17 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
             }
 
             let vk = hook_struct.vk_code;
+
+            // Handle single key capture mode for Remap / Key Dialogs
+            if REMAP_CAPTURE_ACTIVE.load(Ordering::SeqCst) {
+                if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
+                    let dialog_hwnd = REMAP_DIALOG_HWND.load(Ordering::SeqCst);
+                    if dialog_hwnd != 0 {
+                        PostMessageW(dialog_hwnd, WM_REMAP_KEY_CAPTURED, vk as usize, 0);
+                    }
+                }
+                return 1;
+            }
 
             // Handle hotkey capture mode for HotkeyCaptureDialog
             if HOTKEY_CAPTURE_ACTIVE.load(Ordering::SeqCst) {
@@ -257,14 +293,35 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 return 1;
             }
 
-            let (switch_key_enabled, switch_key) = if let Ok(guard) = ENGINE_INSTANCE.lock() {
-                guard
-                    .as_ref()
-                    .map(|e| (e.config().switch_key_enabled, e.config().switch_key))
-                    .unwrap_or((true, crate::engine::config::Hotkey::default()))
-            } else {
-                (true, crate::engine::config::Hotkey::default())
-            };
+            let (is_disabled, remap_target, switch_key_enabled, switch_key) =
+                if let Ok(guard) = ENGINE_INSTANCE.lock() {
+                    if let Some(ref engine) = *guard {
+                        let eff_cfg = engine.effective_config();
+                        let disabled = engine.effective_disabled().contains(&vk);
+                        let remap = engine
+                            .effective_remaps()
+                            .into_iter()
+                            .find(|r| r.from_vk == vk)
+                            .map(|r| r.to_vk);
+                        (disabled, remap, eff_cfg.switch_key_enabled, eff_cfg.switch_key)
+                    } else {
+                        (false, None, true, crate::engine::config::Hotkey::default())
+                    }
+                } else {
+                    (false, None, true, crate::engine::config::Hotkey::default())
+                };
+
+            // 1. Intercept Key Disabling: swallow event completely
+            if is_disabled {
+                return 1;
+            }
+
+            // 2. Intercept Key Remapping: swallow original event and dispatch target key
+            if let Some(target_vk) = remap_target {
+                let is_up = w_param == WM_KEYUP || w_param == WM_SYSKEYUP;
+                send_vk_event(target_vk, is_up);
+                return 1;
+            }
 
             // Handle key-up events for modifier-only hotkey triggers (e.g. Ctrl + Shift toggle)
             if w_param == WM_KEYUP || w_param == WM_SYSKEYUP {
@@ -290,14 +347,15 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                     && let Some(ref mut engine) = *guard
                 {
                     let new_state = engine.toggle_enabled();
-                    crate::engine::config_store::save_config_and_macros_debounced(
+                    crate::engine::config_store::save_config_all_debounced(
                         engine.config(),
                         &engine.macro_table,
+                        &engine.profile_manager,
                     );
                     if new_state {
-                        engine.log_debug("[MKey] >> Chế độ gõ: [V] TIẾNG VIỆT");
+                        engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
                     } else {
-                        engine.log_debug("[MKey] >> Chế độ gõ: [E] TIẾNG ANH");
+                        engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
                     }
                     notify_mode_change(new_state);
                 }
@@ -364,14 +422,15 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                                 && let Some(ref mut engine) = *guard
                             {
                                 let new_state = engine.toggle_enabled();
-                                crate::engine::config_store::save_config_and_macros_debounced(
+                                crate::engine::config_store::save_config_all_debounced(
                                     engine.config(),
                                     &engine.macro_table,
+                                    &engine.profile_manager,
                                 );
                                 if new_state {
-                                    engine.log_debug("[MKey] >> Chế độ gõ: [V] TIẾNG VIỆT");
+                                    engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
                                 } else {
-                                    engine.log_debug("[MKey] >> Chế độ gõ: [E] TIẾNG ANH");
+                                    engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
                                 }
                                 notify_mode_change(new_state);
                                 return 1;
@@ -542,6 +601,9 @@ pub fn run_hook_loop(engine: VietnameseEngine, on_ready: impl FnOnce()) {
         // Invoke caller's initialization callback (e.g. initialize UI)
         on_ready();
 
+        // Initialize foreground application tracker for automatic profile switching
+        app_tracker::init_app_tracker();
+
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, 0, 0, 0) > 0 {
             TranslateMessage(&msg);
@@ -552,6 +614,7 @@ pub fn run_hook_loop(engine: VietnameseEngine, on_ready: impl FnOnce()) {
         crate::engine::config_store::flush_config_debounced();
 
         // Cleanup
+        app_tracker::shutdown_app_tracker();
         let h = *HOOK_HANDLE.lock().unwrap();
         if h != 0 {
             UnhookWindowsHookEx(h);

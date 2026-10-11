@@ -1,4 +1,4 @@
-//! CSS styles coordinator
+﻿//! CSS styles coordinator
 
 pub mod base;
 pub mod buttons;

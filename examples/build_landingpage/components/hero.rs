@@ -1,4 +1,4 @@
-//! Hero banner component
+﻿//! Hero banner component
 
 pub fn render() -> &'static str {
     r####"  <!-- Hero Section -->
@@ -21,7 +21,7 @@ pub fn render() -> &'static str {
       <div class="hero-cta-group">
         <a href="#download" class="btn btn-hero-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          <span>Tải MKey cho Windows</span>
+          <span>Tải Kora cho Windows</span>
         </a>
         <a href="#playground" class="btn btn-hero-secondary">
           <span>Gõ thử trực tiếp</span>

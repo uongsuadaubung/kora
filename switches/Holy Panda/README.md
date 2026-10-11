@@ -1,13 +1,13 @@
-# Soundpack: Holy Panda
+﻿# Soundpack: Holy Panda
 
-- **Nhà sản xuất / Thiết kế**: Drop / Invyr / Halo
-- **Phân loại**: High-Tactile Switch
-- **Tác giả thu âm**: tplai (kbsim)
-- **Giấy phép (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
-- **Nguồn gốc / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/drop/tplai/holy_panda
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Drop / Invyr / Halo
+- **PhÃ¢n loáº¡i**: High-Tactile Switch
+- **TÃ¡c giáº£ thu Ã¢m**: tplai (kbsim)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/drop/tplai/holy_panda
 
-## Giới thiệu & Đặc trưng âm thanh
-Switch tactile huyền thoại tạo nên trào lưu 'thock' trong giới bàn phím cơ toàn cầu.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Switch tactile huyá»n thoáº¡i táº¡o nÃªn trÃ o lÆ°u 'thock' trong giá»›i bÃ n phÃ­m cÆ¡ toÃ n cáº§u.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

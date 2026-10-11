@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MKey — Bộ gõ tiếng Việt cho Windows</title>
+  <title>Kora — Bộ gõ tiếng Việt cho Windows</title>
   <meta name="description" content="Bộ gõ tiếng Việt hiện đại viết bằng Rust. Tự động nhận diện từ tiếng Anh, không nuốt phím kép (pass, error), không nhân đôi chữ trên trình duyệt, tiêu thụ dưới 2 MB RAM.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,8 +17,8 @@
   <header class="navbar">
     <div class="container nav-container">
       <a href="#" class="nav-brand">
-        <img src="images/icon.png" alt="MKey" class="brand-logo-img">
-        <span class="brand-text">MKey</span>
+        <img src="images/icon.png" alt="Kora" class="brand-logo-img">
+        <span class="brand-text">Kora</span>
       </a>
       <nav class="nav-links">
         <a href="#playground">Gõ thử</a>
@@ -31,7 +31,7 @@
         <a href="#download">Tải về</a>
       </nav>
       <div class="nav-actions">
-        <a href="https://github.com/uongsuadaubung/mkey" target="_blank" class="btn btn-ghost">
+        <a href="https://github.com/uongsuadaubung/kora" target="_blank" class="btn btn-ghost">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           GitHub
         </a>
@@ -60,7 +60,7 @@
       <div class="hero-cta-group">
         <a href="#download" class="btn btn-hero-primary">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          <span>Tải MKey cho Windows</span>
+          <span>Tải Kora cho Windows</span>
         </a>
         <a href="#playground" class="btn btn-hero-secondary">
           <span>Gõ thử trực tiếp</span>
@@ -75,8 +75,8 @@
     <div class="container">
       <div class="section-header">
         <div class="section-chip">Trải nghiệm</div>
-        <h2 class="section-title">Xem cách MKey xử lý văn bản</h2>
-        <p class="section-subtitle">So sánh trực tiếp kết quả gõ các từ tiếng Anh thông dụng giữa MKey và các bộ gõ truyền thống.</p>
+        <h2 class="section-title">Xem cách Kora xử lý văn bản</h2>
+        <p class="section-subtitle">So sánh trực tiếp kết quả gõ các từ tiếng Anh thông dụng giữa Kora và các bộ gõ truyền thống.</p>
       </div>
 
       <div class="demo-box">
@@ -118,12 +118,12 @@
             <div class="divider-line"></div>
           </div>
 
-          <div class="comparison-column mkey-col">
+          <div class="comparison-column kora-col">
             <div class="col-header">
-              <span class="col-tag good">MKEY</span>
+              <span class="col-tag good">KORA</span>
             </div>
-            <div class="display-box mkey-display" id="mkeyOutput">error<span class="cursor"></span></div>
-            <div class="display-caption" id="mkeyCaption">Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.</div>
+            <div class="display-box kora-display" id="koraOutput">error<span class="cursor"></span></div>
+            <div class="display-caption" id="koraCaption">Tự nhận diện từ tiếng Anh, giữ nguyên chữ <strong>error</strong>.</div>
           </div>
         </div>
 
@@ -198,11 +198,11 @@
             <div class="divider-line"></div>
           </div>
 
-          <div class="comparison-column mkey-col">
+          <div class="comparison-column kora-col">
             <div class="col-header">
-              <span class="col-tag good">MKEY TỰ ĐỘNG MỞ RỘNG</span>
+              <span class="col-tag good">KORA TỰ ĐỘNG MỞ RỘNG</span>
             </div>
-            <div class="display-box mkey-display" id="macroOutputDisplay">không<span class="cursor"></span></div>
+            <div class="display-box kora-display" id="macroOutputDisplay">không<span class="cursor"></span></div>
             <div class="display-caption" id="macroOutputCaption">Tự động nhận diện từ viết tắt: <code>ko</code> &rarr; <strong>không</strong>.</div>
           </div>
         </div>
@@ -231,7 +231,7 @@
         <div class="macro-table-header">
           <div class="macro-table-title-area">
             <h3 class="macro-table-title">Ví dụ các quy tắc gõ tắt tham khảo</h3>
-            <p class="macro-table-subtitle">Minh họa 3 cơ chế gõ tắt MKey hỗ trợ &mdash; nhấp vào bất kỳ dòng nào để xem cách hoạt động</p>
+            <p class="macro-table-subtitle">Minh họa 3 cơ chế gõ tắt Kora hỗ trợ &mdash; nhấp vào bất kỳ dòng nào để xem cách hoạt động</p>
           </div>
           <div class="macro-table-filter">
             <button class="macro-filter-btn active" data-filter="all">Tất cả (10)</button>
@@ -346,7 +346,7 @@
         <div class="macro-table-footer">
           <div class="macro-footer-tip">
             <span class="tip-icon">💡</span>
-            <span class="tip-text"><strong>Bạn nắm toàn quyền chủ động:</strong> MKey không cài sẵn bất kỳ từ viết tắt nào làm phiền bạn. Bạn hoàn toàn tự do thêm mới, sửa hoặc xóa quy tắc gõ tắt theo thói quen cá nhân trong Bảng điều khiển.</span>
+            <span class="tip-text"><strong>Bạn nắm toàn quyền chủ động:</strong> Kora không cài sẵn bất kỳ từ viết tắt nào làm phiền bạn. Bạn hoàn toàn tự do thêm mới, sửa hoặc xóa quy tắc gõ tắt theo thói quen cá nhân trong Bảng điều khiển.</span>
           </div>
 
           <!-- Macro Caution Warning -->
@@ -407,10 +407,10 @@
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Bộ gõ</span>
+            <span class="ui-window-title">Kora • Tab Bộ gõ</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-bogo.png" alt="Giao diện MKey - Tab Bộ gõ" loading="lazy">
+            <img src="images/ui-tab-bogo.png" alt="Giao diện Kora - Tab Bộ gõ" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 1 • BỘ GÕ &amp; ÂM THANH</span>
@@ -418,7 +418,7 @@
             <ul class="ui-card-list">
               <li><strong>Kiểu gõ linh hoạt:</strong> Hỗ trợ Simple Telex, Telex chuẩn, VNI.</li>
               <li><strong>Tùy biến phím chuyển chế độ:</strong> Mặc định <code>Ctrl + Shift</code> hoặc tự do đổi sang bất kỳ phím nào (<code>Ctrl + Space</code>, <code>Alt + Z</code>...), có nút bật/tắt riêng.</li>
-              <li><strong>Mở khóa âm thanh phím cơ:</strong> Khi thư mục config có chứa gói <code>switches\</code>, MKey tự động mở khóa cụm điều khiển switch ngay trong Tab Bộ gõ (chọn switch, nghe thử và thanh trượt âm lượng).</li>
+              <li><strong>Mở khóa âm thanh phím cơ:</strong> Khi thư mục config có chứa gói <code>switches\</code>, Kora tự động mở khóa cụm điều khiển switch ngay trong Tab Bộ gõ (chọn switch, nghe thử và thanh trượt âm lượng).</li>
             </ul>
           </div>
         </div>
@@ -427,10 +427,10 @@
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Gõ tắt</span>
+            <span class="ui-window-title">Kora • Tab Gõ tắt</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-gotat.png" alt="Giao diện MKey - Tab Gõ tắt" loading="lazy">
+            <img src="images/ui-tab-gotat.png" alt="Giao diện Kora - Tab Gõ tắt" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 2 • GÕ TẮT</span>
@@ -447,10 +447,10 @@
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Hệ thống</span>
+            <span class="ui-window-title">Kora • Tab Hệ thống</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-hethong.png" alt="Giao diện MKey - Tab Hệ thống" loading="lazy">
+            <img src="images/ui-tab-hethong.png" alt="Giao diện Kora - Tab Hệ thống" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 3 • HỆ THỐNG</span>
@@ -470,7 +470,7 @@
           <div class="philosophy-badge">TRIẾT LÝ THIẾT KẾ HIỆN ĐẠI</div>
           <h3 class="philosophy-title">Tối giản để tập trung 100% vào trải nghiệm gõ</h3>
           <p class="philosophy-desc">
-            Không còn rừng checkbox kỹ thuật hay những tính năng từ thập niên 90 mà chẳng còn ai dùng. MKey sinh ra để làm đúng một việc duy nhất tốt nhất: <strong>gõ phím mượt mà, chuẩn xác và không gián đoạn mạch suy nghĩ</strong>.
+            Không còn rừng checkbox kỹ thuật hay những tính năng từ thập niên 90 mà chẳng còn ai dùng. Kora sinh ra để làm đúng một việc duy nhất tốt nhất: <strong>gõ phím mượt mà, chuẩn xác và không gián đoạn mạch suy nghĩ</strong>.
           </p>
         </div>
 
@@ -491,7 +491,7 @@
             </div>
             <div class="philosophy-content">
               <h4>Không bắt bạn phải làm "chuyên gia cấu hình"</h4>
-              <p>Các bộ gõ truyền thống thường phơi bày hàng tá checkbox rối rắm: <em>"Sử dụng clipboard cho unicode", "Cho phép gõ tự do"...</em> cùng hàng loạt thiết lập mở rộng phức tạp khiến người dùng phổ thông không biết phải chọn thế nào. MKey tự động hóa toàn bộ logic thông minh bên dưới — mở lên là dùng hoàn hảo ngay lập tức.</p>
+              <p>Các bộ gõ truyền thống thường phơi bày hàng tá checkbox rối rắm: <em>"Sử dụng clipboard cho unicode", "Cho phép gõ tự do"...</em> cùng hàng loạt thiết lập mở rộng phức tạp khiến người dùng phổ thông không biết phải chọn thế nào. Kora tự động hóa toàn bộ logic thông minh bên dưới — mở lên là dùng hoàn hảo ngay lập tức.</p>
             </div>
           </div>
 
@@ -501,7 +501,7 @@
             </div>
             <div class="philosophy-content">
               <h4>Dồn toàn bộ tài nguyên cho trải nghiệm cốt lõi</h4>
-              <p>Khi giải phóng phần mềm khỏi hàng nghìn dòng mã cũ kỹ không ai dùng đến, MKey có thể tập trung tối đa vào những thứ thực sự tạo nên sự khác biệt hàng ngày: <strong>gõ tiếng Anh không bị nuốt chữ</strong>, <strong>sửa dấu hồi quy thông minh</strong>, <strong>giả lập âm thanh phím cơ WASAPI sống động</strong> và mức tiêu thụ RAM siêu nhẹ <strong>dưới 1 MB</strong>.</p>
+              <p>Khi giải phóng phần mềm khỏi hàng nghìn dòng mã cũ kỹ không ai dùng đến, Kora có thể tập trung tối đa vào những thứ thực sự tạo nên sự khác biệt hàng ngày: <strong>gõ tiếng Anh không bị nuốt chữ</strong>, <strong>sửa dấu hồi quy thông minh</strong>, <strong>giả lập âm thanh phím cơ WASAPI sống động</strong> và mức tiêu thụ RAM siêu nhẹ <strong>dưới 1 MB</strong>.</p>
             </div>
           </div>
         </div>
@@ -515,7 +515,7 @@
       <div class="section-header">
         <div class="section-chip">TÍNH NĂNG NỔI BẬT</div>
         <h2 class="section-title">Gõ văn bản tự nhiên, không gián đoạn</h2>
-        <p class="section-subtitle">MKey hiểu cách bạn gõ hàng ngày và tự động xử lý chuẩn xác, để bạn không còn phải bực mình vì lỗi nhảy chữ hay nuốt phím.</p>
+        <p class="section-subtitle">Kora hiểu cách bạn gõ hàng ngày và tự động xử lý chuẩn xác, để bạn không còn phải bực mình vì lỗi nhảy chữ hay nuốt phím.</p>
       </div>
 
       <div class="specs-grid">
@@ -554,7 +554,7 @@
         <div class="spec-card">
           <span class="spec-tag">TỰ ĐỘNG</span>
           <div class="spec-title">Tự động khôi phục phím khi gõ sai từ</div>
-          <div class="spec-desc">Khi bạn gõ nhầm phím hoặc tổ hợp ký tự không có thật trong tiếng Việt, MKey tự động hoàn lại các ký tự thô ban đầu, ngăn chặn việc nuốt phím hoặc tạo ra ký tự rác khó chịu.</div>
+          <div class="spec-desc">Khi bạn gõ nhầm phím hoặc tổ hợp ký tự không có thật trong tiếng Việt, Kora tự động hoàn lại các ký tự thô ban đầu, ngăn chặn việc nuốt phím hoặc tạo ra ký tự rác khó chịu.</div>
           <div class="feature-demo-screen" data-feature="restore">
             <div class="feature-screen-top">
               <span class="screen-dot"></span>
@@ -570,7 +570,7 @@
         <div class="spec-card">
           <span class="spec-tag">TIỆN LỢI</span>
           <div class="spec-title">Sửa dấu sau khi đã bấm phím cách</div>
-          <div class="spec-desc">Nếu lỡ gõ sang từ tiếp theo mới nhận ra từ trước bị thiếu dấu, bạn chỉ cần bấm Backspace lùi về từ cũ rồi gõ phím dấu. MKey sẽ tự động thêm dấu vào từ trước giúp bạn gõ tiếp ngay mà không phải xóa đi gõ lại từ đầu.</div>
+          <div class="spec-desc">Nếu lỡ gõ sang từ tiếp theo mới nhận ra từ trước bị thiếu dấu, bạn chỉ cần bấm Backspace lùi về từ cũ rồi gõ phím dấu. Kora sẽ tự động thêm dấu vào từ trước giúp bạn gõ tiếp ngay mà không phải xóa đi gõ lại từ đầu.</div>
           <div class="feature-demo-screen" data-feature="backspace">
             <div class="feature-screen-top">
               <span class="screen-dot"></span>
@@ -627,8 +627,8 @@
       <div class="soundpack-guide-card" id="sound-guide">
         <div class="guide-header">
           <div class="guide-badge">HƯỚNG DẪN CÀI ĐẶT GÓI ÂM THANH</div>
-          <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho MKey</h3>
-          <p class="guide-subtitle">File chạy MKey được tối ưu siêu nhẹ (~549 KB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
+          <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho Kora</h3>
+          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~549 KB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
         </div>
 
         <div class="guide-steps-grid">
@@ -640,11 +640,11 @@
               <div class="guide-path-box">
                 <div class="path-label">1 dòng lệnh tự động (PowerShell):</div>
                 <div class="path-code-wrapper">
-                  <code>irm https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.ps1 | iex</code>
-                  <button class="btn-copy-mini" data-copy="irm https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.ps1 | iex" title="Sao chép lệnh">Copy</button>
+                  <code>irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex</code>
+                  <button class="btn-copy-mini" data-copy="irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex" title="Sao chép lệnh">Copy</button>
                 </div>
               </div>
-              <p class="guide-mini-alt">Hoặc tải file chạy tự động: <a href="https://raw.githubusercontent.com/uongsuadaubung/mkey/main/scripts/install-soundpack.bat" download>install-soundpack.bat</a></p>
+              <p class="guide-mini-alt">Hoặc tải file chạy tự động: <a href="https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.bat" download>install-soundpack.bat</a></p>
             </div>
           </div>
 
@@ -652,16 +652,16 @@
             <div class="step-num">2</div>
             <div class="step-content">
               <strong>Hoặc copy thủ công từ GitHub</strong>
-              <p>Nếu bạn đã clone hoặc tải mã nguồn MKey từ GitHub, chỉ cần copy thư mục <code>switches</code> vào thư mục config:</p>
-              <a href="https://github.com/uongsuadaubung/mkey/tree/main/switches" target="_blank" class="btn-step-action">
+              <p>Nếu bạn đã clone hoặc tải mã nguồn Kora từ GitHub, chỉ cần copy thư mục <code>switches</code> vào thư mục config:</p>
+              <a href="https://github.com/uongsuadaubung/kora/tree/main/switches" target="_blank" class="btn-step-action">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                 <span>Xem thư mục switches trên GitHub</span>
               </a>
               <div class="guide-path-box" style="margin-top: 12px;">
                 <div class="path-label">Thư mục đích:</div>
                 <div class="path-code-wrapper">
-                  <code>%USERPROFILE%\.config\mkey\switches\</code>
-                  <button class="btn-copy-mini" data-copy="%USERPROFILE%\.config\mkey\switches" title="Sao chép đường dẫn">Copy</button>
+                  <code>%USERPROFILE%\.config\kora\switches\</code>
+                  <button class="btn-copy-mini" data-copy="%USERPROFILE%\.config\kora\switches" title="Sao chép đường dẫn">Copy</button>
                 </div>
               </div>
             </div>
@@ -671,7 +671,7 @@
             <div class="step-num">3</div>
             <div class="step-content">
               <strong>Tự động mở khóa &amp; Trải nghiệm</strong>
-              <p>Ngay khi thư mục <code>switches\</code> xuất hiện trong config, MKey sẽ <strong>tự động mở khóa cụm Giả lập âm thanh phím cơ</strong> ngay trong Tab Bộ gõ: cho phép tích chọn bật âm thanh, chọn switch yêu thích (Alps SKCM Blue, Holy Panda...), bấm "Nghe thử" và kéo thanh chỉnh âm lượng trực quan.</p>
+              <p>Ngay khi thư mục <code>switches\</code> xuất hiện trong config, Kora sẽ <strong>tự động mở khóa cụm Giả lập âm thanh phím cơ</strong> ngay trong Tab Bộ gõ: cho phép tích chọn bật âm thanh, chọn switch yêu thích (Alps SKCM Blue, Holy Panda...), bấm "Nghe thử" và kéo thanh chỉnh âm lượng trực quan.</p>
               <div class="guide-status-note">
                 <span class="note-dot"></span>
                 <span>Tự động quét &amp; mở khóa 13 bộ switch có sẵn ngay trong Tab Bộ gõ.</span>
@@ -695,7 +695,7 @@
             <div class="custom-sound-badge">TÙY BIẾN KHÔNG GIỚI HẠN</div>
             <h4 class="custom-sound-title">Tự tạo gói âm thanh theo sở thích của riêng bạn</h4>
             <p class="custom-sound-desc">
-              Bạn không hề bị giới hạn trong 13 bộ switch có sẵn! MKey cho phép bạn đưa <strong>bất kỳ file âm thanh nào bạn thích</strong> vào sử dụng — từ tiếng gõ phím cơ custom, máy đánh chữ cổ điển, meme hài hước, cho đến âm thanh anime, lồng tiếng troll :))) Chỉ cần tạo một thư mục mới trong <code>%USERPROFILE%\.config\mkey\switches\&lt;Tên_Gói&gt;\</code> và thả các file <code>.wav</code> vào, MKey sẽ tự động nhận diện ngay trong Bảng điều khiển.
+              Bạn không hề bị giới hạn trong 13 bộ switch có sẵn! Kora cho phép bạn đưa <strong>bất kỳ file âm thanh nào bạn thích</strong> vào sử dụng — từ tiếng gõ phím cơ custom, máy đánh chữ cổ điển, meme hài hước, cho đến âm thanh anime, lồng tiếng troll :))) Chỉ cần tạo một thư mục mới trong <code>%USERPROFILE%\.config\kora\switches\&lt;Tên_Gói&gt;\</code> và thả các file <code>.wav</code> vào, Kora sẽ tự động nhận diện ngay trong Bảng điều khiển.
             </p>
           </div>
 
@@ -803,7 +803,7 @@
                   <div class="naming-row-full">
                     <p><strong>Áp dụng cho:</strong> Toàn bộ chữ cái (A-Z), chữ số (0-9) và các dấu câu.</p>
                     <p><strong>Tên file chuẩn:</strong> Đánh số thứ tự <code>1.wav</code>, <code>2.wav</code>, <code>3.wav</code>, <code>4.wav</code>, <code>5.wav</code>... (hoặc bất kỳ tên file nào không trùng với 18 phím cố định ở trên).</p>
-                    <p class="row-subtext">💡 <strong>Tự động luân phiên:</strong> Khi bạn để nhiều file số (1.wav, 2.wav...), MKey sẽ tự động đổi tiếng luân phiên sau mỗi lần gõ phím. Nếu bất kỳ phím chức năng nào không có file riêng, MKey sẽ tự động phát âm thanh gõ thường này làm mặc định.</p>
+                    <p class="row-subtext">💡 <strong>Tự động luân phiên:</strong> Khi bạn để nhiều file số (1.wav, 2.wav...), Kora sẽ tự động đổi tiếng luân phiên sau mỗi lần gõ phím. Nếu bất kỳ phím chức năng nào không có file riêng, Kora sẽ tự động phát âm thanh gõ thường này làm mặc định.</p>
                   </div>
                 </div>
               </div>
@@ -863,7 +863,7 @@
           <div class="benchmark-badge">ĐỐI CHIẾU THỰC TẾ TRÊN WINDOWS TASK MANAGER</div>
           <h3 class="benchmark-title">Tiêu thụ RAM thực tế: Ẩn cửa sổ vs. Mở cửa sổ</h3>
           <p class="benchmark-subtitle">
-            Minh chứng trực tiếp từ Task Manager khi chạy song song <strong>MKey</strong> cùng <strong>UniKey</strong> và <strong>OpenKey</strong>:
+            Minh chứng trực tiếp từ Task Manager khi chạy song song <strong>Kora</strong> cùng <strong>UniKey</strong> và <strong>OpenKey</strong>:
           </p>
         </div>
 
@@ -878,11 +878,11 @@
               <div class="benchmark-ram-val">0.7 MB RAM</div>
             </div>
             <div class="benchmark-img-container">
-              <img src="images/benchmark-tray.png" alt="Task Manager khi MKey ẩn cửa sổ - 0.7 MB RAM" loading="lazy">
+              <img src="images/benchmark-tray.png" alt="Task Manager khi Kora ẩn cửa sổ - 0.7 MB RAM" loading="lazy">
             </div>
             <div class="benchmark-card-desc">
               <div class="benchmark-metric-row win">
-                <span class="proc-name">MKey (Rust):</span>
+                <span class="proc-name">Kora (Rust):</span>
                 <span class="proc-num">0.7 MB</span>
                 <span class="proc-tag">Tự động giải phóng bộ nhớ</span>
               </div>
@@ -892,7 +892,7 @@
                 <span class="proc-tag">Nặng gấp ~3.5 lần</span>
               </div>
               <p class="benchmark-analysis">
-                🔍 <strong>Nhận xét:</strong> Khi đóng cửa sổ về khay hệ thống (không có mũi tên <code>&gt;</code>), MKey tự động cắt tỉa working set xuống chỉ còn <strong>0.7 MB RAM</strong>, tiết kiệm hơn <strong>70%</strong> so với các bộ gõ truyền thống.
+                🔍 <strong>Nhận xét:</strong> Khi đóng cửa sổ về khay hệ thống (không có mũi tên <code>&gt;</code>), Kora tự động cắt tỉa working set xuống chỉ còn <strong>0.7 MB RAM</strong>, tiết kiệm hơn <strong>70%</strong> so với các bộ gõ truyền thống.
               </p>
             </div>
           </div>
@@ -907,11 +907,11 @@
               <div class="benchmark-ram-val">1.5 MB RAM</div>
             </div>
             <div class="benchmark-img-container">
-              <img src="images/benchmark-window.png" alt="Task Manager khi MKey mở cửa sổ - 1.5 MB RAM" loading="lazy">
+              <img src="images/benchmark-window.png" alt="Task Manager khi Kora mở cửa sổ - 1.5 MB RAM" loading="lazy">
             </div>
             <div class="benchmark-card-desc">
               <div class="benchmark-metric-row win">
-                <span class="proc-name">MKey (Rust):</span>
+                <span class="proc-name">Kora (Rust):</span>
                 <span class="proc-num">1.5 MB</span>
                 <span class="proc-tag">Đang hiển thị toàn bộ giao diện</span>
               </div>
@@ -921,7 +921,7 @@
                 <span class="proc-tag">Vẫn giữ 2.4 MB</span>
               </div>
               <p class="benchmark-analysis">
-                🔍 <strong>Nhận xét:</strong> Ngay cả khi đang mở bảng điều khiển (có mũi tên <code>&gt;</code> trong Task Manager), MKey chỉ tiêu tốn <strong>1.5 MB RAM</strong> — con số này vẫn nhẹ hơn gần <strong>1 MB</strong> so với UniKey & OpenKey.
+                🔍 <strong>Nhận xét:</strong> Ngay cả khi đang mở bảng điều khiển (có mũi tên <code>&gt;</code> trong Task Manager), Kora chỉ tiêu tốn <strong>1.5 MB RAM</strong> — con số này vẫn nhẹ hơn gần <strong>1 MB</strong> so với UniKey & OpenKey.
               </p>
             </div>
           </div>
@@ -936,7 +936,7 @@
       <div class="section-header">
         <div class="section-chip">SO SÁNH</div>
         <h2 class="section-title">Khác biệt trong từng trải nghiệm hàng ngày</h2>
-        <p class="section-subtitle">So sánh cảm giác sử dụng thực tế giữa MKey và các bộ gõ tiếng Việt trước đây.</p>
+        <p class="section-subtitle">So sánh cảm giác sử dụng thực tế giữa Kora và các bộ gõ tiếng Việt trước đây.</p>
       </div>
 
       <div class="comparison-table-wrapper">
@@ -945,7 +945,7 @@
             <tr>
               <th class="feature-col">Tình huống hàng ngày</th>
               <th class="legacy-th">Bộ gõ truyền thống</th>
-              <th class="mkey-th">MKey</th>
+              <th class="kora-th">Kora</th>
             </tr>
           </thead>
           <tbody>
@@ -958,7 +958,7 @@
                 <span class="badge-fail">Bị nuốt chữ</span>
                 <p>Chữ bị biến thành <code>eror</code>, <code>pas</code>, <code>cofee</code>. Phải gõ lặp 3 lần (<code>passs</code>) hoặc tắt tiếng Việt.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Giữ nguyên vẹn</span>
                 <p>Tự động nhận diện từ tiếng Anh và giữ đúng từ, không nuốt chữ, không cần gõ 3 lần.</p>
               </td>
@@ -973,7 +973,7 @@
                 <span class="badge-fail">Dễ lặp chữ đầu</span>
                 <p>Thường bị nhảy chữ thành <code>ggoogle</code>, <code>ttoán</code> gây khó chịu khi tìm kiếm.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Gõ chuẩn xác</span>
                 <p>Chữ hiển thị chuẩn từng ký tự ngay từ đầu, tìm kiếm hay nhập link web đều mượt mà.</p>
               </td>
@@ -988,9 +988,9 @@
                 <span class="badge-neutral">Phải tạo nhiều lần</span>
                 <p>Muốn gõ tắt cả chữ thường và hoa phải tạo thủ công từng từ như <code>ko</code>, <code>Ko</code>, <code>KO</code>.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Tự động đổi kiểu chữ</span>
-                <p>Chỉ cần tạo 1 từ <code>ko</code> &rarr; <code>không</code>, MKey tự nhận diện để xuất <code>Không</code> hoặc <code>KHÔNG</code> theo cách bạn gõ.</p>
+                <p>Chỉ cần tạo 1 từ <code>ko</code> &rarr; <code>không</code>, Kora tự nhận diện để xuất <code>Không</code> hoặc <code>KHÔNG</code> theo cách bạn gõ.</p>
               </td>
             </tr>
 
@@ -1003,7 +1003,7 @@
                 <span class="badge-fail">Phải gõ lại cả từ</span>
                 <p>Xóa cách rồi gõ dấu sẽ thành <code>chao s</code>. Buộc bạn phải xóa hết cả từ để gõ lại từ đầu.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Tự động thêm dấu</span>
                 <p>Chỉ cần xóa cách rồi gõ dấu, chữ tự đổi thành <code>cháo</code> mà không mất công gõ lại.</p>
               </td>
@@ -1018,7 +1018,7 @@
                 <span class="badge-neutral">Bị bó buộc</span>
                 <p>Chỉ cho chọn cố định giữa <code>Ctrl + Shift</code> hoặc <code>Alt + Z</code>, không thể tùy biến theo ý thích.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Tự do đổi phím 100%</span>
                 <p>Gán bất kỳ phím nào (như <code>Ctrl + Space</code>, <code>Alt + Z</code>...) qua giao diện nhận diện thông minh, có nút bật/tắt riêng.</p>
               </td>
@@ -1033,7 +1033,7 @@
                 <span class="badge-fail">Không có sẵn</span>
                 <p>Phải cài thêm ứng dụng ngoài cồng kềnh, ngốn hàng trăm MB bộ nhớ RAM của máy.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Hỗ trợ 13 bộ switch</span>
                 <p>Hỗ trợ phát âm thanh phím cơ sống động qua WASAPI, chỉ tốn ~1.5 MB RAM khi bật và không cần cài phần mềm ngoài nặng nề.</p>
               </td>
@@ -1048,7 +1048,7 @@
                 <span class="badge-neutral">2.4 MB (cố định)</span>
                 <p>UniKey và OpenKey luôn chiếm từ 2.4 MB RAM trở lên dù ẩn hay mở cửa sổ.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Chỉ 0.7 MB &rarr; 1.5 MB</span>
                 <p>Khi ẩn cửa sổ chỉ tốn <strong>0.7 MB RAM</strong> (nhẹ hơn 70%). Khi mở bảng điều khiển cũng chỉ <strong>1.5 MB</strong> (<a href="#performance" style="color: #38bdf8; text-decoration: underline;">xem ảnh Task Manager &uarr;</a>).</p>
               </td>
@@ -1063,7 +1063,7 @@
                 <span class="badge-neutral">Rườm rà, nhiều tùy chọn cổ</span>
                 <p>Nhiều bảng mã cũ từ thập niên 90 (TCVN3, VNI...) và hàng chục checkbox kỹ thuật rườm rà dễ gây rối mắt và nhầm lẫn.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Tối giản chuẩn Unicode</span>
                 <p>Chuẩn Unicode hiện đại 100%. Tự động hóa ngầm toàn bộ cơ chế, không bắt bạn phải làm chuyên gia cấu hình để gõ văn bản mượt mà.</p>
               </td>
@@ -1078,7 +1078,7 @@
                 <span class="badge-neutral">Đôi khi khựng nhịp phím</span>
                 <p>Dễ xung đột các phím di chuyển khi chơi game nếu quên tắt chế độ tiếng Việt.</p>
               </td>
-              <td class="mkey-td">
+              <td class="kora-td">
                 <span class="badge-win">Hoàn toàn mượt mà</span>
                 <p>Nhạy bén tức thì, phản hồi êm ái kể cả khi bạn gõ văn bản cực nhanh hay chơi game.</p>
               </td>
@@ -1095,7 +1095,7 @@
       <div class="section-header">
         <div class="section-chip">HỎI ĐÁP</div>
         <h2 class="section-title">Câu hỏi thường gặp</h2>
-        <p class="section-subtitle">Giải đáp nhanh các thắc mắc phổ biến nhất khi bắt đầu sử dụng bộ gõ MKey.</p>
+        <p class="section-subtitle">Giải đáp nhanh các thắc mắc phổ biến nhất khi bắt đầu sử dụng bộ gõ Kora.</p>
       </div>
 
       <div class="faq-grid">
@@ -1105,17 +1105,17 @@
             <h3>Windows SmartScreen có báo file lạ không?</h3>
           </div>
           <p class="faq-a">
-            MKey là phần mềm mã nguồn mở hoàn toàn miễn phí (chưa mua chứng chỉ số đắt tiền hàng năm từ Microsoft), nên khi tải về lần đầu, Windows SmartScreen có thể hiển thị cảnh báo bảo vệ. Bạn chỉ cần nhấn vào <strong>"More info" (Thông tin khác)</strong> &rarr; chọn <strong>"Run anyway" (Vẫn chạy)</strong>. Toàn bộ mã nguồn MKey đều công khai 100% trên GitHub để bạn tự kiểm chứng.
+            Kora là phần mềm mã nguồn mở hoàn toàn miễn phí (chưa mua chứng chỉ số đắt tiền hàng năm từ Microsoft), nên khi tải về lần đầu, Windows SmartScreen có thể hiển thị cảnh báo bảo vệ. Bạn chỉ cần nhấn vào <strong>"More info" (Thông tin khác)</strong> &rarr; chọn <strong>"Run anyway" (Vẫn chạy)</strong>. Toàn bộ mã nguồn Kora đều công khai 100% trên GitHub để bạn tự kiểm chứng.
           </p>
         </div>
 
         <div class="faq-card">
           <div class="faq-q">
             <span class="faq-icon">💻</span>
-            <h3>MKey hỗ trợ những phiên bản Windows nào?</h3>
+            <h3>Kora hỗ trợ những phiên bản Windows nào?</h3>
           </div>
           <p class="faq-a">
-            MKey hoạt động tối ưu trên <strong>Windows 10</strong> và <strong>Windows 11 (64-bit)</strong>. File chạy là dạng <strong>Portable độc lập</strong>, không cần cài đặt, không ghi rác vào Windows Registry và không yêu cầu quyền Quản trị viên (Administrator).
+            Kora hoạt động tối ưu trên <strong>Windows 10</strong> và <strong>Windows 11 (64-bit)</strong>. File chạy là dạng <strong>Portable độc lập</strong>, không cần cài đặt, không ghi rác vào Windows Registry và không yêu cầu quyền Quản trị viên (Administrator).
           </p>
         </div>
 
@@ -1125,7 +1125,7 @@
             <h3>Tôi có cần gỡ UniKey hoặc OpenKey cũ không?</h3>
           </div>
           <p class="faq-a">
-            Bạn không nhất thiết phải gỡ cài đặt, nhưng <strong>cần tắt hoặc thoát hoàn toàn</strong> các bộ gõ cũ (UniKey, OpenKey, EVKey...) trước khi bật MKey. Nếu để 2 bộ gõ cùng chạy ngầm song song, cả hai sẽ cùng bắt phím và gây ra lỗi lặp hoặc nhảy ký tự.
+            Bạn không nhất thiết phải gỡ cài đặt, nhưng <strong>cần tắt hoặc thoát hoàn toàn</strong> các bộ gõ cũ (UniKey, OpenKey, EVKey...) trước khi bật Kora. Nếu để 2 bộ gõ cùng chạy ngầm song song, cả hai sẽ cùng bắt phím và gây ra lỗi lặp hoặc nhảy ký tự.
           </p>
         </div>
 
@@ -1147,16 +1147,16 @@
     <div class="container download-container">
       <div class="download-card">
         <div class="download-badge">PHIÊN BẢN 0.3.0 • MIỄN PHÍ & MÃ NGUỒN MỞ</div>
-        <h2 class="download-title">Bắt đầu sử dụng MKey</h2>
+        <h2 class="download-title">Bắt đầu sử dụng Kora</h2>
         <p class="download-desc">
           Tải bản chạy ngay (portable) mở lên là sử dụng ngay, không cần cài đặt rườm rà. Tương thích hoàn hảo Windows 10 &amp; 11 (64-bit), không cần quyền Quản trị viên (Admin).
         </p>
 
         <div class="download-buttons">
-          <a href="https://github.com/uongsuadaubung/mkey/releases/latest" class="btn btn-download-main">
+          <a href="https://github.com/uongsuadaubung/kora/releases/latest" class="btn btn-download-main">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
             <div class="btn-text-block">
-              <span class="btn-main-text">Tải MKey (.exe)</span>
+              <span class="btn-main-text">Tải Kora (.exe)</span>
               <span class="btn-sub-text">Bản Portable cho Windows 10 / 11 (64-bit)</span>
             </div>
           </a>
@@ -1182,14 +1182,14 @@
     <div class="container footer-container">
       <div class="footer-left">
         <div class="footer-brand">
-          <img src="images/icon.png" alt="MKey" class="footer-logo-img">
-          <span>MKey</span>
+          <img src="images/icon.png" alt="Kora" class="footer-logo-img">
+          <span>Kora</span>
         </div>
         <p class="footer-tagline">Bộ gõ tiếng Việt hiện đại cho Windows.</p>
         <p class="footer-copy">Mã nguồn mở trên GitHub.</p>
       </div>
       <div class="footer-right">
-        <a href="https://github.com/uongsuadaubung/mkey" target="_blank">Mã nguồn GitHub</a>
+        <a href="https://github.com/uongsuadaubung/kora" target="_blank">Mã nguồn GitHub</a>
       </div>
     </div>
   </footer>

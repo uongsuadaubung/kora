@@ -1,8 +1,8 @@
-//! Base styles: CSS variables, reset, ambient glow, container
+﻿//! Base styles: CSS variables, reset, ambient glow, container
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================
-   MKey Landing Page — Titanium & Obsidian Monochrome (Apple Pro / Linear.app)
+   Kora Landing Page — Titanium & Obsidian Monochrome (Apple Pro / Linear.app)
    ========================================================================== */
 
 :root {

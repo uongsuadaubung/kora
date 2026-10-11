@@ -1,4 +1,4 @@
-//! Feature live typing animations, copy buttons, sound button, and initialization
+﻿//! Feature live typing animations, copy buttons, sound button, and initialization
 
 pub fn render() -> &'static str {
     r####"  // ==========================================================================

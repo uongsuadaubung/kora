@@ -51,7 +51,7 @@ pub const IDNO: i32 = 7;
 pub const IDOK: i32 = 1;
 
 /// Magic identifier to tag our own synthetic input events and prevent infinite hook loops
-pub const MAGIC_EXTRA_INFO: usize = 0x4D4B4559; // "MKEY" in ASCII
+pub const MAGIC_EXTRA_INFO: usize = 0x4B4F5241; // "KORA" in ASCII
 
 // Win32 FFI Structures
 #[repr(C)]
@@ -195,7 +195,31 @@ unsafe extern "system" {
     pub fn GetClassNameW(hWnd: isize, lpClassName: *mut u16, nMaxCount: i32) -> i32;
     pub fn MessageBoxW(hWnd: isize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;
     pub fn PostMessageW(hWnd: isize, Msg: u32, wParam: usize, lParam: isize) -> i32;
+    pub fn SetWinEventHook(
+        eventMin: u32,
+        eventMax: u32,
+        hmodWinEventProc: isize,
+        pfnWinEventProc: Option<WINEVENTPROC>,
+        idProcess: u32,
+        idThread: u32,
+        dwFlags: u32,
+    ) -> isize;
+    pub fn UnhookWinEvent(hWinEventHook: isize) -> i32;
 }
+
+pub const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
+pub const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
+pub const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
+
+pub type WINEVENTPROC = unsafe extern "system" fn(
+    hWinEventHook: isize,
+    event: u32,
+    hwnd: isize,
+    idObject: i32,
+    idChild: i32,
+    idEventThread: u32,
+    dwmsEventTime: u32,
+);
 
 #[link(name = "kernel32")]
 unsafe extern "system" {

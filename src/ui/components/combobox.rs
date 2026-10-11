@@ -1,33 +1,13 @@
-//! Native Win32 ComboBox Component
+//! Native Win32 ComboBox Component (Owner-Drawn with Smooth Padding & Modern Theming)
 
-use super::window::to_wide;
+use crate::ui::win32::*;
+use crate::ui::colors::ThemePalette;
+use crate::ui::tokens::spacing;
 use std::ptr::null_mut;
 
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn CreateWindowExW(
-        dw_ex_style: u32,
-        lp_class_name: *const u16,
-        lp_window_name: *const u16,
-        dw_style: u32,
-        x: i32,
-        y: i32,
-        n_width: i32,
-        n_height: i32,
-        h_wnd_parent: isize,
-        h_menu: isize,
-        h_instance: isize,
-        lp_param: *mut std::ffi::c_void,
-    ) -> isize;
-    fn SendMessageW(h_wnd: isize, msg: u32, w_param: usize, l_param: isize) -> isize;
-}
-
-const WS_CHILD: u32 = 0x40000000;
-const WS_VISIBLE: u32 = 0x10000000;
-const WS_TABSTOP: u32 = 0x00010000;
 const CBS_DROPDOWNLIST: u32 = 0x0003;
+const CBS_OWNERDRAWFIXED: u32 = 0x0010;
 const CBS_HASSTRINGS: u32 = 0x0200;
-const WS_VSCROLL: u32 = 0x00200000;
 
 const CB_ADDSTRING: u32 = 0x0143;
 const CB_SETCURSEL: u32 = 0x014E;
@@ -35,8 +15,37 @@ const CB_GETCURSEL: u32 = 0x0147;
 const CB_RESETCONTENT: u32 = 0x014B;
 const CB_GETLBTEXTLEN: u32 = 0x0149;
 const CB_GETLBTEXT: u32 = 0x0148;
+const CB_SETITEMHEIGHT: u32 = 0x0153;
 const CB_ERR: isize = -1;
 const WM_SETFONT: u32 = 0x0030;
+
+unsafe extern "system" fn combobox_self_subclass(
+    hwnd: isize,
+    msg: u32,
+    wparam: usize,
+    lparam: isize,
+    uid_subclass: usize,
+    _ref_data: usize,
+) -> isize {
+    const WM_NCDESTROY: u32 = 0x0082;
+    if msg == WM_NCDESTROY {
+        unsafe {
+            RemoveWindowSubclass(hwnd, combobox_self_subclass, uid_subclass);
+        }
+        return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    }
+
+    // Message Reflection: Self-contained item rendering
+    if msg == OCM_DRAWITEM {
+        let dis = unsafe { &*(lparam as *const DRAWITEMSTRUCT) };
+        let is_dark = crate::ui::is_current_dark();
+        if ComboBox::render_item(dis, is_dark) {
+            return 1;
+        }
+    }
+
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+}
 
 pub struct ComboBox {
     hwnd: isize,
@@ -60,7 +69,13 @@ impl ComboBox {
                 0,
                 class_name.as_ptr(),
                 null_mut(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | CBS_DROPDOWNLIST | CBS_HASSTRINGS,
+                WS_CHILD
+                    | WS_VISIBLE
+                    | WS_TABSTOP
+                    | WS_VSCROLL
+                    | CBS_DROPDOWNLIST
+                    | CBS_HASSTRINGS
+                    | CBS_OWNERDRAWFIXED,
                 x,
                 y,
                 width,
@@ -73,15 +88,124 @@ impl ComboBox {
         };
 
         if hwnd != 0 {
-            if hfont != 0 {
-                unsafe {
+            unsafe {
+                if hfont != 0 {
                     SendMessageW(hwnd, WM_SETFONT, hfont as usize, 1);
                 }
+                const COMBO_SELECTION_HEIGHT: isize = 22;
+                const COMBO_LIST_ITEM_HEIGHT: isize = 24;
+                SendMessageW(hwnd, CB_SETITEMHEIGHT, usize::MAX, COMBO_SELECTION_HEIGHT);
+                SendMessageW(hwnd, CB_SETITEMHEIGHT, 0, COMBO_LIST_ITEM_HEIGHT);
+
+                SetWindowSubclass(hwnd, combobox_self_subclass, id as usize, 0);
             }
             Some(Self { hwnd, id })
         } else {
             None
         }
+    }
+
+    /// Unified owner-drawn renderer for Win32 ComboBox with smooth padding and modern theme colors
+    pub fn render_item(dis: &DRAWITEMSTRUCT, is_dark: bool) -> bool {
+        if dis.ctl_type != 3 /* ODT_COMBOBOX */ {
+            return false;
+        }
+
+        unsafe {
+            let palette = ThemePalette::get(is_dark);
+            let is_selected = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
+            let is_disabled = (dis.item_state & 0x0004 /* ODS_DISABLED */) != 0;
+            let is_edit = (dis.item_state & 0x1000 /* ODS_COMBOBOXEDIT */) != 0;
+
+            // Background color:
+            // - Closed selection box: always use clean input background (bg_input)
+            // - Dropdown list item: highlight with accent if selected/hovered, otherwise bg_input
+            let bg_color = if is_edit {
+                palette.bg_input
+            } else if is_selected {
+                palette.accent
+            } else {
+                palette.bg_input
+            };
+
+            // Text color:
+            let text_color = if is_disabled {
+                palette.text_secondary
+            } else if !is_edit && is_selected {
+                palette.text_white
+            } else {
+                palette.text_primary
+            };
+
+            // 1. Fill Item Background
+            let brush = CreateSolidBrush(bg_color);
+            FillRect(dis.hdc, &dis.rc_item, brush);
+            DeleteObject(brush);
+
+            // 2. Draw Item Text with comfortable padding
+            if (dis.item_id as i32) >= 0 {
+                let mut text_buf = [0u16; 256];
+                let len = SendMessageW(
+                    dis.hwnd_item,
+                    CB_GETLBTEXT,
+                    dis.item_id as usize,
+                    text_buf.as_mut_ptr() as isize,
+                );
+
+                if len > 0 && len != CB_ERR {
+                    SetBkMode(dis.hdc, TRANSPARENT);
+                    SetTextColor(dis.hdc, text_color);
+
+                    let font = crate::ui::theme::get_app_font_normal();
+                    let old_font = if font != 0 {
+                        SelectObject(dis.hdc, font)
+                    } else {
+                        0
+                    };
+
+                    let mut text_rc = dis.rc_item;
+                    text_rc.left += spacing::SPACE_8;
+                    text_rc.right -= spacing::SPACE_4;
+
+                    DrawTextW(
+                        dis.hdc,
+                        text_buf.as_ptr(),
+                        len as i32,
+                        &mut text_rc,
+                        DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                    );
+
+                    if old_font != 0 {
+                        SelectObject(dis.hdc, old_font);
+                    }
+                }
+            }
+
+            true
+        }
+    }
+
+    /// Creates a ComboBox with items and an initial selected index in a single declarative call
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_items(
+        parent: isize,
+        id: u32,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        hfont: isize,
+        items: &[&str],
+        default_selected: usize,
+    ) -> Option<Self> {
+        let combo = Self::create(parent, id, x, y, width, height, hfont)?;
+        for item in items {
+            combo.add_item(item);
+        }
+        if !items.is_empty() {
+            combo.set_selected(default_selected);
+        }
+        Some(combo)
     }
 
     pub fn hwnd(&self) -> isize {
@@ -94,14 +218,22 @@ impl ComboBox {
 
     pub fn set_enabled(&self, enabled: bool) {
         unsafe {
-            super::window::EnableWindow(self.hwnd, if enabled { 1 } else { 0 });
+            EnableWindow(self.hwnd, enabled as i32);
         }
     }
 
     pub fn is_enabled(&self) -> bool {
-        let style =
-            unsafe { super::window::GetWindowLongW(self.hwnd, super::window::GWL_STYLE) } as u32;
-        (style & super::window::WS_DISABLED) == 0
+        unsafe { IsWindowEnabled(self.hwnd) != 0 }
+    }
+
+    pub fn is_visible(&self) -> bool {
+        unsafe { IsWindowVisible(self.hwnd) != 0 }
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        unsafe {
+            ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
+        }
     }
 
     pub fn add_item(&self, text: &str) {

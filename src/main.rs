@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 #![windows_subsystem = "windows"]
 
-use mkey::platform::{alloc_console, attach_parent_console, ensure_single_instance};
-use mkey::{EngineAction, VietnameseEngine};
+use kora::platform::{alloc_console, attach_parent_console, ensure_single_instance};
+use kora::{EngineAction, VietnameseEngine};
 use std::io::{self, BufRead};
 
 fn main() {
@@ -10,7 +10,7 @@ fn main() {
     let is_cli = args.iter().any(|a| a == "--cli");
     let is_autostart = args.iter().any(|a| a == "--autostart" || a == "--silent");
 
-    // Single-instance guard: prevent multiple running instances of MKey
+    // Single-instance guard: prevent multiple running instances of Kora
     if !ensure_single_instance(is_cli) {
         return;
     }
@@ -18,8 +18,8 @@ fn main() {
     // Attach to existing parent console if launched from terminal (cmd/PowerShell)
     attach_parent_console();
 
-    // Load configuration & macros unified from ~/.config/mkey/config.ini
-    let (mut config, macros) = mkey::load_config_and_macros();
+    // Load configuration, macros & profiles unified from ~/.config/kora/config.ini
+    let (mut config, macros, profiles) = kora::load_config_all();
 
     // Command-line flag overrides
     if args.iter().any(|a| a == "--no-debug") {
@@ -35,6 +35,7 @@ fn main() {
     let is_debug = config.debug;
     let mut engine = VietnameseEngine::new(config);
     engine.macro_table = macros;
+    engine.profile_manager = profiles;
 
     if is_cli {
         alloc_console();
@@ -43,7 +44,7 @@ fn main() {
         #[cfg(target_os = "windows")]
         {
             println!("========================================================");
-            println!("         MKey Vietnamese Engine - Windows Hook          ");
+            println!("         Kora - Next-Gen Keyboard & Input Suite         ");
             println!("========================================================");
             let log_path = engine
                 .config()
@@ -88,7 +89,7 @@ fn main() {
                 }
             );
             println!("* Phím tắt ngoặc: [ -> ư, ] -> ơ");
-            println!("* Cấu hình lưu tại: {}", mkey::get_config_path().display());
+            println!("* Cấu hình lưu tại: {}", kora::get_config_path().display());
             println!("--------------------------------------------------------");
 
             if is_debug && let Some(ref path) = engine.config().debug_file_path {
@@ -104,8 +105,8 @@ fn main() {
                     );
                     let _ = writeln!(
                         f,
-                        "MKey Session Started: {}",
-                        mkey::engine::current_timestamp_str()
+                        "Kora Session Started: {}",
+                        kora::logger::current_timestamp_str()
                     );
                     let _ = writeln!(
                         f,
@@ -121,13 +122,13 @@ fn main() {
             }
 
             let show_dialog_on_startup = !is_autostart && engine.config().show_dialog_on_startup;
-            mkey::platform::win32::set_mode_change_callback(mkey::ui::update_tray_icon);
-            mkey::platform::win32::run_hook_loop(engine, move || {
-                mkey::ui::init_ui();
+            kora::platform::win32::set_mode_change_callback(kora::ui::update_tray_icon);
+            kora::platform::win32::run_hook_loop(engine, move || {
+                kora::ui::init_ui();
                 if show_dialog_on_startup {
-                    mkey::ui::show_control_panel();
+                    kora::ui::show_control_panel();
                 } else {
-                    mkey::platform::win32::trim_working_set();
+                    kora::platform::win32::trim_working_set();
                 }
             });
         }
@@ -141,7 +142,7 @@ fn main() {
 
 fn run_cli(mut engine: VietnameseEngine) {
     println!("========================================================");
-    println!("          MKey Vietnamese Engine - CLI Demo             ");
+    println!("          Kora Vietnamese Engine - CLI Demo             ");
     println!("========================================================");
     println!("Gõ các phím tiếng Việt (Telex) để kiểm tra hoạt động:");
     println!("Ví dụ: 'tooi gox tieengs vieetj' -> 'tôi gõ tiếng việt'");

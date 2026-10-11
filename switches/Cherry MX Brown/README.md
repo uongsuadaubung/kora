@@ -1,13 +1,13 @@
-# Soundpack: Cherry MX Brown
+﻿# Soundpack: Cherry MX Brown
 
-- **Nhà sản xuất / Thiết kế**: Cherry
-- **Phân loại**: Tactile Mechanical Switch
-- **Tác giả thu âm**: Hai Nguyen (Mechvibes)
-- **Giấy phép (License)**: [MIT License](https://github.com/hainguyents13/mechvibes/blob/main/LICENSE)
-- **Nguồn gốc / Repository**: https://github.com/hainguyents13/mechvibes
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Cherry
+- **PhÃ¢n loáº¡i**: Tactile Mechanical Switch
+- **TÃ¡c giáº£ thu Ã¢m**: Hai Nguyen (Mechvibes)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/hainguyents13/mechvibes/blob/main/LICENSE)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/hainguyents13/mechvibes
 
-## Giới thiệu & Đặc trưng âm thanh
-Switch tactile phổ biến nhất lịch sử bàn phím cơ, tiếng khấc nhẹ nhàng, không gây ồn ào.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Switch tactile phá»• biáº¿n nháº¥t lá»‹ch sá»­ bÃ n phÃ­m cÆ¡, tiáº¿ng kháº¥c nháº¹ nhÃ ng, khÃ´ng gÃ¢y á»“n Ã o.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

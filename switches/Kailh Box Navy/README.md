@@ -1,13 +1,13 @@
-# Soundpack: Kailh Box Navy
+﻿# Soundpack: Kailh Box Navy
 
-- **Nhà sản xuất / Thiết kế**: Kailh / NovelKeys
-- **Phân loại**: Thick Clickbar Mechanical Switch
-- **Tác giả thu âm**: tplai (kbsim)
-- **Giấy phép (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
-- **Nguồn gốc / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/kailh/tplai/box_navy
+- **NhÃ  sáº£n xuáº¥t / Thiáº¿t káº¿**: Kailh / NovelKeys
+- **PhÃ¢n loáº¡i**: Thick Clickbar Mechanical Switch
+- **TÃ¡c giáº£ thu Ã¢m**: tplai (kbsim)
+- **Giáº¥y phÃ©p (License)**: [MIT License](https://github.com/tplai/kbsim/blob/master/LICENSE.md)
+- **Nguá»“n gá»‘c / Repository**: https://github.com/kamillobinski/thock-soundpacks/tree/main/keyboard/kailh/tplai/box_navy
 
-## Giới thiệu & Đặc trưng âm thanh
-Switch cơ chế thanh nảy clickbar dày của Kailh, tiếng click đanh thép và giòn giã bậc nhất.
+## Giá»›i thiá»‡u & Äáº·c trÆ°ng Ã¢m thanh
+Switch cÆ¡ cháº¿ thanh náº£y clickbar dÃ y cá»§a Kailh, tiáº¿ng click Ä‘anh thÃ©p vÃ  giÃ²n giÃ£ báº­c nháº¥t.
 
 ---
-*Âm thanh được chuẩn hóa thành định dạng PCM WAV chất lượng cao dùng cho tính năng giả lập âm bàn phím cơ của bộ gõ MKey.*
+*Ã‚m thanh Ä‘Æ°á»£c chuáº©n hÃ³a thÃ nh Ä‘á»‹nh dáº¡ng PCM WAV cháº¥t lÆ°á»£ng cao dÃ¹ng cho tÃ­nh nÄƒng giáº£ láº­p Ã¢m bÃ n phÃ­m cÆ¡ cá»§a bá»™ gÃµ Kora.*

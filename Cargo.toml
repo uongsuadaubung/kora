@@ -1,17 +1,18 @@
 [package]
-name = "mkey"
-version = "0.4.0"
+name = "kora"
+version = "0.5.0"
 edition = "2024"
 authors = ["Mạnh Kiên <manhkien13041997@gmail.com>"]
-description = "MKey - Bộ gõ tiếng Việt siêu nhẹ, hiệu năng cao viết bằng Rust"
-default-run = "MKey"
+description = "Kora - Hệ sinh thái Bàn phím & Bộ gõ thế hệ mới viết bằng Rust"
+repository = "https://github.com/uongsuadaubung/kora"
+default-run = "Kora"
 
 [lib]
-name = "mkey"
+name = "kora"
 path = "src/lib.rs"
 
 [[bin]]
-name = "MKey"
+name = "Kora"
 path = "src/main.rs"
 
 [[example]]

@@ -1,4 +1,4 @@
-//! FAQ section styling
+﻿//! FAQ section styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================

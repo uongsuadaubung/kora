@@ -1,4 +1,4 @@
-//! Performance metrics and Task Manager benchmark showcase component
+﻿//! Performance metrics and Task Manager benchmark showcase component
 
 pub fn render() -> &'static str {
     r####"  <!-- Performance & Engineering Metrics -->
@@ -46,7 +46,7 @@ pub fn render() -> &'static str {
           <div class="benchmark-badge">ĐỐI CHIẾU THỰC TẾ TRÊN WINDOWS TASK MANAGER</div>
           <h3 class="benchmark-title">Tiêu thụ RAM thực tế: Ẩn cửa sổ vs. Mở cửa sổ</h3>
           <p class="benchmark-subtitle">
-            Minh chứng trực tiếp từ Task Manager khi chạy song song <strong>MKey</strong> cùng <strong>UniKey</strong> và <strong>OpenKey</strong>:
+            Minh chứng trực tiếp từ Task Manager khi chạy song song <strong>Kora</strong> cùng <strong>UniKey</strong> và <strong>OpenKey</strong>:
           </p>
         </div>
 
@@ -61,11 +61,11 @@ pub fn render() -> &'static str {
               <div class="benchmark-ram-val">0.7 MB RAM</div>
             </div>
             <div class="benchmark-img-container">
-              <img src="images/benchmark-tray.png" alt="Task Manager khi MKey ẩn cửa sổ - 0.7 MB RAM" loading="lazy">
+              <img src="images/benchmark-tray.png" alt="Task Manager khi Kora ẩn cửa sổ - 0.7 MB RAM" loading="lazy">
             </div>
             <div class="benchmark-card-desc">
               <div class="benchmark-metric-row win">
-                <span class="proc-name">MKey (Rust):</span>
+                <span class="proc-name">Kora (Rust):</span>
                 <span class="proc-num">0.7 MB</span>
                 <span class="proc-tag">Tự động giải phóng bộ nhớ</span>
               </div>
@@ -75,7 +75,7 @@ pub fn render() -> &'static str {
                 <span class="proc-tag">Nặng gấp ~3.5 lần</span>
               </div>
               <p class="benchmark-analysis">
-                🔍 <strong>Nhận xét:</strong> Khi đóng cửa sổ về khay hệ thống (không có mũi tên <code>&gt;</code>), MKey tự động cắt tỉa working set xuống chỉ còn <strong>0.7 MB RAM</strong>, tiết kiệm hơn <strong>70%</strong> so với các bộ gõ truyền thống.
+                🔍 <strong>Nhận xét:</strong> Khi đóng cửa sổ về khay hệ thống (không có mũi tên <code>&gt;</code>), Kora tự động cắt tỉa working set xuống chỉ còn <strong>0.7 MB RAM</strong>, tiết kiệm hơn <strong>70%</strong> so với các bộ gõ truyền thống.
               </p>
             </div>
           </div>
@@ -90,11 +90,11 @@ pub fn render() -> &'static str {
               <div class="benchmark-ram-val">1.5 MB RAM</div>
             </div>
             <div class="benchmark-img-container">
-              <img src="images/benchmark-window.png" alt="Task Manager khi MKey mở cửa sổ - 1.5 MB RAM" loading="lazy">
+              <img src="images/benchmark-window.png" alt="Task Manager khi Kora mở cửa sổ - 1.5 MB RAM" loading="lazy">
             </div>
             <div class="benchmark-card-desc">
               <div class="benchmark-metric-row win">
-                <span class="proc-name">MKey (Rust):</span>
+                <span class="proc-name">Kora (Rust):</span>
                 <span class="proc-num">1.5 MB</span>
                 <span class="proc-tag">Đang hiển thị toàn bộ giao diện</span>
               </div>
@@ -104,7 +104,7 @@ pub fn render() -> &'static str {
                 <span class="proc-tag">Vẫn giữ 2.4 MB</span>
               </div>
               <p class="benchmark-analysis">
-                🔍 <strong>Nhận xét:</strong> Ngay cả khi đang mở bảng điều khiển (có mũi tên <code>&gt;</code> trong Task Manager), MKey chỉ tiêu tốn <strong>1.5 MB RAM</strong> — con số này vẫn nhẹ hơn gần <strong>1 MB</strong> so với UniKey & OpenKey.
+                🔍 <strong>Nhận xét:</strong> Ngay cả khi đang mở bảng điều khiển (có mũi tên <code>&gt;</code> trong Task Manager), Kora chỉ tiêu tốn <strong>1.5 MB RAM</strong> — con số này vẫn nhẹ hơn gần <strong>1 MB</strong> so với UniKey & OpenKey.
               </p>
             </div>
           </div>

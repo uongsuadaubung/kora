@@ -1,4 +1,4 @@
-//! Interface showcase & design philosophy component
+﻿//! Interface showcase & design philosophy component
 
 pub fn render() -> &'static str {
     r####"  <!-- App Interface Showcase -->
@@ -15,10 +15,10 @@ pub fn render() -> &'static str {
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Bộ gõ</span>
+            <span class="ui-window-title">Kora • Tab Bộ gõ</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-bogo.png" alt="Giao diện MKey - Tab Bộ gõ" loading="lazy">
+            <img src="images/ui-tab-bogo.png" alt="Giao diện Kora - Tab Bộ gõ" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 1 • BỘ GÕ &amp; ÂM THANH</span>
@@ -26,7 +26,7 @@ pub fn render() -> &'static str {
             <ul class="ui-card-list">
               <li><strong>Kiểu gõ linh hoạt:</strong> Hỗ trợ Simple Telex, Telex chuẩn, VNI.</li>
               <li><strong>Tùy biến phím chuyển chế độ:</strong> Mặc định <code>Ctrl + Shift</code> hoặc tự do đổi sang bất kỳ phím nào (<code>Ctrl + Space</code>, <code>Alt + Z</code>...), có nút bật/tắt riêng.</li>
-              <li><strong>Mở khóa âm thanh phím cơ:</strong> Khi thư mục config có chứa gói <code>switches\</code>, MKey tự động mở khóa cụm điều khiển switch ngay trong Tab Bộ gõ (chọn switch, nghe thử và thanh trượt âm lượng).</li>
+              <li><strong>Mở khóa âm thanh phím cơ:</strong> Khi thư mục config có chứa gói <code>switches\</code>, Kora tự động mở khóa cụm điều khiển switch ngay trong Tab Bộ gõ (chọn switch, nghe thử và thanh trượt âm lượng).</li>
             </ul>
           </div>
         </div>
@@ -35,10 +35,10 @@ pub fn render() -> &'static str {
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Gõ tắt</span>
+            <span class="ui-window-title">Kora • Tab Gõ tắt</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-gotat.png" alt="Giao diện MKey - Tab Gõ tắt" loading="lazy">
+            <img src="images/ui-tab-gotat.png" alt="Giao diện Kora - Tab Gõ tắt" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 2 • GÕ TẮT</span>
@@ -55,10 +55,10 @@ pub fn render() -> &'static str {
         <div class="ui-card">
           <div class="ui-card-header">
             <span class="ui-dot"></span>
-            <span class="ui-window-title">MKey • Tab Hệ thống</span>
+            <span class="ui-window-title">Kora • Tab Hệ thống</span>
           </div>
           <div class="ui-img-frame">
-            <img src="images/ui-tab-hethong.png" alt="Giao diện MKey - Tab Hệ thống" loading="lazy">
+            <img src="images/ui-tab-hethong.png" alt="Giao diện Kora - Tab Hệ thống" loading="lazy">
           </div>
           <div class="ui-card-body">
             <span class="ui-tab-tag">TAB 3 • HỆ THỐNG</span>
@@ -78,7 +78,7 @@ pub fn render() -> &'static str {
           <div class="philosophy-badge">TRIẾT LÝ THIẾT KẾ HIỆN ĐẠI</div>
           <h3 class="philosophy-title">Tối giản để tập trung 100% vào trải nghiệm gõ</h3>
           <p class="philosophy-desc">
-            Không còn rừng checkbox kỹ thuật hay những tính năng từ thập niên 90 mà chẳng còn ai dùng. MKey sinh ra để làm đúng một việc duy nhất tốt nhất: <strong>gõ phím mượt mà, chuẩn xác và không gián đoạn mạch suy nghĩ</strong>.
+            Không còn rừng checkbox kỹ thuật hay những tính năng từ thập niên 90 mà chẳng còn ai dùng. Kora sinh ra để làm đúng một việc duy nhất tốt nhất: <strong>gõ phím mượt mà, chuẩn xác và không gián đoạn mạch suy nghĩ</strong>.
           </p>
         </div>
 
@@ -99,7 +99,7 @@ pub fn render() -> &'static str {
             </div>
             <div class="philosophy-content">
               <h4>Không bắt bạn phải làm "chuyên gia cấu hình"</h4>
-              <p>Các bộ gõ truyền thống thường phơi bày hàng tá checkbox rối rắm: <em>"Sử dụng clipboard cho unicode", "Cho phép gõ tự do"...</em> cùng hàng loạt thiết lập mở rộng phức tạp khiến người dùng phổ thông không biết phải chọn thế nào. MKey tự động hóa toàn bộ logic thông minh bên dưới — mở lên là dùng hoàn hảo ngay lập tức.</p>
+              <p>Các bộ gõ truyền thống thường phơi bày hàng tá checkbox rối rắm: <em>"Sử dụng clipboard cho unicode", "Cho phép gõ tự do"...</em> cùng hàng loạt thiết lập mở rộng phức tạp khiến người dùng phổ thông không biết phải chọn thế nào. Kora tự động hóa toàn bộ logic thông minh bên dưới — mở lên là dùng hoàn hảo ngay lập tức.</p>
             </div>
           </div>
 
@@ -109,7 +109,7 @@ pub fn render() -> &'static str {
             </div>
             <div class="philosophy-content">
               <h4>Dồn toàn bộ tài nguyên cho trải nghiệm cốt lõi</h4>
-              <p>Khi giải phóng phần mềm khỏi hàng nghìn dòng mã cũ kỹ không ai dùng đến, MKey có thể tập trung tối đa vào những thứ thực sự tạo nên sự khác biệt hàng ngày: <strong>gõ tiếng Anh không bị nuốt chữ</strong>, <strong>sửa dấu hồi quy thông minh</strong>, <strong>giả lập âm thanh phím cơ WASAPI sống động</strong> và mức tiêu thụ RAM siêu nhẹ <strong>dưới 1 MB</strong>.</p>
+              <p>Khi giải phóng phần mềm khỏi hàng nghìn dòng mã cũ kỹ không ai dùng đến, Kora có thể tập trung tối đa vào những thứ thực sự tạo nên sự khác biệt hàng ngày: <strong>gõ tiếng Anh không bị nuốt chữ</strong>, <strong>sửa dấu hồi quy thông minh</strong>, <strong>giả lập âm thanh phím cơ WASAPI sống động</strong> và mức tiêu thụ RAM siêu nhẹ <strong>dưới 1 MB</strong>.</p>
             </div>
           </div>
         </div>

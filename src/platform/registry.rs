@@ -1,4 +1,4 @@
-//! Pure Windows Registry API Wrapper for MKey
+//! Pure Windows Registry API Wrapper for Kora
 //! Zero-dependency FFI bindings to advapi32.dll
 
 #[cfg(target_os = "windows")]
@@ -65,12 +65,12 @@ fn to_wide(s: &str) -> Vec<u16> {
 }
 
 /// Queries Windows Registry directly (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
-/// to determine if MKey is configured to autostart with Windows.
+/// to determine if Kora is configured to autostart with Windows.
 pub fn is_windows_autostart_enabled() -> bool {
     #[cfg(target_os = "windows")]
     unsafe {
         let subkey = to_wide("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-        let val_name = to_wide("MKey");
+        let val_name = to_wide("Kora");
 
         let mut raw_hkey: isize = 0;
         if RegOpenKeyExW(
@@ -98,12 +98,12 @@ pub fn is_windows_autostart_enabled() -> bool {
     false
 }
 
-/// Sets or removes MKey from Windows Startup registry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
+/// Sets or removes Kora from Windows Startup registry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
 pub fn set_windows_autostart(enable: bool) {
     #[cfg(target_os = "windows")]
     unsafe {
         let subkey = to_wide("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
-        let val_name = to_wide("MKey");
+        let val_name = to_wide("Kora");
 
         let mut raw_hkey: isize = 0;
         if RegOpenKeyExW(

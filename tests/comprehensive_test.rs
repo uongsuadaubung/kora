@@ -1,4 +1,4 @@
-use mkey::{EngineAction, EngineConfig, VietnameseEngine};
+use kora::{EngineAction, EngineConfig, VietnameseEngine};
 
 fn simulate(engine: &mut VietnameseEngine, text: &str) -> String {
     let mut screen = String::new();
@@ -36,8 +36,8 @@ fn test_group_1_english_words_preservation() {
     assert_eq!(simulate(&mut engine, "bug "), "bug ");
     assert_eq!(simulate(&mut engine, "flag "), "flag ");
     assert_eq!(simulate(&mut engine, "dog "), "dog ");
-    // MKey Smart Bypass: Gõ 'pass' ra thẳng 'pass' mà không bị nuốt thành 'pas'
-    assert_eq!(simulate(&mut engine, "pass "), "pass ");
+    // Chuẩn Unikey: Gõ 3 chữ 's' để hoàn tác dấu sắc thành 'pass'
+    assert_eq!(simulate(&mut engine, "passs "), "pass ");
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn test_group_4_casing_preservation() {
         simulate(&mut engine, "COONGJ HOAF XAX HOOIJ CHUR NGHIAX VIEETJ NAM "),
         "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM "
     );
-    // MKey Smart Bypass: Các từ tiếng Anh có phụ âm kép như CLASS, PASS bảo toàn 100%
+    // Kora Smart Bypass: Các từ tiếng Anh có phụ âm kép như CLASS, PASS bảo toàn 100%
     assert_eq!(
         simulate(&mut engine, "TOOI GOX TIEESNG VIEETJ TREEN CLASS "),
         "TÔI GÕ TIẾNG VIỆT TRÊN CLASS "
@@ -119,7 +119,7 @@ fn test_group_4_casing_preservation() {
     assert_eq!(simulate(&mut engine, "itemCount "), "itemCount ");
     assert_eq!(simulate(&mut engine, "getOption "), "getOption ");
     assert_eq!(simulate(&mut engine, "checkFlag "), "checkFlag ");
-    assert_eq!(simulate(&mut engine, "passCount "), "passCount ");
+    assert_eq!(simulate(&mut engine, "passsCount "), "passCount ");
 }
 
 #[test]

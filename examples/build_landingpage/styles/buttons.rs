@@ -1,4 +1,4 @@
-//! Button components styling
+﻿//! Button components styling
 
 pub fn render() -> &'static str {
     r####"/* ==========================================================================
