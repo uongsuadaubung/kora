@@ -139,7 +139,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     tray_exit: "Thoát",
 
     // Sidebar
-    sidebar_profiles_title: "Hồ sơ",
+    sidebar_profiles_title: "📁 Hồ sơ",
     sidebar_root_desc: "Toàn hệ thống • Mặc định",
     sidebar_unassigned: "Chưa gắn ứng dụng",
     sidebar_btn_settings: "⚙️ Cài đặt chung hệ thống",

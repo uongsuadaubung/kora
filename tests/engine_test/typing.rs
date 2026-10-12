@@ -1,4 +1,4 @@
-use super::common::simulate_typing;
+use super::common::{simulate_typing, type_key};
 use kora::{EngineConfig, InputMethod, VietnameseEngine};
 
 #[test]
@@ -171,5 +171,102 @@ fn test_simple_telex_vs_standard_telex() {
     assert_eq!(simulate_typing(&mut simple_engine, "tieengs "), "tiếng ");
     assert_eq!(simulate_typing(&mut simple_engine, "vieetj "), "việt ");
     assert_eq!(simulate_typing(&mut simple_engine, "ddangw "), "đăng ");
+}
+
+#[test]
+fn test_diacritic_switching() {
+    let mut engine = VietnameseEngine::new(EngineConfig::default());
+
+    // 1. Vòng lặp hoán đổi liên tục 20 lần: luôn <-> lươn (phím 'w' và 'o')
+    let mut scr = String::new();
+    for ch in "luoon".chars() {
+        type_key(&mut engine, ch, &mut scr);
+    }
+    assert_eq!(scr, "luôn");
+
+    for i in 1..=20 {
+        type_key(&mut engine, 'w', &mut scr);
+        assert_eq!(scr, "lươn", "Lỗi vòng lặp {} khi chuyển luôn -> lươn", i);
+        type_key(&mut engine, 'o', &mut scr);
+        assert_eq!(scr, "luôn", "Lỗi vòng lặp {} khi chuyển lươn -> luôn", i);
+    }
+
+    // 2. Vòng lặp hoán đổi liên tục 20 lần có dấu thanh: muộn <-> mượn
+    engine.reset();
+    scr.clear();
+    for ch in "muoojn".chars() {
+        type_key(&mut engine, ch, &mut scr);
+    }
+    assert_eq!(scr, "muộn");
+
+    for i in 1..=20 {
+        type_key(&mut engine, 'w', &mut scr);
+        assert_eq!(scr, "mượn", "Lỗi vòng lặp {} khi chuyển muộn -> mượn", i);
+        type_key(&mut engine, 'o', &mut scr);
+        assert_eq!(scr, "muộn", "Lỗi vòng lặp {} khi chuyển mượn -> muộn", i);
+    }
+
+    // 3. Vòng lặp hoán đổi liên tục 20 lần có dấu thanh và âm cuối khác: cuộc <-> cược
+    engine.reset();
+    scr.clear();
+    for ch in "cuoojc".chars() {
+        type_key(&mut engine, ch, &mut scr);
+    }
+    assert_eq!(scr, "cuộc");
+
+    for i in 1..=20 {
+        type_key(&mut engine, 'w', &mut scr);
+        assert_eq!(scr, "cược", "Lỗi vòng lặp {} khi chuyển cuộc -> cược", i);
+        type_key(&mut engine, 'o', &mut scr);
+        assert_eq!(scr, "cuộc", "Lỗi vòng lặp {} khi chuyển cược -> cuộc", i);
+    }
+
+    // 4. Vòng lặp hoán đổi liên tục 20 lần: cân <-> căn (phím 'w' và 'a')
+    engine.reset();
+    scr.clear();
+    for ch in "caan".chars() {
+        type_key(&mut engine, ch, &mut scr);
+    }
+    assert_eq!(scr, "cân");
+
+    for i in 1..=20 {
+        type_key(&mut engine, 'w', &mut scr);
+        assert_eq!(scr, "căn", "Lỗi vòng lặp {} khi chuyển cân -> căn", i);
+        type_key(&mut engine, 'a', &mut scr);
+        assert_eq!(scr, "cân", "Lỗi vòng lặp {} khi chuyển căn -> cân", i);
+    }
+
+    // 5. Vòng lặp hoán đổi liên tục 20 lần: côn <-> cơn (phím 'w' và 'o')
+    engine.reset();
+    scr.clear();
+    for ch in "coon".chars() {
+        type_key(&mut engine, ch, &mut scr);
+    }
+    assert_eq!(scr, "côn");
+
+    for i in 1..=20 {
+        type_key(&mut engine, 'w', &mut scr);
+        assert_eq!(scr, "cơn", "Lỗi vòng lặp {} khi chuyển côn -> cơn", i);
+        type_key(&mut engine, 'o', &mut scr);
+        assert_eq!(scr, "côn", "Lỗi vòng lặp {} khi chuyển cơn -> côn", i);
+    }
+
+    // 6. Vòng lặp hoán đổi liên tục 20 lần kiểu gõ VNI: luôn <-> lươn (phím '7' và '6')
+    let mut vni_engine = VietnameseEngine::new(EngineConfig {
+        method: InputMethod::Vni,
+        ..Default::default()
+    });
+    let mut vni_scr = String::new();
+    for ch in "luon6".chars() {
+        type_key(&mut vni_engine, ch, &mut vni_scr);
+    }
+    assert_eq!(vni_scr, "luôn");
+
+    for i in 1..=20 {
+        type_key(&mut vni_engine, '7', &mut vni_scr);
+        assert_eq!(vni_scr, "lươn", "Lỗi VNI vòng lặp {} khi chuyển luôn -> lươn", i);
+        type_key(&mut vni_engine, '6', &mut vni_scr);
+        assert_eq!(vni_scr, "luôn", "Lỗi VNI vòng lặp {} khi chuyển lươn -> luôn", i);
+    }
 }
 

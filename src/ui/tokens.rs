@@ -5,6 +5,7 @@
 pub mod typography {
     pub const FONT_SIZE_HERO: i32 = 18;
     pub const FONT_SIZE_TITLE: i32 = 13;
+    pub const FONT_SIZE_SIDEBAR_TITLE: i32 = 11;
     pub const FONT_SIZE_BODY: i32 = 9;
     pub const FONT_SIZE_SUBTITLE: i32 = 9;
 }

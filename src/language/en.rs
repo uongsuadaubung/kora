@@ -139,7 +139,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     tray_exit: "Exit",
 
     // Sidebar
-    sidebar_profiles_title: "Profiles",
+    sidebar_profiles_title: "📁 Profiles",
     sidebar_root_desc: "System-wide • Default",
     sidebar_unassigned: "Unassigned",
     sidebar_btn_settings: "⚙️ System Settings",

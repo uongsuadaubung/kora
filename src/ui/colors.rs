@@ -150,8 +150,7 @@ impl ThemePalette {
     pub const fn text_color_for_ctrl(&self, ctrl_id: u32) -> u32 {
         match ctrl_id {
             crate::ui::tokens::id::IDC_ABOUT_APP_AUTHOR => self.text_link,
-            crate::ui::tokens::id::IDC_SIDEBAR_TITLE
-            | crate::ui::tokens::id::IDC_BANNER_STATUS
+            crate::ui::tokens::id::IDC_BANNER_STATUS
             | crate::ui::tokens::id::IDC_LABEL_SOUNDPACK_STATUS => self.text_secondary,
             crate::ui::tokens::id::IDC_LABEL_VOLUME_VAL => self.accent,
             _ => self.text_primary,

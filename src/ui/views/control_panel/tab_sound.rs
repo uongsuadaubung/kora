@@ -437,5 +437,9 @@ impl TabSound {
             ShowWindow(self.lbl_soundpack_note.hwnd(), cmd);
             ShowWindow(self.btn_download_soundpack.hwnd(), cmd);
         }
+        if visible {
+            self.slider_volume
+                .apply_theme(crate::ui::theme::is_current_dark());
+        }
     }
 }

@@ -151,11 +151,17 @@ impl NucleusState {
             1 => {
                 let v = &mut self.vowels[0];
                 match v.base {
-                    BaseVowel::A if v.diacritic == Diacritic::None => {
+                    BaseVowel::A
+                        if v.diacritic == Diacritic::None
+                            || v.diacritic == Diacritic::Circumflex =>
+                    {
                         v.diacritic = Diacritic::Breve;
                         true
                     }
-                    BaseVowel::O if v.diacritic == Diacritic::None => {
+                    BaseVowel::O
+                        if v.diacritic == Diacritic::None
+                            || v.diacritic == Diacritic::Circumflex =>
+                    {
                         v.diacritic = Diacritic::Horn;
                         true
                     }
@@ -174,7 +180,9 @@ impl NucleusState {
                     // Special exception: in Vietnamese, "thuở" and "huơ" have horn only on 'o' (uơ)
                     // when there is no coda ("thưở" and "hươ" do not exist in Vietnamese).
                     (BaseVowel::U, BaseVowel::O)
-                        if d0 == Diacritic::None || d1 == Diacritic::None =>
+                        if d0 == Diacritic::None
+                            || d1 == Diacritic::None
+                            || d1 == Diacritic::Circumflex =>
                     {
                         let is_thuo_or_huo = !has_coda
                             && self.onset.as_ref().is_some_and(|o| match o.chars.as_slice() {
@@ -198,7 +206,9 @@ impl NucleusState {
                         true
                     }
                     // "oa" -> only 'a' gets breve: "oă" (hoặc, khoăn)
-                    (BaseVowel::O, BaseVowel::A) if d1 == Diacritic::None => {
+                    (BaseVowel::O, BaseVowel::A)
+                        if d1 == Diacritic::None || d1 == Diacritic::Circumflex =>
+                    {
                         self.vowels[1].diacritic = Diacritic::Breve;
                         true
                     }
@@ -208,7 +218,9 @@ impl NucleusState {
                         true
                     }
                     // "oi" -> only 'o' gets horn: "ơi" (chơi, nơi)
-                    (BaseVowel::O, BaseVowel::I) if d0 == Diacritic::None => {
+                    (BaseVowel::O, BaseVowel::I)
+                        if d0 == Diacritic::None || d0 == Diacritic::Circumflex =>
+                    {
                         self.vowels[0].diacritic = Diacritic::Horn;
                         true
                     }
@@ -222,7 +234,11 @@ impl NucleusState {
             }
             3
                 // Triphthong e.g. "uoi" -> "ươi", "uou" -> "ươu"
-                if self.vowels[0].base == BaseVowel::U && self.vowels[1].base == BaseVowel::O =>
+                if self.vowels[0].base == BaseVowel::U
+                    && self.vowels[1].base == BaseVowel::O
+                    && (self.vowels[0].diacritic == Diacritic::None
+                        || self.vowels[1].diacritic == Diacritic::None
+                        || self.vowels[1].diacritic == Diacritic::Circumflex) =>
             {
                 self.vowels[0].diacritic = Diacritic::Horn;
                 self.vowels[1].diacritic = Diacritic::Horn;
@@ -305,6 +321,18 @@ impl NucleusState {
 
                 match target {
                     Some(target_base) => {
+                        // Diacritic switching: ươ -> uô, uơ -> uô when 'o' is pressed
+                        if target_base == BaseVowel::O
+                            && self.vowels.len() >= 2
+                            && self.vowels[0].base == BaseVowel::U
+                            && self.vowels[1].base == BaseVowel::O
+                            && self.vowels[1].diacritic == Diacritic::Horn
+                        {
+                            self.vowels[0].diacritic = Diacritic::None;
+                            self.vowels[1].diacritic = Diacritic::Circumflex;
+                            return ModifierOutcome::Applied;
+                        }
+
                         // Double vowel circumflex (Telex: aa -> â, ee -> ê, oo -> ô)
                         if let Some(pos) = self.vowels.iter().rposition(|v| {
                             v.base == target_base && v.diacritic == Diacritic::Circumflex
@@ -324,6 +352,16 @@ impl NucleusState {
                     }
                     None => {
                         // Generic circumflex (VNI: 6)
+                        if self.vowels.len() >= 2
+                            && self.vowels[0].base == BaseVowel::U
+                            && self.vowels[1].base == BaseVowel::O
+                            && self.vowels[1].diacritic == Diacritic::Horn
+                        {
+                            self.vowels[0].diacritic = Diacritic::None;
+                            self.vowels[1].diacritic = Diacritic::Circumflex;
+                            return ModifierOutcome::Applied;
+                        }
+
                         if coda.is_some()
                             && can_undo_circumflex.is_none()
                             && self

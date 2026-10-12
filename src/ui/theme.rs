@@ -152,6 +152,22 @@ unsafe extern "system" fn enum_child_theme_proc(child: isize, lparam: isize) -> 
             );
         } else if class_name.eq_ignore_ascii_case("Static") {
             InvalidateRect(child, null_mut(), 1);
+        } else if class_name.eq_ignore_ascii_case("msctls_trackbar32") {
+            let res = SetWindowTheme(child, theme_w.as_ptr(), null_mut());
+            if is_dark && res != 0 {
+                SetWindowTheme(child, to_wide("DarkMode_CFD").as_ptr(), null_mut());
+            }
+            SetWindowPos(
+                child,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
+            InvalidateRect(child, null_mut(), 1);
+            UpdateWindow(child);
         }
     }
 
@@ -184,6 +200,9 @@ pub fn apply_ui_theme(hwnd: isize, controls: &ControlPanelControls, is_dark: boo
         controls.tab_macro.list_macro.apply_theme(is_dark);
         controls.tab_remap.list_remap.apply_theme(is_dark);
         controls.tab_remap.list_disable.apply_theme(is_dark);
+
+        // Theme Slider
+        controls.tab_sound.slider_volume.apply_theme(is_dark);
 
         // Recursively invalidate and redraw entire dialog and all child controls cleanly
         RedrawWindow(

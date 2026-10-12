@@ -7,7 +7,7 @@ use crate::ui::components::listbox::ListBox;
 use crate::ui::win32::{
     to_wide, fill_rect_color, round_rect, DrawTextW, InvalidateRect, SelectObject, SetBkColor,
     SetBkMode, SetTextColor, DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX,
-    DT_SINGLELINE, DT_VCENTER, FW_NORMAL, MEASUREITEMSTRUCT, RECT, TRANSPARENT,
+    DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL, MEASUREITEMSTRUCT, RECT, TRANSPARENT,
 };
 use crate::ui::components::{ButtonVariant, Label, PushButton};
 use crate::platform::win32::ENGINE_INSTANCE;
@@ -42,15 +42,19 @@ pub struct SidebarControls {
 impl SidebarControls {
     pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
         let strings = crate::language::current();
+        let hfont_title = crate::ui::theme::cached_font(
+            crate::ui::tokens::typography::FONT_SIZE_SIDEBAR_TITLE,
+            FW_BOLD,
+        );
         let lbl_title = Label::create_with_id(
             parent,
             IDC_SIDEBAR_TITLE,
             strings.sidebar_profiles_title,
+            12,
             14,
-            16,
-            160,
-            20,
-            hfont_bold,
+            175,
+            24,
+            hfont_title,
         )?;
 
         let btn_add_profile = PushButton::create_with_variant(
@@ -415,7 +419,7 @@ impl SidebarControls {
             let palette = ThemePalette::get(is_dark);
             unsafe {
                 SetBkColor(hdc, palette.bg_sidebar);
-                SetTextColor(hdc, palette.text_secondary);
+                SetTextColor(hdc, palette.text_primary);
             }
             let sb_br = crate::ui::theme::get_sidebar_bg_brush();
             if sb_br != 0 {

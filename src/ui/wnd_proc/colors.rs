@@ -72,7 +72,11 @@ pub fn handle_ctlcolor_static(
             }
         } else {
             let ctrl_id = GetDlgCtrlID(hwnd_ctrl) as u32;
-            SetBkMode(hdc, TRANSPARENT);
+            if ctrl_id == IDC_SLIDER_SOUND_VOLUME {
+                SetBkMode(hdc, OPAQUE);
+            } else {
+                SetBkMode(hdc, TRANSPARENT);
+            }
 
             if let Some(c) = controls
                 && let Some(br) = c.on_ctlcolor_static(hdc, ctrl_id, is_current_dark())

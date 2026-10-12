@@ -656,6 +656,8 @@ impl SyllableState {
                 ModifierOutcome::Applied => {
                     if let KeyEffect::Circumflex(Some(target_base)) = effect {
                         coda.circumflex_across_coda = Some(target_base);
+                    } else {
+                        coda.circumflex_across_coda = None;
                     }
                     let output = coda.render();
                     return (

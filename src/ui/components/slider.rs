@@ -57,7 +57,9 @@ impl Slider {
             SendMessageW(hwnd, TBM_SETTICFREQ, 10, 0);
         }
 
-        Some(Self { hwnd, id })
+        let slider = Self { hwnd, id };
+        slider.apply_theme(crate::ui::theme::is_current_dark());
+        Some(slider)
     }
 
     /// Declarative helper: creates a Slider with initial value in 1 line
@@ -115,6 +117,32 @@ impl Slider {
     pub fn set_visible(&self, visible: bool) {
         unsafe {
             ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
+        }
+    }
+
+    pub fn apply_theme(&self, is_dark: bool) {
+        unsafe {
+            allow_window_dark_mode(self.hwnd, is_dark);
+            let theme_str = if is_dark {
+                "DarkMode_Explorer"
+            } else {
+                "Explorer"
+            };
+            let res = SetWindowTheme(self.hwnd, to_wide(theme_str).as_ptr(), null_mut());
+            if is_dark && res != 0 {
+                SetWindowTheme(self.hwnd, to_wide("DarkMode_CFD").as_ptr(), null_mut());
+            }
+            SetWindowPos(
+                self.hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
+            InvalidateRect(self.hwnd, null_mut(), 1);
+            UpdateWindow(self.hwnd);
         }
     }
 }
