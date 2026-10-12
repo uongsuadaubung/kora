@@ -265,6 +265,7 @@ impl NucleusState {
         effect: KeyEffect,
         key: RawKey,
         coda: Option<&[(char, bool)]>,
+        can_undo_circumflex: Option<BaseVowel>,
         config: &EngineConfig,
     ) -> ModifierOutcome {
         let make_raw = |n: &NucleusState| -> String {
@@ -308,8 +309,8 @@ impl NucleusState {
                         if let Some(pos) = self.vowels.iter().rposition(|v| {
                             v.base == target_base && v.diacritic == Diacritic::Circumflex
                         }) {
-                            // If a coda consonant already exists, circumflex cannot be undone across the coda
-                            if coda.is_none() {
+                            // If a coda consonant exists, circumflex can only be undone if it was applied across the coda
+                            if coda.is_none() || can_undo_circumflex == Some(target_base) {
                                 self.vowels[pos].diacritic = Diacritic::None;
                                 ModifierOutcome::Undone(make_raw(self))
                             } else {
@@ -323,8 +324,8 @@ impl NucleusState {
                     }
                     None => {
                         // Generic circumflex (VNI: 6)
-                        // If coda exists and circumflex is already present, do not undo/toggle off across coda!
                         if coda.is_some()
+                            && can_undo_circumflex.is_none()
                             && self
                                 .vowels
                                 .iter()

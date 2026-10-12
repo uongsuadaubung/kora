@@ -185,6 +185,27 @@ fn test_free_mark_circumflex_across_coda() {
     assert_eq!(simulate_typing(&mut engine, "tetes "), "tết ");
     assert_eq!(simulate_typing(&mut engine, "hetes "), "hết ");
     assert_eq!(simulate_typing(&mut engine, "metej "), "mệt ");
+
+    // 8. Undo toggle circumflex across coda when typing modifier key again:
+    // "themee" -> "theme", "memee" -> "meme", "vanaa" -> "vana", "denee" -> "dene", "congoo" -> "congo"
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "theme"), "thêm");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "themee"), "theme");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "themee "), "theme ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "Themee"), "Theme");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "THEMEE"), "THEME");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "memee"), "meme");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "vanaa"), "vana");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "denee"), "dene");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "congoo"), "congo");
 }
 
 #[test]

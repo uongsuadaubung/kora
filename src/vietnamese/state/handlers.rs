@@ -464,7 +464,7 @@ impl SyllableState {
             |b| nucleus.vowels.iter().any(|v| v.base == b),
             has_onset_d,
         ) {
-            match nucleus.apply_modifier(effect, key, None, config) {
+            match nucleus.apply_modifier(effect, key, None, None, config) {
                 ModifierOutcome::Applied => {
                     let output = nucleus.render();
                     return (
@@ -651,9 +651,12 @@ impl SyllableState {
         ) {
             match coda
                 .nucleus
-                .apply_modifier(effect, key, Some(&coda.coda), config)
+                .apply_modifier(effect, key, Some(&coda.coda), coda.circumflex_across_coda, config)
             {
                 ModifierOutcome::Applied => {
+                    if let KeyEffect::Circumflex(Some(target_base)) = effect {
+                        coda.circumflex_across_coda = Some(target_base);
+                    }
                     let output = coda.render();
                     return (
                         SyllableState::Coda(coda),

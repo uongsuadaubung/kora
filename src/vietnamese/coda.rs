@@ -1,6 +1,6 @@
 //! Vietnamese Coda (Phụ âm cuối) State Representation
 
-use super::charset::{Diacritic, Tone, compose_vowel};
+use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel};
 use super::inline_list::InlineList;
 use super::nucleus::NucleusState;
 use super::syllable::Syllable;
@@ -11,6 +11,7 @@ use std::fmt;
 pub struct CodaState {
     pub nucleus: NucleusState,
     pub coda: InlineList<(char, bool), 4>,
+    pub circumflex_across_coda: Option<BaseVowel>,
 }
 
 impl CodaState {
@@ -24,6 +25,7 @@ impl CodaState {
         Self {
             nucleus,
             coda: InlineList::from_single((ch, is_upper)),
+            circumflex_across_coda: None,
         }
     }
 
