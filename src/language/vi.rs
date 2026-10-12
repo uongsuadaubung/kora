@@ -39,6 +39,14 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     label_volume: "Âm lượng:",
     btn_test_sound: "Nghe thử",
     sound_profile_default: "Mặc định",
+    soundpack_card_title: "Gói âm thanh switch phím cơ",
+    btn_download_soundpack: "📥 Tải gói âm thanh switch (13 bộ)",
+    btn_downloading_soundpack: "Đang tải & cài đặt... ⏳",
+    btn_update_soundpack: "🔄 Cập nhật / Tải lại gói âm thanh",
+    soundpack_note_missing: "Chưa cài đặt. Bấm nút bên dưới để tự động tải 13 bộ switch từ GitHub (~3 MB).",
+    soundpack_note_installed: "Đã cài đặt đủ 13 bộ switch (Alps, Cherry MX, Holy Panda, Topre, v.v.).",
+    soundpack_download_success: "Đã tải và cài đặt thành công gói âm thanh switch phím cơ!",
+    soundpack_download_error: "Tải gói âm thanh thất bại:",
 
     // Tab 1: Macro
     check_use_macro: "Bật gõ tắt",

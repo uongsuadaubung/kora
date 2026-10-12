@@ -1,4 +1,4 @@
-﻿//! Interface showcase & design philosophy component
+//! Interface showcase & design philosophy component
 
 pub fn render() -> &'static str {
     r####"  <!-- App Interface Showcase -->
@@ -26,7 +26,7 @@ pub fn render() -> &'static str {
             <ul class="ui-card-list">
               <li><strong>Kiểu gõ linh hoạt:</strong> Hỗ trợ Simple Telex, Telex chuẩn, VNI.</li>
               <li><strong>Tùy biến phím chuyển chế độ:</strong> Mặc định <code>Ctrl + Shift</code> hoặc tự do đổi sang bất kỳ phím nào (<code>Ctrl + Space</code>, <code>Alt + Z</code>...), có nút bật/tắt riêng.</li>
-              <li><strong>Mở khóa âm thanh phím cơ:</strong> Khi thư mục config có chứa gói <code>switches\</code>, Kora tự động mở khóa cụm điều khiển switch ngay trong Tab Bộ gõ (chọn switch, nghe thử và thanh trượt âm lượng).</li>
+              <li><strong>Âm thanh phím cơ tích hợp:</strong> Tải tự động 13 bộ switch tuyển chọn ngay trong Bảng điều khiển (chọn switch, nghe thử và thanh trượt âm lượng trực quan).</li>
             </ul>
           </div>
         </div>

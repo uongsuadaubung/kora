@@ -6,10 +6,12 @@
 //! - [`wav`]: Giải mã file âm thanh PCM WAVE 8/16/24/32-bit & bộ nhớ đệm `SoundBank`.
 //! - [`wasapi`]: Giao diện COM Low-level WASAPI & phiên làm việc `WasapiSession`.
 
+pub mod installer;
 pub mod tags;
 pub mod wasapi;
 pub mod wav;
 
+pub use installer::*;
 pub use tags::*;
 pub use wasapi::*;
 pub use wav::*;

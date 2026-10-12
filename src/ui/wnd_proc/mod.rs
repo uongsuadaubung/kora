@@ -116,6 +116,20 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             crate::updater::show_update_result_dialog(hwnd, &status);
             0
         }
+        crate::ui::WM_APP_SOUNDPACK_INSTALLED => {
+            // lparam owns a Box<SoundpackInstallStatus> handed over by the installer worker thread
+            let status = unsafe {
+                Box::from_raw(
+                    lparam
+                        as *mut crate::platform::win32::sound::installer::SoundpackInstallStatus,
+                )
+            };
+            if let Some(c) = controls {
+                c.tab_sound.on_soundpack_installed(&status);
+            }
+            crate::platform::win32::sound::installer::show_soundpack_install_dialog(hwnd, &status);
+            0
+        }
         WM_COMMAND => commands::handle_command(hwnd, wparam, lparam, controls),
         WM_NOTIFY => {
             let nmhdr = unsafe { &*(lparam as *const NMHDR) };

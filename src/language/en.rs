@@ -39,6 +39,14 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     label_volume: "Volume:",
     btn_test_sound: "Test",
     sound_profile_default: "Default",
+    soundpack_card_title: "Mechanical Switch Soundpacks",
+    btn_download_soundpack: "📥 Download Soundpack (13 switches)",
+    btn_downloading_soundpack: "Downloading & installing... ⏳",
+    btn_update_soundpack: "🔄 Update / Re-download Soundpack",
+    soundpack_note_missing: "Not installed. Click below to automatically download 13 switch packs from GitHub (~3 MB).",
+    soundpack_note_installed: "13 switch soundpacks installed (Alps, Cherry MX, Holy Panda, Topre, etc.).",
+    soundpack_download_success: "Successfully downloaded and installed mechanical switch soundpack!",
+    soundpack_download_error: "Failed to download soundpack:",
 
     // Tab 1: Macro
     check_use_macro: "Enable shorthand",

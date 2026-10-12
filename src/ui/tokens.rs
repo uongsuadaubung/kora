@@ -147,6 +147,9 @@ pub mod id {
     pub const IDC_SLIDER_SOUND_VOLUME: u32 = 442;
     pub const IDC_BTN_TEST_SOUND: u32 = 443;
     pub const IDC_LABEL_VOLUME_VAL: u32 = 444;
+    pub const IDC_BTN_DOWNLOAD_SOUNDPACK: u32 = 445;
+    pub const IDC_LABEL_SOUNDPACK_STATUS: u32 = 446;
+    pub const IDC_LABEL_SOUNDPACK_TITLE: u32 = 447;
 
     // 450..459: Restore Defaults Card Controls
     pub const IDC_LABEL_DEFAULTS_TITLE: u32 = 450;

@@ -1,4 +1,4 @@
-﻿//! Download CTA section component
+//! Download CTA section component
 
 pub fn render() -> &'static str {
     r####"  <!-- Download Section -->
@@ -23,8 +23,8 @@ pub fn render() -> &'static str {
           <a href="#sound-guide" class="btn btn-download-sub">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
             <div class="btn-text-block">
-              <span class="btn-main-text">Gói âm thanh Switch</span>
-              <span class="btn-sub-text">Xem script tải tự động từ GitHub</span>
+              <span class="btn-main-text">13 Bộ Switch Phím Cơ</span>
+              <span class="btn-sub-text">Tải tự động 1-click trong ứng dụng</span>
             </div>
           </a>
         </div>

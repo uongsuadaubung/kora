@@ -111,6 +111,14 @@ pub struct LanguageStrings {
     pub label_volume: &'static str,
     pub btn_test_sound: &'static str,
     pub sound_profile_default: &'static str,
+    pub soundpack_card_title: &'static str,
+    pub btn_download_soundpack: &'static str,
+    pub btn_downloading_soundpack: &'static str,
+    pub btn_update_soundpack: &'static str,
+    pub soundpack_note_missing: &'static str,
+    pub soundpack_note_installed: &'static str,
+    pub soundpack_download_success: &'static str,
+    pub soundpack_download_error: &'static str,
 
     // Tab 1: Macro
     pub check_use_macro: &'static str,

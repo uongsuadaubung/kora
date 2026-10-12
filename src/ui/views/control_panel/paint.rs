@@ -122,8 +122,27 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
                 RoundRect(hdc, layout::CARD_X, top, right_bound, layout::CARD_BOTTOM_Y, radii::RADIUS_CARD, radii::RADIUS_CARD);
             }
             crate::ui::views::control_panel::ViewMode::Profile(2) => {
-                // Card: Âm thanh gõ phím cơ (Typing Sound)
-                RoundRect(hdc, layout::CARD_X, layout::CARD_START_Y, right_bound, 286, radii::RADIUS_CARD, radii::RADIUS_CARD);
+                // Card 1: Thiết lập Âm thanh gõ phím cơ
+                RoundRect(
+                    hdc,
+                    layout::CARD_X,
+                    layout::CARD_START_Y,
+                    right_bound,
+                    crate::ui::views::control_panel::tab_sound::SOUND_CARD1_BOTTOM,
+                    radii::RADIUS_CARD,
+                    radii::RADIUS_CARD,
+                );
+
+                // Card 2: Quản lý & Tải gói âm thanh switch (phân cách bằng layout::CARD_GAP)
+                RoundRect(
+                    hdc,
+                    layout::CARD_X,
+                    crate::ui::views::control_panel::tab_sound::SOUND_CARD2_TOP,
+                    right_bound,
+                    crate::ui::views::control_panel::tab_sound::SOUND_CARD2_BOTTOM,
+                    radii::RADIUS_CARD,
+                    radii::RADIUS_CARD,
+                );
             }
             crate::ui::views::control_panel::ViewMode::Profile(3) => {
                 // Card 1: 2 Checkboxes (Bật gõ tắt & Gõ tắt trong tiếng Anh)

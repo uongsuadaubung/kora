@@ -52,6 +52,9 @@ pub const WM_APP_MODE_CHANGED: u32 = 0x8000 + 120;
 /// Posted to the control panel by the update-check worker; lparam = `Box<UpdateStatus>` raw ptr.
 pub const WM_APP_UPDATE_CHECKED: u32 = 0x8000 + 121;
 
+/// Posted to the control panel by the soundpack installer worker; lparam = `Box<SoundpackInstallStatus>` raw ptr.
+pub const WM_APP_SOUNDPACK_INSTALLED: u32 = 0x8000 + 122;
+
 /// Id of the root ("Mặc định") profile in `ProfileManager`.
 pub const GLOBAL_PROFILE_ID: &str = "global";
 

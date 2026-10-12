@@ -94,7 +94,7 @@ pub fn render() -> &'static str {
         <div class="spec-card">
           <span class="spec-tag">ÂM THANH PHÍM</span>
           <div class="spec-title">Giả lập âm thanh phím cơ sống động</div>
-          <div class="spec-desc">Trải nghiệm tiếng gõ phím cơ chân thực với 13 bộ switch tuyển chọn (Alps SKCM Blue, Holy Panda, Cherry MX...). Tự động mở khóa cụm điều khiển âm thanh ngay trong Tab Bộ gõ khi phát hiện thư mục <code>switches\</code>.</div>
+          <div class="spec-desc">Trải nghiệm tiếng gõ phím cơ chân thực với 13 bộ switch tuyển chọn (Alps SKCM Blue, Holy Panda, Cherry MX...). Tích hợp sẵn tính năng tải và kích hoạt 1-click trực tiếp trong Tab Âm thanh.</div>
           <div class="feature-demo-screen" data-feature="sound">
             <div class="feature-screen-top">
               <span class="screen-dot"></span>
@@ -109,8 +109,8 @@ pub fn render() -> &'static str {
             </div>
           </div>
           <div class="sound-quick-tip">
-            <span class="tip-icon">📦</span>
-            <span>Tự động mở khóa khi có gói <code>switches\</code> trong config. <a href="#sound-guide">Xem hướng dẫn cài đặt &darr;</a></span>
+            <span class="tip-icon">⚡</span>
+            <span>Tích hợp sẵn nút tải 13 bộ switch tự động trong Bảng điều khiển. <a href="#sound-guide">Xem hướng dẫn chi tiết &darr;</a></span>
           </div>
         </div>
 
@@ -166,43 +166,32 @@ pub fn render() -> &'static str {
       <!-- Soundpack Installation Guide -->
       <div class="soundpack-guide-card" id="sound-guide">
         <div class="guide-header">
-          <div class="guide-badge">HƯỚNG DẪN CÀI ĐẶT GÓI ÂM THANH</div>
-          <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho Kora</h3>
-          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~1 MB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
+          <div class="guide-badge">TẢI TỰ ĐỘNG BUILT-IN 1-CLICK</div>
+          <h3 class="guide-title">Tải và kích hoạt âm thanh phím cơ ngay trong Kora</h3>
+          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~1 MB) nên không kèm sẵn file âm thanh lớn. Bạn chỉ cần 1 click trực tiếp trong Bảng điều khiển để kích hoạt trọn bộ 13 switch tuyển chọn:</p>
         </div>
 
         <div class="guide-steps-grid">
           <div class="guide-step-item">
             <div class="step-num">1</div>
             <div class="step-content">
-              <strong>Tự động cài đặt (Khuyên dùng)</strong>
-              <p>Mở PowerShell (hoặc Terminal) và dán lệnh sau để tự động tải &amp; giải nén vào thư mục config:</p>
-              <div class="guide-path-box">
-                <div class="path-label">1 dòng lệnh tự động (PowerShell):</div>
-                <div class="path-code-wrapper">
-                  <code>irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex</code>
-                  <button class="btn-copy-mini" data-copy="irm https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.ps1 | iex" title="Sao chép lệnh">Copy</button>
-                </div>
+              <strong>Mở Bảng điều khiển &amp; Tab Âm thanh</strong>
+              <p>Nhấp đúp chuột vào biểu tượng Kora ở khay hệ thống (hoặc chuột phải chọn <em>Bảng điều khiển...</em>), sau đó chọn tab <strong>Âm thanh gõ</strong>.</p>
+              <div class="guide-status-note">
+                <span class="note-dot"></span>
+                <span>Giao diện trực quan, đồng bộ với giao diện hệ thống.</span>
               </div>
-              <p class="guide-mini-alt">Hoặc tải file chạy tự động: <a href="https://raw.githubusercontent.com/uongsuadaubung/kora/main/scripts/install-soundpack.bat" download>install-soundpack.bat</a></p>
             </div>
           </div>
 
           <div class="guide-step-item">
             <div class="step-num">2</div>
             <div class="step-content">
-              <strong>Hoặc copy thủ công từ GitHub</strong>
-              <p>Nếu bạn đã clone hoặc tải mã nguồn Kora từ GitHub, chỉ cần copy thư mục <code>switches</code> vào thư mục config:</p>
-              <a href="https://github.com/uongsuadaubung/kora/tree/main/switches" target="_blank" class="btn-step-action">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                <span>Xem thư mục switches trên GitHub</span>
-              </a>
-              <div class="guide-path-box" style="margin-top: 12px;">
-                <div class="path-label">Thư mục đích:</div>
-                <div class="path-code-wrapper">
-                  <code>%USERPROFILE%\.config\kora\switches\</code>
-                  <button class="btn-copy-mini" data-copy="%USERPROFILE%\.config\kora\switches" title="Sao chép đường dẫn">Copy</button>
-                </div>
+              <strong>Bấm nút tải tự động 1-click</strong>
+              <p>Trong thẻ <em>Tải gói âm thanh switch</em>, nhấn nút <strong>📥 Tải gói âm thanh switch (13 bộ)</strong>. Kora sẽ tự động tải từ đám mây và giải nén ngay vào máy bạn.</p>
+              <div class="guide-status-note">
+                <span class="note-dot"></span>
+                <span>Tải &amp; giải nén hoàn toàn tự động chỉ trong vài giây.</span>
               </div>
             </div>
           </div>
@@ -210,11 +199,11 @@ pub fn render() -> &'static str {
           <div class="guide-step-item">
             <div class="step-num">3</div>
             <div class="step-content">
-              <strong>Tự động mở khóa &amp; Trải nghiệm</strong>
-              <p>Ngay khi thư mục <code>switches\</code> xuất hiện trong config, Kora sẽ <strong>tự động mở khóa cụm Giả lập âm thanh phím cơ</strong> ngay trong Tab Bộ gõ: cho phép tích chọn bật âm thanh, chọn switch yêu thích (Alps SKCM Blue, Holy Panda...), bấm "Nghe thử" và kéo thanh chỉnh âm lượng trực quan.</p>
+              <strong>Chọn switch yêu thích &amp; Thưởng thức</strong>
+              <p>Tích chọn <strong>Bật âm thanh gõ phím</strong>, chọn switch bạn muốn (Holy Panda, Cherry MX Blue, Alps SKCM Blue...) và bấm <strong>Nghe thử</strong> để cảm nhận độ đầm tay!</p>
               <div class="guide-status-note">
                 <span class="note-dot"></span>
-                <span>Tự động quét &amp; mở khóa 13 bộ switch có sẵn ngay trong Tab Bộ gõ.</span>
+                <span>Nhận diện ngay lập tức mà không cần khởi động lại ứng dụng.</span>
               </div>
             </div>
           </div>
@@ -241,7 +230,7 @@ pub fn render() -> &'static str {
 
           <div class="naming-rules-wrapper">
             <div class="rules-table-title">Danh sách tên file chuẩn cố định cho từng phím (định dạng <code>.wav</code>):</div>
-            
+
             <div class="naming-categories">
               <!-- Group 1 -->
               <div class="naming-group-card">
