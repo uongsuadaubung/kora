@@ -13,7 +13,7 @@ use crate::ui::components::*;
 use crate::ui::tokens::id::*;
 
 /// Switch-key badge geometry (label inside the pill painted by paint.rs)
-const BADGE_X: i32 = 372;
+const BADGE_X: i32 = 392;
 const BADGE_Y: i32 = 270;
 const BADGE_H: i32 = 18;
 const BADGE_MIN_W: i32 = 116;
@@ -104,7 +104,7 @@ impl TabTyping {
         )?;
 
         let lbl_switch_prompt =
-            Label::create(parent, strings.typing_lbl_current_key, 260, 270, 105, 20, hfont_bold)?;
+            Label::create(parent, strings.typing_lbl_current_key, 260, 270, 124, 20, hfont_bold)?;
 
         let lbl_switch_badge = Label::create_centered_with_id(
             parent,
@@ -187,17 +187,16 @@ impl TabTyping {
     /// Dynamically enables or disables switch-key controls based on `check_switch_key`
     pub fn update_switch_controls_state(&self) {
         let is_enabled = self.check_switch_key.is_checked();
-        self.lbl_switch_prompt.set_enabled(is_enabled);
-        self.lbl_switch_badge.set_enabled(is_enabled);
         self.btn_switch_key.set_enabled(is_enabled);
         unsafe {
             let rc = RECT {
-                left: BADGE_X - 4,
+                left: 260,
                 top: BADGE_Y - 8,
                 right: BADGE_X + BADGE_MAX_W + 4,
                 bottom: BADGE_Y + BADGE_H + 8,
             };
             InvalidateRect(self.parent, &rc, 1);
+            InvalidateRect(self.lbl_switch_prompt.hwnd(), std::ptr::null(), 1);
             InvalidateRect(self.lbl_switch_badge.hwnd(), std::ptr::null(), 1);
         }
     }
@@ -386,15 +385,9 @@ impl TabTyping {
     pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
         if ctrl_id == IDC_LABEL_SWITCH_KEY_BADGE {
             let palette = crate::ui::colors::ThemePalette::get(is_dark);
-            let is_enabled = self.lbl_switch_badge.is_enabled();
-            let text_clr = if is_enabled {
-                palette.accent
-            } else {
-                palette.text_secondary
-            };
             unsafe {
                 SetBkColor(hdc, palette.bg_input);
-                SetTextColor(hdc, text_clr);
+                SetTextColor(hdc, palette.accent);
             }
             let in_br = crate::ui::theme::get_input_bg_brush();
             if in_br != 0 {
