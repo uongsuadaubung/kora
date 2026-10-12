@@ -1,4 +1,4 @@
-﻿# Kora Rust Engine — Tài liệu Kỹ thuật & Kiến trúc Hệ thống
+# Kora Rust Engine — Tài liệu Kỹ thuật & Kiến trúc Hệ thống
 
 Tài liệu này mô tả chi tiết kiến trúc bên trong, luồng xử lý dữ liệu, máy trạng thái ngữ âm học và các thuật toán cốt lõi của **Kora Engine** được viết bằng Rust.
 
@@ -28,14 +28,15 @@ flowchart TD
 
     subgraph Engine_Layer ["3. Tầng Điều phối (Engine Coordinator Layer)"]
         VE["VietnameseEngine (src/engine/mod.rs)"]
-        ConfigStore["ConfigStore (src/engine/config_store.rs)"]
+        ConfigStore["ConfigStore & Debounced Writer (src/engine/config_store/)"]
         MacroTbl["MacroTable (Bảng gõ tắt 3 tầng & Casing)"]
         Hist["WordHistory (Ring Buffer VecDeque phục hồi từ)"]
         SpellingGuard["Spelling Checker & English Word Restore"]
     end
 
-    subgraph Language_Layer ["4. Phân hệ Đa ngôn ngữ (Localization)"]
+    subgraph Language_Layer ["4. Phân hệ Đa ngôn ngữ & Cập nhật (i18n & Updater)"]
         Lang["Language & LanguageStrings (src/language/)"]
+        Updater["Version Updater (src/updater.rs)"]
     end
 
     subgraph Buffer_Layer ["5. Tầng Bộ đệm (Typing Buffer Layer)"]
@@ -45,7 +46,7 @@ flowchart TD
     end
 
     subgraph Linguistic_Layer ["6. Tầng Ngữ âm học (Linguistic State Machine)"]
-        SM["SyllableState (src/vietnamese/state.rs)"]
+        SM["SyllableState (src/vietnamese/state/)"]
         OnsetNode["Onset (src/vietnamese/onset.rs)"]
         NucleusNode["Nucleus & Tone (src/vietnamese/nucleus.rs)"]
         CodaNode["Coda (src/vietnamese/coda.rs)"]
@@ -53,10 +54,11 @@ flowchart TD
     end
 
     subgraph Sound_Layer ["7. Phân hệ Âm thanh Phím cơ (WASAPI Sound Engine)"]
-        SoundEngine["wasapi_audio_worker (src/platform/win32/sound.rs)"]
+        SoundEngine["wasapi_audio_worker (src/platform/win32/sound/)"]
         SoundBankNode["SoundBank (On-Demand PCM 48 kHz Cache)"]
         PolyMixer["SIMD Polyphonic Voice Mixer (16 Voices)"]
         WasapiSessionNode["WasapiSession (Windows COM Shared Mode)"]
+        SoundInstaller["1-Click Downloader (src/platform/win32/sound/installer.rs)"]
     end
 
     KBD_Hook -->|"on_key() / on_backspace()"| VE
@@ -75,6 +77,8 @@ flowchart TD
     AppDetect --> Injector
     WndProc --> CtrlPanel & TrayMenu
     CtrlPanel --> Components & ThemeEngine
+    CtrlPanel -.->|"Check update"| Updater
+    CtrlPanel -.->|"1-Click install"| SoundInstaller
     Lang --> CtrlPanel & TrayMenu
     ConfigStore --> VE & WndProc
     ConfigStore -.->|"reconfigure_sound()"| SoundEngine
@@ -121,10 +125,10 @@ flowchart TD
 
 ### 2.2. `SyllableState` — Máy trạng thái Ngữ âm học Tiếng Việt (Micro-Modules)
 - **Files:**
-  - `src/vietnamese/state.rs`: Điều phối chu trình chuyển dịch trạng thái âm tiết.
+  - `src/vietnamese/state/`: Điều phối chu trình chuyển dịch trạng thái âm tiết (`handlers.rs`, `render.rs`, `spelling_check.rs`, `types.rs`).
   - `src/vietnamese/onset.rs`: Quản lý phụ âm đầu (`OnsetState`) và biến đổi chữ `đ`.
-  - `src/vietnamese/nucleus.rs`: Quản lý nguyên âm (`NucleusState`), quy tắc đặt dấu thanh mới/cũ, dấu mũ (`^`), dấu móc (`w`).
-  - `src/vietnamese/coda.rs`: Quản lý phụ âm cuối (`CodaState`), quy tắc gõ dấu xuyên phụ âm cuối và chặn lỗi chính tả (Stop Coda Guard).
+  - `src/vietnamese/nucleus.rs`: Quản lý nguyên âm (`NucleusState`), quy tắc đặt dấu thanh mới/cũ, dấu mũ (`^`), dấu móc (`w`), và cơ chế hoán đổi dấu đối xứng linh hoạt.
+  - `src/vietnamese/coda.rs`: Quản lý phụ âm cuối (`CodaState`), quy tắc gõ dấu xuyên phụ âm cuối, hoàn tác dấu mũ xuyên phụ âm cuối và chặn lỗi chính tả (Stop Coda Guard).
   - `src/vietnamese/modifier.rs`: Ánh xạ biến âm thống nhất cho cả Telex và VNI.
 - Máy trạng thái quản lý chu trình chuyển dịch của một âm tiết:
   $$\text{Empty} \longrightarrow \text{Onset} \longrightarrow \text{Nucleus} \longrightarrow \text{Coda}$$
@@ -147,9 +151,20 @@ flowchart TD
      - Gõ dấu ở cuối từ: `v-i-e-e-t-j` $\rightarrow$ `việt`.
    - **Tổ hợp dấu mũ (`toggle_circumflex`):** Nhân đôi nguyên âm (`aa` $\rightarrow$ `â`, `ee` $\rightarrow$ `ê`, `oo` $\rightarrow$ `ô`). Gõ lần thứ 3 sẽ hoàn tác về dạng chữ đôi thô (`tee`, `loo`).
    - **Tổ hợp dấu móc (`apply_horn` / `revert_horn`):** Phím `w` gắn móc cho `u, o` $\rightarrow$ `ư, ơ` và trăng cho `a` $\rightarrow$ `ă`. Gõ `w` lần nữa sẽ hoàn tác.
+   - **Cơ chế Hoán đổi Dấu Đối xứng Linh hoạt (Bidirectional Diacritic Mutation):**
+     - Cho phép người dùng chuyển đổi mượt mà giữa các nguyên âm có dấu tương đương mà không cần xóa đi gõ lại, bảo toàn nguyên vẹn dấu thanh ngữ âm học:
+       - Cặp `uô` $\longleftrightarrow$ `ươ` (phím `w` và `o` trong Telex, `7` và `6` trong VNI): `luôn` $\leftrightarrow$ `lươn`, `muộn` $\leftrightarrow$ `mượn`, `cuộc` $\leftrightarrow$ `cược`.
+       - Cặp `â` $\longleftrightarrow$ `ă` (phím `w` và `a` trong Telex, `8` và `6` trong VNI): `cân` $\leftrightarrow$ `căn`, `mất` $\leftrightarrow$ `mắt`.
+       - Cặp `ô` $\longleftrightarrow$ `ơ` (phím `w` và `o` trong Telex, `7` và `6` trong VNI): `côn` $\leftrightarrow$ `cơn`, `chột` $\leftrightarrow$ `chợt`.
+     - **Bảo toàn Dấu thanh Chuẩn (`find_tone_position()`):** Khi hoán đổi dấu, hệ thống tự động tính toán lại vị trí đặt dấu thanh tối ưu theo cấu trúc ngữ âm học hiện đại (hoặc truyền thống), đảm bảo dấu thanh luôn đậu đúng nguyên âm chính mà không bị rớt dấu.
 4. **Coda (Phụ âm cuối - `coda.rs`):**
    - Tiếp nhận các phụ âm cuối: `c, ch, m, n, ng, nh, p, t`.
    - **Free Mark dấu mũ xuyên phụ âm cuối (`a, e, o`):** Cho phép đặt dấu mũ sau khi đã gõ phụ âm cuối (ví dụ: `v-a-n-a-s` $\rightarrow$ `vấn`, `c-o-n-g-o` $\rightarrow$ `công`, `d-d-e-n-e` $\rightarrow$ `đên`).
+   - **Hoàn tác Dấu Mũ xuyên Phụ âm Cuối (Circumflex Undo Across Coda):**
+     - Khi âm tiết đã có phụ âm cuối và nguyên âm đang mang dấu mũ (`â, ê, ô`), nếu người dùng gõ thêm chính nguyên âm đó một lần nữa, hệ thống tự động hoàn tác dấu mũ và trả về nguyên âm gốc kèm ký tự vừa gõ:
+       - `theme`: `the` $\to$ `thê` + `m` $\to$ `thêm` + `e` $\to$ `theme` (giải quyết triệt để lỗi khi gõ các từ tiếng Anh phổ biến như `theme`, `meme`, `extreme`).
+       - `vana`: `va` $\to$ `vâ` + `n` $\to$ `vân` + `a` $\to$ `vana` (`nirvana`, `havana`).
+       - `congo`: `co` $\to$ `cô` + `n` $\to$ `côn` + `o` $\to$ `congo` (`congo`, `bongo`).
    - **Stop Coda Guard (Chặn tạo từ sai ngữ âm):** Các phụ âm cuối tắc vô thanh (`c, ch, p, t`) khi chưa có dấu thanh thì không thể nhận thêm dấu mũ (nhờ đó các từ tiếng Anh như `data` không bao giờ bị biến thành `dât`).
    - Áp dụng quy tắc thanh điệu ngữ âm học: Phụ âm cuối tắc vô thanh (`c, ch, p, t`) chỉ chấp nhận thanh **Sắc** hoặc **Nặng**; nếu gõ thanh khác, hệ thống tự động hủy dấu hoặc đẩy ra ký tự thô.
 5. **Passthrough (Ký tự thô):**
@@ -230,9 +245,13 @@ flowchart TD
 ---
 
 ### 2.7. `ConfigStore` & Khởi động cùng Hệ điều hành (Windows Autostart)
-- **Files:** `src/engine/config_store.rs`, `src/platform/registry.rs`
+- **Files:** `src/engine/config_store/` (`mod.rs`, `debounced.rs`, `paths.rs`, `codec/`), `src/platform/registry.rs`
 - **Tách biệt Trách nhiệm Lưu trữ (Separation of Concerns):**
-  - Cấu hình gõ phím (`EngineConfig`) và danh mục Macro được lưu trữ vào file `config.ini` qua `ConfigStore`.
+  - Cấu hình gõ phím (`EngineConfig`), hồ sơ ứng dụng (`ProfileManager`) và danh mục Macro/Remap/Disable được lưu trữ vào file `config.ini` qua `ConfigStore`.
+  - **Cơ chế Ghi Hoãn Chống Nghẽn I/O (Debounced Config Writer):**
+    - Trang bị `DebouncedConfigWriter` với bộ đếm hoãn thời gian thực (500 ms).
+    - Khi người dùng kéo thanh trượt âm lượng liên tục, thay đổi switch phím cơ hoặc chỉnh sửa bảng phím tắt, các thao tác ghi đĩa được gom cụm và chỉ xả xuống file `config.ini` sau khi thao tác dừng lại 500 ms.
+    - Loại bỏ 100% tình trạng thắt cổ chai I/O đĩa và khựng luồng giao diện khi cấu hình thay đổi dồn dập.
   - Thuộc tính `show_dialog_on_startup: bool` ("Bật hội thoại này khi khởi động") được lưu trong mục `[system]` của file cấu hình.
   - Trạng thái **Khởi động cùng Windows (Autostart)** được tách rời hoàn toàn khỏi `EngineConfig`, được truy vấn và cấu hình trực tiếp với Windows Registry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Kora`) qua module `src/platform/registry.rs`. Khi chạy tự khởi động với flag `--autostart`, ứng dụng chỉ hiển thị cửa sổ nếu `show_dialog_on_startup == true`.
 
@@ -248,7 +267,7 @@ flowchart TD
 ---
 
 ### 2.9. `Platform & Win32 Injector` — Tầng Giao tiếp Hệ điều hành Cấp thấp
-- **Files:** `src/platform/win32/mod.rs`, `src/platform/win32/injector.rs`, `src/platform/win32/app_detect.rs`
+- **Files:** `src/platform/win32/mod.rs`, `src/platform/win32/injector.rs`, `src/platform/win32/app_detect.rs`, `src/platform/win32/types/`
 - **Kỹ thuật Tổng hợp Phím Nguyên tử (`SendInput`) trên Stack Buffer:**
   - Chuỗi phím xóa lùi (`VK_BACK`) và ký tự Unicode mới được gom và gửi qua một lời gọi `SendInput` nguyên tử.
   - Sử dụng bộ đệm stack `[INPUT; 64]` cho 99.99% các trường hợp thay thế phím thông thường (Zero Heap Allocation), chỉ fallback sang `Vec<INPUT>` khi gặp chuỗi macro cực dài. Ngăn chặn triệt để micro-stutter trên luồng Low-Level Keyboard Hook của Windows.
@@ -265,26 +284,29 @@ flowchart TD
 ---
 
 ### 2.10. `Native Win32 UI & Theming` — Phân hệ Giao diện Thuần Native
-- **Files:** `src/ui/mod.rs`, `src/ui/win32.rs`, `src/ui/theme.rs`, `src/ui/tokens.rs`, `src/ui/components/`, `src/ui/views/`, `src/ui/tray/`, `src/ui/wnd_proc/`
-- **Tài liệu đặc tả kiến trúc UI:** Chi tiết kiến trúc UI Component tự chủ, cơ chế Message Reflection `OCM_*`, Window-Bound State qua `GWLP_USERDATA` và hướng dẫn viết component mới được tài liệu hóa chuyên sâu tại [UI_COMPONENT_ARCHITECTURE.md](file:///c:/Users/uongsuadaubung/Desktop/kora/docs/UI_COMPONENT_ARCHITECTURE.md).
+- **Files:** `src/ui/mod.rs`, `src/ui/win32/`, `src/ui/theme.rs`, `src/ui/tokens.rs`, `src/ui/components/`, `src/ui/views/`, `src/ui/tray/`, `src/ui/wnd_proc/`
+- **Tài liệu đặc tả kiến trúc UI:** Chi tiết kiến trúc UI Component tự chủ, cơ chế Message Reflection `OCM_*`, Window-Bound State qua `GWLP_USERDATA` và hướng dẫn viết component mới được tài liệu hóa chuyên sâu tại [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md).
 - **Kiến trúc GDI Thuần (Pure Win32 GDI):**
   - Không sử dụng WebView, Electron hay framework giao diện cồng kềnh. Toàn bộ các thành phần hiển thị (card bo góc, tab bar, nút bấm, bảng danh sách ListView, ActionTable) được kết xuất trực tiếp qua Windows GDI và UxTheme.
 - **Khử chớp nháy (Double Buffering):**
   - Mọi thao tác vẽ container và thẻ card được thực hiện trên một Memory Device Context (`CreateCompatibleDC`, `CreateCompatibleBitmap`) trước khi đẩy ra màn hình bằng `BitBlt` trong thông điệp `WM_PAINT`, mang lại trải nghiệm thị giác mượt mà 100%.
 - **Cơ chế Subclassing Điều khiển Win32 (`SetWindowSubclass`):**
-  - Can thiệp thông điệp `WM_PAINT`, `WM_MOUSEMOVE`, `WM_MOUSELEAVE` của các điều khiển Win32 chuẩn (`BUTTON`, `SysListView32`) để áp dụng phong cách thiết kế hiện đại mà vẫn bảo toàn đầy đủ tính năng trợ năng (accessibility) và điều hướng bàn phím của hệ điều hành.
-- **Hệ thống Giao diện Sáng/Tối (Light/Dark Theme Engine):**
+  - Can thiệp thông điệp `WM_PAINT`, `WM_MOUSEMOVE`, `WM_MOUSELEAVE` của các điều khiển Win32 chuẩn (`BUTTON`, `SysListView32`, `msctls_trackbar32`) để áp dụng phong cách thiết kế hiện đại mà vẫn bảo toàn đầy đủ tính năng trợ năng (accessibility) và điều hướng bàn phím của hệ điều hành.
+- **Hệ thống Giao diện Sáng/Tối (Light/Dark Theme Engine) & Đồng bộ Slider Thời gian thực:**
   - Tự động nhận diện theme hệ thống Windows qua Registry (`AppsUseLightTheme`), hỗ trợ chuyển đổi giao diện thời gian thực với bảng màu ngữ nghĩa `ThemePalette` và bộ nhớ đệm GDI brush/pen tái sử dụng.
+  - Xử lý đồng bộ màu tức thì cho thanh trượt âm lượng `msctls_trackbar32` khi chuyển Dark/Light mode qua `WM_CTLCOLORSTATIC` và cưỡng bức vẽ lại kênh trượt (`InvalidateRect` + `UpdateWindow`), triệt tiêu độ trễ làm mới màu.
+- **Tối ưu hóa Phông chữ & Nhận diện Sidebar:**
+  - Tiêu đề danh mục Sidebar được thiết kế nổi bật với phông chữ 11pt Bold kèm biểu tượng `📁 Hồ sơ`, phân cấp thị giác rõ ràng giữa khu vực quản lý hồ sơ và nội dung cấu hình chi tiết.
 
 ---
 
 ## 3. Kỹ thuật Tối ưu hóa Hiệu năng & Triệt tiêu Cấp phát Bộ nhớ (Zero-Allocation Engineering)
 
-Để đạt được kỷ lục thông lượng **~10.960.000 phím/giây** và độ trễ cực thấp **~0.09 microsecond / phím** (91 ns) trên bản Release, kiến trúc Kora Engine áp dụng các kỹ thuật tối ưu hóa cấp phát bộ nhớ (Zero-Allocation) và thân thiện với bộ nhớ đệm CPU (Cache-Friendly):
+Để đạt được kỷ lục thông lượng **~13.700.000 phím/giây** và độ trễ cực thấp **~0.07 microsecond / phím** (70 ns) trên bản Release, kiến trúc Kora Engine áp dụng các kỹ thuật tối ưu hóa cấp phát bộ nhớ (Zero-Allocation) và thân thiện với bộ nhớ đệm CPU (Cache-Friendly):
 
 ```mermaid
 flowchart LR
-    subgraph Hot_Path ["Keystroke Hot Path (91 ns / key)"]
+    subgraph Hot_Path ["Keystroke Hot Path (70 ns / key)"]
         direction TB
         KBD["Low-Level KBD Hook"] -->|"VK to char"| FastMatch["L1 Cache Match &amp; ASCII Fast-Path<br/>(decompose_vowel / compose_vowel)"]
         FastMatch -->|"Zero-Copy Key"| TB_Fast["TypingBuffer::feed_key<br/>(Cached last_rendered)"]
@@ -351,7 +373,7 @@ flowchart LR
 - **Giải pháp:** Sử dụng helper `with_lowercase_key` cùng bộ đệm chữ thường tĩnh trên stack `[u8; 64]` cho các từ ASCII $\le$ 64 ký tự. Triệt tiêu 100% heap allocation khi gõ phím cách trong suốt quá trình soạn thảo thông thường.
 
 ### 3.10. Phân hệ Âm thanh Phím cơ WASAPI & Bộ trộn Đa âm SIMD (Native Mechanical Keyboard Sound Engine)
-- **File:** `src/platform/win32/sound.rs`
+- **Files:** `src/platform/win32/sound/` (`mod.rs`, `wasapi.rs`, `wav.rs`, `tags.rs`, `installer.rs`)
 - **Kiến trúc Luồng tách rời Bất đồng bộ (Decoupled Worker Architecture):**
   - Luồng gõ phím Windows Hook (`low_level_keyboard_proc`) tuyệt đối không bao giờ thực hiện I/O hay phát âm thanh đồng bộ.
   - Khi có sự kiện phím, hàm `trigger_key_sound(vk)` kiểm tra cờ nguyên tử `SOUND_ENABLED: AtomicBool`. Nếu bật, nó đẩy lệnh `SoundCmd::Play(vk)` vào kênh `mpsc::sync_channel(16)` thông qua lệnh `try_send`.
@@ -370,6 +392,22 @@ flowchart LR
   - Bảng ánh xạ Virtual-Key sang KeyTag `vk_to_tag` chạy trong thời gian $O(1)$.
   - Hàm so khớp file `match_file_tag` loại trừ triệt để lỗi xung đột chuỗi con (ví dụ: đảm bảo `backspace.wav` luôn ưu tiên trước `space.wav`, `pagedown.wav` trước `down.wav`).
 
+### 3.11. Trình tải Gói Âm thanh 1-Click Tích hợp (Built-in 1-Click Soundpack Downloader)
+- **File:** `src/platform/win32/sound/installer.rs`
+- **Tải và nạp âm thanh không phụ thuộc script ngoài:**
+  - Loại bỏ hoàn toàn sự phụ thuộc vào các tập lệnh ngoài (`scripts/install-soundpack.*`).
+  - Tích hợp trực tiếp module tải native: tự động kết nối GitHub Releases qua HTTP/WinINet, tải file nén `switches.zip`, giải nén và cấu trúc thư mục âm thanh chuẩn `switches/<name>/*.wav`.
+  - Giao diện Control Panel cung cấp nút bấm 1-click trực quan: tự động nhận diện gói đã cài hay chưa, tải nền với trạng thái tiến trình và nạp nóng ngay lập tức vào bộ nhớ mà không cần khởi động lại ứng dụng.
+  - Toàn bộ các script cài đặt thủ công đã được dọn dẹp sạch sẽ khỏi repository, giảm thiểu bề mặt mã nguồn và rủi ro bảo mật thực thi script.
+
+### 3.12. Module Kiểm tra Bản cập nhật Tự động (Lightweight Update Checker)
+- **File:** `src/updater.rs`
+- **Cơ chế kiểm tra phiên bản mới:**
+  - Kết nối đến GitHub API (`repos/kora-input/kora/releases/latest`) bằng tiện ích curl hệ thống hoặc WinINet native.
+  - Phân tích chuỗi JSON trả về (`tag_name`, `html_url`) với bộ phân tích cú pháp chuỗi nhẹ zero-dependency.
+  - So sánh phiên bản ngữ nghĩa (SemVer `vX.Y.Z`) giữa phiên bản hiện tại (`CARGO_PKG_VERSION`) và bản phát hành mới nhất.
+  - Hiển thị thông báo trực tiếp trên Control Panel và mở trình duyệt tới trang phát hành chính thức khi người dùng đồng ý cập nhật.
+
 ---
 
 ## 4. Bản đồ File Mã nguồn (Codebase Directory Map)
@@ -378,8 +416,9 @@ flowchart LR
 Kora/
 ├── Cargo.toml                  # Khai báo cấu hình dự án Rust & dependencies
 ├── src/
-│   ├── lib.rs                  # Export library API
+│   ├── lib.rs                  # Export library API & modules
 │   ├── main.rs                 # Điểm khởi chạy ứng dụng Windows GUI & Hook loop
+│   ├── updater.rs              # Kiểm tra phiên bản mới từ GitHub Releases & cập nhật
 │   ├── language/               # Phân hệ Đa ngôn ngữ (i18n & Localization)
 │   │   ├── mod.rs              # Language enum, LanguageStrings dictionary & switcher
 │   │   ├── vi.rs               # Bản dịch Tiếng Việt (Default)
@@ -390,31 +429,105 @@ Kora/
 │   │   ├── mod.rs              # VietnameseEngine coordinator
 │   │   ├── action.rs           # Định nghĩa EngineAction (Passthrough, Replace, Consume)
 │   │   ├── buffer.rs           # TypingBuffer & Thuật toán SSOT evaluate_keys
-│   │   ├── config.rs           # EngineConfig (Telex, VNI, language, show_dialog_on_startup...)
+│   │   ├── config/             # Cấu hình gõ phím (hotkey, input_method, theme, engine options)
+│   │   │   ├── mod.rs          # EngineConfig facade
+│   │   │   ├── hotkey.rs       # Cấu hình phím tắt chuyển chế độ
+│   │   │   ├── input_method.rs # InputMethod enum (Telex, VNI, Simple Telex)
+│   │   │   └── theme.rs        # Cấu hình giao diện (Dark, Light, System)
 │   │   ├── config_store/       # Tải/lưu cấu hình config.ini & bảng macro ra đĩa (debounced)
+│   │   │   ├── mod.rs          # ConfigStore facade & API
+│   │   │   ├── debounced.rs    # DebouncedConfigWriter chống nghẽn I/O (500ms delay)
+│   │   │   ├── paths.rs        # Quản lý đường dẫn file config.ini & macro
+│   │   │   └── codec/          # Bộ mã hóa/giải mã INI parser & serializer
 │   │   ├── history.rs          # WordHistory Ring Buffer VecDeque quản lý từ
 │   │   ├── macro_table.rs      # Bảng gõ tắt 3 tầng (Normal, Start, End) & Casing
 │   │   └── profile/            # Hệ thống quản lý đa cấu hình (Profiles: Gaming, Code, Office...)
+│   │       ├── mod.rs          # Profile module facade
+│   │       ├── manager.rs      # ProfileManager điều phối active app & kế thừa live delta
+│   │       └── model.rs        # Profile struct, MacroRule, RemapRule, DisableRule
 │   ├── ui/                     # Phân hệ Giao diện Native Win32 (xem docs/UI_COMPONENT_ARCHITECTURE.md)
 │   │   ├── mod.rs              # Khởi tạo UI, đăng ký Window Class
-│   │   ├── win32.rs            # Win32 FFI bindings, types, constants & OCM_* reflection
 │   │   ├── theme.rs            # Dark/Light theme, Windows 11 UxTheme, GDI brush cache
 │   │   ├── colors.rs           # Bảng màu định nghĩa UI (Dark/Light palette)
 │   │   ├── tokens.rs           # Design tokens (spacing, typography, border radius)
-│   │   ├── components/         # ActionTable, PushButton, CheckBox, ComboBox, Label, ListBox, ListView...
-│   │   ├── views/              # Control Panel layout & Modal Dialogs (dialogs/)
-│   │   ├── tray/               # Gom cụm System Tray Icon, Loader & Context Menu Handler
-│   │   └── wnd_proc/           # Window Procedures & Message Reflector Router
+│   │   ├── win32/              # Tách lớp Win32 GUI FFI, drawing & reflection
+│   │   │   ├── mod.rs          # Module facade & re-exports
+│   │   │   ├── draw.rs         # Tiện ích vẽ GDI (Rounded rect, borders, fills)
+│   │   │   ├── ffi.rs          # Win32 extern declarations & API wrappers
+│   │   │   ├── font.rs         # Quản lý phông chữ GDI Segoe UI
+│   │   │   ├── styling.rs      # Theme styling helpers
+│   │   │   └── types.rs        # Cấu trúc dữ liệu & constants GUI Win32
+│   │   ├── components/         # BỘ THƯ VIỆN UI COMPONENT TỰ CHỦ
+│   │   │   ├── mod.rs          # Re-export các component
+│   │   │   ├── button.rs       # PushButton (Primary, Secondary, Danger, Fluent hover)
+│   │   │   ├── checkbox.rs     # CheckBox (Fluent 18x18, owner-draw)
+│   │   │   ├── combobox.rs     # ComboBox (Owner-draw dropdown)
+│   │   │   ├── label.rs        # Label (Nhãn văn bản & nhóm)
+│   │   │   ├── listbox.rs      # ListBox (Owner-draw modern item selection)
+│   │   │   ├── listview.rs     # ListView (Win32 SysListView32 + CustomDraw)
+│   │   │   ├── menu.rs         # Context Menu popup helpers
+│   │   │   ├── slider.rs       # Slider Trackbar (msctls_trackbar32 subclassed & theme sync)
+│   │   │   ├── tab_bar.rs      # Modern tab selector with indicator
+│   │   │   ├── textbox.rs      # TextBox (Dual-subclass fluent border text input)
+│   │   │   └── action_table/   # ActionTable dạng bảng tương tác đa năng
+│   │   │       ├── mod.rs      # ActionTable facade
+│   │   │       ├── types.rs    # ColumnConfig, ActionItem, BadgeConfig
+│   │   │       ├── geometry.rs # Tính toán tọa độ hàng, cột, nút bấm
+│   │   │       ├── columns.rs  # Quản lý cấu hình cột & độ rộng
+│   │   │       ├── input.rs    # Xử lý sự kiện chuột & phím
+│   │   │       ├── sort.rs     # Sắp xếp dữ liệu theo cột
+│   │   │       ├── model.rs    # State container & data source
+│   │   │       ├── hit_test.rs # Xác định vùng click nút Edit/Delete
+│   │   │       ├── scrolling.rs# Quản lý thanh cuộn dọc mượt mà
+│   │   │       ├── drawing.rs  # Vẽ nền, đường kẻ, chữ, badges, nút bấm
+│   │   │       └── subclass.rs # Window subclass proc cho ActionTable
+│   │   ├── views/              # CÁC MÀN HÌNH VÀ HỘP THOẠI NGHIỆP VỤ
+│   │   │   ├── mod.rs          # Re-export views và dialogs
+│   │   │   ├── control_panel/  # Cửa sổ Control Panel chính
+│   │   │   │   ├── mod.rs      # Container chính: điều hướng, tab switching, layout
+│   │   │   │   ├── banner.rs   # Header status banner (Bật/Tắt, Active Profile)
+│   │   │   │   ├── footer.rs   # Nút Reset / Save / Close
+│   │   │   │   ├── paint.rs    # Gradient & border painting của Control Panel
+│   │   │   │   ├── sidebar.rs  # Left navigation sidebar (11pt bold + icon 📁 Hồ sơ)
+│   │   │   │   ├── tab_about.rs# Tab Giới thiệu phần mềm & tác giả
+│   │   │   │   ├── tab_macro.rs# Tab Quản lý phím gõ tắt (Macro)
+│   │   │   │   ├── tab_remap.rs# Tab Phím tắt & Remap
+│   │   │   │   ├── tab_sound.rs# Tab Âm thanh gõ phím (WASAPI + 1-Click downloader)
+│   │   │   │   ├── tab_system.rs# Tab Cấu hình hệ thống (Khởi động, ngôn ngữ, cập nhật)
+│   │   │   │   └── tab_typing.rs# Tab Bộ gõ tiếng Việt
+│   │   │   └── dialogs/        # HỘP THOẠI MODAL ĐỘC LẬP
+│   │   │       ├── mod.rs      # Re-export các hàm show_*_dialog
+│   │   │       ├── add_profile.rs  # Hộp thoại tạo profile mới
+│   │   │       ├── confirm.rs      # Hộp thoại xác nhận thao tác
+│   │   │       ├── disable_key.rs  # Hộp thoại vô hiệu hóa phím
+│   │   │       ├── hotkey.rs       # Hộp thoại ghi nhận tổ hợp phím tắt (Hotkey capture)
+│   │   │       ├── macro_editor.rs # Hộp thoại thêm/sửa từ gõ tắt
+│   │   │       └── remap_key.rs    # Hộp thoại gán phím (Remap Key)
+│   │   ├── tray/               # PHÂN HỆ SYSTEM TRAY (Gom cụm độc lập)
+│   │   │   ├── mod.rs          # Re-export TrayIcon, loader & menu handler
+│   │   │   ├── handler.rs      # Xử lý context menu khay hệ thống (Click, Thoát, Mở UI)
+│   │   │   ├── icon.rs         # Wrapper NOTIFYICONDATAW Win32 API
+│   │   │   └── loader.rs       # Nạp icon từ PE resource (.ico/.rc)
+│   │   └── wnd_proc/           # WINDOW PROCEDURES & MESSAGE DISPATCHING
+│   │       ├── mod.rs          # Window Procedure chính + Message Reflection Dispatcher
+│   │       ├── colors.rs       # Xử lý WM_CTLCOLORSTATIC, WM_CTLCOLORDLG cho dark theme
+│   │       ├── commands.rs     # Xử lý WM_COMMAND và routing sự kiện menu
+│   │       └── tray.rs         # Xử lý thông điệp khay hệ thống WM_TRAYICON
 │   ├── vietnamese/             # Phân hệ Ngữ âm học tiếng Việt
 │   │   ├── mod.rs              # Vietnamese module export
 │   │   ├── charset.rs          # Bảng mã ký tự, nguyên âm cơ bản, dấu thanh, dấu mũ
+│   │   ├── coda.rs             # Máy trạng thái phụ âm cuối (CodaState, hoàn tác dấu mũ qua coda)
 │   │   ├── inline_list.rs      # Mảng stack cố định InlineList<T, N> (Zero Heap Alloc)
-│   │   ├── onset.rs            # Máy trạng thái phụ âm đầu (OnsetState, dấu đ)
-│   │   ├── nucleus.rs          # Máy trạng thái nguyên âm, dấu thanh, dấu mũ, dấu móc
-│   │   ├── coda.rs             # Máy trạng thái phụ âm cuối (CodaState, chặn sai âm)
 │   │   ├── modifier.rs         # Xử lý phím biến âm Telex / VNI
+│   │   ├── nucleus.rs          # Máy trạng thái nguyên âm, dấu thanh, dấu mũ, hoán đổi dấu đối xứng
+│   │   ├── onset.rs            # Máy trạng thái phụ âm đầu (OnsetState, dấu đ)
 │   │   ├── spelling.rs         # Ma trận luật ngữ âm & Phonotactics validation
-│   │   ├── state.rs            # SyllableState machine điều phối chuyển dịch trạng thái
+│   │   ├── state/              # SyllableState machine điều phối chuyển dịch trạng thái
+│   │   │   ├── mod.rs          # SyllableState facade
+│   │   │   ├── handlers.rs     # Xử lý sự kiện phím (diacritic mutation, modifiers, coda)
+│   │   │   ├── render.rs       # Kết xuất âm tiết ra chuỗi UTF-8 không cấp phát heap
+│   │   │   ├── spelling_check.rs# Kiểm tra hợp lệ ngữ âm theo ngữ cảnh
+│   │   │   └── types.rs        # Định nghĩa các biến thể SyllableState
 │   │   └── syllable.rs         # VietnameseSyllable struct & Renderer
 │   └── platform/               # Tầng giao tiếp hệ điều hành
 │       ├── mod.rs              # Platform facade
@@ -422,31 +535,52 @@ Kora/
 │       ├── registry.rs         # Đọc/ghi Windows Registry (Run key Autostart)
 │       └── win32/              # Tách lớp native Win32 FFI & Hook
 │           ├── mod.rs          # Low-Level Keyboard & Mouse Hook, Windows Message Loop
-│           ├── types.rs        # Win32 FFI structs (INPUT, MSG, POINT) & constants
-│           ├── injector.rs     # Tổng hợp phím SendInput (Unicode & Backspace)
 │           ├── app_detect.rs   # Nhận diện tiến trình active & browser Omnibox
-│           └── sound.rs        # WASAPI mechanical keyboard sound engine & SIMD polyphonic mixer
+│           ├── injector.rs     # Tổng hợp phím SendInput (Unicode & Backspace)
+│           ├── sound/          # Phân hệ Âm thanh WASAPI Native
+│           │   ├── mod.rs      # Sound facade, worker thread & commands
+│           │   ├── installer.rs# Bộ tải 1-click soundpack từ GitHub Releases
+│           │   ├── tags.rs     # Ánh xạ phím Virtual-Key sang KeyTag âm thanh
+│           │   ├── wasapi.rs   # Giao tiếp COM WASAPI Audio Session Client
+│           │   └── wav.rs      # Bộ giải mã file WAV PCM 48kHz
+│           └── types/          # Win32 FFI structs & input wrappers
+│               ├── mod.rs      # Types facade
+│               ├── win32_defs.rs # Định nghĩa hằng số Win32 API
+│               └── win32_input.rs# INPUT struct & union abstractions
 ├── tests/                      # Bộ kiểm thử tự động (Unit & Integration Tests)
 │   ├── comprehensive_test.rs   # Kiểm thử kịch bản gõ phức hợp & benchmark thông lượng
 │   ├── config_test.rs          # Kiểm thử lưu trữ cấu hình & registry autostart
 │   ├── engine_test.rs          # Kiểm thử chuyên sâu toàn bộ hành vi Engine
 │   ├── language_test.rs        # Kiểm thử từ điển đa ngôn ngữ & i18n
-│   └── spelling_test.rs        # Kiểm thử quy tắc ngữ âm học & ghép vần tiếng Việt
+│   ├── profile_test.rs         # Kiểm thử hệ thống Multi-Profile & Live Delta Inheritance
+│   ├── spelling_test.rs        # Kiểm thử quy tắc ngữ âm học & ghép vần tiếng Việt
+│   └── engine_test/            # Cụm kiểm thử phân đoạn Engine
+│       ├── backspace.rs        # Kiểm thử xóa lùi & triệt tiêu lỗi ma
+│       ├── english_bypass.rs   # Kiểm thử bỏ qua từ tiếng Anh & hoàn tác tức thì
+│       ├── macro_rules.rs      # Kiểm thử gõ tắt 3 tầng & bảo toàn casing
+│       ├── spelling.rs         # Kiểm thử luật chính tả & dấu mũ/móc
+│       ├── system_ui.rs        # Kiểm thử theme & tích hợp hệ thống
+│       └── typing.rs           # Kiểm thử gõ Telex/VNI & stress-test hoán đổi dấu (20 vòng)
 └── docs/
-    └── ARCHITECTURE.md         # Tài liệu kiến trúc này
+    ├── ARCHITECTURE.md         # Tài liệu kiến trúc này
+    ├── UI_COMPONENT_ARCHITECTURE.md # Tài liệu kiến trúc UI Component Win32
+    ├── LINGUISTIC_RESEARCH_SMART_BYPASS.md # Nghiên cứu ngôn ngữ học & Smart Bypass
+    └── NewDessign.md           # Đặc tả thiết kế Multi-Profile & Workspace Hub
 ```
 
 ---
 
-## 4. Hướng dẫn Biên dịch & Chạy Kiểm thử (Build & Test Guide)
+## 5. Hướng dẫn Biên dịch & Chạy Kiểm thử (Build & Test Guide)
 
-### 4.1. Yêu cầu hệ thống
+### 5.1. Yêu cầu hệ thống
 - Rust toolchain (phiên bản `1.75+` khuyến nghị): `rustc`, `cargo`.
 - Hệ điều hành: Windows 10 / 11 (hỗ trợ Windows API `user32.dll`).
 
-### 4.2. Chạy toàn bộ Test Suite
+### 5.2. Chạy toàn bộ Test Suite (80 Tests Tự động — 100% PASS)
+Hệ thống được bảo vệ nghiêm ngặt bởi **80 kịch bản kiểm thử tự động**, bao gồm kiểm thử đơn vị, kiểm thử tích hợp, kiểm thử kế thừa Profile Delta và stress-test hoán đổi dấu liên tục:
+
 ```bash
-# Chạy tất cả unit & integration tests
+# Chạy tất cả unit & integration tests (80/80 passed)
 cargo test
 
 # Chạy riêng từng test suite
@@ -454,10 +588,14 @@ cargo test --test comprehensive_test
 cargo test --test config_test
 cargo test --test engine_test
 cargo test --test language_test
+cargo test --test profile_test
 cargo test --test spelling_test
+
+# Chạy riêng stress-test hoán đổi dấu 20 vòng lặp
+cargo test --test engine_test test_diacritic_switching
 ```
 
-### 4.3. Biên dịch bản Release
+### 5.3. Biên dịch bản Release
 ```bash
 cargo build --release
 ```

@@ -1,4 +1,4 @@
-﻿# Kiến trúc UI Component Độc lập (Win32 Native Component Architecture)
+# Kiến trúc UI Component Độc lập (Win32 Native Component Architecture)
 
 Tài liệu này quy chuẩn toàn bộ kiến trúc lập trình giao diện người dùng (UI Component) của dự án **Kora**, đóng vai trò là kim chỉ nam thiết kế và tiêu chuẩn kỹ thuật để đội ngũ phát triển rà soát, mở rộng hoặc viết thêm bất kỳ UI Component nào trong tương lai.
 
@@ -291,14 +291,20 @@ Phân hệ UI được tổ chức theo cấu trúc phân tầng rõ ràng, lo�
 ```
 src/ui/
 ├── mod.rs                        # Khởi tạo cửa sổ UI chính, đăng ký Window Class
-├── win32.rs                      # Toàn bộ Win32 FFI bindings, types, constants & OCM_* reflection
 ├── theme.rs                      # Dark/Light theme mode, ThemePalette, brush caching
 ├── colors.rs                     # Định nghĩa mã màu và hằng số giao diện
 ├── tokens.rs                     # Design tokens (spacing, typography, border radius)
 │
+├── win32/                        # TÁCH LỚP WIN32 GUI FFI, DRAWING & REFLECTION
+│   ├── mod.rs                    # Module facade & re-exports
+│   ├── draw.rs                   # Tiện ích vẽ GDI (Rounded rect, borders, fills)
+│   ├── ffi.rs                    # Win32 extern declarations & API wrappers
+│   ├── font.rs                   # Quản lý phông chữ GDI Segoe UI
+│   ├── styling.rs                # Theme styling helpers
+│   └── types.rs                  # Cấu trúc dữ liệu & constants GUI Win32 (OCM_* reflection)
+│
 ├── components/                   # BỘ THƯ VIỆN UI COMPONENT TỰ CHỦ (Không chứa logic nghiệp vụ)
 │   ├── mod.rs                    # Re-export các component
-│   ├── action_table.rs           # ActionTable (bảng tương tác với nút inline Sửa/Xóa)
 │   ├── button.rs                 # PushButton (Primary, Secondary, Danger, Fluent hover)
 │   ├── checkbox.rs               # CheckBox (Fluent 18x18, owner-draw)
 │   ├── combobox.rs               # ComboBox (Owner-draw dropdown)
@@ -306,9 +312,21 @@ src/ui/
 │   ├── listbox.rs                # ListBox (Owner-draw modern item selection)
 │   ├── listview.rs               # ListView (Win32 SysListView32 + CustomDraw)
 │   ├── menu.rs                   # Context Menu popup helpers
-│   ├── slider.rs                 # Slider Trackbar
+│   ├── slider.rs                 # Slider Trackbar (msctls_trackbar32 subclass & theme sync)
 │   ├── tab_bar.rs                # Modern tab selector with indicator
-│   └── textbox.rs                # TextBox (Dual-subclass fluent border text input)
+│   ├── textbox.rs                # TextBox (Dual-subclass fluent border text input)
+│   └── action_table/             # ActionTable dạng module tương tác đa năng
+│       ├── mod.rs                # ActionTable facade
+│       ├── types.rs              # ColumnConfig, ActionItem, BadgeConfig
+│       ├── geometry.rs           # Tính toán tọa độ hàng, cột, nút bấm
+│       ├── columns.rs            # Quản lý cấu hình cột & độ rộng
+│       ├── input.rs              # Xử lý sự kiện chuột & phím
+│       ├── sort.rs               # Sắp xếp dữ liệu theo cột
+│       ├── model.rs              # State container & data source
+│       ├── hit_test.rs           # Xác định vùng click nút Edit/Delete
+│       ├── scrolling.rs          # Quản lý thanh cuộn dọc mượt mà
+│       ├── drawing.rs            # Vẽ nền, đường kẻ, chữ, badges, nút bấm
+│       └── subclass.rs           # Window subclass proc cho ActionTable
 │
 ├── views/                        # CÁC MÀN HÌNH VÀ HỘP THOẠI NGHIỆP VỤ
 │   ├── mod.rs                    # Re-export views và dialogs (đảm bảo backwards-compatibility)
@@ -316,18 +334,19 @@ src/ui/
 │   │   ├── mod.rs                # Container chính: điều hướng, tab switching, layout
 │   │   ├── paint.rs              # Gradient & border painting riêng của Control Panel
 │   │   ├── banner.rs             # Header status banner (Bật/Tắt, Active Profile)
-│   │   ├── sidebar.rs            # Left navigation sidebar & profile selector
+│   │   ├── sidebar.rs            # Left navigation sidebar (11pt bold + icon 📁 Hồ sơ)
 │   │   ├── footer.rs             # Nút Reset / Save / Close
 │   │   ├── tab_typing.rs         # Tab Bộ gõ tiếng Việt
 │   │   ├── tab_remap.rs          # Tab Phím tắt & Remap (đổi tên từ tab_remap_disable.rs)
 │   │   ├── tab_macro.rs          # Tab Quản lý phím gõ tắt (Macro)
-│   │   ├── tab_sound.rs          # Tab Âm thanh gõ phím
+│   │   ├── tab_sound.rs          # Tab Âm thanh gõ phím (WASAPI + 1-Click downloader)
 │   │   ├── tab_system.rs         # Tab Cấu hình hệ thống (Khởi động, ngôn ngữ, cập nhật)
 │   │   └── tab_about.rs          # Tab Giới thiệu phần mềm & tác giả
 │   │
 │   └── dialogs/                  # HỘP THOẠI MODAL (Tách biệt khỏi view chính)
 │       ├── mod.rs                # Re-export các hàm show_*_dialog
 │       ├── add_profile.rs        # Hộp thoại tạo profile mới
+│       ├── confirm.rs            # Hộp thoại xác nhận thao tác
 │       ├── remap_key.rs          # Hộp thoại gán phím (Remap Key)
 │       ├── disable_key.rs        # Hộp thoại vô hiệu hóa phím (Disable Key)
 │       ├── hotkey.rs             # Hộp thoại ghi nhận tổ hợp phím tắt (Hotkey capture)

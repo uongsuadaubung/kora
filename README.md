@@ -5,7 +5,7 @@
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
-> 🚀 **Kora Core Engine:** Bộ công cụ bàn phím & bộ gõ hiện đại (*Modern Input & Keyboard Suite*) viết bằng **Rust thuần** và Win32 GDI native: tích hợp Bộ gõ Tiếng Việt chuẩn xác cao, Đổi phím (Key Remap), Khóa phím chuyên dụng (Key Blocker), Không gian làm việc đa ứng dụng (Multi-Profile Workspace) và Giả lập âm thanh phím cơ WASAPI phòng thu.  
+> 🚀 **Kora Core Engine:** Bộ công cụ bàn phím & bộ gõ hiện đại (*Modern Input & Keyboard Suite*) viết bằng **Rust thuần** và Win32 GDI native: tích hợp Bộ gõ Tiếng Việt chuẩn xác cao, Đổi phím (Key Remap), Khóa phím chuyên dụng (Key Blocker), Không gian làm việc đa ứng dụng (Multi-Profile Workspace) và Giả lập âm thanh phím cơ WASAPI phòng thu.
 > 📖 **Tài liệu kiến trúc chi tiết:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
@@ -23,16 +23,16 @@ Tuy nhiên, trong quá trình phát triển, quy mô ứng dụng đã mở rộ
 
 Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của một **bộ công cụ bàn phím & bộ gõ hiện đại, tinh tế (Modern Input & Keyboard Suite)**. Đằng sau cái tên 4 chữ cái ngắn gọn là 4 tầng ý nghĩa sâu sắc:
 
-1. 🎵 **Âm thanh (Acoustics & Sound FX)**  
+1. 🎵 **Âm thanh (Acoustics & Sound FX)**
    *Kora* là tên một loại nhạc cụ dây truyền thống nổi tiếng với âm sắc trong trẻo, mộc mạc và thanh thoát. Đây là hình ảnh đại diện cho tính năng giả lập âm thanh phím cơ của Kora — biến từng nhịp gõ phím hằng ngày thành một trải nghiệm âm thanh sống động và giàu cảm xúc.
 
-2. 🌐 **Không gian (Workspace & Multi-Profile)**  
+2. 🌐 **Không gian (Workspace & Multi-Profile)**
    Trong triết học Hy Lạp cổ đại, *Chōra* hay *Kora* (χώρα) có nghĩa là *"khoảng không gian / miền đất mở"* — nơi vạn vật định hình và phát triển. Điều này đồng điệu với triết lý kiến trúc *Multi-Profile* của Kora: mỗi ứng dụng, mỗi trò chơi (Game, IDE, Office, Graphic Tool) là một không gian làm việc độc lập, tự động biến đổi cấu hình phím tối ưu theo ngữ cảnh.
 
-3. 🛡️ **Lớp vỏ bảo vệ kiên cố (Kernel Shield & Key Blocking)**  
+3. 🛡️ **Lớp vỏ bảo vệ kiên cố (Kernel Shield & Key Blocking)**
    Trong tiếng Nhật, *Kōra* (甲羅) có nghĩa là chiếc mai rùa vững chắc. Kora hoạt động như một lớp khiên bảo vệ ở tầng nhân cấp thấp (*Windows Hook*): lọc sạch thao tác phím thừa, chặn phím bấm nhầm khi chơi game (khóa phím Windows, Insert, Caps Lock), ngăn ngừa xung đột dấu và giữ cho luồng thao tác luôn an toàn, liền mạch.
 
-4. ⚡ **Tối giản & Quốc tế (Minimalist & Global)**  
+4. ⚡ **Tối giản & Quốc tế (Minimalist & Global)**
    Bắt đầu bằng chữ **K** mạnh mẽ (*Keyboard / Kernel*) và kết thúc bằng nguyên âm mở `-a`, **Kora** mang phong cách của những công cụ phần mềm hiện đại (như *Figma, Raycast, Sora*): phát âm dứt khoát, dễ nhớ và tự nhiên trên phạm vi toàn cầu.
 
 ---
@@ -47,7 +47,7 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
 | ⏱️ **Độ trễ phản hồi (Latency)** | **~0.07 – 0.09 microsecond / phím** (70 – 90 ns) | Phản hồi siêu thanh trong 70 nano-giây, nhanh gấp **150.000 lần** ngưỡng mắt người nhận biết |
 | 💾 **Bộ nhớ RAM (Chạy ngầm)** | **< 1 MB** (0.5 – 0.9 MB) | Nhẹ không đối thủ; hoạt động ổn định và cực kỳ tiết kiệm tài nguyên |
 | 🖥️ **Bộ nhớ RAM (Control Panel mở)** | **~1.5 MB** | Toàn bộ giao diện Win32 native siêu gọn nhẹ, không dùng WebView/Electron cồng kềnh |
-| 🔊 **Giả lập phím cơ (Sound Engine)** | **Tích hợp Native WASAPI (13 switches)** | Âm thanh phím cơ 48 kHz studio tích hợp sẵn, không cần cài thêm phần mềm ngoài |
+| 🔊 **Giả lập phím cơ (Sound Engine)** | **Tích hợp Native WASAPI (13 switches)** | Âm thanh phím cơ 48 kHz studio + Trình tải 1-Click tích hợp, không cần script ngoài |
 | 📦 **Dung lượng file thực thi (.exe)** | **~1 MB** | Siêu nhỏ gọn (chứa trọn bộ gõ, GUI native, WASAPI engine & switch loader) |
 | 🛡️ **Runtime Dependencies** | **0 dependencies (Pure Rust)** | 100% Rust thuần giao tiếp trực tiếp Windows API, không rủi ro bảo mật bên thứ 3 |
 | 🎮 **Hiện tượng khựng phím (Stutter)** | **Zero Input Lag / Zero GC Pause** | Không có Garbage Collector (GC) thu gom rác gây trễ nhịp khi chơi game đỉnh cao |
@@ -105,7 +105,6 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
 - Hệ điều hành: Windows 10 / 11
 
 ### Chạy kiểm thử tự động (Automated Tests)
-Hệ thống được bảo đảm bởi 72+ kịch bản kiểm thử tự động toàn diện:
 ```bash
 cargo test
 ```

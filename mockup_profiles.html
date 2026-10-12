@@ -520,6 +520,24 @@
       color: var(--text-secondary);
     }
 
+    .action-type-btn {
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .action-type-btn:hover {
+      border-color: #ec4899;
+      color: var(--text-primary);
+    }
+    .action-type-btn.active {
+      border-color: #ec4899 !important;
+      background: rgba(236, 72, 153, 0.18) !important;
+      color: #f472b6 !important;
+    }
+
     /* Remap Table */
     .data-table {
       width: 100%;
@@ -752,7 +770,13 @@
     <button onclick="openAddProfileModal()" style="background:var(--accent); color:white; border-color:var(--accent);">
       ➕ Thêm Profile Mới (Modal)
     </button>
-    <span style="color: #999; font-size: 12px;">Đầy đủ 100% cả 4 Tab (Macro chi tiết có form Sửa/Xóa/Thêm) + Popup nút ➕</span>
+    <button onclick="openKeyMacroModal()" style="background:#8b5cf6; color:white; border-color:#8b5cf6; font-weight:600;">
+      ⚡ Thử Modal Phím Macro
+    </button>
+    <button onclick="openActionEditorModal('press')" style="background:#ec4899; color:white; border-color:#ec4899; font-weight:600;">
+      🎯 Thử Thao Tác Thêm 1 Hành Động
+    </button>
+    <span style="color: #999; font-size: 12px;">Đầy đủ 100% cả 4 Tab + Đổi phím, Khóa phím & Phím Macro</span>
   </div>
 
   <div class="app-window" id="mainWindow">
@@ -811,9 +835,9 @@
         <!-- Subtabs -->
         <div class="subtabs" id="subtabContainer">
           <div class="subtab active" onclick="switchSubTab('typing')">⌨️ Bộ gõ & Phím tắt</div>
-          <div class="subtab" onclick="switchSubTab('remap')">🔄 Đổi & Khóa phím</div>
+          <div class="subtab" onclick="switchSubTab('remap')">🔄 Bàn phím (Remap & Macro)</div>
           <div class="subtab" onclick="switchSubTab('sound')">🔊 Âm thanh gõ</div>
-          <div class="subtab" onclick="switchSubTab('macro')">⚡ Gõ tắt (Macro)</div>
+          <div class="subtab" onclick="switchSubTab('macro')">⚡ Gõ tắt (Text Expansion)</div>
         </div>
 
         <!-- Main Tab Content Body -->
@@ -1131,6 +1155,301 @@
       </div>
     </div>
 
+    <!-- ==================================================== -->
+    <!-- MODAL 5: PHÍM MACRO (KEY MACRO DIALOG)              -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="keyMacroModal">
+      <div class="modal-window" style="width: 580px; max-height: 90vh;">
+        <div class="modal-header">
+          <h3>
+            <span style="background:#8b5cf6; color:white; border-radius:4px; padding:2px 6px; font-size:12px;">⚡</span>
+            Cấu hình Phím Macro (Key Macro)
+          </h3>
+          <span class="modal-close-btn" onclick="closeKeyMacroModal()">✕</span>
+        </div>
+
+        <div class="modal-body" style="gap: 14px;">
+          <!-- Explanation alert -->
+          <div style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border); line-height: 1.5;">
+            💡 <b>Phím Macro</b> giúp bạn ấn 1 phím vật lý để tự động kích hoạt một chuỗi hành động bàn phím liên tiếp (nhấn nhanh phím/tổ hợp phím, nhấn giữ, nhả phím hoặc chờ theo mili-giây).
+          </div>
+
+          <!-- Trigger Key & Name row -->
+          <div style="display:grid; grid-template-columns: 180px 1fr; gap:12px;">
+            <div>
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+                PHÍM KÍCH HOẠT (TRIGGER):
+              </label>
+              <div id="boxMacroTrigger" style="height:40px; background:var(--bg-input); border:2px dashed #8b5cf6; border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:15px; font-weight:bold; cursor:pointer;" onclick="listenMacroTrigger()">
+                <span id="txtMacroModalTrigger" style="color:#a78bfa;">F1</span>
+              </div>
+              <small style="color:var(--text-secondary); font-size:10px; margin-top:3px; display:block;">Click vào ô để bấm phím kích hoạt</small>
+            </div>
+
+            <div>
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:4px;">
+                TÊN GỢI NHỚ (MÔ TẢ):
+              </label>
+              <input type="text" id="inputMacroModalName" placeholder="VD: Combo Nhảy Game, Format Code IDE..." style="height:40px; width:100%; font-size:12px; padding:0 10px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);">
+              <small style="color:var(--text-secondary); font-size:10px; margin-top:3px; display:block;">Đặt tên để dễ quản lý danh sách macro</small>
+            </div>
+          </div>
+
+          <!-- Action Pipeline Table Card -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">
+                Chuỗi Hành Động (Action Pipeline):
+              </label>
+              <span style="font-size:11px; color:var(--text-secondary);" id="lblActionCount">4 hành động</span>
+            </div>
+
+            <!-- Table of Actions -->
+            <div style="border:1px solid var(--border); border-radius:6px; background:var(--bg-input); max-height:165px; overflow-y:auto;">
+              <table class="data-table" style="border:none;">
+                <thead>
+                  <tr style="position:sticky; top:0; z-index:1;">
+                    <th style="width:36px; text-align:center;">#</th>
+                    <th style="width:140px;">Hành động</th>
+                    <th>Phím / Tham số</th>
+                    <th style="width:95px; text-align:center;">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="macroModalActionTableBody">
+                  <!-- Injected via renderMacroModalActionTable() -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Add Action Buttons Toolbar -->
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label style="font-size:11px; font-weight:600; color:var(--text-secondary); display:block;">
+                ➕ Chèn thêm hành động vào chuỗi:
+              </label>
+              <button class="btn btn-primary" style="background:#ec4899; border-color:#ec4899; font-size:11px; padding:3px 10px;" onclick="openActionEditorModal('press')">
+                🎯 + Mở Form Thêm Hành Động
+              </button>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn" style="border-color:#8b5cf6; color:#a78bfa;" onclick="openActionEditorModal('press')">
+                ⚡ + Nhấn nhanh (Press)
+              </button>
+              <button class="btn" style="border-color:#ef4444; color:#f87171;" onclick="openActionEditorModal('down')">
+                ⬇️ + Nhấn giữ (Down)
+              </button>
+              <button class="btn" style="border-color:#22c55e; color:#4ade80;" onclick="openActionEditorModal('up')">
+                ⬆️ + Nhả phím (Up)
+              </button>
+              <button class="btn" style="border-color:#eab308; color:#facc15;" onclick="openActionEditorModal('delay')">
+                ⏱️ + Chờ (Delay)
+              </button>
+              <button class="btn" style="border-color:#3b82f6; color:#60a5fa;" onclick="openActionEditorModal('text')">
+                🔤 + Gõ chữ (Text)
+              </button>
+              <button class="btn btn-danger" style="margin-left:auto; font-size:11px;" onclick="clearAllMacroActions()">
+                🗑️ Xóa hết
+              </button>
+            </div>
+          </div>
+
+          <!-- DSL Live Preview Box -->
+          <div style="background:var(--bg-card-header); border:1px solid var(--border); border-radius:6px; padding:10px 12px;">
+            <div style="font-size:10.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:4px; display:flex; justify-content:space-between;">
+              <span>Mã DSL xem trước (Lưu trữ trong config.ini):</span>
+              <span style="color:#a78bfa; font-family:monospace; font-size:11px;">Pipeline DSL</span>
+            </div>
+            <div id="txtMacroDslPreview" style="font-family:Consolas, 'Courier New', monospace; font-size:12px; color:#4EC9B0; word-break:break-all; background:var(--bg-input); padding:6px 10px; border-radius:4px; border:1px solid var(--border-subtle);">
+              down(W) + delay(200) + press(Space) + up(W)
+            </div>
+          </div>
+
+          <!-- Quick Templates -->
+          <div>
+            <label style="font-size:10.5px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px;">
+              Mẫu combo làm sẵn (Nhấp để áp dụng nhanh):
+            </label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="loadMacroTemplate('bunnyhop')">🎮 Combo Nhảy Bunny Hop</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="loadMacroTemplate('ideformat')">💻 Format Code (Ctrl+Shift+L)</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="loadMacroTemplate('csbuy')">🔫 Mua AK-47 Nhanh</button>
+              <button class="btn" style="font-size:11px; padding:3px 8px;" onclick="loadMacroTemplate('signature')">✍️ Chèn chữ ký cá nhân</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);" id="txtMacroModalTargetContext">Áp dụng cho: <b>...</b></span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeKeyMacroModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" style="background:#8b5cf6; border-color:#8b5cf6;" onclick="confirmSaveKeyMacro()">Lưu Phím Macro</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL 6: THÊM / SỬA HÀNH ĐỘNG (ACTION EDITOR DIALOG) -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="actionEditorModal" style="z-index: 1100;">
+      <div class="modal-window" style="width: 530px; box-shadow: 0 30px 80px rgba(0,0,0,0.85); border: 1px solid var(--accent);">
+        <div class="modal-header" style="background:var(--bg-card-header);">
+          <h3>
+            <span style="background:#ec4899; color:white; border-radius:4px; padding:2px 6px; font-size:12px;">🎯</span>
+            <span id="txtActionModalHeaderTitle">Thêm Hành Động Vào Chuỗi (Action)</span>
+          </h3>
+          <span class="modal-close-btn" onclick="closeActionEditorModal()">✕</span>
+        </div>
+
+        <div class="modal-body" style="gap: 14px;">
+          <!-- Action Type Selector Pills -->
+          <div>
+            <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:6px; text-transform:uppercase;">
+              1. Chọn Loại Hành Động:
+            </label>
+            <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:6px;">
+              <button type="button" class="btn action-type-btn active" id="btnTypePress" onclick="selectActionType('press')" style="justify-content:center; padding:6px 4px; font-size:11px; font-weight:600;">
+                ⚡ Press
+              </button>
+              <button type="button" class="btn action-type-btn" id="btnTypeDown" onclick="selectActionType('down')" style="justify-content:center; padding:6px 4px; font-size:11px; font-weight:600;">
+                ⬇️ Down
+              </button>
+              <button type="button" class="btn action-type-btn" id="btnTypeUp" onclick="selectActionType('up')" style="justify-content:center; padding:6px 4px; font-size:11px; font-weight:600;">
+                ⬆️ Up
+              </button>
+              <button type="button" class="btn action-type-btn" id="btnTypeDelay" onclick="selectActionType('delay')" style="justify-content:center; padding:6px 4px; font-size:11px; font-weight:600;">
+                ⏱️ Delay
+              </button>
+              <button type="button" class="btn action-type-btn" id="btnTypeText" onclick="selectActionType('text')" style="justify-content:center; padding:6px 4px; font-size:11px; font-weight:600;">
+                🔤 Text
+              </button>
+            </div>
+          </div>
+
+          <!-- Action Description Banner -->
+          <div id="boxActionDescription" style="font-size:11.5px; color:var(--text-secondary); background:var(--bg-card-header); padding:8px 12px; border-radius:5px; border:1px solid var(--border); line-height:1.5;">
+            <!-- Injected via JS -->
+          </div>
+
+          <!-- Dynamic Input Container -->
+          <div>
+            <label style="font-size:11px; font-weight:700; color:var(--text-secondary); display:block; margin-bottom:6px; text-transform:uppercase;">
+              2. Thiết Lập Giá Trị / Bắt Phím:
+            </label>
+
+            <!-- PANEL 1: KEY / COMBO CAPTURE (For Press, Down, Up) -->
+            <div id="panelKeyCapture" style="display:block;">
+              <div id="boxActionKeyCapture" style="height:48px; background:var(--bg-input); border:2px dashed var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:monospace; font-size:16px; font-weight:bold; cursor:pointer;" onclick="listenActionKey()">
+                <span id="txtActionKeyDisplay" style="color:var(--accent);">Ctrl + Shift + L</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-top:4px;">
+                <small style="color:var(--text-secondary); font-size:10.5px;">Click vào khung phía trên rồi bấm phím hoặc tổ hợp phím</small>
+                <small style="color:var(--accent); font-size:10.5px; cursor:pointer; font-weight:600;" onclick="listenActionKey()">🎯 Bắt phím ngay</small>
+              </div>
+
+              <!-- Quick Suggestions Chips -->
+              <div style="margin-top:10px;">
+                <label style="font-size:10.5px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px;">
+                  Gợi ý chọn nhanh:
+                </label>
+                <div class="chip-wrap" id="actionKeyChips" style="margin-top:0;">
+                  <!-- Injected via JS based on type -->
+                </div>
+              </div>
+            </div>
+
+            <!-- PANEL 2: DELAY INPUT (For Delay) -->
+            <div id="panelDelayInput" style="display:none;">
+              <div style="display:flex; align-items:center; gap:12px; background:var(--bg-input); padding:10px 14px; border:1px solid var(--border); border-radius:6px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:18px;">⏱️</span>
+                  <input type="number" id="inputActionDelayMs" min="10" max="10000" step="10" value="150" style="width:90px; height:36px; font-size:15px; font-family:monospace; font-weight:bold; text-align:center; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; color:#facc15;" oninput="syncDelaySlider(this.value)">
+                  <span style="font-weight:600; color:var(--text-secondary); font-size:12px;">mili-giây (ms)</span>
+                </div>
+                <div style="flex:1; border-left:1px solid var(--border); padding-left:12px;">
+                  <span id="lblDelaySecondsText" style="font-size:11.5px; color:var(--accent); font-weight:600;">= 0.15 giây</span>
+                  <div style="font-size:10px; color:var(--text-secondary);">Thời gian ngủ luồng giả lập</div>
+                </div>
+              </div>
+
+              <!-- Slider -->
+              <div style="margin-top:10px; padding:0 4px;">
+                <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">
+                  <span>10 ms (Cực nhanh)</span>
+                  <span>500 ms</span>
+                  <span>2000 ms (2 giây)</span>
+                </div>
+                <input type="range" id="sliderActionDelay" min="10" max="2000" step="10" value="150" style="width:100%; cursor:pointer;" oninput="syncDelayInput(this.value)">
+              </div>
+
+              <!-- Delay Chips -->
+              <div style="margin-top:10px;">
+                <label style="font-size:10.5px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px;">
+                  Mốc độ trễ gợi ý cho Game & Code:
+                </label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(30)">⚡ 30 ms (Siêu tốc)</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(80)">80 ms</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(150)">150 ms (Tiêu chuẩn)</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(200)">200 ms</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(500)">500 ms (Nửa giây)</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionDelayPreset(1000)">1000 ms (1 giây)</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- PANEL 3: TEXT INPUT (For Text) -->
+            <div id="panelTextInput" style="display:none;">
+              <input type="text" id="inputActionText" placeholder="Nhập chuỗi văn bản cần gõ tự động..." style="width:100%; height:40px; font-size:13px; padding:0 12px; background:var(--bg-input); border:1px solid var(--border); border-radius:6px; color:var(--text-primary);" oninput="updateActionDslPreview()">
+              <small style="color:var(--text-secondary); font-size:10.5px; margin-top:4px; display:block;">
+                Hệ thống sẽ tự động chuyển thành chuỗi các lệnh nhấn phím liên tiếp tương ứng.
+              </small>
+
+              <!-- Text Suggestions -->
+              <div style="margin-top:10px;">
+                <label style="font-size:10.5px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px;">
+                  Gợi ý chuỗi văn bản thông dụng:
+                </label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionTextPreset('Kora')">Kora</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionTextPreset('Xin chào các bạn!')">Xin chào các bạn!</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionTextPreset('Format Document')">Format Document</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionTextPreset('git commit -m &quot;update&quot;')">git commit</button>
+                  <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionTextPreset('admin@gmail.com')">admin@gmail.com</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Action DSL Live Preview -->
+          <div style="background:var(--bg-card-header); border:1px solid var(--border); border-radius:6px; padding:10px 12px; margin-top:2px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <span style="font-size:10.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase;">
+                3. Lệnh DSL sẽ chèn vào chuỗi:
+              </span>
+              <span id="lblActionTypeTag" style="font-size:10.5px; font-weight:bold; color:#a78bfa;">PRESS ACTION</span>
+            </div>
+            <div style="font-family:Consolas, 'Courier New', monospace; font-size:13px; color:#4EC9B0; font-weight:bold; background:var(--bg-input); padding:7px 12px; border-radius:4px; border:1px solid var(--border-subtle);" id="txtSingleActionDslPreview">
+              press(Ctrl+Shift+L)
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="panel-footer" style="background:var(--bg-sidebar);">
+          <span style="font-size:11px; color:var(--text-secondary);" id="txtActionModalFooterTip">Hành động sẽ được nối vào cuối Pipeline</span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="closeActionEditorModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" id="btnConfirmActionModal" style="background:#ec4899; border-color:#ec4899;" onclick="confirmSaveActionEditor()">
+              ➕ Thêm vào chuỗi
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
@@ -1164,6 +1483,10 @@
           { key: 'ko', val: 'không', type: 'Bình thường' },
           { key: 'Kora', val: 'Kora Vietnamese Input Method', type: 'Đầu từ' },
           { key: 'email', val: 'manhkien13041997@gmail.com', type: 'Bình thường' }
+        ],
+        keyMacros: [
+          { trigger: 'F1', name: 'Combo Nhảy Game', dsl: 'down(W) + delay(200) + press(Space) + delay(50) + up(W) + press(X)' },
+          { trigger: 'F2', name: 'Format Code IDE', dsl: 'press(Ctrl+Shift+L)' }
         ]
       },
       cs2: {
@@ -1190,7 +1513,15 @@
         overriddenRemaps: {},
         appRemaps: [],
         unmutedDisabled: [],
-        appDisabled: ['Left Windows', 'Right Windows', 'Caps Lock']
+        appDisabled: ['Left Windows', 'Right Windows', 'Caps Lock'],
+        // Key Macros
+        mutedKeyMacros: ['F2'],
+        overriddenKeyMacros: {
+          'F1': { trigger: 'F1', name: 'Bunny Hop CS2', dsl: 'down(W) + delay(150) + press(Space) + up(W)' }
+        },
+        appKeyMacros: [
+          { trigger: 'F3', name: 'Mua AK-47 & Giáp', dsl: 'press(B) + delay(80) + press(4) + delay(40) + press(2)' }
+        ]
       },
       vscode: {
         id: 'vscode',
@@ -1223,7 +1554,13 @@
         },
         appRemaps: [{ from: 'F1', to: 'F5' }],
         unmutedDisabled: ['Insert'], // Mở khóa phím Insert trong VS Code
-        appDisabled: []
+        appDisabled: [],
+        // Key Macros
+        mutedKeyMacros: [],
+        overriddenKeyMacros: {},
+        appKeyMacros: [
+          { trigger: 'F2', name: 'Format Document', dsl: 'press(Ctrl+Shift+P) + delay(100) + text(Format Document) + press(Enter)' }
+        ]
       },
       word: {
         id: 'word',
@@ -1248,7 +1585,10 @@
         overriddenRemaps: {},
         appRemaps: [],
         unmutedDisabled: [],
-        appDisabled: []
+        appDisabled: [],
+        mutedKeyMacros: [],
+        overriddenKeyMacros: {},
+        appKeyMacros: []
       }
     };
 
@@ -1423,6 +1763,28 @@
               </thead>
               <tbody>
                 ${renderDisableTableRowsCách2(p)}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- KEY MACRO CARD -->
+          <div class="card">
+            <div class="card-title">
+              <span>⚡ Bảng Phím Macro (Key Macro)</span>
+              <button class="btn btn-primary" onclick="openKeyMacroModal()">+ Thêm Macro</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:110px;">Phím bấm</th>
+                  <th style="width:160px;">Tên mô tả</th>
+                  <th>Chuỗi hành động (Action Pipeline)</th>
+                  <th style="width:140px;">Nguồn gốc</th>
+                  <th style="width:120px; text-align:right;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${renderKeyMacroRowsCách2(p)}
               </tbody>
             </table>
           </div>
@@ -1695,6 +2057,131 @@
       return html;
     }
 
+    // ==========================================
+    // CÁCH 2: KEY MACRO (PHÍM MACRO) TABLE ROWS
+    // ==========================================
+    function renderKeyMacroRowsCách2(p) {
+      if (p.isRoot) {
+        const list = p.keyMacros || [];
+        if (list.length === 0) {
+          return '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-secondary);">Chưa có phím Macro nào. Bấm "+ Thêm Macro" để tạo mới.</td></tr>';
+        }
+        return list.map((m, i) => `
+          <tr>
+            <td><span class="key-badge" style="color:#a78bfa; border-color:#8b5cf6;">${m.trigger}</span></td>
+            <td><b>${m.name || 'Phím Macro'}</b></td>
+            <td><code style="color:#4EC9B0; font-size:11px; background:rgba(0,0,0,0.25); padding:3px 6px; border-radius:4px; font-family:Consolas, monospace;">${m.dsl}</code></td>
+            <td><span class="type-badge" style="color:#a78bfa; border:1px solid #8b5cf6;">🌐 Toàn hệ thống</span></td>
+            <td style="text-align:right;">
+              <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="openKeyMacroModal(${i})">Sửa</button>
+              <button class="btn btn-danger" style="padding:2px 6px; font-size:10.5px;" onclick="deleteGlobalKeyMacro(${i})">Xóa</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      // Child profile: Live Inheritance with Overrides & Mutes
+      const globalMacros = profiles.global.keyMacros || [];
+      const muted = p.mutedKeyMacros || [];
+      const overrides = p.overriddenKeyMacros || {};
+      const appSpecific = p.appKeyMacros || [];
+
+      let html = '';
+
+      // 1. Inherited from global
+      globalMacros.forEach(g => {
+        const isMuted = muted.includes(g.trigger);
+        const isOverridden = overrides[g.trigger] !== undefined;
+        const currentName = isOverridden ? overrides[g.trigger].name : g.name;
+        const currentDsl = isOverridden ? overrides[g.trigger].dsl : g.dsl;
+
+        html += `
+          <tr style="${isMuted ? 'opacity:0.45; background:rgba(0,0,0,0.15);' : ''}">
+            <td>
+              <span class="key-badge" style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : 'color:#a78bfa; border-color:#8b5cf6;'}">
+                ${g.trigger}
+              </span>
+            </td>
+            <td style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : ''}">
+              <b>${currentName}</b>
+            </td>
+            <td>
+              <code style="${isMuted ? 'text-decoration:line-through; color:var(--text-secondary);' : 'color:#4EC9B0;'} font-size:11px; background:rgba(0,0,0,0.25); padding:3px 6px; border-radius:4px; font-family:Consolas, monospace;">
+                ${currentDsl}
+              </code>
+            </td>
+            <td>
+              ${isMuted ? '<span class="type-badge" style="color:var(--danger); border:1px solid var(--danger);">🚫 Đã tắt trong app</span>' :
+                (isOverridden ? '<span class="type-badge" style="color:var(--warning); border:1px solid var(--warning);">✏️ Ghi đè Global</span>' :
+                '<span class="type-badge">🌐 Kế thừa Global</span>')}
+            </td>
+            <td style="text-align:right;">
+              ${isMuted ? `
+                <button class="btn btn-primary" style="padding:2px 8px; font-size:11px;" onclick="unmuteKeyMacro('${g.trigger}')">Bật lại</button>
+              ` : `
+                ${isOverridden ? `<button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="restoreGlobalKeyMacro('${g.trigger}')" title="Khôi phục macro gốc Global">Khôi phục</button>` : ''}
+                <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="openKeyMacroModalForOverride('${g.trigger}')">Sửa</button>
+                <button class="btn btn-danger" style="padding:2px 6px; font-size:10.5px;" onclick="muteKeyMacro('${g.trigger}')" title="Tắt macro này trong app">🚫 Tắt</button>
+              `}
+            </td>
+          </tr>
+        `;
+      });
+
+      // 2. App specific macros
+      appSpecific.forEach((m, i) => {
+        html += `
+          <tr>
+            <td><span class="key-badge" style="color:#4EC9B0; border-color:#4EC9B0;">${m.trigger}</span></td>
+            <td><b>${m.name}</b></td>
+            <td><code style="color:#4EC9B0; font-size:11px; background:rgba(0,0,0,0.25); padding:3px 6px; border-radius:4px; font-family:Consolas, monospace;">${m.dsl}</code></td>
+            <td><span class="type-badge" style="color:#4EC9B0; border:1px solid #4EC9B0;">✨ Riêng app này</span></td>
+            <td style="text-align:right;">
+              <button class="btn" style="padding:2px 6px; font-size:10.5px;" onclick="openKeyMacroModal(${i})">Sửa</button>
+              <button class="btn btn-danger" style="padding:2px 6px; font-size:10.5px;" onclick="deleteAppKeyMacro(${i})">Xóa</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      if (!html) html = '<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-secondary);">Chưa có phím Macro nào cho ứng dụng này</td></tr>';
+      return html;
+    }
+
+    function muteKeyMacro(trigger) {
+      const p = profiles[activeProfileId];
+      if (!p.mutedKeyMacros) p.mutedKeyMacros = [];
+      if (!p.mutedKeyMacros.includes(trigger)) p.mutedKeyMacros.push(trigger);
+      renderCurrentTab();
+    }
+
+    function unmuteKeyMacro(trigger) {
+      const p = profiles[activeProfileId];
+      if (p.mutedKeyMacros) {
+        p.mutedKeyMacros = p.mutedKeyMacros.filter(k => k !== trigger);
+      }
+      renderCurrentTab();
+    }
+
+    function restoreGlobalKeyMacro(trigger) {
+      const p = profiles[activeProfileId];
+      if (p.overriddenKeyMacros && p.overriddenKeyMacros[trigger]) {
+        delete p.overriddenKeyMacros[trigger];
+      }
+      renderCurrentTab();
+    }
+
+    function deleteGlobalKeyMacro(i) {
+      profiles.global.keyMacros.splice(i, 1);
+      renderCurrentTab();
+    }
+
+    function deleteAppKeyMacro(i) {
+      const p = profiles[activeProfileId];
+      p.appKeyMacros.splice(i, 1);
+      renderCurrentTab();
+    }
+
     // Remap handlers
     function muteRemap(from) {
       const p = profiles[activeProfileId];
@@ -1778,8 +2265,12 @@
     function resetKeyListeningStyles() {
       const bf = document.getElementById('boxKeyFrom');
       const bt = document.getElementById('boxKeyTo');
+      const bm = document.getElementById('boxMacroTrigger');
+      const ba = document.getElementById('boxActionKeyCapture');
       if (bf) { bf.style.border = '1px solid var(--border)'; bf.style.background = 'var(--bg-input)'; }
       if (bt) { bt.style.border = '1px solid var(--border)'; bt.style.background = 'var(--bg-input)'; }
+      if (bm) { bm.style.border = '2px dashed #8b5cf6'; bm.style.background = 'var(--bg-input)'; }
+      if (ba) { ba.style.border = '2px dashed var(--accent)'; ba.style.background = 'var(--bg-input)'; }
     }
 
     function stopListeningKey() {
@@ -1900,7 +2391,63 @@
       else if (e.code === 'Space') name = 'Space';
       else if (e.code === 'ScrollLock') name = 'Scroll Lock';
       else if (e.code === 'Pause') name = 'Pause';
+      else if (e.code === 'Enter') name = 'Enter';
       else if (name.length === 1) name = name.toUpperCase();
+
+      if (listeningTarget === 'macroTrigger') {
+        document.getElementById('txtMacroModalTrigger').innerText = name;
+        stopListeningKey();
+        return;
+      }
+
+      if (listeningTarget === 'actionKey') {
+        if (currentActionEditorType === 'press') {
+          let parts = [];
+          if (e.ctrlKey) parts.push('Ctrl');
+          if (e.altKey) parts.push('Alt');
+          if (e.shiftKey) parts.push('Shift');
+          if (e.metaKey) parts.push('Windows');
+
+          let keyName = e.key;
+          if (['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
+            if (parts.length > 0) {
+              document.getElementById('txtActionKeyDisplay').innerText = parts.join(' + ');
+              updateActionDslPreview();
+            }
+            return;
+          }
+
+          if (e.code === 'Space') keyName = 'Space';
+          else if (e.code === 'CapsLock') keyName = 'Caps Lock';
+          else if (e.code === 'Enter') keyName = 'Enter';
+          else if (e.code === 'Escape') keyName = 'Escape';
+          else if (e.code === 'Tab') keyName = 'Tab';
+          else if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+          if (!parts.includes(keyName)) parts.push(keyName);
+          document.getElementById('txtActionKeyDisplay').innerText = parts.join(' + ');
+          stopListeningKey();
+          updateActionDslPreview();
+          return;
+        } else {
+          // Single key for down / up
+          let keyName = e.key;
+          if (e.code === 'Space') keyName = 'Space';
+          else if (e.code === 'CapsLock') keyName = 'Caps Lock';
+          else if (e.code === 'Enter') keyName = 'Enter';
+          else if (e.code === 'Escape') keyName = 'Escape';
+          else if (e.code === 'Tab') keyName = 'Tab';
+          else if (e.code === 'ControlLeft' || e.code === 'ControlRight') keyName = 'Ctrl';
+          else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keyName = 'Shift';
+          else if (e.code === 'AltLeft' || e.code === 'AltRight') keyName = 'Alt';
+          else if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+          document.getElementById('txtActionKeyDisplay').innerText = keyName;
+          stopListeningKey();
+          updateActionDslPreview();
+          return;
+        }
+      }
 
       if (listeningTarget === 'hotkey') {
         let parts = [];
@@ -1939,6 +2486,528 @@
         stopListeningKey();
       }
     });
+
+    // ==========================================
+    // KEY MACRO MODAL CONTROLLERS & ACTION TABLE
+    // ==========================================
+    let currentEditingMacroIndex = -1;
+    let currentEditingMacroOverride = null; // trigger string if overriding
+    let currentMacroActions = [];
+
+    function openKeyMacroModal(idx) {
+      const p = profiles[activeProfileId];
+      document.getElementById('txtMacroModalTargetContext').innerHTML = `Áp dụng cho: <b>${p.icon} ${p.name}</b>`;
+      currentEditingMacroOverride = null;
+
+      if (idx !== undefined && idx >= 0) {
+        currentEditingMacroIndex = idx;
+        const list = p.isRoot ? (p.keyMacros || []) : (p.appKeyMacros || []);
+        const macro = list[idx];
+        if (macro) {
+          document.getElementById('txtMacroModalTrigger').innerText = macro.trigger;
+          document.getElementById('inputMacroModalName').value = macro.name || '';
+          parseDslToActions(macro.dsl);
+        }
+      } else {
+        currentEditingMacroIndex = -1;
+        document.getElementById('txtMacroModalTrigger').innerText = 'F1';
+        document.getElementById('inputMacroModalName').value = 'Combo Nhảy Game';
+        currentMacroActions = [
+          { type: 'down', val: 'W' },
+          { type: 'delay', val: '200' },
+          { type: 'press', val: 'Space' },
+          { type: 'delay', val: '50' },
+          { type: 'up', val: 'W' },
+          { type: 'press', val: 'X' }
+        ];
+      }
+
+      renderMacroModalActionTable();
+      document.getElementById('keyMacroModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function openKeyMacroModalForOverride(trigger) {
+      const p = profiles[activeProfileId];
+      document.getElementById('txtMacroModalTargetContext').innerHTML = `Ghi đè trong: <b>${p.icon} ${p.name}</b>`;
+      currentEditingMacroIndex = -1;
+      currentEditingMacroOverride = trigger;
+
+      const override = p.overriddenKeyMacros && p.overriddenKeyMacros[trigger];
+      if (override) {
+        document.getElementById('txtMacroModalTrigger').innerText = trigger;
+        document.getElementById('inputMacroModalName').value = override.name || '';
+        parseDslToActions(override.dsl);
+      } else {
+        const globalMacro = (profiles.global.keyMacros || []).find(g => g.trigger === trigger);
+        document.getElementById('txtMacroModalTrigger').innerText = trigger;
+        document.getElementById('inputMacroModalName').value = globalMacro ? globalMacro.name : '';
+        parseDslToActions(globalMacro ? globalMacro.dsl : 'press(Space)');
+      }
+
+      renderMacroModalActionTable();
+      document.getElementById('keyMacroModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function closeKeyMacroModal() {
+      document.getElementById('keyMacroModal').style.display = 'none';
+      stopListeningKey();
+    }
+
+    function listenMacroTrigger() {
+      listeningTarget = 'macroTrigger';
+      const b = document.getElementById('boxMacroTrigger');
+      b.style.borderColor = '#8b5cf6';
+      b.style.background = 'rgba(139, 92, 246, 0.2)';
+      document.getElementById('txtMacroModalTrigger').innerText = 'Hãy bấm phím...';
+    }
+
+    function parseDslToActions(dslStr) {
+      currentMacroActions = [];
+      if (!dslStr) return;
+      // Tokens separated by '+'
+      const parts = dslStr.split('+').map(s => s.trim()).filter(Boolean);
+      for (const part of parts) {
+        const match = part.match(/^(\w+)\((.*)\)$/);
+        if (match) {
+          const type = match[1].toLowerCase();
+          const val = match[2];
+          currentMacroActions.push({ type, val });
+        }
+      }
+    }
+
+    function renderMacroModalActionTable() {
+      const tbody = document.getElementById('macroModalActionTableBody');
+      if (!tbody) return;
+
+      if (currentMacroActions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--text-secondary);">Chưa có hành động nào trong chuỗi. Hãy bấm các nút bên dưới để chèn hành động!</td></tr>';
+        document.getElementById('txtMacroDslPreview').innerText = '(Trống - chưa có hành động)';
+        document.getElementById('lblActionCount').innerText = '0 hành động';
+        return;
+      }
+
+      let html = '';
+      currentMacroActions.forEach((act, idx) => {
+        let badgeStyle = '';
+        let badgeText = '';
+        let valFormatted = '';
+
+        if (act.type === 'press') {
+          badgeStyle = 'background:rgba(139,92,246,0.18); color:#c4b5fd; border:1px solid #8b5cf6;';
+          badgeText = '⚡ press (Nhấn)';
+          valFormatted = `<span class="key-badge" style="color:#a78bfa; border-color:#8b5cf6;">${act.val}</span>`;
+        } else if (act.type === 'down') {
+          badgeStyle = 'background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid #ef4444;';
+          badgeText = '⬇️ down (Giữ)';
+          valFormatted = `<span class="key-badge" style="color:#f87171; border-color:#ef4444;">${act.val}</span>`;
+        } else if (act.type === 'up') {
+          badgeStyle = 'background:rgba(34,197,94,0.18); color:#86efac; border:1px solid #22c55e;';
+          badgeText = '⬆️ up (Nhả)';
+          valFormatted = `<span class="key-badge" style="color:#4ade80; border-color:#22c55e;">${act.val}</span>`;
+        } else if (act.type === 'delay') {
+          badgeStyle = 'background:rgba(234,179,8,0.18); color:#fde047; border:1px solid #eab308;';
+          badgeText = '⏱️ delay (Chờ)';
+          valFormatted = `<span style="font-family:monospace; font-weight:bold; color:#facc15;">${act.val} ms</span> <small style="color:var(--text-secondary);">(${parseInt(act.val)/1000}s)</small>`;
+        } else if (act.type === 'text') {
+          badgeStyle = 'background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid #3b82f6;';
+          badgeText = '🔤 text (Chuỗi)';
+          valFormatted = `<span style="font-family:monospace; color:#60a5fa;">"${act.val}"</span>`;
+        }
+
+        html += `
+          <tr>
+            <td style="text-align:center; color:var(--text-secondary); font-size:11px;">${idx + 1}</td>
+            <td>
+              <span style="display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; ${badgeStyle}">
+                ${badgeText}
+              </span>
+            </td>
+            <td>${valFormatted}</td>
+            <td style="text-align:center;">
+              <div style="display:flex; gap:4px; justify-content:center;">
+                <button class="btn" style="padding:1px 6px; font-size:10.5px;" onclick="openActionEditorModalForEdit(${idx})" title="Chỉnh sửa hành động này">✏️ Sửa</button>
+                <button class="btn btn-danger" style="padding:1px 6px; font-size:10.5px;" onclick="removeModalAction(${idx})" title="Xóa hành động này">✕</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+
+      // Update DSL Preview
+      const dsl = currentMacroActions.map(a => `${a.type}(${a.val})`).join(' + ');
+      document.getElementById('txtMacroDslPreview').innerText = dsl || '(Trống - chưa có hành động)';
+      document.getElementById('lblActionCount').innerText = `${currentMacroActions.length} hành động`;
+    }
+
+    function removeModalAction(idx) {
+      currentMacroActions.splice(idx, 1);
+      renderMacroModalActionTable();
+    }
+
+    function clearAllMacroActions() {
+      if (confirm('Bạn có chắc muốn xóa toàn bộ hành động trong chuỗi?')) {
+        currentMacroActions = [];
+        renderMacroModalActionTable();
+      }
+    }
+
+    function promptModalAddPress() {
+      openActionEditorModal('press');
+    }
+
+    function promptModalAddDown() {
+      openActionEditorModal('down');
+    }
+
+    function promptModalAddUp() {
+      openActionEditorModal('up');
+    }
+
+    function promptModalAddDelay() {
+      openActionEditorModal('delay');
+    }
+
+    function promptModalAddText() {
+      openActionEditorModal('text');
+    }
+
+    // ==========================================
+    // ACTION EDITOR MODAL CONTROLLERS (MODAL 6)
+    // ==========================================
+    let currentActionEditorType = 'press';
+    let currentEditingActionIndex = -1;
+
+    function openActionEditorModal(initialType) {
+      currentEditingActionIndex = -1;
+      document.getElementById('txtActionModalHeaderTitle').innerText = 'Thêm Hành Động Vào Chuỗi (Add Action)';
+      document.getElementById('btnConfirmActionModal').innerText = '➕ Thêm vào chuỗi';
+      document.getElementById('txtActionModalFooterTip').innerText = 'Hành động mới sẽ được nối vào cuối Action Pipeline';
+
+      selectActionType(initialType || 'press');
+
+      // Set nice defaults if empty
+      if (currentActionEditorType === 'press') {
+        document.getElementById('txtActionKeyDisplay').innerText = 'Ctrl + Shift + L';
+      } else if (currentActionEditorType === 'down' || currentActionEditorType === 'up') {
+        document.getElementById('txtActionKeyDisplay').innerText = 'W';
+      } else if (currentActionEditorType === 'delay') {
+        setActionDelayPreset(150);
+      } else if (currentActionEditorType === 'text') {
+        document.getElementById('inputActionText').value = 'Kora';
+      }
+
+      updateActionDslPreview();
+      document.getElementById('actionEditorModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function openActionEditorModalForEdit(idx) {
+      if (idx < 0 || idx >= currentMacroActions.length) return;
+      currentEditingActionIndex = idx;
+      const act = currentMacroActions[idx];
+
+      document.getElementById('txtActionModalHeaderTitle').innerText = `Chỉnh Sửa Hành Động #${idx + 1} (${act.type})`;
+      document.getElementById('btnConfirmActionModal').innerText = '💾 Lưu thay đổi';
+      document.getElementById('txtActionModalFooterTip').innerText = `Đang cập nhật hành động tại vị trí #${idx + 1}`;
+
+      selectActionType(act.type);
+
+      if (act.type === 'press' || act.type === 'down' || act.type === 'up') {
+        document.getElementById('txtActionKeyDisplay').innerText = act.val;
+      } else if (act.type === 'delay') {
+        setActionDelayPreset(parseInt(act.val) || 150);
+      } else if (act.type === 'text') {
+        document.getElementById('inputActionText').value = act.val;
+      }
+
+      updateActionDslPreview();
+      document.getElementById('actionEditorModal').style.display = 'flex';
+      stopListeningKey();
+    }
+
+    function closeActionEditorModal() {
+      document.getElementById('actionEditorModal').style.display = 'none';
+      stopListeningKey();
+    }
+
+    function selectActionType(type) {
+      currentActionEditorType = type;
+      stopListeningKey();
+
+      // Update pills active status
+      ['press', 'down', 'up', 'delay', 'text'].forEach(t => {
+        const btn = document.getElementById('btnType' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          if (t === type) btn.classList.add('active');
+          else btn.classList.remove('active');
+        }
+      });
+
+      // Update description banner & panels
+      const desc = document.getElementById('boxActionDescription');
+      const pKey = document.getElementById('panelKeyCapture');
+      const pDelay = document.getElementById('panelDelayInput');
+      const pText = document.getElementById('panelTextInput');
+      const chips = document.getElementById('actionKeyChips');
+      const tag = document.getElementById('lblActionTypeTag');
+
+      if (type === 'press') {
+        tag.innerText = '⚡ PRESS ACTION';
+        tag.style.color = '#c4b5fd';
+        desc.innerHTML = '⚡ <b>Nhấn nhanh (Press)</b>: Gửi 1 lần Down rồi Up ngay lập tức. Hỗ trợ cả <b>phím đơn</b> (<code>Space</code>, <code>Enter</code>, <code>F5</code>) và <b>tổ hợp phím</b> (<code>Ctrl + Shift + L</code>, <code>Alt + Tab</code>).';
+        pKey.style.display = 'block';
+        pDelay.style.display = 'none';
+        pText.style.display = 'none';
+        chips.innerHTML = `
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Ctrl + Shift + L')">Ctrl + Shift + L</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Space')">Space</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Enter')">Enter</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Escape')">Escape</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Tab')">Tab</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('F5')">F5</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Ctrl + C')">Ctrl + C</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Ctrl + V')">Ctrl + V</button>
+        `;
+      } else if (type === 'down') {
+        tag.innerText = '⬇️ DOWN ACTION';
+        tag.style.color = '#fca5a5';
+        desc.innerHTML = '⬇️ <b>Nhấn giữ (Down)</b>: Gửi tín hiệu nhấn phím (KeyDown) và giữ nguyên trạng thái cho đến khi gặp lệnh <b>up(...)</b> tương ứng. Thường dùng cho game (ví dụ giữ phím <code>W</code> để chạy).';
+        pKey.style.display = 'block';
+        pDelay.style.display = 'none';
+        pText.style.display = 'none';
+        chips.innerHTML = `
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('W')">W (Tiến)</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Shift')">Shift (Chạy nhanh)</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Ctrl')">Ctrl (Ngồi)</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Alt')">Alt</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Space')">Space</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('A')">A</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('D')">D</button>
+        `;
+      } else if (type === 'up') {
+        tag.innerText = '⬆️ UP ACTION';
+        tag.style.color = '#86efac';
+        desc.innerHTML = '⬆️ <b>Nhả phím (Up)</b>: Gửi tín hiệu nhả phím (KeyUp) để giải phóng phím đã được nhấn giữ trước đó (kết thúc lệnh <b>down(...)</b>).';
+        pKey.style.display = 'block';
+        pDelay.style.display = 'none';
+        pText.style.display = 'none';
+        chips.innerHTML = `
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('W')">W</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Shift')">Shift</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Ctrl')">Ctrl</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Alt')">Alt</button>
+          <button type="button" class="btn" style="font-size:11px; padding:3px 8px;" onclick="setActionKeyPreset('Space')">Space</button>
+        `;
+      } else if (type === 'delay') {
+        tag.innerText = '⏱️ DELAY ACTION';
+        tag.style.color = '#fde047';
+        desc.innerHTML = '⏱️ <b>Chờ độ trễ (Delay)</b>: Tạm dừng chuỗi macro một khoảng thời gian (mili-giây) trước khi thực hiện hành động tiếp theo, giúp game hoặc phần mềm xử lý kịp.';
+        pKey.style.display = 'none';
+        pDelay.style.display = 'block';
+        pText.style.display = 'none';
+      } else if (type === 'text') {
+        tag.innerText = '🔤 TEXT ACTION';
+        tag.style.color = '#93c5fd';
+        desc.innerHTML = '🔤 <b>Gõ văn bản (Text)</b>: Tiện ích tự động gõ một chuỗi văn bản (tương đương gọi hàm <b>press</b> liên tục cho từng chữ cái).';
+        pKey.style.display = 'none';
+        pDelay.style.display = 'none';
+        pText.style.display = 'block';
+      }
+
+      updateActionDslPreview();
+    }
+
+    function listenActionKey() {
+      listeningTarget = 'actionKey';
+      const b = document.getElementById('boxActionKeyCapture');
+      b.style.borderColor = '#ec4899';
+      b.style.background = 'rgba(236, 72, 153, 0.15)';
+      document.getElementById('txtActionKeyDisplay').innerText = 'Hãy bấm phím hoặc tổ hợp...';
+    }
+
+    function setActionKeyPreset(val) {
+      document.getElementById('txtActionKeyDisplay').innerText = val;
+      stopListeningKey();
+      updateActionDslPreview();
+    }
+
+    function syncDelaySlider(val) {
+      const v = parseInt(val) || 10;
+      document.getElementById('sliderActionDelay').value = v;
+      document.getElementById('lblDelaySecondsText').innerText = `= ${(v / 1000).toFixed(2)} giây`;
+      updateActionDslPreview();
+    }
+
+    function syncDelayInput(val) {
+      const v = parseInt(val) || 10;
+      document.getElementById('inputActionDelayMs').value = v;
+      document.getElementById('lblDelaySecondsText').innerText = `= ${(v / 1000).toFixed(2)} giây`;
+      updateActionDslPreview();
+    }
+
+    function setActionDelayPreset(ms) {
+      document.getElementById('inputActionDelayMs').value = ms;
+      document.getElementById('sliderActionDelay').value = ms;
+      document.getElementById('lblDelaySecondsText').innerText = `= ${(ms / 1000).toFixed(2)} giây`;
+      updateActionDslPreview();
+    }
+
+    function setActionTextPreset(txt) {
+      document.getElementById('inputActionText').value = txt;
+      updateActionDslPreview();
+    }
+
+    function updateActionDslPreview() {
+      let val = '';
+      if (currentActionEditorType === 'press' || currentActionEditorType === 'down' || currentActionEditorType === 'up') {
+        val = document.getElementById('txtActionKeyDisplay').innerText.trim();
+        if (val.includes('Hãy bấm')) val = 'KEY';
+        // Remove spaces around '+' if combo
+        val = val.replace(/\s*\+\s*/g, '+');
+      } else if (currentActionEditorType === 'delay') {
+        val = document.getElementById('inputActionDelayMs').value.trim() || '150';
+      } else if (currentActionEditorType === 'text') {
+        val = document.getElementById('inputActionText').value.trim() || 'Text';
+      }
+
+      const dsl = `${currentActionEditorType}(${val})`;
+      document.getElementById('txtSingleActionDslPreview').innerText = dsl;
+    }
+
+    function confirmSaveActionEditor() {
+      let val = '';
+      if (currentActionEditorType === 'press' || currentActionEditorType === 'down' || currentActionEditorType === 'up') {
+        val = document.getElementById('txtActionKeyDisplay').innerText.trim();
+        if (!val || val.includes('Hãy bấm')) {
+          alert('Vui lòng chọn hoặc bấm phím hợp lệ!');
+          return;
+        }
+        val = val.replace(/\s*\+\s*/g, '+');
+      } else if (currentActionEditorType === 'delay') {
+        val = document.getElementById('inputActionDelayMs').value.trim();
+        if (!val || isNaN(val) || parseInt(val) <= 0) {
+          alert('Vui lòng nhập thời gian chờ hợp lệ (số mili-giây > 0)!');
+          return;
+        }
+      } else if (currentActionEditorType === 'text') {
+        val = document.getElementById('inputActionText').value.trim();
+        if (!val) {
+          alert('Vui lòng nhập chuỗi văn bản cần gõ!');
+          return;
+        }
+      }
+
+      const newAction = { type: currentActionEditorType, val };
+
+      if (currentEditingActionIndex >= 0 && currentEditingActionIndex < currentMacroActions.length) {
+        currentMacroActions[currentEditingActionIndex] = newAction;
+      } else {
+        currentMacroActions.push(newAction);
+      }
+
+      renderMacroModalActionTable();
+      closeActionEditorModal();
+
+      // Ensure keyMacroModal is visible so user sees the result!
+      document.getElementById('keyMacroModal').style.display = 'flex';
+    }
+
+    function loadMacroTemplate(name) {
+      if (name === 'bunnyhop') {
+        document.getElementById('txtMacroModalTrigger').innerText = 'F1';
+        document.getElementById('inputMacroModalName').value = 'Bunny Hop Game';
+        currentMacroActions = [
+          { type: 'down', val: 'W' },
+          { type: 'delay', val: '150' },
+          { type: 'press', val: 'Space' },
+          { type: 'delay', val: '40' },
+          { type: 'up', val: 'W' }
+        ];
+      } else if (name === 'ideformat') {
+        document.getElementById('txtMacroModalTrigger').innerText = 'F2';
+        document.getElementById('inputMacroModalName').value = 'Format Code Document';
+        currentMacroActions = [
+          { type: 'press', val: 'Ctrl+Shift+L' }
+        ];
+      } else if (name === 'csbuy') {
+        document.getElementById('txtMacroModalTrigger').innerText = 'F3';
+        document.getElementById('inputMacroModalName').value = 'Mua AK-47 & Giáp';
+        currentMacroActions = [
+          { type: 'press', val: 'B' },
+          { type: 'delay', val: '80' },
+          { type: 'press', val: '4' },
+          { type: 'delay', val: '40' },
+          { type: 'press', val: '2' }
+        ];
+      } else if (name === 'signature') {
+        document.getElementById('txtMacroModalTrigger').innerText = 'F4';
+        document.getElementById('inputMacroModalName').value = 'Chèn Chữ Ký Cá Nhân';
+        currentMacroActions = [
+          { type: 'text', val: 'Trân trọng, Mạnh Kiên - Kora Team' },
+          { type: 'press', val: 'Enter' }
+        ];
+      }
+      renderMacroModalActionTable();
+    }
+
+    function confirmSaveKeyMacro() {
+      const trigger = document.getElementById('txtMacroModalTrigger').innerText.trim();
+      const name = document.getElementById('inputMacroModalName').value.trim() || 'Phím Macro';
+      
+      if (!trigger || trigger.includes('Hãy bấm')) {
+        alert('Vui lòng chọn phím kích hoạt hợp lệ!');
+        return;
+      }
+      if (currentMacroActions.length === 0) {
+        alert('Chuỗi hành động phải có ít nhất 1 hành động!');
+        return;
+      }
+
+      const dsl = currentMacroActions.map(a => `${a.type}(${a.val})`).join(' + ');
+      const p = profiles[activeProfileId];
+
+      if (p.isRoot) {
+        if (!p.keyMacros) p.keyMacros = [];
+        if (currentEditingMacroIndex >= 0 && currentEditingMacroIndex < p.keyMacros.length) {
+          p.keyMacros[currentEditingMacroIndex] = { trigger, name, dsl };
+        } else {
+          // Replace if trigger matches or push
+          const exIdx = p.keyMacros.findIndex(m => m.trigger.toLowerCase() === trigger.toLowerCase());
+          if (exIdx >= 0) p.keyMacros[exIdx] = { trigger, name, dsl };
+          else p.keyMacros.push({ trigger, name, dsl });
+        }
+      } else {
+        // Child profile
+        if (currentEditingMacroOverride) {
+          if (!p.overriddenKeyMacros) p.overriddenKeyMacros = {};
+          p.overriddenKeyMacros[currentEditingMacroOverride] = { trigger: currentEditingMacroOverride, name, dsl };
+          unmuteKeyMacro(currentEditingMacroOverride);
+        } else if (currentEditingMacroIndex >= 0 && p.appKeyMacros && currentEditingMacroIndex < p.appKeyMacros.length) {
+          p.appKeyMacros[currentEditingMacroIndex] = { trigger, name, dsl };
+        } else {
+          // Check if matches global trigger -> override
+          const isGlobal = (profiles.global.keyMacros || []).some(g => g.trigger.toLowerCase() === trigger.toLowerCase());
+          if (isGlobal) {
+            if (!p.overriddenKeyMacros) p.overriddenKeyMacros = {};
+            p.overriddenKeyMacros[trigger] = { trigger, name, dsl };
+            unmuteKeyMacro(trigger);
+          } else {
+            if (!p.appKeyMacros) p.appKeyMacros = [];
+            const exIdx = p.appKeyMacros.findIndex(m => m.trigger.toLowerCase() === trigger.toLowerCase());
+            if (exIdx >= 0) p.appKeyMacros[exIdx] = { trigger, name, dsl };
+            else p.appKeyMacros.push({ trigger, name, dsl });
+          }
+        }
+      }
+
+      closeKeyMacroModal();
+      renderCurrentTab();
+    }
 
     // ==========================================
     // HOTKEY MODAL CONTROLLERS
