@@ -198,8 +198,8 @@ pub fn apply_ui_theme(hwnd: isize, controls: &ControlPanelControls, is_dark: boo
 
         // Theme ListViews
         controls.tab_macro.list_macro.apply_theme(is_dark);
-        controls.tab_remap.list_remap.apply_theme(is_dark);
-        controls.tab_remap.list_disable.apply_theme(is_dark);
+        controls.tab_keys.remap.list.apply_theme(is_dark);
+        controls.tab_keys.disable.list.apply_theme(is_dark);
 
         // Theme Slider
         controls.tab_sound.slider_volume.apply_theme(is_dark);

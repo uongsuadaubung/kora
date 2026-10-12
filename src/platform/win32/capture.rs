@@ -20,10 +20,18 @@ pub(crate) static CAPTURED_HOTKEY: Mutex<Option<crate::engine::config::Hotkey>> 
 pub(crate) static CAPTURE_DISPLAY_TEXT: Mutex<String> = Mutex::new(String::new());
 pub(crate) static HOTKEY_MOD_ARMED: AtomicBool = AtomicBool::new(false);
 
+// Global runtime modifier tracking flags
 pub(crate) static TRACKED_CTRL: AtomicBool = AtomicBool::new(false);
 pub(crate) static TRACKED_SHIFT: AtomicBool = AtomicBool::new(false);
 pub(crate) static TRACKED_ALT: AtomicBool = AtomicBool::new(false);
 pub(crate) static TRACKED_WIN: AtomicBool = AtomicBool::new(false);
+
+// Dedicated capture tracking flags (independent from runtime hooks, prevents losing held modifiers)
+pub(crate) static CAPTURE_CTRL: AtomicBool = AtomicBool::new(false);
+pub(crate) static CAPTURE_SHIFT: AtomicBool = AtomicBool::new(false);
+pub(crate) static CAPTURE_ALT: AtomicBool = AtomicBool::new(false);
+pub(crate) static CAPTURE_WIN: AtomicBool = AtomicBool::new(false);
+pub(crate) static PENDING_MODIFIER_HOTKEY: Mutex<Option<crate::engine::config::Hotkey>> = Mutex::new(None);
 
 pub(crate) static REMAP_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub(crate) static REMAP_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -60,11 +68,14 @@ pub fn stop_single_key_capture() {
 
 pub fn start_hotkey_capture(hwnd: isize) {
     HOTKEY_DIALOG_HWND.store(hwnd, Ordering::SeqCst);
-    TRACKED_CTRL.store(false, Ordering::SeqCst);
-    TRACKED_SHIFT.store(false, Ordering::SeqCst);
-    TRACKED_ALT.store(false, Ordering::SeqCst);
-    TRACKED_WIN.store(false, Ordering::SeqCst);
+    CAPTURE_CTRL.store(false, Ordering::SeqCst);
+    CAPTURE_SHIFT.store(false, Ordering::SeqCst);
+    CAPTURE_ALT.store(false, Ordering::SeqCst);
+    CAPTURE_WIN.store(false, Ordering::SeqCst);
     if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = PENDING_MODIFIER_HOTKEY.lock() {
         *guard = None;
     }
     if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
@@ -76,10 +87,13 @@ pub fn start_hotkey_capture(hwnd: isize) {
 pub fn stop_hotkey_capture() {
     HOTKEY_CAPTURE_ACTIVE.store(false, Ordering::SeqCst);
     HOTKEY_DIALOG_HWND.store(0, Ordering::SeqCst);
-    TRACKED_CTRL.store(false, Ordering::SeqCst);
-    TRACKED_SHIFT.store(false, Ordering::SeqCst);
-    TRACKED_ALT.store(false, Ordering::SeqCst);
-    TRACKED_WIN.store(false, Ordering::SeqCst);
+    CAPTURE_CTRL.store(false, Ordering::SeqCst);
+    CAPTURE_SHIFT.store(false, Ordering::SeqCst);
+    CAPTURE_ALT.store(false, Ordering::SeqCst);
+    CAPTURE_WIN.store(false, Ordering::SeqCst);
+    if let Ok(mut guard) = PENDING_MODIFIER_HOTKEY.lock() {
+        *guard = None;
+    }
 }
 
 /// Resets all internal modifier and hotkey tracking flags to prevent stuck modifiers
@@ -89,12 +103,24 @@ pub fn reset_modifier_states() {
     TRACKED_SHIFT.store(false, Ordering::SeqCst);
     TRACKED_ALT.store(false, Ordering::SeqCst);
     TRACKED_WIN.store(false, Ordering::SeqCst);
+    CAPTURE_CTRL.store(false, Ordering::SeqCst);
+    CAPTURE_SHIFT.store(false, Ordering::SeqCst);
+    CAPTURE_ALT.store(false, Ordering::SeqCst);
+    CAPTURE_WIN.store(false, Ordering::SeqCst);
     HOTKEY_MOD_ARMED.store(false, Ordering::SeqCst);
     sound::reset_key_sound_bits();
 }
 
 pub fn get_captured_hotkey() -> Option<crate::engine::config::Hotkey> {
     if let Ok(guard) = CAPTURED_HOTKEY.lock() {
+        *guard
+    } else {
+        None
+    }
+}
+
+pub fn get_pending_modifier_hotkey() -> Option<crate::engine::config::Hotkey> {
+    if let Ok(guard) = PENDING_MODIFIER_HOTKEY.lock() {
         *guard
     } else {
         None
@@ -135,14 +161,18 @@ pub unsafe fn handle_remap_capture(vk: u32, w_param: usize) -> Option<isize> {
 }
 
 /// Xử lý chế độ bắt phím tắt Hotkey từ Low-Level Keyboard Hook
+/// Hỗ trợ bấm tổ hợp phím hoàn toàn tự do và thoải mái:
+/// - Mọi kết hợp từ 1 đến 4 phím bổ trợ (Ctrl, Shift, Alt, Win) + 1 phím thường (ví dụ: Ctrl + Shift + Alt + Z)
+/// - Mọi tổ hợp từ 2 đến 4 phím bổ trợ thuần (ví dụ: Ctrl + Shift, Ctrl + Alt, Ctrl + Shift + Alt)
 pub unsafe fn handle_hotkey_capture(vk: u32, w_param: usize) -> Option<isize> {
     if HOTKEY_CAPTURE_ACTIVE.load(Ordering::SeqCst)
         && HOTKEY_DIALOG_HWND.load(Ordering::SeqCst) == unsafe { GetForegroundWindow() }
     {
+        let dialog_hwnd = HOTKEY_DIALOG_HWND.load(Ordering::SeqCst);
+
         if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
             if vk == 0x1B {
                 stop_hotkey_capture();
-                let dialog_hwnd = HOTKEY_DIALOG_HWND.load(Ordering::SeqCst);
                 if dialog_hwnd != 0 {
                     unsafe {
                         PostMessageW(dialog_hwnd, WM_HOTKEY_CANCELLED, 0, 0);
@@ -150,60 +180,39 @@ pub unsafe fn handle_hotkey_capture(vk: u32, w_param: usize) -> Option<isize> {
                 }
                 return Some(1);
             }
+
             if is_ctrl_vk(vk) {
-                TRACKED_CTRL.store(true, Ordering::SeqCst);
+                CAPTURE_CTRL.store(true, Ordering::SeqCst);
             }
             if is_shift_vk(vk) {
-                TRACKED_SHIFT.store(true, Ordering::SeqCst);
+                CAPTURE_SHIFT.store(true, Ordering::SeqCst);
             }
             if is_alt_vk(vk) {
-                TRACKED_ALT.store(true, Ordering::SeqCst);
+                CAPTURE_ALT.store(true, Ordering::SeqCst);
             }
             if is_win_vk(vk) {
-                TRACKED_WIN.store(true, Ordering::SeqCst);
+                CAPTURE_WIN.store(true, Ordering::SeqCst);
             }
 
-            let async_shift = unsafe { (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0 };
-            let async_ctrl = unsafe { (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0 };
-            let async_alt = unsafe { (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0 };
-            let async_win = unsafe {
-                ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0)
-            };
-
-            if !async_shift && !is_shift_vk(vk) {
-                TRACKED_SHIFT.store(false, Ordering::SeqCst);
-            }
-            if !async_ctrl && !is_ctrl_vk(vk) {
-                TRACKED_CTRL.store(false, Ordering::SeqCst);
-            }
-            if !async_alt && !is_alt_vk(vk) {
-                TRACKED_ALT.store(false, Ordering::SeqCst);
-            }
-            if !async_win && !is_win_vk(vk) {
-                TRACKED_WIN.store(false, Ordering::SeqCst);
-            }
-
-            let is_shift = is_shift_vk(vk) || async_shift;
-            let is_ctrl = is_ctrl_vk(vk) || async_ctrl;
-            let is_alt = is_alt_vk(vk) || async_alt;
-            let is_win = is_win_vk(vk) || async_win;
+            let is_ctrl = CAPTURE_CTRL.load(Ordering::SeqCst) || is_ctrl_vk(vk);
+            let is_shift = CAPTURE_SHIFT.load(Ordering::SeqCst) || is_shift_vk(vk);
+            let is_alt = CAPTURE_ALT.load(Ordering::SeqCst) || is_alt_vk(vk);
+            let is_win = CAPTURE_WIN.load(Ordering::SeqCst) || is_win_vk(vk);
 
             let is_mod = is_modifier_vk(vk);
-            let captured = crate::engine::config::Hotkey {
-                ctrl: is_ctrl,
-                shift: is_shift,
-                alt: is_alt,
-                win: is_win,
-                vk: if is_mod { 0 } else { vk },
-            };
 
-            let display = if captured.is_valid() {
-                if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
-                    *guard = Some(captured);
+            if is_mod {
+                let mod_candidate = crate::engine::config::Hotkey {
+                    ctrl: is_ctrl,
+                    shift: is_shift,
+                    alt: is_alt,
+                    win: is_win,
+                    vk: 0,
+                };
+                if let Ok(mut guard) = PENDING_MODIFIER_HOTKEY.lock() {
+                    *guard = Some(mod_candidate);
                 }
-                captured.display_text()
-            } else if is_mod {
+
                 let mut parts = Vec::new();
                 if is_ctrl {
                     parts.push("Ctrl");
@@ -217,24 +226,109 @@ pub unsafe fn handle_hotkey_capture(vk: u32, w_param: usize) -> Option<isize> {
                 if is_win {
                     parts.push("Win");
                 }
-                format!("{} + ...", parts.join(" + "))
-            } else {
-                let key_name = crate::engine::config::vk_to_name(vk);
-                format!("{} (Cần thêm Ctrl/Alt/Shift)", key_name)
-            };
 
-            if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
-                *guard = display;
-            }
-            let dialog_hwnd = HOTKEY_DIALOG_HWND.load(Ordering::SeqCst);
-            if dialog_hwnd != 0 {
-                unsafe {
-                    PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
+                let display = if parts.len() <= 1 {
+                    format!("{} + ...", parts.join(" + "))
+                } else {
+                    parts.join(" + ")
+                };
+
+                if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
+                    *guard = display;
+                }
+                if dialog_hwnd != 0 {
+                    unsafe {
+                        PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
+                    }
+                }
+            } else {
+                // Non-modifier key pressed (e.g. Z, Space, F1..F12, etc.)
+                if let Ok(mut guard) = PENDING_MODIFIER_HOTKEY.lock() {
+                    *guard = None;
+                }
+
+                let captured = crate::engine::config::Hotkey {
+                    ctrl: is_ctrl,
+                    shift: is_shift,
+                    alt: is_alt,
+                    win: is_win,
+                    vk,
+                };
+
+                if captured.is_valid() {
+                    if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
+                        *guard = Some(captured);
+                    }
+                    if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
+                        *guard = captured.display_text();
+                    }
+                    if dialog_hwnd != 0 {
+                        unsafe {
+                            PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
+                        }
+                    }
+                } else {
+                    let key_name = crate::engine::config::vk_to_name(vk);
+                    let display = format!("{} (Cần thêm Ctrl/Alt/Shift)", key_name);
+                    if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
+                        *guard = display;
+                    }
+                    if dialog_hwnd != 0 {
+                        unsafe {
+                            PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
+                        }
+                    }
                 }
             }
         } else if w_param == WM_KEYUP || w_param == WM_SYSKEYUP {
-            unsafe {
-                update_modifier_tracking_keyup(vk);
+            let was_ctrl = CAPTURE_CTRL.load(Ordering::SeqCst);
+            let was_shift = CAPTURE_SHIFT.load(Ordering::SeqCst);
+            let was_alt = CAPTURE_ALT.load(Ordering::SeqCst);
+            let was_win = CAPTURE_WIN.load(Ordering::SeqCst);
+
+            if is_ctrl_vk(vk) {
+                CAPTURE_CTRL.store(false, Ordering::SeqCst);
+            }
+            if is_shift_vk(vk) {
+                CAPTURE_SHIFT.store(false, Ordering::SeqCst);
+            }
+            if is_alt_vk(vk) {
+                CAPTURE_ALT.store(false, Ordering::SeqCst);
+            }
+            if is_win_vk(vk) {
+                CAPTURE_WIN.store(false, Ordering::SeqCst);
+            }
+
+            // Khi người dùng nhả phím bổ trợ (Ctrl/Shift/Alt/Win) mà trước đó đang giữ >= 2 phím
+            // và chưa bấm phím thường nào, ta chốt tổ hợp thuần phím bổ trợ (ví dụ: Ctrl + Shift, Ctrl + Alt, Ctrl + Shift + Alt)!
+            if is_modifier_vk(vk) {
+                let pending = if let Ok(mut guard) = PENDING_MODIFIER_HOTKEY.lock() {
+                    guard.take()
+                } else {
+                    None
+                };
+
+                let mod_count = was_ctrl as u8 + was_shift as u8 + was_alt as u8 + was_win as u8;
+                if mod_count >= 2 && pending.is_some() {
+                    let mod_hk = crate::engine::config::Hotkey {
+                        ctrl: was_ctrl,
+                        shift: was_shift,
+                        alt: was_alt,
+                        win: was_win,
+                        vk: 0,
+                    };
+                    if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
+                        *guard = Some(mod_hk);
+                    }
+                    if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
+                        *guard = mod_hk.display_text();
+                    }
+                    if dialog_hwnd != 0 {
+                        unsafe {
+                            PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
+                        }
+                    }
+                }
             }
         }
         return Some(1);
@@ -244,21 +338,16 @@ pub unsafe fn handle_hotkey_capture(vk: u32, w_param: usize) -> Option<isize> {
 
 /// Cập nhật nhả phím cho các cờ theo dõi phím bổ trợ
 pub unsafe fn update_modifier_tracking_keyup(vk: u32) {
-    if is_ctrl_vk(vk) || unsafe { (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0 } {
+    if is_ctrl_vk(vk) {
         TRACKED_CTRL.store(false, Ordering::SeqCst);
     }
-    if is_shift_vk(vk) || unsafe { (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0 } {
+    if is_shift_vk(vk) {
         TRACKED_SHIFT.store(false, Ordering::SeqCst);
     }
-    if is_alt_vk(vk) || unsafe { (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0 } {
+    if is_alt_vk(vk) {
         TRACKED_ALT.store(false, Ordering::SeqCst);
     }
-    if is_win_vk(vk)
-        || unsafe {
-            ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
-                && ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) == 0)
-        }
-    {
+    if is_win_vk(vk) {
         TRACKED_WIN.store(false, Ordering::SeqCst);
     }
 }

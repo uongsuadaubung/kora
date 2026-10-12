@@ -6,8 +6,8 @@ pub mod footer;
 pub mod paint;
 pub mod sidebar;
 pub mod tab_about;
+pub mod tab_keys;
 pub mod tab_macro;
-pub mod tab_remap;
 pub mod tab_sound;
 pub mod tab_system;
 pub mod tab_typing;
@@ -17,8 +17,8 @@ pub use footer::*;
 pub use paint::*;
 pub use sidebar::*;
 pub use tab_about::*;
+pub use tab_keys::*;
 pub use tab_macro::*;
-pub use tab_remap::*;
 pub use tab_sound::*;
 pub use tab_system::*;
 pub use tab_typing::*;
@@ -45,7 +45,7 @@ pub struct ControlPanelControls {
     pub banner: ProfileBanner,
     pub tab_bar: TabBar,
     pub tab_typing: TabTyping,
-    pub tab_remap: TabRemapDisable,
+    pub tab_keys: TabKeys,
     pub tab_sound: TabSound,
     pub tab_macro: TabMacro,
     pub tab_system: TabSystem,
@@ -83,7 +83,7 @@ impl ControlPanelControls {
         )?;
 
         let tab_typing = TabTyping::create(parent, hfont_normal, hfont_bold)?;
-        let tab_remap = TabRemapDisable::create(parent, hfont_normal, hfont_bold)?;
+        let tab_keys = TabKeys::create(parent, hfont_normal, hfont_bold)?;
         let tab_sound = TabSound::create(parent, hfont_normal, hfont_bold)?;
         let tab_macro = TabMacro::create(parent, hfont_normal, hfont_bold)?;
         let tab_system = TabSystem::create(parent, hfont_normal, hfont_bold)?;
@@ -95,7 +95,7 @@ impl ControlPanelControls {
             banner,
             tab_bar,
             tab_typing,
-            tab_remap,
+            tab_keys,
             tab_sound,
             tab_macro,
             tab_system,
@@ -121,7 +121,7 @@ impl ControlPanelControls {
         self.banner.set_visible(is_profile);
         self.tab_bar.set_visible(is_profile);
         self.tab_typing.update_visibility(subtab == Some(0));
-        self.tab_remap.update_visibility(subtab == Some(1));
+        self.tab_keys.update_visibility(subtab == Some(1));
         self.tab_sound.update_visibility(subtab == Some(2));
         self.tab_macro.update_visibility(subtab == Some(3));
         self.tab_system.update_visibility(mode == ViewMode::SystemSettings);
@@ -163,12 +163,12 @@ impl ControlPanelControls {
         self.sidebar.populate_profiles(&all_refs, &profile.id);
         self.banner.update_profile(profile);
         self.tab_typing.load_profile(profile, cfg);
-        self.tab_remap.load_profile(profile, cfg);
+        self.tab_keys.load_profile(profile, cfg);
         self.tab_sound.load_profile(profile, cfg);
         self.tab_macro.load_profile(profile, cfg);
         self.tab_system.load_config(cfg);
-        self.tab_remap.populate_remaps(&snap.remaps);
-        self.tab_remap.populate_disabled(&snap.disabled);
+        self.tab_keys.populate_remaps(&snap.remaps);
+        self.tab_keys.populate_disabled(&snap.disabled);
         self.populate_macro_items(&snap.macros);
         Some(snap.config)
     }
@@ -179,7 +179,7 @@ impl ControlPanelControls {
         self.sidebar.update_language(strings);
         self.banner.update_language(strings);
         self.tab_typing.update_language(strings);
-        self.tab_remap.update_language(strings);
+        self.tab_keys.update_language(strings);
         self.tab_sound.update_language(strings);
         self.tab_macro.update_language(strings);
         self.tab_system.update_language(lang, strings);
@@ -256,7 +256,7 @@ impl ControlPanelControls {
         if self.tab_typing.on_command(hwnd, ctrl_id, notify_code) {
             return true;
         }
-        if self.tab_remap.on_command(hwnd, ctrl_id, notify_code) {
+        if self.tab_keys.on_command(hwnd, ctrl_id, notify_code) {
             return true;
         }
         if self.tab_sound.on_command(hwnd, ctrl_id, notify_code) {

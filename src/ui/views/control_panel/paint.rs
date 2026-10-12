@@ -118,7 +118,7 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
             }
             crate::ui::views::control_panel::ViewMode::Profile(1) => {
                 // One card below the sub-tab bar (Đổi phím / Chặn phím share it)
-                let top = crate::ui::views::control_panel::tab_remap::SUB_CARD_Y;
+                let top = crate::ui::views::control_panel::tab_keys::SUB_CARD_Y;
                 RoundRect(hdc, layout::CARD_X, top, right_bound, layout::CARD_BOTTOM_Y, radii::RADIUS_CARD, radii::RADIUS_CARD);
             }
             crate::ui::views::control_panel::ViewMode::Profile(2) => {

@@ -490,9 +490,10 @@ Kora/
 │   │   │   │   ├── paint.rs    # Gradient & border painting của Control Panel
 │   │   │   │   ├── sidebar.rs  # Left navigation sidebar (11pt bold + icon 📁 Hồ sơ)
 │   │   │   │   ├── tab_about.rs# Tab Giới thiệu phần mềm & tác giả
-│   │   │   │   ├── tab_macro.rs# Tab Quản lý phím gõ tắt (Macro)
-│   │   │   │   ├── tab_remap.rs# Tab Phím tắt & Remap
-│   │   │   │   ├── tab_sound.rs# Tab Âm thanh gõ phím (WASAPI + 1-Click downloader)
+│   │   │   │   ├── tab_keys/   # Tab Quản lý bàn phím (Đổi phím, Khóa phím & Phím Macro)
+│   │   │   │   │   ├── mod.rs          # Điều phối Sub-tab bar và visibility
+│   │   │   │   │   ├── panel_remap.rs  # Sub-panel Đổi phím (ActionTable)
+│   │   │   │   │   └── panel_disable.rs# Sub-panel Khóa phím (ActionTable)
 │   │   │   │   ├── tab_system.rs# Tab Cấu hình hệ thống (Khởi động, ngôn ngữ, cập nhật)
 │   │   │   │   └── tab_typing.rs# Tab Bộ gõ tiếng Việt
 │   │   │   └── dialogs/        # HỘP THOẠI MODAL ĐỘC LẬP

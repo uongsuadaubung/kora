@@ -336,8 +336,10 @@ src/ui/
 │   │   ├── banner.rs             # Header status banner (Bật/Tắt, Active Profile)
 │   │   ├── sidebar.rs            # Left navigation sidebar (11pt bold + icon 📁 Hồ sơ)
 │   │   ├── footer.rs             # Nút Reset / Save / Close
-│   │   ├── tab_typing.rs         # Tab Bộ gõ tiếng Việt
-│   │   ├── tab_remap.rs          # Tab Phím tắt & Remap (đổi tên từ tab_remap_disable.rs)
+│   │   ├── tab_keys/             # Tab Quản lý bàn phím (Đổi phím, Khóa phím & Phím Macro)
+│   │   │   ├── mod.rs            # Điều phối Sub-tab bar và visibility
+│   │   │   ├── panel_remap.rs    # Sub-panel Đổi phím (ActionTable)
+│   │   │   └── panel_disable.rs  # Sub-panel Khóa phím (ActionTable)
 │   │   ├── tab_macro.rs          # Tab Quản lý phím gõ tắt (Macro)
 │   │   ├── tab_sound.rs          # Tab Âm thanh gõ phím (WASAPI + 1-Click downloader)
 │   │   ├── tab_system.rs         # Tab Cấu hình hệ thống (Khởi động, ngôn ngữ, cập nhật)

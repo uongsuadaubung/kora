@@ -114,16 +114,33 @@ pub unsafe extern "system" fn low_level_mouse_proc(
     unsafe {
         if n_code >= 0
             && (w_param == WM_LBUTTONDOWN || w_param == WM_RBUTTONDOWN || w_param == WM_MBUTTONDOWN)
-            && let Ok(mut guard) = ENGINE_INSTANCE.lock()
-            && let Some(ref mut engine) = *guard
         {
-            if engine.config().debug && !engine.buffer.is_empty() {
-                engine.log_debug(format!(
-                    "[DBG][WIN32_MOUSE] Mouse button {:#X} clicked -> Reset engine buffer",
-                    w_param
-                ));
+            if (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0 {
+                capture::TRACKED_CTRL.store(false, Ordering::SeqCst);
             }
-            engine.reset();
+            if (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0 {
+                capture::TRACKED_SHIFT.store(false, Ordering::SeqCst);
+            }
+            if (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0 {
+                capture::TRACKED_ALT.store(false, Ordering::SeqCst);
+            }
+            if ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
+                && ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) == 0)
+            {
+                capture::TRACKED_WIN.store(false, Ordering::SeqCst);
+            }
+
+            if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                && let Some(ref mut engine) = *guard
+            {
+                if engine.config().debug && !engine.buffer.is_empty() {
+                    engine.log_debug(format!(
+                        "[DBG][WIN32_MOUSE] Mouse button {:#X} clicked -> Reset engine buffer",
+                        w_param
+                    ));
+                }
+                engine.reset();
+            }
         }
         CallNextHookEx(0, n_code, w_param, l_param)
     }
@@ -258,31 +275,25 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 // 2. Query hardware modifier states cleanly and reliably
                 let is_caps = (GetKeyState(VK_CAPITAL) & 1) != 0;
 
-                let async_shift = (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0;
-                let async_ctrl = (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0;
-                let async_alt = (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0;
-                let async_win = ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0);
-
-                // Self-healing synchronization: if physical key is NOT pressed and current VK is not that modifier,
-                // clear the tracked flag so missed KeyUp (e.g. from Win+L lock, sleep, Alt+Tab) never gets stuck!
-                if !async_shift && !is_shift_vk(vk) {
-                    TRACKED_SHIFT.store(false, Ordering::SeqCst);
-                }
-                if !async_ctrl && !is_ctrl_vk(vk) {
-                    TRACKED_CTRL.store(false, Ordering::SeqCst);
-                }
-                if !async_alt && !is_alt_vk(vk) {
-                    TRACKED_ALT.store(false, Ordering::SeqCst);
-                }
-                if !async_win && !is_win_vk(vk) {
-                    TRACKED_WIN.store(false, Ordering::SeqCst);
-                }
-
-                let is_shift = is_shift_vk(vk) || async_shift;
-                let is_ctrl = is_ctrl_vk(vk) || async_ctrl;
-                let is_alt = is_alt_vk(vk) || async_alt;
-                let is_win = is_win_vk(vk) || async_win;
+                let is_shift = is_shift_vk(vk)
+                    || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0)
+                    || ((GetAsyncKeyState(0xA0) as u16 & 0x8000) != 0) // VK_LSHIFT
+                    || ((GetAsyncKeyState(0xA1) as u16 & 0x8000) != 0) // VK_RSHIFT
+                    || TRACKED_SHIFT.load(Ordering::SeqCst);
+                let is_ctrl = is_ctrl_vk(vk)
+                    || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0)
+                    || ((GetAsyncKeyState(0xA2) as u16 & 0x8000) != 0) // VK_LCONTROL
+                    || ((GetAsyncKeyState(0xA3) as u16 & 0x8000) != 0) // VK_RCONTROL
+                    || TRACKED_CTRL.load(Ordering::SeqCst);
+                let is_alt = is_alt_vk(vk)
+                    || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0)
+                    || ((GetAsyncKeyState(0xA4) as u16 & 0x8000) != 0) // VK_LMENU
+                    || ((GetAsyncKeyState(0xA5) as u16 & 0x8000) != 0) // VK_RMENU
+                    || TRACKED_ALT.load(Ordering::SeqCst);
+                let is_win = is_win_vk(vk)
+                    || ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
+                    || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0)
+                    || TRACKED_WIN.load(Ordering::SeqCst);
 
                 // Check modifier-only hotkey arming (e.g. Ctrl + Shift)
                 if switch_key_enabled {
@@ -300,7 +311,7 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                             HOTKEY_MOD_ARMED.store(false, Ordering::SeqCst);
                         }
                     } else {
-                        // Check modifier + key hotkey (e.g. Ctrl + Space, Alt + Z, Shift + Space)
+                        // Check modifier + key hotkey (e.g. Ctrl + Space, Alt + Z, Shift + Space, Win + Z)
                         if vk == switch_key.vk
                             && is_ctrl == switch_key.ctrl
                             && is_shift == switch_key.shift
@@ -322,6 +333,10 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                                     engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
                                 }
                                 notify_mode_change(new_state);
+                                if is_win {
+                                    send_vk_event(0xFF, false);
+                                    send_vk_event(0xFF, true);
+                                }
                                 return 1;
                             }
                             return CallNextHookEx(0, n_code, w_param, l_param);

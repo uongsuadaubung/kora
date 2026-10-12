@@ -4,8 +4,9 @@
 use crate::engine::config::Hotkey;
 use crate::engine::config_store;
 use crate::platform::win32::{
-    get_captured_display_text, get_captured_hotkey, set_captured_hotkey, start_hotkey_capture,
-    stop_hotkey_capture, ENGINE_INSTANCE, WM_HOTKEY_CAPTURED, WM_HOTKEY_CANCELLED,
+    get_captured_display_text, get_captured_hotkey, get_pending_modifier_hotkey,
+    set_captured_hotkey, start_hotkey_capture, stop_hotkey_capture, ENGINE_INSTANCE,
+    WM_HOTKEY_CANCELLED, WM_HOTKEY_CAPTURED,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -644,7 +645,10 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             }
 
                             if !st.is_inherit {
-                                let valid_hk = st.current_hotkey.or_else(get_captured_hotkey);
+                                let valid_hk = st
+                                    .current_hotkey
+                                    .or_else(get_captured_hotkey)
+                                    .or_else(get_pending_modifier_hotkey);
                                 match valid_hk {
                                     Some(hk) if hk.is_valid() => {}
                                     _ => return 0,
@@ -666,6 +670,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                                     let final_hotkey = st
                                         .current_hotkey
                                         .or_else(get_captured_hotkey)
+                                        .or_else(get_pending_modifier_hotkey)
                                         .unwrap_or_default();
 
                                     if st.is_root {

@@ -102,13 +102,13 @@ pub fn refresh_macro_list() {
 /// Re-populates the remap list from the engine (call without holding the engine lock).
 pub fn refresh_remap_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_remap_items(e)), super::controls()) {
-        c.tab_remap.populate_remaps(&items);
+        c.tab_keys.populate_remaps(&items);
     }
 }
 
 /// Re-populates the disabled-key list from the engine (call without holding the engine lock).
 pub fn refresh_disable_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_disable_items(e)), super::controls()) {
-        c.tab_remap.populate_disabled(&items);
+        c.tab_keys.populate_disabled(&items);
     }
 }
