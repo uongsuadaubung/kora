@@ -29,7 +29,6 @@ const MF_STRING: u32 = 0x0000;
 const MF_SEPARATOR: u32 = 0x0800;
 const MF_CHECKED: u32 = 0x0008;
 const MF_UNCHECKED: u32 = 0x0000;
-const MF_POPUP: u32 = 0x0010;
 
 const TPM_RETURNCMD: u32 = 0x0100;
 const TPM_NONOTIFY: u32 = 0x0080;
@@ -47,10 +46,6 @@ impl PopupMenu {
         } else {
             None
         }
-    }
-
-    pub fn handle(&self) -> isize {
-        self.h_menu
     }
 
     pub fn add_item(&mut self, id: u32, text: &str) {
@@ -74,24 +69,10 @@ impl PopupMenu {
         }
     }
 
-    pub fn add_submenu(&mut self, text: &str, submenu: PopupMenu) {
-        let wide = to_wide(text);
-        unsafe {
-            AppendMenuW(
-                self.h_menu,
-                MF_POPUP,
-                submenu.h_menu as usize,
-                wide.as_ptr(),
-            );
-        }
-        // Submenu handle is now owned by parent menu; prevent double-free
-        std::mem::forget(submenu);
-    }
-
     pub fn track(&self, hwnd: isize, x: i32, y: i32) -> u32 {
         unsafe {
             SetForegroundWindow(hwnd);
-            TrackPopupMenu(
+            let cmd = TrackPopupMenu(
                 self.h_menu,
                 TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
                 x,
@@ -99,7 +80,10 @@ impl PopupMenu {
                 0,
                 hwnd,
                 null_mut(),
-            )
+            );
+            // KB135788: ensure the menu closes properly when the user clicks elsewhere
+            crate::ui::win32::PostMessageW(hwnd, 0 /* WM_NULL */, 0, 0);
+            cmd
         }
     }
 }

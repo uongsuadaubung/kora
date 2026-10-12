@@ -1,9 +1,9 @@
 [package]
 name = "kora"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 authors = ["Mạnh Kiên <manhkien13041997@gmail.com>"]
-description = "Kora - Hệ sinh thái Bàn phím & Bộ gõ thế hệ mới viết bằng Rust"
+description = "Kora - Modern Input & Keyboard Suite written in Rust"
 repository = "https://github.com/uongsuadaubung/kora"
 default-run = "Kora"
 
@@ -30,3 +30,9 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+

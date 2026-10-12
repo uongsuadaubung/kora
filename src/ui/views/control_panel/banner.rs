@@ -4,11 +4,11 @@
 use crate::engine::profile::AppProfile;
 use crate::ui::colors::ThemePalette;
 use crate::ui::win32::{
-    create_app_font, DeleteObject, EnableWindow, SetBkColor, SetTextColor,
+    EnableWindow, SetBkColor, SetTextColor,
     ShowWindow, FW_BOLD, SW_HIDE, SW_SHOW,
 };
 use crate::ui::components::{ButtonVariant, Label, PushButton};
-use crate::ui::theme::get_panel_bg_brush;
+use crate::ui::theme::{cached_font, get_panel_bg_brush};
 use crate::ui::tokens::id::*;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::typography::*;
@@ -21,13 +21,12 @@ pub struct ProfileBanner {
     pub lbl_status: Label,
     pub btn_delete: PushButton,
     pub is_root: AtomicBool,
-    pub hfont_title: isize,
 }
 
 impl ProfileBanner {
-    pub fn create(parent: isize, hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
+    pub fn create(parent: isize, hfont_normal: isize) -> Option<Self> {
         let strings = crate::language::current();
-        let hfont_title = create_app_font(FONT_SIZE_TITLE, FW_BOLD);
+        let hfont_title = cached_font(FONT_SIZE_TITLE, FW_BOLD);
 
         let initial_title = format!("🌐 {}", strings.banner_root_title);
         let lbl_name = Label::create_with_id(
@@ -75,12 +74,11 @@ impl ProfileBanner {
             lbl_status,
             btn_delete,
             is_root: AtomicBool::new(true),
-            hfont_title,
         })
     }
 
     /// Updates banner display for the selected profile
-    pub fn update_profile(&self, profile: &AppProfile, is_active: bool) {
+    pub fn update_profile(&self, profile: &AppProfile) {
         let strings = crate::language::current();
         self.is_root.store(profile.is_root, Ordering::SeqCst);
 
@@ -99,11 +97,7 @@ impl ProfileBanner {
             } else {
                 profile.process_names.join(", ")
             };
-            if is_active {
-                format!("{}{}", strings.banner_status_active_prefix, proc_str)
-            } else {
-                format!("{}{}", strings.banner_status_inactive_prefix, proc_str)
-            }
+            format!("{}{}", strings.banner_status_inactive_prefix, proc_str)
         };
         self.lbl_status.set_text(&status);
 
@@ -122,10 +116,8 @@ impl ProfileBanner {
             && let Some(ref engine) = *guard
         {
             let sel_id = engine.profile_manager.selected_id.clone();
-            let act_id = engine.profile_manager.active_id.clone();
             if let Some(prof) = engine.profile_manager.get_profile(&sel_id) {
-                let is_active = sel_id == act_id;
-                self.update_profile(prof, is_active);
+                self.update_profile(prof);
             }
         }
         self.btn_delete.set_text(strings.banner_btn_delete);
@@ -154,7 +146,7 @@ impl ProfileBanner {
         None
     }
 
-    pub fn handle_delete_profile(&self, _controls: &super::ControlPanelControls, hwnd: isize) {
+    pub fn handle_delete_profile(&self, hwnd: isize) {
         let name = match crate::platform::win32::ENGINE_INSTANCE.lock() {
             Ok(guard) => guard.as_ref().and_then(|engine| {
                 let sel_id = &engine.profile_manager.selected_id;
@@ -190,21 +182,27 @@ impl ProfileBanner {
                     deleted = true;
                 }
             }
-            if deleted {
-                unsafe {
-                    let ptr = crate::ui::win32::GetWindowLongPtrW(hwnd, crate::ui::win32::GWLP_USERDATA)
-                        as *const super::ControlPanelControls;
+            if deleted
+                && let Some(c) = crate::ui::controls().or_else(|| {
+                    let ptr = unsafe {
+                        crate::ui::win32::GetWindowLongPtrW(hwnd, crate::ui::win32::GWLP_USERDATA)
+                            as *const super::ControlPanelControls
+                    };
                     if !ptr.is_null() {
-                        super::SidebarControls::switch_to_profile(&*ptr, hwnd, "global");
+                        unsafe { Some(&*ptr) }
+                    } else {
+                        None
                     }
-                }
+                })
+            {
+                super::SidebarControls::switch_to_profile(c, hwnd, "global");
             }
         });
     }
 
-    pub fn on_command(&self, hwnd: isize, ctl_id: u32, controls: &super::ControlPanelControls) -> bool {
+    pub fn on_command(&self, hwnd: isize, ctl_id: u32) -> bool {
         if ctl_id == IDC_BTN_DEL_PROFILE {
-            self.handle_delete_profile(controls, hwnd);
+            self.handle_delete_profile(hwnd);
             true
         } else {
             false
@@ -222,16 +220,6 @@ impl ProfileBanner {
                 EnableWindow(self.btn_delete.hwnd(), 1);
             } else {
                 ShowWindow(self.btn_delete.hwnd(), SW_HIDE);
-            }
-        }
-    }
-}
-
-impl Drop for ProfileBanner {
-    fn drop(&mut self) {
-        if self.hfont_title != 0 {
-            unsafe {
-                DeleteObject(self.hfont_title);
             }
         }
     }

@@ -20,6 +20,14 @@ const BADGE_MIN_W: i32 = 116;
 const BADGE_MAX_W: i32 = 690 - BADGE_X; // keep clear of the "Đổi phím" button at x=700
 const BADGE_PAD_X: i32 = 16;
 
+/// The single "Simple Telex" combo entry maps to both SimpleTelex1/2: keep whichever is stored.
+fn simple_telex_keep_variant(current: InputMethod) -> InputMethod {
+    match current {
+        InputMethod::SimpleTelex2 => InputMethod::SimpleTelex2,
+        _ => InputMethod::SimpleTelex1,
+    }
+}
+
 pub struct TabTyping {
     parent: isize,
     // Card 1: Thiết lập Bộ gõ tiếng Việt
@@ -29,8 +37,8 @@ pub struct TabTyping {
     pub lbl_method: Label,
     pub combo_method: ComboBox,
 
-    // Card 2: Phím chuyển đổi E ⇄ V
-    pub lbl_group_switch: Label,
+    // Card 2: Phím chuyển đổi E ⇄ V (Checkbox title toggles switch shortcut)
+    pub check_switch_key: CheckBox,
     pub lbl_switch_prompt: Label,
     pub lbl_switch_badge: Label,
     pub btn_switch_key: PushButton,
@@ -83,14 +91,16 @@ impl TabTyping {
         )?;
 
         // --- Card 2: Phím chuyển đổi E ⇄ V ---
-        let lbl_group_switch = Label::create(
+        let check_switch_key = CheckBox::create_with_state(
             parent,
+            IDC_CHECK_SWITCH_KEY,
             strings.typing_group_switch,
             260,
-            238,
-            260,
-            20,
+            236,
+            380,
+            24,
             hfont_bold,
+            true,
         )?;
 
         let lbl_switch_prompt =
@@ -155,21 +165,41 @@ impl TabTyping {
             false,
         )?;
 
-        Some(Self {
+        let tab = Self {
             parent,
             lbl_group_typing,
             lbl_mode,
             combo_mode,
             lbl_method,
             combo_method,
-            lbl_group_switch,
+            check_switch_key,
             lbl_switch_prompt,
             lbl_switch_badge,
             btn_switch_key,
             lbl_group_features,
             check_restore_wrong,
             check_auto_upper,
-        })
+        };
+        tab.update_switch_controls_state();
+        Some(tab)
+    }
+
+    /// Dynamically enables or disables switch-key controls based on `check_switch_key`
+    pub fn update_switch_controls_state(&self) {
+        let is_enabled = self.check_switch_key.is_checked();
+        self.lbl_switch_prompt.set_enabled(is_enabled);
+        self.lbl_switch_badge.set_enabled(is_enabled);
+        self.btn_switch_key.set_enabled(is_enabled);
+        unsafe {
+            let rc = RECT {
+                left: BADGE_X - 4,
+                top: BADGE_Y - 8,
+                right: BADGE_X + BADGE_MAX_W + 4,
+                bottom: BADGE_Y + BADGE_H + 8,
+            };
+            InvalidateRect(self.parent, &rc, 1);
+            InvalidateRect(self.lbl_switch_badge.hwnd(), std::ptr::null(), 1);
+        }
     }
 
     /// Sets the switch-key badge text and fits the label (and its painted pill) to the content.
@@ -207,6 +237,9 @@ impl TabTyping {
         };
         self.combo_method
             .reset_items(&[strings.method_telex, strings.method_vni, strings.method_simple_telex], Some(method_idx));
+
+        self.check_switch_key.set_checked(config.switch_key_enabled);
+        self.update_switch_controls_state();
 
         self.set_badge_text(&config.switch_key.display_text());
         self.btn_switch_key.set_text(strings.typing_btn_change_key);
@@ -248,6 +281,13 @@ impl TabTyping {
             self.combo_method
                 .reset_items(&method_items, Some(method_idx));
 
+            // Switch key enabled checkbox (tri-state)
+            self.check_switch_key.set_tri_state(
+                profile.switch_key_enabled,
+                global_config.switch_key_enabled,
+            );
+            self.update_switch_controls_state();
+
             // Hotkey switch badge
             let badge_text = match profile.switch_key {
                 Some(ref k) => k.display_text(),
@@ -280,10 +320,11 @@ impl TabTyping {
             match method_sel {
                 0 => config.method = InputMethod::Telex,
                 1 => config.method = InputMethod::Vni,
-                2 => config.method = InputMethod::SimpleTelex1,
+                2 => config.method = simple_telex_keep_variant(config.method),
                 _ => {}
             }
         }
+        config.switch_key_enabled = self.check_switch_key.is_checked();
         config.restore_on_wrong_spelling = self.check_restore_wrong.is_checked();
         config.auto_uppercase_first_char = self.check_auto_upper.is_checked();
     }
@@ -306,10 +347,17 @@ impl TabTyping {
                 0 => profile.method = MethodMode::Inherit,
                 1 => profile.method = MethodMode::Specific(InputMethod::Telex),
                 2 => profile.method = MethodMode::Specific(InputMethod::Vni),
-                3 => profile.method = MethodMode::Specific(InputMethod::SimpleTelex1),
+                3 => {
+                    let current = match profile.method {
+                        MethodMode::Specific(m) => m,
+                        MethodMode::Inherit => InputMethod::SimpleTelex1,
+                    };
+                    profile.method = MethodMode::Specific(simple_telex_keep_variant(current));
+                }
                 _ => {}
             }
         }
+        profile.switch_key_enabled = self.check_switch_key.tri_state();
         profile.restore_on_wrong_spelling = self.check_restore_wrong.tri_state();
         profile.auto_uppercase_first_char = self.check_auto_upper.tri_state();
     }
@@ -318,21 +366,19 @@ impl TabTyping {
         self.lbl_group_typing.set_text(strings.typing_group_main);
         self.lbl_mode.set_text(strings.typing_lbl_mode);
         self.lbl_method.set_text(strings.typing_lbl_method);
-        self.lbl_group_switch.set_text(strings.typing_group_switch);
+        self.check_switch_key.set_text(strings.typing_group_switch);
         self.lbl_switch_prompt.set_text(strings.typing_lbl_current_key);
         self.lbl_group_features.set_text(strings.typing_group_features);
         self.check_restore_wrong.set_text(strings.check_restore_wrong);
         self.check_auto_upper.set_text(strings.check_auto_upper);
 
-        if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            if sel_id == "global" {
-                self.load_config(engine.config());
-            } else if let Some(child) = engine.profile_manager.get_profile(&sel_id) {
-                self.load_profile(child, engine.config());
-            }
+        // Combo items are localized: reselect current values (engine lock released first).
+        let snap = crate::ui::controller::with_engine(|e| {
+            let pm = &e.profile_manager;
+            (pm.get_profile(&pm.selected_id).cloned(), e.config().clone())
+        });
+        if let Some((Some(profile), cfg)) = snap {
+            self.load_profile(&profile, &cfg);
         }
     }
 
@@ -340,9 +386,15 @@ impl TabTyping {
     pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
         if ctrl_id == IDC_LABEL_SWITCH_KEY_BADGE {
             let palette = crate::ui::colors::ThemePalette::get(is_dark);
+            let is_enabled = self.lbl_switch_badge.is_enabled();
+            let text_clr = if is_enabled {
+                palette.accent
+            } else {
+                palette.text_secondary
+            };
             unsafe {
                 SetBkColor(hdc, palette.bg_input);
-                SetTextColor(hdc, palette.accent);
+                SetTextColor(hdc, text_clr);
             }
             let in_br = crate::ui::theme::get_input_bg_brush();
             if in_br != 0 {
@@ -353,32 +405,38 @@ impl TabTyping {
     }
 
     pub fn on_command(&self, hwnd: isize, ctrl_id: u32, notify_code: u32) -> bool {
+        use crate::ui::controller::EditTarget;
         if ctrl_id == IDC_BTN_SWITCH_KEY {
-            crate::ui::views::dialogs::show_hotkey_dialog(hwnd);
+            if self.btn_switch_key.is_enabled() {
+                crate::ui::views::dialogs::show_hotkey_dialog(hwnd);
+            }
             return true;
         }
 
         let is_combo = (ctrl_id == IDC_COMBO_TYPING_MODE || ctrl_id == IDC_COMBO_TYPING_METHOD)
-            && notify_code == 1;
-        let is_check = (ctrl_id == IDC_CHECK_RESTORE_WRONG || ctrl_id == IDC_CHECK_AUTO_UPPER)
+            && notify_code == crate::ui::win32::CBN_SELCHANGE;
+        let is_check = (ctrl_id == IDC_CHECK_RESTORE_WRONG
+            || ctrl_id == IDC_CHECK_AUTO_UPPER
+            || ctrl_id == IDC_CHECK_SWITCH_KEY)
             && notify_code == 0;
 
         if is_combo || is_check {
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
-                    self.read_config(engine.config_mut());
-                } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                    self.read_profile(child);
-                }
-                crate::engine::config_store::save_config_all_debounced(
-                    engine.config(),
-                    &engine.macro_table,
-                    &engine.profile_manager,
-                );
+            let sw_on = self.check_switch_key.is_checked();
+            if ctrl_id == IDC_CHECK_SWITCH_KEY {
+                self.update_switch_controls_state();
             }
+            crate::ui::controller::edit_selected_then(
+                |target| match target {
+                    EditTarget::Global(cfg) => self.read_config(cfg),
+                    EditTarget::Child(child) => self.read_profile(child),
+                },
+                |engine| {
+                    let pm = &mut engine.profile_manager;
+                    if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
+                        pm.global_profile.switch_key_enabled = Some(sw_on);
+                    }
+                },
+            );
             return true;
         }
 
@@ -394,7 +452,7 @@ impl TabTyping {
             ShowWindow(self.lbl_method.hwnd(), cmd);
             ShowWindow(self.combo_method.hwnd(), cmd);
 
-            ShowWindow(self.lbl_group_switch.hwnd(), cmd);
+            ShowWindow(self.check_switch_key.hwnd(), cmd);
             ShowWindow(self.lbl_switch_prompt.hwnd(), cmd);
             ShowWindow(self.lbl_switch_badge.hwnd(), cmd);
             ShowWindow(self.btn_switch_key.hwnd(), cmd);

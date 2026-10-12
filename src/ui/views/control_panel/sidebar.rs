@@ -5,15 +5,13 @@ use crate::engine::profile::AppProfile;
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::listbox::ListBox;
 use crate::ui::win32::{
-    create_app_font, to_wide, CreatePen, CreateSolidBrush, DeleteObject, DrawTextW, FillRect,
-    InvalidateRect, RoundRect, SelectObject, SetBkColor, SetBkMode, SetTextColor, ShowWindow,
-    DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER,
-    FW_NORMAL, MEASUREITEMSTRUCT, PS_SOLID, RECT, SW_HIDE, SW_SHOW, TRANSPARENT,
+    to_wide, fill_rect_color, round_rect, DrawTextW, InvalidateRect, SelectObject, SetBkColor,
+    SetBkMode, SetTextColor, DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX,
+    DT_SINGLELINE, DT_VCENTER, FW_NORMAL, MEASUREITEMSTRUCT, RECT, TRANSPARENT,
 };
 use crate::ui::components::{ButtonVariant, Label, PushButton};
 use crate::platform::win32::ENGINE_INSTANCE;
 use super::ViewMode;
-use crate::ui::tokens::borders::*;
 use crate::ui::tokens::id::*;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::radii::*;
@@ -29,8 +27,6 @@ pub struct SidebarProfileItem {
     pub icon: String,
     pub name: String,
     pub desc: String,
-    pub is_root: bool,
-    pub is_active: bool,
 }
 
 pub struct SidebarControls {
@@ -41,9 +37,6 @@ pub struct SidebarControls {
     pub btn_about: PushButton,
     pub items: Arc<RwLock<Vec<SidebarProfileItem>>>,
     pub current_view_mode: Arc<RwLock<ViewMode>>,
-    pub hfont_normal: isize,
-    pub hfont_bold: isize,
-    pub hfont_sub: isize,
 }
 
 impl SidebarControls {
@@ -107,7 +100,7 @@ impl SidebarControls {
             hfont_normal,
         )?;
 
-        let hfont_sub = create_app_font(FONT_SIZE_SUBTITLE, FW_NORMAL);
+        let hf_sub = crate::ui::theme::cached_font(FONT_SIZE_SUBTITLE, FW_NORMAL);
 
         let items = Arc::new(RwLock::new(Vec::new()));
         let current_view_mode = Arc::new(RwLock::new(ViewMode::Profile(0)));
@@ -115,7 +108,6 @@ impl SidebarControls {
         // Setup message reflection drawers
         let items_clone = items.clone();
         let hf_bold = hfont_bold;
-        let hf_sub = hfont_sub;
         list_profiles.set_item_drawer(move |dis, is_dark| {
             if dis.item_id != u32::MAX {
                 let is_selected = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
@@ -163,9 +155,6 @@ impl SidebarControls {
             btn_about,
             items,
             current_view_mode,
-            hfont_normal,
-            hfont_bold,
-            hfont_sub,
         })
     }
 
@@ -174,7 +163,6 @@ impl SidebarControls {
         &self,
         profiles: &[&AppProfile],
         selected_id: &str,
-        active_id: &str,
     ) {
         let strings = crate::language::current();
         let mut items = Vec::new();
@@ -200,8 +188,6 @@ impl SidebarControls {
                 icon: if p.icon.is_empty() { "⌨️".to_string() } else { p.icon.clone() },
                 name,
                 desc,
-                is_root: p.is_root,
-                is_active: p.id == active_id,
             });
         }
 
@@ -224,9 +210,18 @@ impl SidebarControls {
             }
         }
         if !items.is_empty() {
-            let cur = self.list_profiles.get_selected_index().unwrap_or(-1);
-            if cur != sel_idx {
-                self.list_profiles.set_selected_index(sel_idx);
+            let in_profile_mode = if let Ok(m) = self.current_view_mode.read() {
+                matches!(*m, ViewMode::Profile(_))
+            } else {
+                true
+            };
+            if in_profile_mode {
+                let cur = self.list_profiles.get_selected_index().unwrap_or(-1);
+                if cur != sel_idx {
+                    self.list_profiles.set_selected_index(sel_idx);
+                }
+            } else {
+                self.list_profiles.set_selected_index(-1);
             }
         }
 
@@ -248,8 +243,7 @@ impl SidebarControls {
         {
             let profiles = engine.profile_manager.all_profiles();
             let sel_id = engine.profile_manager.selected_id.clone();
-            let act_id = engine.profile_manager.active_id.clone();
-            self.populate_profiles(&profiles, &sel_id, &act_id);
+            self.populate_profiles(&profiles, &sel_id);
         }
     }
 
@@ -259,26 +253,7 @@ impl SidebarControls {
         }
     }
 
-    pub fn draw_profile_item(
-        &self,
-        hdc: isize,
-        rc_item: &RECT,
-        item_id: u32,
-        is_selected: bool,
-        is_dark: bool,
-    ) {
-        Self::draw_profile_item_ext(
-            &self.items,
-            self.hfont_bold,
-            self.hfont_sub,
-            hdc,
-            rc_item,
-            item_id,
-            is_selected,
-            is_dark,
-        );
-    }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn draw_profile_item_ext(
         items: &RwLock<Vec<SidebarProfileItem>>,
         hfont_bold: isize,
@@ -293,9 +268,7 @@ impl SidebarControls {
             let palette = ThemePalette::get(is_dark);
 
             // 1. Fill entire item rectangle with sidebar background
-            let sb_br = CreateSolidBrush(palette.bg_sidebar);
-            FillRect(hdc, rc_item, sb_br);
-            DeleteObject(sb_br);
+            fill_rect_color(hdc, rc_item, palette.bg_sidebar);
 
             let item = {
                 if let Ok(guard) = items.read() {
@@ -316,17 +289,9 @@ impl SidebarControls {
                 bottom: rc_item.bottom - 2,
             };
 
-            // 2. Draw card background (rounded rect if active/selected)
+            // 2. Draw card background (rounded rect if selected)
             if is_selected {
-                let active_br = CreateSolidBrush(palette.tab_active_bg);
-                let active_pen = CreatePen(PS_SOLID, WIDTH_THIN, palette.border);
-                let ob = SelectObject(hdc, active_br);
-                let op = SelectObject(hdc, active_pen);
-                RoundRect(hdc, card_rc.left, card_rc.top, card_rc.right, card_rc.bottom, RADIUS_MD, RADIUS_MD);
-                SelectObject(hdc, ob);
-                SelectObject(hdc, op);
-                DeleteObject(active_br);
-                DeleteObject(active_pen);
+                round_rect(hdc, &card_rc, RADIUS_MD, palette.tab_active_bg, Some(palette.border));
             }
 
             SetBkMode(hdc, TRANSPARENT);
@@ -399,10 +364,7 @@ impl SidebarControls {
             };
 
             // 1. Completely erase full item bounds with sidebar background
-            // Ensures zero white borders, frames, or classic Win32 artifacts can leak through
-            let sb_br = CreateSolidBrush(palette.bg_sidebar);
-            FillRect(dis.hdc, &dis.rc_item, sb_br);
-            DeleteObject(sb_br);
+            fill_rect_color(dis.hdc, &dis.rc_item, palette.bg_sidebar);
 
             let card_rc = RECT {
                 left: dis.rc_item.left + 2,
@@ -416,25 +378,9 @@ impl SidebarControls {
 
             // 2. Draw card background (rounded rect if active, pressed, or hovered)
             if is_active || is_pressed {
-                let br = CreateSolidBrush(palette.tab_active_bg);
-                let pen = CreatePen(PS_SOLID, WIDTH_THIN, palette.border);
-                let ob = SelectObject(dis.hdc, br);
-                let op = SelectObject(dis.hdc, pen);
-                RoundRect(dis.hdc, card_rc.left, card_rc.top, card_rc.right, card_rc.bottom, RADIUS_MD, RADIUS_MD);
-                SelectObject(dis.hdc, ob);
-                SelectObject(dis.hdc, op);
-                DeleteObject(br);
-                DeleteObject(pen);
+                round_rect(dis.hdc, &card_rc, RADIUS_MD, palette.tab_active_bg, Some(palette.border));
             } else if is_hover {
-                let br = CreateSolidBrush(palette.tab_hover_bg);
-                let pen = CreatePen(PS_SOLID, WIDTH_THIN, palette.border);
-                let ob = SelectObject(dis.hdc, br);
-                let op = SelectObject(dis.hdc, pen);
-                RoundRect(dis.hdc, card_rc.left, card_rc.top, card_rc.right, card_rc.bottom, RADIUS_MD, RADIUS_MD);
-                SelectObject(dis.hdc, ob);
-                SelectObject(dis.hdc, op);
-                DeleteObject(br);
-                DeleteObject(pen);
+                round_rect(dis.hdc, &card_rc, RADIUS_MD, palette.tab_hover_bg, Some(palette.border));
             }
 
             // 3. Draw text and icon
@@ -531,56 +477,10 @@ impl SidebarControls {
         hwnd: isize,
         id: &str,
     ) {
-        let (cfg, selected_profile, is_active, all_profiles, active_id, remaps, disabled, macros) = {
-            if let Ok(mut guard) = ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                engine.profile_manager.selected_id = id.to_string();
-                let prof = engine
-                    .profile_manager
-                    .get_profile(id)
-                    .cloned()
-                    .unwrap_or_else(|| engine.profile_manager.global_profile.clone());
-                let is_act = engine.profile_manager.active_id == id;
-                let act_id = engine.profile_manager.active_id.clone();
-                let all: Vec<AppProfile> = engine
-                    .profile_manager
-                    .all_profiles()
-                    .into_iter()
-                    .cloned()
-                    .collect();
-                let r = engine.profile_manager.resolve_remap_items_for_ui(id);
-                let d = engine.profile_manager.resolve_disable_items_for_ui(id);
-                let m = engine
-                    .profile_manager
-                    .resolve_macro_items_for_ui(id, &engine.macro_table.get_sorted_entries());
-                (
-                    engine.config().clone(),
-                    prof,
-                    is_act,
-                    all,
-                    act_id,
-                    r,
-                    d,
-                    m,
-                )
-            } else {
-                return;
-            }
-        };
-
-        let all_refs: Vec<&AppProfile> = all_profiles.iter().collect();
-        controls
-            .sidebar
-            .populate_profiles(&all_refs, &selected_profile.id, &active_id);
-        controls.banner.update_profile(&selected_profile, is_active);
-        controls.tab_typing.load_profile(&selected_profile, &cfg);
-        controls.tab_remap.load_profile(&selected_profile, &cfg);
-        controls.tab_sound.load_profile(&selected_profile, &cfg);
-        controls.tab_macro.load_profile(&selected_profile, &cfg);
-        controls.tab_remap.populate_remaps(&remaps);
-        controls.tab_remap.populate_disabled(&disabled);
-        controls.populate_macro_items(&macros);
+        if crate::ui::controller::with_engine(|e| e.profile_manager.selected_id = id.to_string()).is_none() {
+            return;
+        }
+        controls.refresh_from_engine();
 
         let cur_tab = controls.tab_bar.get_cur_sel();
         controls.update_view_mode(ViewMode::Profile(cur_tab));
@@ -613,27 +513,6 @@ impl SidebarControls {
                 true
             }
             _ => false,
-        }
-    }
-
-    pub fn set_visible(&self, visible: bool) {
-        let cmd = if visible { SW_SHOW } else { SW_HIDE };
-        unsafe {
-            ShowWindow(self.lbl_title.hwnd(), cmd);
-            ShowWindow(self.btn_add_profile.hwnd(), cmd);
-            ShowWindow(self.list_profiles.hwnd(), cmd);
-            ShowWindow(self.btn_system_settings.hwnd(), cmd);
-            ShowWindow(self.btn_about.hwnd(), cmd);
-        }
-    }
-}
-
-impl Drop for SidebarControls {
-    fn drop(&mut self) {
-        unsafe {
-            if self.hfont_sub != 0 {
-                DeleteObject(self.hfont_sub);
-            }
         }
     }
 }

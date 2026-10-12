@@ -3,7 +3,6 @@
 use crate::ui::win32::*;
 use crate::ui::colors::ThemePalette;
 use crate::ui::theme::{get_app_font_bold, get_app_font_normal};
-use crate::ui::tokens::{borders, radii};
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
@@ -22,7 +21,6 @@ pub struct ButtonData {
     pub is_hover: bool,
     pub bg_erase: Option<u32>,
     pub corner_radius: i32,
-    pub show_border: bool,
     pub align_left: bool,
     pub custom_drawer: Option<ButtonCustomDrawer>,
 }
@@ -34,7 +32,6 @@ impl Default for ButtonData {
             is_hover: false,
             bg_erase: None,
             corner_radius: 6,
-            show_border: true,
             align_left: false,
             custom_drawer: None,
         }
@@ -131,10 +128,10 @@ unsafe extern "system" fn button_subclass_proc(
             };
 
         let is_dark = crate::ui::is_current_dark();
-        if let Some(ref drawer) = custom_drawer {
-            if drawer(dis, is_dark) {
-                return 1;
-            }
+        if let Some(ref drawer) = custom_drawer
+            && drawer(dis, is_dark)
+        {
+            return 1;
         }
 
         let palette = ThemePalette::get(is_dark);
@@ -289,7 +286,6 @@ impl PushButton {
                 is_hover: false,
                 bg_erase,
                 corner_radius: 6,
-                show_border: true,
                 align_left: false,
                 custom_drawer: None,
             }));
@@ -310,45 +306,9 @@ impl PushButton {
         }
     }
 
-    pub fn set_variant(&self, variant: ButtonVariant) {
-        if let Ok(mut s) = self.state.lock() {
-            s.variant = variant;
-        }
-        unsafe {
-            InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
-    pub fn set_bg_erase(&self, bg_erase: Option<u32>) {
-        if let Ok(mut s) = self.state.lock() {
-            s.bg_erase = bg_erase;
-        }
-        unsafe {
-            InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
     pub fn set_corner_radius(&self, corner_radius: i32) {
         if let Ok(mut s) = self.state.lock() {
             s.corner_radius = corner_radius;
-        }
-        unsafe {
-            InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
-    pub fn set_show_border(&self, show_border: bool) {
-        if let Ok(mut s) = self.state.lock() {
-            s.show_border = show_border;
-        }
-        unsafe {
-            InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
-    pub fn set_align_left(&self, align_left: bool) {
-        if let Ok(mut s) = self.state.lock() {
-            s.align_left = align_left;
         }
         unsafe {
             InvalidateRect(self.hwnd, null_mut(), 0);
@@ -429,86 +389,6 @@ impl PushButton {
         }
     }
 
-    /// Unified declarative button renderer directly from Win32 DRAWITEMSTRUCT
-    pub fn render_dis(
-        dis: &DRAWITEMSTRUCT,
-        text: &str,
-        variant: ButtonVariant,
-        is_dark: bool,
-        bg_erase: u32,
-    ) {
-        let is_pressed = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
-        let is_disabled = (dis.item_state & 0x0004 /* ODS_DISABLED */) != 0;
-        let is_hover = Self::is_mouse_hover(dis.hwnd_item);
-        Self::render_ext_state(
-            dis.hdc,
-            &dis.rc_item,
-            text,
-            variant,
-            is_pressed,
-            is_hover,
-            is_disabled,
-            is_dark,
-            bg_erase,
-            6,
-            false,
-        );
-    }
-
-    /// Unified Fluent Design Button Renderer
-    #[allow(clippy::too_many_arguments)]
-    pub fn render(
-        hdc: isize,
-        rc: &RECT,
-        text: &str,
-        variant: ButtonVariant,
-        is_pressed: bool,
-        is_disabled: bool,
-        is_dark: bool,
-        bg_erase: u32,
-    ) {
-        Self::render_ext_state(
-            hdc, rc, text, variant, is_pressed, false, is_disabled, is_dark, bg_erase, 6, false,
-        );
-    }
-
-    /// Unified Fluent Design Button Renderer with explicit hover state
-    #[allow(clippy::too_many_arguments)]
-    pub fn render_state(
-        hdc: isize,
-        rc: &RECT,
-        text: &str,
-        variant: ButtonVariant,
-        is_pressed: bool,
-        is_hover: bool,
-        is_disabled: bool,
-        is_dark: bool,
-        bg_erase: u32,
-    ) {
-        Self::render_ext_state(
-            hdc, rc, text, variant, is_pressed, is_hover, is_disabled, is_dark, bg_erase, radii::RADIUS_MD, false,
-        );
-    }
-
-    /// Unified Fluent Design Button Renderer with custom border radius and text alignment
-    #[allow(clippy::too_many_arguments)]
-    pub fn render_ext(
-        hdc: isize,
-        rc: &RECT,
-        text: &str,
-        variant: ButtonVariant,
-        is_pressed: bool,
-        is_disabled: bool,
-        is_dark: bool,
-        bg_erase: u32,
-        radius: i32,
-        align_left: bool,
-    ) {
-        Self::render_ext_state(
-            hdc, rc, text, variant, is_pressed, false, is_disabled, is_dark, bg_erase, radius, align_left,
-        );
-    }
-
     /// Unified Fluent Design Button Renderer with explicit hover state, radius, and alignment
     #[allow(clippy::too_many_arguments)]
     pub fn render_ext_state(
@@ -544,14 +424,7 @@ impl PushButton {
                             palette.text_secondary,
                             get_app_font_bold(),
                         )
-                    } else if is_pressed {
-                        (
-                            palette.accent_hover,
-                            palette.accent_hover,
-                            palette.text_white,
-                            get_app_font_bold(),
-                        )
-                    } else if is_hover {
+                    } else if is_pressed || is_hover {
                         (
                             palette.accent_hover,
                             palette.accent_hover,
@@ -656,15 +529,7 @@ impl PushButton {
             };
 
             // 3. Paint Rounded Pill
-            let br = CreateSolidBrush(btn_color);
-            let pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, border_color);
-            let ob = SelectObject(hdc, br);
-            let op = SelectObject(hdc, pen);
-            RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radius, radius);
-            SelectObject(hdc, ob);
-            SelectObject(hdc, op);
-            DeleteObject(br);
-            DeleteObject(pen);
+            round_rect(hdc, rc, radius, btn_color, Some(border_color));
 
             // 4. Paint Label Text
             SetBkMode(hdc, TRANSPARENT);

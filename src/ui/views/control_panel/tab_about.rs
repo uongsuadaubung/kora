@@ -18,6 +18,7 @@ pub struct TabAbout {
     pub label_about_title: Label,
     pub label_about_author: Label,
     pub label_about_engine: Label,
+    pub btn_check_update: PushButton,
     pub btn_github: PushButton,
     pub hfont_title: isize,
 }
@@ -84,16 +85,29 @@ impl TabAbout {
             hfont_normal,
         )?;
 
+        let btn_check_update = PushButton::create_with_variant(
+            parent,
+            IDC_BTN_CHECK_UPDATE,
+            strings.btn_check_update,
+            362,
+            266,
+            156,
+            32,
+            hfont_bold,
+            ButtonVariant::Primary,
+            None,
+        )?;
+
         let btn_github = PushButton::create_with_variant(
             parent,
             IDC_BTN_GITHUB,
             strings.about_github_btn,
-            446,
+            534,
             266,
-            160,
+            156,
             32,
             hfont_bold,
-            ButtonVariant::Primary,
+            ButtonVariant::Secondary,
             None,
         )?;
 
@@ -103,6 +117,7 @@ impl TabAbout {
             label_about_title,
             label_about_author,
             label_about_engine,
+            btn_check_update,
             btn_github,
             hfont_title,
         })
@@ -116,12 +131,37 @@ impl TabAbout {
             ShowWindow(self.label_about_title.hwnd(), show_cmd);
             ShowWindow(self.label_about_author.hwnd(), show_cmd);
             ShowWindow(self.label_about_engine.hwnd(), show_cmd);
+            ShowWindow(self.btn_check_update.hwnd(), show_cmd);
             ShowWindow(self.btn_github.hwnd(), show_cmd);
         }
     }
 
-    pub fn on_command(&self, _hwnd: isize, ctl_id: u32) -> bool {
+    pub fn on_command(&self, hwnd: isize, ctl_id: u32) -> bool {
         match ctl_id {
+            IDC_BTN_CHECK_UPDATE => {
+                let hwnd_panel = hwnd;
+                let strings = crate::language::current();
+                self.btn_check_update.set_text(strings.btn_checking_update);
+                self.btn_check_update.set_enabled(false);
+
+                std::thread::spawn(move || {
+                    let status = Box::new(crate::updater::check_for_updates());
+                    let ptr = Box::into_raw(status);
+                    // Ownership passes to the UI thread (WM_APP_UPDATE_CHECKED handler)
+                    let posted = unsafe {
+                        crate::ui::win32::PostMessageW(
+                            hwnd_panel,
+                            crate::ui::WM_APP_UPDATE_CHECKED,
+                            0,
+                            ptr as isize,
+                        )
+                    };
+                    if posted == 0 {
+                        drop(unsafe { Box::from_raw(ptr) });
+                    }
+                });
+                true
+            }
             IDC_BTN_GITHUB => {
                 crate::ui::wnd_proc::tray::open_url("https://github.com/uongsuadaubung/kora");
                 true
@@ -188,7 +228,15 @@ impl TabAbout {
         self.label_about_title.set_text(strings.about_title);
         self.label_about_author.set_text(strings.about_author);
         self.label_about_engine.set_text(strings.about_engine_desc);
+        self.btn_check_update.set_text(strings.btn_check_update);
         self.btn_github.set_text(strings.about_github_btn);
+    }
+
+    /// UI-thread completion of the background update check (see WM_APP_UPDATE_CHECKED).
+    pub fn on_update_checked(&self) {
+        self.btn_check_update
+            .set_text(crate::language::current().btn_check_update);
+        self.btn_check_update.set_enabled(true);
     }
 }
 

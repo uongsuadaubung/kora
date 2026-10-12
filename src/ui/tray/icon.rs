@@ -55,22 +55,15 @@ impl TrayIcon {
         }
     }
 
-    pub fn set_icon(&mut self, hicon: isize) {
-        self.nid.h_icon = hicon;
-        self.nid.u_flags |= NIF_ICON;
-        if self.is_added {
-            unsafe {
-                Shell_NotifyIconW(NIM_MODIFY, &mut self.nid);
-            }
+    /// Updates icon and tooltip with a single Shell_NotifyIconW round-trip to Explorer.
+    pub fn update(&mut self, hicon: isize, tip: &str) {
+        if hicon != 0 {
+            self.nid.h_icon = hicon;
         }
-    }
-
-    pub fn set_tooltip(&mut self, text: &str) {
-        let wide: Vec<u16> = OsStr::new(text).encode_wide().chain(Some(0)).collect();
+        let wide: Vec<u16> = OsStr::new(tip).encode_wide().collect();
         let len = wide.len().min(127);
         self.nid.sz_tip[..len].copy_from_slice(&wide[..len]);
         self.nid.sz_tip[len] = 0;
-        self.nid.u_flags |= NIF_TIP;
         if self.is_added {
             unsafe {
                 Shell_NotifyIconW(NIM_MODIFY, &mut self.nid);
@@ -87,6 +80,12 @@ impl TrayIcon {
             }
         }
         false
+    }
+
+    /// Re-adds the icon after Explorer restarted ("TaskbarCreated"): the old icon is gone.
+    pub fn readd(&mut self) -> bool {
+        self.is_added = false;
+        self.show()
     }
 
     pub fn hide(&mut self) -> bool {

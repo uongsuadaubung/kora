@@ -44,26 +44,23 @@ pub fn show_remap_dialog(parent: isize) {
     show_remap_dialog_with_keys(parent, None, None);
 }
 
+static REGISTERED: std::sync::Once = std::sync::Once::new();
+const CLASS_NAME: &str = "KoraRemapDialogClass";
+
 /// Displays the modal Key Remap Dialog with optional initial keys for editing
 pub fn show_remap_dialog_with_keys(parent: isize, initial_from: Option<u32>, initial_to: Option<u32>) {
-    let class_name = to_wide("KoraRemapDialogClass");
+    register_class_once(&REGISTERED, CLASS_NAME, remap_dialog_wnd_proc, 0);
 
     unsafe {
-        let mut wc: WNDCLASSEXW = std::mem::zeroed();
-        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-        wc.lpfn_wnd_proc = Some(remap_dialog_wnd_proc);
-        wc.h_instance = 0;
-        wc.h_cursor = LoadCursorW(0, IDC_ARROW);
-        wc.lpsz_class_name = class_name.as_ptr();
-        RegisterClassExW(&wc);
-
+        let class_name = to_wide(CLASS_NAME);
         DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
 
         let strings = crate::language::current();
         let default_root_name = format!("🌐 {}", strings.banner_root_title);
         let target_display = {
-            let guard = ENGINE_INSTANCE.lock().unwrap();
-            if let Some(ref engine) = *guard {
+            if let Ok(guard) = ENGINE_INSTANCE.lock()
+                && let Some(ref engine) = *guard
+            {
                 let sel_id = engine.profile_manager.selected_id.clone();
                 if sel_id == "global" {
                     default_root_name
@@ -152,30 +149,6 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
-    const WM_CREATE: u32 = 0x0001;
-    const WM_DESTROY: u32 = 0x0002;
-    const WM_COMMAND: u32 = 0x0111;
-    const WM_DRAWITEM: u32 = 0x002B;
-    const WM_PAINT: u32 = 0x000F;
-    const WM_ERASEBKGND: u32 = 0x0014;
-    const WM_CLOSE: u32 = 0x0010;
-    const WM_KEYDOWN: u32 = 0x0100;
-    const WM_SYSKEYDOWN: u32 = 0x0104;
-
-    #[repr(C)]
-    #[allow(non_camel_case_types)]
-    struct DRAWITEMSTRUCT {
-        ctl_type: u32,
-        ctl_id: u32,
-        item_id: u32,
-        item_action: u32,
-        item_state: u32,
-        hwnd_item: isize,
-        hdc: isize,
-        rc_item: RECT,
-        item_data: usize,
-    }
-
     unsafe {
         match msg {
             WM_CREATE => {
@@ -272,7 +245,7 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                             0
                         };
 
-                        let wide_text = to_wide(&text);
+                        let wide_text = to_wide(text);
                         let mut rc = dis.rc_item;
                         DrawTextW(
                             dis.hdc,
@@ -362,7 +335,7 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                             0
                         };
 
-                        let wide_text = to_wide(&text);
+                        let wide_text = to_wide(text);
                         let mut rc = dis.rc_item;
                         DrawTextW(
                             dis.hdc,
@@ -726,6 +699,28 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 }
                 0
             }
+            WM_ACTIVATE => {
+                if (wparam & 0xFFFF) == 0 {
+                    let mut h_from = 0;
+                    let mut h_to = 0;
+                    if let Ok(mut guard) = STATE.lock()
+                        && let Some(ref mut st) = *guard
+                        && st.active_target != ActiveCaptureTarget::None
+                    {
+                        st.active_target = ActiveCaptureTarget::None;
+                        h_from = st.hwnd_from_box;
+                        h_to = st.hwnd_to_box;
+                    }
+                    stop_single_key_capture();
+                    if h_from != 0 {
+                        InvalidateRect(h_from, null_mut(), 1);
+                    }
+                    if h_to != 0 {
+                        InvalidateRect(h_to, null_mut(), 1);
+                    }
+                }
+                0
+            }
             WM_COMMAND => {
                 let control_id = (wparam & 0xFFFF) as u32;
                 match control_id {
@@ -791,15 +786,17 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                         PostMessageW(hwnd, WM_CLOSE, 0, 0);
                     }
                     IDC_BTN_REMAP_APPLY => {
+                        stop_single_key_capture();
                         let (orig_from, from_opt, to_opt) = STATE
                             .lock()
                             .ok()
                             .and_then(|g| g.as_ref().map(|s| (s.original_from_vk, s.from_vk, s.to_vk)))
                             .unwrap_or((None, None, None));
 
-                        if let (Some(from), Some(to)) = (from_opt, to_opt) {
-                            if from != 0 && to != 0 && from != to {
-                                let mut changed = false;
+                        if let (Some(from), Some(to)) = (from_opt, to_opt)
+                            && from != 0 && to != 0 && from != to
+                        {
+                            let mut changed = false;
                             if let Ok(mut guard) = ENGINE_INSTANCE.lock()
                                 && let Some(ref mut engine) = *guard
                             {
@@ -840,20 +837,11 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                             }
 
                             if changed {
-                                if let Ok(guard) = ENGINE_INSTANCE.lock()
-                                    && let Some(ref engine) = *guard
-                                    && let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                                    && let Some(ref ui) = *ui_guard
-                                {
-                                    let sel_id = engine.profile_manager.selected_id.clone();
-                                    let remap_items = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-                                    ui.controls.tab_remap.populate_remaps(&remap_items);
-                                }
+                                crate::ui::controller::refresh_remap_list();
                             }
 
                             PostMessageW(hwnd, WM_CLOSE, 0, 0);
                         }
-                    }
                     }
                     _ => {}
                 }
@@ -862,10 +850,32 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
             WM_KEYDOWN | WM_SYSKEYDOWN => {
                 let vk = wparam as u32;
                 if vk == 0x1B {
-                    // Escape closes dialog when not actively capturing
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    let mut was_capturing = false;
+                    let mut h_from = 0;
+                    let mut h_to = 0;
+                    if let Ok(mut guard) = STATE.lock()
+                        && let Some(ref mut st) = *guard
+                        && st.active_target != ActiveCaptureTarget::None
+                    {
+                        st.active_target = ActiveCaptureTarget::None;
+                        was_capturing = true;
+                        h_from = st.hwnd_from_box;
+                        h_to = st.hwnd_to_box;
+                    }
+                    stop_single_key_capture();
+                    if was_capturing {
+                        if h_from != 0 {
+                            InvalidateRect(h_from, null_mut(), 1);
+                        }
+                        if h_to != 0 {
+                            InvalidateRect(h_to, null_mut(), 1);
+                        }
+                    } else {
+                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    }
+                    return 0;
                 }
-                0
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_ERASEBKGND => 1,
             WM_CLOSE => {

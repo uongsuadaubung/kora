@@ -5,12 +5,12 @@ use crate::ui::colors::ThemePalette;
 use crate::ui::win32::*;
 use crate::ui::views::ControlPanelControls;
 use std::ptr::null_mut;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 
 static PANEL_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static TAB_CARD_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static INPUT_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
-static BORDER_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static SIDEBAR_BG_BRUSH: AtomicIsize = AtomicIsize::new(0);
 static CURRENT_IS_DARK: AtomicBool = AtomicBool::new(false);
 static IS_APPLYING_THEME: AtomicBool = AtomicBool::new(false);
@@ -19,20 +19,26 @@ pub fn is_current_dark() -> bool {
     CURRENT_IS_DARK.load(Ordering::Relaxed)
 }
 
-static APP_FONT_NORMAL: AtomicIsize = AtomicIsize::new(0);
-static APP_FONT_BOLD: AtomicIsize = AtomicIsize::new(0);
-
-pub fn set_app_fonts(normal: isize, bold: isize) {
-    APP_FONT_NORMAL.store(normal, Ordering::Relaxed);
-    APP_FONT_BOLD.store(bold, Ordering::Relaxed);
+/// Process-lifetime font cache keyed by (point size, weight). Only a handful of sizes are used,
+/// so fonts are created once and never freed: no per-paint CreateFontW/DeleteObject churn and
+/// no per-dialog leaks.
+pub fn cached_font(point_size: i32, weight: i32) -> isize {
+    static CACHE: Mutex<Vec<(i32, i32, isize)>> = Mutex::new(Vec::new());
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(&(_, _, f)) = cache.iter().find(|&&(s, w, _)| s == point_size && w == weight) {
+        return f;
+    }
+    let f = create_app_font(point_size, weight);
+    cache.push((point_size, weight, f));
+    f
 }
 
 pub fn get_app_font_normal() -> isize {
-    APP_FONT_NORMAL.load(Ordering::Relaxed)
+    cached_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_NORMAL)
 }
 
 pub fn get_app_font_bold() -> isize {
-    APP_FONT_BOLD.load(Ordering::Relaxed)
+    cached_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_SEMIBOLD)
 }
 
 pub fn get_panel_bg_brush() -> isize {
@@ -54,7 +60,7 @@ pub fn get_sidebar_bg_brush() -> isize {
 /// Resolves whether dark mode should be active given the theme setting
 pub fn resolve_is_dark(theme: UiTheme) -> bool {
     match theme {
-        UiTheme::Auto => crate::ui::tray::is_windows_dark_taskbar(),
+        UiTheme::Auto => crate::ui::tray::is_windows_dark_apps(),
         UiTheme::Light => false,
         UiTheme::Dark => true,
     }
@@ -95,14 +101,6 @@ pub fn recreate_theme_brushes(is_dark: bool) {
     );
     if old_input != 0 {
         unsafe { DeleteObject(old_input) };
-    }
-
-    let old_border = BORDER_BRUSH.swap(
-        unsafe { CreateSolidBrush(palette.border) },
-        Ordering::Relaxed,
-    );
-    if old_border != 0 {
-        unsafe { DeleteObject(old_border) };
     }
 }
 
@@ -181,10 +179,6 @@ pub fn apply_ui_theme(hwnd: isize, controls: &ControlPanelControls, is_dark: boo
     // Automatically enumerate and theme all child controls (Buttons, CheckBoxes, Combos, Edits, Labels)
     unsafe {
         EnumChildWindows(hwnd, Some(enum_child_theme_proc), is_dark as isize);
-
-        // Redraw TabBar with updated colors
-        InvalidateRect(controls.tab_bar.hwnd(), null_mut(), 1);
-        UpdateWindow(controls.tab_bar.hwnd());
 
         // Theme ListViews
         controls.tab_macro.list_macro.apply_theme(is_dark);

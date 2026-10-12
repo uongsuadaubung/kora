@@ -27,7 +27,6 @@ const WM_CTLCOLORLISTBOX: u32 = 0x0134;
 const WM_CTLCOLORSTATIC: u32 = 0x0138;
 
 /// Control Panel Dialog window procedure
-/// Control Panel Dialog window procedure
 #[allow(clippy::missing_safety_doc)]
 pub unsafe extern "system" fn control_panel_wnd_proc(
     hwnd: isize,
@@ -35,15 +34,17 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
-    // 1. Direct Lock-Free Window State Access via GWLP_USERDATA
-    let controls_ptr = unsafe {
-        GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls
-    };
-    let controls = if !controls_ptr.is_null() {
-        unsafe { Some(&*controls_ptr) }
-    } else {
-        None
-    };
+    // 1. Direct Lock-Free Window State Access via thread-local UI with GWLP_USERDATA fallback
+    let controls = crate::ui::controls().or_else(|| {
+        let controls_ptr = unsafe {
+            GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls
+        };
+        if !controls_ptr.is_null() {
+            unsafe { Some(&*controls_ptr) }
+        } else {
+            None
+        }
+    });
 
     match msg {
         WM_ERASEBKGND => 1,
@@ -62,10 +63,10 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
         }
         WM_MEASUREITEM => {
             let mis = unsafe { &mut *(lparam as *mut MEASUREITEMSTRUCT) };
-            if let Some(c) = controls {
-                if c.on_measure_item(mis) {
-                    return 1;
-                }
+            if let Some(c) = controls
+                && c.on_measure_item(mis)
+            {
+                return 1;
             }
             0
         }
@@ -81,27 +82,38 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             0
         }
         WM_SETTINGCHANGE => {
-            let cfg_theme = {
-                if let Ok(guard) = ENGINE_INSTANCE.lock()
-                    && let Some(ref engine) = *guard
+            // Broadcast for many unrelated reasons (env vars, clock, ...): only react to
+            // "ImmersiveColorSet" and only when the resolved dark/light state really changes.
+            if lparam != 0 && unsafe { wide_ptr_eq(lparam as *const u16, "ImmersiveColorSet") } {
+                let cfg_theme = ENGINE_INSTANCE
+                    .lock()
+                    .ok()
+                    .and_then(|g| g.as_ref().map(|e| e.config().theme))
+                    .unwrap_or(crate::engine::config::UiTheme::Auto);
+                if cfg_theme == crate::engine::config::UiTheme::Auto
+                    && let Some(c) = controls
                 {
-                    engine.config().theme
-                } else {
-                    crate::engine::config::UiTheme::Auto
+                    let is_dark = resolve_is_dark(cfg_theme);
+                    if is_dark != is_current_dark() {
+                        apply_ui_theme(hwnd, c, is_dark);
+                    }
                 }
-            };
-            if cfg_theme == crate::engine::config::UiTheme::Auto
-                && let Some(c) = controls
-            {
-                let is_dark = resolve_is_dark(cfg_theme);
-                apply_ui_theme(hwnd, c, is_dark);
             }
             0
         }
         WM_HSCROLL => {
             if let Some(c) = controls {
-                c.on_hscroll(lparam);
+                c.on_hscroll(wparam, lparam);
             }
+            0
+        }
+        crate::ui::WM_APP_UPDATE_CHECKED => {
+            // lparam owns a Box<UpdateStatus> handed over by the update-check worker thread
+            let status = unsafe { Box::from_raw(lparam as *mut crate::updater::UpdateStatus) };
+            if let Some(c) = controls {
+                c.tab_about.on_update_checked();
+            }
+            crate::updater::show_update_result_dialog(hwnd, &status);
             0
         }
         WM_COMMAND => commands::handle_command(hwnd, wparam, lparam, controls),
@@ -119,15 +131,24 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
         WM_CTLCOLOREDIT | WM_CTLCOLORLISTBOX => {
             colors::handle_ctlcolor_edit_listbox(hwnd, msg, wparam, lparam)
         }
-        WM_CTLCOLORSTATIC => colors::handle_ctlcolor_static(hwnd, msg, wparam, lparam),
+        WM_CTLCOLORSTATIC => colors::handle_ctlcolor_static(hwnd, msg, wparam, lparam, controls),
         WM_SETCURSOR => colors::handle_setcursor(hwnd, msg, wparam, lparam),
         WM_CLOSE => {
-            unsafe {
-                ShowWindow(hwnd, SW_HIDE);
-            }
-            crate::platform::win32::trim_working_set();
+            crate::ui::hide_control_panel();
             0
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
+}
+
+/// Compares a NUL-terminated UTF-16 string with an ASCII literal.
+unsafe fn wide_ptr_eq(p: *const u16, s: &str) -> bool {
+    let mut i = 0usize;
+    for b in s.bytes() {
+        if unsafe { *p.add(i) } != b as u16 {
+            return false;
+        }
+        i += 1;
+    }
+    unsafe { *p.add(i) == 0 }
 }

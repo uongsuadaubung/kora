@@ -1,4 +1,4 @@
-﻿//! FAQ accordion component
+//! FAQ accordion component
 
 pub fn render() -> &'static str {
     r####"  <!-- FAQ Section -->
@@ -34,10 +34,10 @@ pub fn render() -> &'static str {
         <div class="faq-card">
           <div class="faq-q">
             <span class="faq-icon">⚡</span>
-            <h3>Tôi có cần gỡ UniKey hoặc OpenKey cũ không?</h3>
+            <h3>Tôi có cần gỡ các bộ gõ khác trên máy không?</h3>
           </div>
           <p class="faq-a">
-            Bạn không nhất thiết phải gỡ cài đặt, nhưng <strong>cần tắt hoặc thoát hoàn toàn</strong> các bộ gõ cũ (UniKey, OpenKey, EVKey...) trước khi bật Kora. Nếu để 2 bộ gõ cùng chạy ngầm song song, cả hai sẽ cùng bắt phím và gây ra lỗi lặp hoặc nhảy ký tự.
+            Bạn không nhất thiết phải gỡ cài đặt, nhưng <strong>cần tắt hoặc thoát hoàn toàn</strong> các bộ gõ khác đang chạy ngầm trước khi bật Kora. Nếu để 2 bộ gõ cùng chạy song song, cả hai sẽ cùng can thiệp phím và gây ra hiện tượng lặp hoặc nhảy ký tự.
           </p>
         </div>
 
@@ -48,6 +48,16 @@ pub fn render() -> &'static str {
           </div>
           <p class="faq-a">
             Mặc định bạn có thể dùng tổ hợp phím <code>Ctrl + Shift</code> hoặc click chuột trái trực tiếp vào biểu tượng icon <strong>V</strong> / <strong>E</strong> ở khay hệ thống. Ngoài ra, trong Bảng điều khiển bạn hoàn toàn có thể <strong>tự do đổi sang bất kỳ phím tắt nào</strong> (như <code>Ctrl + Space</code>, <code>Alt + Z</code>...) bằng cửa sổ nhận diện phím bấm trực quan, hoặc tắt hẳn phím chuyển nếu không muốn bị bấm nhầm.
+          </p>
+        </div>
+
+        <div class="faq-card">
+          <div class="faq-q">
+            <span class="faq-icon">🌙</span>
+            <h3>Máy tính Sleep hoặc khóa màn hình xong có bị mất tiếng Việt không?</h3>
+          </div>
+          <p class="faq-a">
+            <strong>Hoàn toàn không!</strong> Kora được trang bị cơ chế tự phục hồi thông minh: dù bạn gập laptop, bấm khóa màn hình hay để máy tự ngủ sau thời gian dài, ngay khi bạn mở máy và đăng nhập lại, Kora sẽ tự động làm mới trạng thái để bạn tiếp tục gõ tiếng Việt mượt mà ngay lập tức — không lo bị mất tiếng Việt, kẹt phím hay nhảy chữ hoa kỳ dị (như <code>gÕ</code>, <code>tiẾng ViỆt</code>).
           </p>
         </div>
       </div>

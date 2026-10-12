@@ -19,8 +19,6 @@ const WM_MOUSELEAVE: u32 = 0x02A3;
 const WM_SETCURSOR: u32 = 0x0020;
 const WM_COMMAND: u32 = 0x0111;
 
-pub type TabBarCallback = Arc<dyn Fn(usize) + Send + Sync>;
-
 pub struct TabBarState {
     pub tabs: Vec<String>,
     pub cur_sel: usize,
@@ -29,7 +27,6 @@ pub struct TabBarState {
     pub font_bold: isize,
     pub parent: isize,
     pub control_id: u32,
-    pub on_change: Option<TabBarCallback>,
 }
 
 static REGISTER_CLASS_ONCE: Once = Once::new();
@@ -89,7 +86,7 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                 GetClientRect(hwnd, &mut rc);
                 let w = rc.right - rc.left;
                 if w > 0 {
-                    let x = (lparam & 0xFFFF) as i32;
+                    let x = (lparam as i16) as i32;
                     let changed = if let Ok(mut g) = state_mutex.lock() {
                         let num_tabs = g.tabs.len();
                         if num_tabs > 0 {
@@ -141,8 +138,8 @@ unsafe extern "system" fn tab_bar_wnd_proc(
             }
             let w = rc.right - rc.left;
             if w > 0 {
-                let x = (lparam & 0xFFFF) as i32;
-                let (changed, new_idx, parent, id, cb) = if let Ok(mut g) = state_mutex.lock() {
+                let x = (lparam as i16) as i32;
+                let (changed, parent, id) = if let Ok(mut g) = state_mutex.lock() {
                     let num_tabs = g.tabs.len();
                     if num_tabs > 0 {
                         let track_padding = 3;
@@ -152,23 +149,20 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                         let old = g.cur_sel;
                         if old != idx {
                             g.cur_sel = idx;
-                            (true, idx, g.parent, g.control_id, g.on_change.clone())
+                            (true, g.parent, g.control_id)
                         } else {
-                            (false, idx, 0, 0, None)
+                            (false, 0, 0)
                         }
                     } else {
-                        (false, 0, 0, 0, None)
+                        (false, 0, 0)
                     }
                 } else {
-                    (false, 0, 0, 0, None)
+                    (false, 0, 0)
                 };
 
                 if changed {
                     unsafe {
                         InvalidateRect(hwnd, null_mut(), 0);
-                    }
-                    if let Some(cb) = cb {
-                        cb(new_idx);
                     }
                     if parent != 0 {
                         unsafe {
@@ -357,7 +351,6 @@ impl TabBar {
             font_bold: hfont_bold,
             parent,
             control_id: id,
-            on_change: None,
         }));
 
         let raw_state = Arc::into_raw(state.clone());
@@ -406,24 +399,6 @@ impl TabBar {
         }
     }
 
-    pub fn set_cur_sel(&self, index: usize) {
-        let changed = if let Ok(mut g) = self.state.lock() {
-            if index < g.tabs.len() && g.cur_sel != index {
-                g.cur_sel = index;
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-        if changed {
-            unsafe {
-                InvalidateRect(self.hwnd, null_mut(), 0);
-            }
-        }
-    }
-
     pub fn set_tabs(&self, tabs: &[impl AsRef<str>]) {
         if let Ok(mut g) = self.state.lock() {
             g.tabs = tabs.iter().map(|s| s.as_ref().to_string()).collect();
@@ -433,12 +408,6 @@ impl TabBar {
         }
         unsafe {
             InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
-    pub fn set_on_change<F: Fn(usize) + Send + Sync + 'static>(&self, f: F) {
-        if let Ok(mut g) = self.state.lock() {
-            g.on_change = Some(Arc::new(f));
         }
     }
 

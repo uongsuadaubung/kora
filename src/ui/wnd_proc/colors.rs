@@ -42,7 +42,13 @@ pub fn handle_ctlcolor_edit_listbox(hwnd: isize, msg: u32, wparam: usize, lparam
     }
 }
 
-pub fn handle_ctlcolor_static(hwnd: isize, msg: u32, wparam: usize, lparam: isize) -> isize {
+pub fn handle_ctlcolor_static(
+    hwnd: isize,
+    msg: u32,
+    wparam: usize,
+    lparam: isize,
+    controls: Option<&crate::ui::views::ControlPanelControls>,
+) -> isize {
     let hdc = wparam as isize;
     let hwnd_ctrl = lparam;
     unsafe {
@@ -68,9 +74,8 @@ pub fn handle_ctlcolor_static(hwnd: isize, msg: u32, wparam: usize, lparam: isiz
             let ctrl_id = GetDlgCtrlID(hwnd_ctrl) as u32;
             SetBkMode(hdc, TRANSPARENT);
 
-            if let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                && let Some(ref ui) = *ui_guard
-                && let Some(br) = ui.controls.on_ctlcolor_static(hdc, ctrl_id, is_current_dark())
+            if let Some(c) = controls
+                && let Some(br) = c.on_ctlcolor_static(hdc, ctrl_id, is_current_dark())
             {
                 return br;
             }

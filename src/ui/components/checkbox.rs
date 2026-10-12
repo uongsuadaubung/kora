@@ -424,27 +424,6 @@ impl CheckBox {
         Some(cb)
     }
 
-    /// Declarative helper: create a CheckBox with initial checked state and custom background color
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_fluent(
-        parent: isize,
-        id: u32,
-        text: &str,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        hfont: isize,
-        checked: bool,
-        bg_color: Option<u32>,
-    ) -> Option<Self> {
-        let cb = Self::create_ext(parent, id, text, x, y, width, height, hfont, bg_color)?;
-        if checked {
-            cb.set_checked(true);
-        }
-        Some(cb)
-    }
-
     pub fn hwnd(&self) -> isize {
         self.hwnd
     }
@@ -492,10 +471,6 @@ impl CheckBox {
         }
     }
 
-    pub fn toggle(&self) {
-        self.set_checked(!self.is_checked());
-    }
-
     /// Draws box + label (+ inherit note) flush against the right edge of the control
     pub fn set_align_right(&self, right: bool) {
         unsafe { SendMessageW(self.hwnd, CBM_SET_ALIGN_RIGHT, right as usize, 0) };
@@ -509,19 +484,11 @@ impl CheckBox {
         }
     }
 
-    pub fn is_enabled(&self) -> bool {
-        unsafe { IsWindowEnabled(self.hwnd) != 0 }
-    }
-
     pub fn set_enabled(&self, enabled: bool) {
         unsafe {
             EnableWindow(self.hwnd, enabled as i32);
             InvalidateRect(self.hwnd, null_mut(), 1);
         }
-    }
-
-    pub fn is_visible(&self) -> bool {
-        unsafe { IsWindowVisible(self.hwnd) != 0 }
     }
 
     pub fn set_visible(&self, visible: bool) {

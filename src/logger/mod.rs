@@ -13,13 +13,13 @@ pub struct AsyncLogWriter {
 }
 
 impl AsyncLogWriter {
-    pub fn new(path: Option<String>) -> Self {
+    pub fn new(path: Option<std::sync::Arc<str>>) -> Self {
         if let Some(path) = path {
             let (tx, rx) = channel::<String>();
             let file = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(&path);
+                .open(&*path);
 
             if let Ok(mut file) = file {
                 let _ = std::thread::Builder::new()

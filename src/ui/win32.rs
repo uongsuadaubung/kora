@@ -91,7 +91,6 @@ pub struct NMLVCUSTOMDRAW {
     pub u_align: u32,
 }
 
-pub const GWLP_WNDPROC: i32 = -4;
 pub const GWL_STYLE: i32 = -16;
 
 #[link(name = "user32")]
@@ -167,13 +166,6 @@ unsafe extern "system" {
     pub fn ReleaseDC(h_wnd: isize, hdc: isize) -> i32;
     pub fn SetWindowLongPtrW(h_wnd: isize, n_index: i32, dw_new_long: isize) -> isize;
     pub fn GetWindowLongPtrW(h_wnd: isize, n_index: i32) -> isize;
-    pub fn CallWindowProcW(
-        lp_prev_wnd_func: unsafe extern "system" fn(isize, u32, usize, isize) -> isize,
-        h_wnd: isize,
-        msg: u32,
-        w_param: usize,
-        l_param: isize,
-    ) -> isize;
     pub fn GetClassNameW(h_wnd: isize, lp_class_name: *mut u16, n_max_count: i32) -> i32;
     pub fn CreatePen(i_style: i32, c_width: i32, color: u32) -> isize;
     pub fn SelectObject(hdc: isize, h: isize) -> isize;
@@ -241,46 +233,60 @@ unsafe extern "system" {
         y_src: i32,
         rop: u32,
     ) -> i32;
-    pub fn SetScrollInfo(hwnd: isize, n_bar: i32, lpsi: *const SCROLLINFO, redraw: i32) -> i32;
-    pub fn GetScrollInfo(hwnd: isize, n_bar: i32, lpsi: *mut SCROLLINFO) -> i32;
     pub fn SetCapture(h_wnd: isize) -> isize;
     pub fn ReleaseCapture() -> i32;
+    pub fn SetTimer(
+        h_wnd: isize,
+        n_id_event: usize,
+        u_elapse: u32,
+        lp_timer_func: Option<unsafe extern "system" fn(isize, u32, usize, u32)>,
+    ) -> usize;
+    pub fn KillTimer(h_wnd: isize, u_id_event: usize) -> i32;
+    pub fn IsDialogMessageW(h_dlg: isize, lp_msg: *const std::ffi::c_void) -> i32;
+    pub fn GetActiveWindow() -> isize;
+    pub fn GetParent(h_wnd: isize) -> isize;
 }
 
-#[repr(C)]
-pub struct SCROLLINFO {
-    pub cb_size: u32,
-    pub f_mask: u32,
-    pub n_min: i32,
-    pub n_max: i32,
-    pub n_page: u32,
-    pub n_pos: i32,
-    pub n_track_pos: i32,
-}
-pub const SB_HORZ: i32 = 0;
-pub const SB_VERT: i32 = 1;
-pub const SB_CTL: i32 = 2;
-pub const SB_BOTH: i32 = 3;
+pub use crate::platform::win32::types::{
+    NOTIFY_FOR_THIS_SESSION, PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND, PBT_APMSUSPEND,
+    WM_POWERBROADCAST, WM_WTSSESSION_CHANGE, WTS_CONSOLE_CONNECT, WTS_SESSION_LOCK,
+    WTS_SESSION_LOGON, WTS_SESSION_UNLOCK, WTSRegisterSessionNotification,
+    WTSUnRegisterSessionNotification,
+};
 
-pub const SIF_RANGE: u32 = 0x0001;
-pub const SIF_PAGE: u32 = 0x0002;
-pub const SIF_POS: u32 = 0x0004;
-pub const SIF_DISABLENOSCROLL: u32 = 0x0008;
-pub const SIF_TRACKPOS: u32 = 0x0010;
-pub const SIF_ALL: u32 = SIF_RANGE | SIF_PAGE | SIF_POS | SIF_TRACKPOS;
+/// Command IDs `IsDialogMessageW` sends for Enter / Escape.
+pub const IDOK: u32 = 1;
+pub const IDCANCEL: u32 = 2;
 
-pub const SB_LINEUP: u32 = 0;
-pub const SB_LINEDOWN: u32 = 1;
-pub const SB_PAGEUP: u32 = 2;
-pub const SB_PAGEDOWN: u32 = 3;
-pub const SB_THUMBPOSITION: u32 = 4;
-pub const SB_THUMBTRACK: u32 = 5;
+pub const WM_TIMER: u32 = 0x0113;
 
 pub const SRCCOPY: u32 = 0x00CC0020;
+pub const WM_CREATE: u32 = 0x0001;
+pub const WM_DESTROY: u32 = 0x0002;
+pub const WM_ACTIVATE: u32 = 0x0006;
+pub const WM_CLOSE: u32 = 0x0010;
 pub const WM_PAINT: u32 = 0x000F;
-pub const WM_VSCROLL: u32 = 0x0115;
+pub const WM_ERASEBKGND: u32 = 0x0014;
+pub const WM_SETCURSOR: u32 = 0x0020;
+pub const WM_DRAWITEM: u32 = 0x002B;
+pub const WM_NCHITTEST: u32 = 0x0084;
+pub const WM_KEYDOWN: u32 = 0x0100;
+pub const WM_KEYUP: u32 = 0x0101;
+pub const WM_SYSKEYDOWN: u32 = 0x0104;
+pub const WM_SYSKEYUP: u32 = 0x0105;
+pub const WM_COMMAND: u32 = 0x0111;
 pub const WM_HSCROLL: u32 = 0x0114;
+pub const WM_VSCROLL: u32 = 0x0115;
+pub const WM_CTLCOLOREDIT: u32 = 0x0133;
+pub const WM_CTLCOLORLISTBOX: u32 = 0x0134;
+pub const WM_CTLCOLORBTN: u32 = 0x0135;
+pub const WM_CTLCOLORSTATIC: u32 = 0x0138;
+pub const WM_MOUSEMOVE: u32 = 0x0200;
+pub const WM_LBUTTONDOWN: u32 = 0x0201;
+pub const WM_LBUTTONUP: u32 = 0x0202;
+pub const WM_LBUTTONDBLCLK: u32 = 0x0203;
 pub const WM_MOUSEWHEEL: u32 = 0x020A;
+pub const WM_MOUSELEAVE: u32 = 0x02A3;
 pub const CS_VREDRAW: u32 = 0x0001;
 pub const CS_HREDRAW: u32 = 0x0002;
 pub const CS_DBLCLKS: u32 = 0x0008;
@@ -322,12 +328,13 @@ pub struct MEASUREITEMSTRUCT {
 
 pub const GWLP_USERDATA: i32 = -21;
 
+pub const CBN_SELCHANGE: u32 = 1;
+
 // Win32 Standard Message Reflection (OCM_*) Constants
 pub const OCM_BASE: u32 = 0x2000;
 pub const OCM_NOTIFY: u32 = OCM_BASE + 0x004E; // WM_NOTIFY
 pub const OCM_COMMAND: u32 = OCM_BASE + 0x0111; // WM_COMMAND
 pub const OCM_DRAWITEM: u32 = OCM_BASE + 0x002B; // WM_DRAWITEM
-pub const OCM_MEASUREITEM: u32 = OCM_BASE + 0x002C; // WM_MEASUREITEM
 pub const OCM_CTLCOLORSTATIC: u32 = OCM_BASE + 0x0138;
 pub const OCM_CTLCOLOREDIT: u32 = OCM_BASE + 0x0133;
 pub const OCM_CTLCOLORLISTBOX: u32 = OCM_BASE + 0x0134;
@@ -351,7 +358,6 @@ unsafe extern "system" {
 pub const RDW_INVALIDATE: u32 = 0x0001;
 pub const RDW_ERASE: u32 = 0x0004;
 pub const RDW_ALLCHILDREN: u32 = 0x0080;
-pub const RDW_UPDATENOW: u32 = 0x0100;
 pub const RDW_FRAME: u32 = 0x0400;
 
 pub const SWP_FRAMECHANGED: u32 = 0x0020;
@@ -394,28 +400,8 @@ unsafe extern "system" {
         psz_sub_app_name: *const u16,
         psz_sub_id_list: *const u16,
     ) -> i32;
-    pub fn OpenThemeData(hwnd: isize, psz_class_list: *const u16) -> isize;
-    pub fn CloseThemeData(h_theme: isize) -> i32;
-    pub fn DrawThemeBackground(
-        h_theme: isize,
-        hdc: isize,
-        i_part_id: i32,
-        i_state_id: i32,
-        p_rect: *const RECT,
-        p_clip_rect: *const RECT,
-    ) -> i32;
 }
 
-pub const BP_CHECKBOX: i32 = 3;
-pub const CBS_UNCHECKEDNORMAL: i32 = 1;
-pub const CBS_UNCHECKEDHOT: i32 = 2;
-pub const CBS_UNCHECKEDPRESSED: i32 = 3;
-pub const CBS_UNCHECKEDDISABLED: i32 = 4;
-pub const CBS_CHECKEDNORMAL: i32 = 5;
-pub const CBS_CHECKEDHOT: i32 = 6;
-pub const CBS_CHECKEDPRESSED: i32 = 7;
-pub const CBS_CHECKEDDISABLED: i32 = 8;
-pub const WS_DISABLED: u32 = 0x08000000;
 pub const WM_SETFONT: u32 = 0x0030;
 pub const WM_GETFONT: u32 = 0x0031;
 
@@ -546,7 +532,6 @@ pub const SW_HIDE: i32 = 0;
 pub const SW_SHOW: i32 = 5;
 
 pub const HWND_TOP: isize = 0;
-pub const HWND_BOTTOM: isize = 1;
 pub const SWP_NOSIZE: u32 = 0x0001;
 pub const SWP_NOMOVE: u32 = 0x0002;
 pub const SWP_NOACTIVATE: u32 = 0x0010;
@@ -554,9 +539,6 @@ pub const SWP_SHOWWINDOW: u32 = 0x0040;
 
 pub const SM_CXSCREEN: i32 = 0;
 pub const SM_CYSCREEN: i32 = 1;
-
-pub const COLOR_WINDOW: isize = 5;
-pub const COLOR_BTNFACE: isize = 15;
 
 pub const CLEARTYPE_QUALITY: u32 = 5;
 pub const DEFAULT_CHARSET: u32 = 1;
@@ -566,6 +548,165 @@ pub const FW_BOLD: i32 = 700;
 
 pub fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(Some(0)).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Allocation-free paint helpers. They use the stock DC_BRUSH / DC_PEN objects,
+// whose color is changed per call, so no GDI object is created or leaked.
+// ---------------------------------------------------------------------------
+
+#[link(name = "gdi32")]
+unsafe extern "system" {
+    pub fn GetStockObject(i: i32) -> isize;
+    pub fn SetDCBrushColor(hdc: isize, color: u32) -> u32;
+    pub fn SetDCPenColor(hdc: isize, color: u32) -> u32;
+}
+
+pub const NULL_BRUSH: i32 = 5;
+pub const NULL_PEN: i32 = 8;
+pub const DC_BRUSH: i32 = 18;
+pub const DC_PEN: i32 = 19;
+
+/// Fills `rc` with a solid color.
+pub fn fill_rect_color(hdc: isize, rc: &RECT, color: u32) {
+    unsafe {
+        SetDCBrushColor(hdc, color);
+        FillRect(hdc, rc, GetStockObject(DC_BRUSH));
+    }
+}
+
+/// Draws a 1px border around `rc`.
+pub fn frame_rect_color(hdc: isize, rc: &RECT, color: u32) {
+    unsafe {
+        SetDCBrushColor(hdc, color);
+        FrameRect(hdc, rc, GetStockObject(DC_BRUSH));
+    }
+}
+
+/// Filled rounded rectangle with a 1px border (`border = None` → no outline).
+/// `radius` is the corner ellipse diameter as passed to `RoundRect`.
+pub fn round_rect(hdc: isize, rc: &RECT, radius: i32, fill: u32, border: Option<u32>) {
+    unsafe {
+        SetDCBrushColor(hdc, fill);
+        let pen = match border {
+            Some(c) => {
+                SetDCPenColor(hdc, c);
+                GetStockObject(DC_PEN)
+            }
+            None => GetStockObject(NULL_PEN),
+        };
+        let old_brush = SelectObject(hdc, GetStockObject(DC_BRUSH));
+        let old_pen = SelectObject(hdc, pen);
+        // NULL_PEN draws one pixel short on the right/bottom; compensate.
+        let extra = if border.is_none() { 1 } else { 0 };
+        RoundRect(hdc, rc.left, rc.top, rc.right + extra, rc.bottom + extra, radius, radius);
+        SelectObject(hdc, old_pen);
+        SelectObject(hdc, old_brush);
+    }
+}
+
+/// Outline-only rounded rectangle.
+pub fn round_rect_outline(hdc: isize, rc: &RECT, radius: i32, border: u32) {
+    unsafe {
+        SetDCPenColor(hdc, border);
+        let old_brush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        let old_pen = SelectObject(hdc, GetStockObject(DC_PEN));
+        RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radius, radius);
+        SelectObject(hdc, old_pen);
+        SelectObject(hdc, old_brush);
+    }
+}
+
+/// Filled ellipse (outline in the same color).
+pub fn fill_ellipse(hdc: isize, rc: &RECT, color: u32) {
+    unsafe {
+        SetDCBrushColor(hdc, color);
+        SetDCPenColor(hdc, color);
+        let old_brush = SelectObject(hdc, GetStockObject(DC_BRUSH));
+        let old_pen = SelectObject(hdc, GetStockObject(DC_PEN));
+        Ellipse(hdc, rc.left, rc.top, rc.right, rc.bottom);
+        SelectObject(hdc, old_pen);
+        SelectObject(hdc, old_brush);
+    }
+}
+
+/// 1px straight line from (x1, y1) to (x2, y2).
+pub fn draw_line(hdc: isize, x1: i32, y1: i32, x2: i32, y2: i32, color: u32) {
+    unsafe {
+        SetDCPenColor(hdc, color);
+        let old_pen = SelectObject(hdc, GetStockObject(DC_PEN));
+        MoveToEx(hdc, x1, y1, std::ptr::null_mut());
+        LineTo(hdc, x2, y2);
+        SelectObject(hdc, old_pen);
+    }
+}
+
+/// Off-screen buffer for flicker-free painting. Draw into [`BackBuffer::hdc`];
+/// the content is blitted to the target DC when the buffer is dropped.
+pub struct BackBuffer {
+    target: isize,
+    mem: isize,
+    bmp: isize,
+    old_bmp: isize,
+    width: i32,
+    height: i32,
+}
+
+impl BackBuffer {
+    /// Returns `None` if the memory DC/bitmap could not be created (caller should
+    /// then paint directly into `target`).
+    pub fn new(target: isize, width: i32, height: i32) -> Option<Self> {
+        unsafe {
+            let mem = CreateCompatibleDC(target);
+            if mem == 0 {
+                return None;
+            }
+            let bmp = CreateCompatibleBitmap(target, width.max(1), height.max(1));
+            if bmp == 0 {
+                DeleteDC(mem);
+                return None;
+            }
+            let old_bmp = SelectObject(mem, bmp);
+            Some(Self { target, mem, bmp, old_bmp, width, height })
+        }
+    }
+
+    #[inline]
+    pub fn hdc(&self) -> isize {
+        self.mem
+    }
+}
+
+impl Drop for BackBuffer {
+    fn drop(&mut self) {
+        unsafe {
+            BitBlt(self.target, 0, 0, self.width, self.height, self.mem, 0, 0, SRCCOPY);
+            SelectObject(self.mem, self.old_bmp);
+            DeleteObject(self.bmp);
+            DeleteDC(self.mem);
+        }
+    }
+}
+
+/// Registers a window class once per process (subsequent calls are no-ops).
+/// `registered` must be a dedicated `static` per class.
+pub fn register_class_once(
+    registered: &std::sync::Once,
+    class_name: &str,
+    wnd_proc: unsafe extern "system" fn(isize, u32, usize, isize) -> isize,
+    style: u32,
+) {
+    registered.call_once(|| unsafe {
+        let name = to_wide(class_name);
+        let mut wc: WNDCLASSEXW = std::mem::zeroed();
+        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
+        wc.style = style;
+        wc.lpfn_wnd_proc = Some(wnd_proc);
+        wc.h_instance = 0;
+        wc.h_cursor = LoadCursorW(0, IDC_ARROW);
+        wc.lpsz_class_name = name.as_ptr();
+        RegisterClassExW(&wc);
+    });
 }
 
 /// Creates modern Segoe UI font matching Windows 10/11 standards

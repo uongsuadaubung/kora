@@ -180,7 +180,7 @@ pub struct AppProfile {
 
     // 4. Typing Sound (Mechanical Switch)
     pub sound_enabled: Option<bool>,
-    pub sound_profile: Option<String>,
+    pub sound_profile: Option<std::sync::Arc<str>>,
     pub sound_volume: Option<u8>,
 
     // 5. Macro (Delta inheritance)
@@ -208,15 +208,15 @@ impl AppProfile {
             auto_uppercase_first_char: Some(false),
             bracket_w: Some(true),
             remember_history_across_space: Some(true),
-            remap_enabled: Some(true),
+            remap_enabled: Some(false),
             muted_remaps: Vec::new(),
             overridden_remaps: HashMap::new(),
             app_remaps: Vec::new(),
             unmuted_disabled: Vec::new(),
-            disable_enabled: Some(true),
+            disable_enabled: Some(false),
             app_disabled: Vec::new(),
             sound_enabled: Some(false),
-            sound_profile: Some("Holy Panda".to_string()),
+            sound_profile: Some(std::sync::Arc::from("Holy Panda")),
             sound_volume: Some(50),
             use_macro: Some(false),
             use_macro_in_english_mode: Some(true),

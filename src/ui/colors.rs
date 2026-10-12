@@ -137,30 +137,12 @@ pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
     danger_text_hover: rgb(197, 21, 21), // Red hover text
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TextRole {
-    Primary,
-    Secondary,
-    Input,
-    Link,
-}
-
 impl ThemePalette {
     pub const fn get(is_dark: bool) -> &'static ThemePalette {
         if is_dark {
             &DARK_PALETTE
         } else {
             &LIGHT_PALETTE
-        }
-    }
-
-    /// Resolves text color based on semantic role
-    pub const fn text_color(&self, role: TextRole) -> u32 {
-        match role {
-            TextRole::Primary => self.text_primary,
-            TextRole::Secondary => self.text_secondary,
-            TextRole::Input => self.text_input,
-            TextRole::Link => self.text_link,
         }
     }
 

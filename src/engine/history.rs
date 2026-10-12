@@ -1,9 +1,10 @@
 use super::buffer::RawKey;
+use crate::vietnamese::InlineList;
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CommittedWord {
-    pub raw_keys: Vec<RawKey>,
+    pub raw_keys: InlineList<RawKey, 32>,
     pub is_raw_restored: bool,
     pub spaces_after: usize,
 }
@@ -30,7 +31,7 @@ impl WordHistory {
     }
 
     /// Record a newly completed word
-    pub fn commit_word(&mut self, raw_keys: Vec<RawKey>, is_raw_restored: bool) {
+    pub fn commit_word(&mut self, raw_keys: InlineList<RawKey, 32>, is_raw_restored: bool) {
         if !raw_keys.is_empty() {
             if self.committed_words.len() >= MAX_HISTORY_WORDS {
                 self.committed_words.pop_front();
@@ -61,7 +62,7 @@ impl WordHistory {
     /// - `Some(None)` if a trailing space was consumed (nothing to restore yet)
     /// - `Some(Some((raw_keys, is_raw_restored)))` if the trailing space was the last one and the previous word was restored
     /// - `None` if history is completely empty or no space to backspace across
-    pub fn pop_backspace(&mut self) -> Option<Option<(Vec<RawKey>, bool)>> {
+    pub fn pop_backspace(&mut self) -> Option<Option<(InlineList<RawKey, 32>, bool)>> {
         if let Some(last) = self.committed_words.back_mut() {
             if last.spaces_after > 1 {
                 last.spaces_after -= 1;

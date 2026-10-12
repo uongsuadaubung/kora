@@ -143,7 +143,7 @@ impl NucleusState {
     /// - Diphthong "ua" -> "ưa" (only 'u' gets horn: mưa, chưa, xưa)
     /// - Diphthong "oa" -> "oă" (only 'a' gets breve: hoặc, khoăn)
     /// - Diphthongs "ui", "oi" -> "ưi", "ơi" (first vowel gets horn: gửi, chơi)
-    /// - Diphthong "iu" -> "ưu" (second vowel gets horn: cừu, lựu)
+    /// - Diphthong "uu" -> "ưu" (first vowel gets horn: lưu, mưu, cừu, hưu, cứu)
     /// - Triphthong "uoi", "uou" -> "ươi", "ươu" (u and o get horn)
     pub fn apply_horn(&mut self, has_coda: bool) -> bool {
         match self.vowels.len() {
@@ -212,9 +212,9 @@ impl NucleusState {
                         self.vowels[0].diacritic = Diacritic::Horn;
                         true
                     }
-                    // "iu" -> only 'u' gets horn: "ưu" (cừu, lựu)
-                    (BaseVowel::I, BaseVowel::U) if d1 == Diacritic::None => {
-                        self.vowels[1].diacritic = Diacritic::Horn;
+                    // "uu" -> first 'u' gets horn: "ưu" (lưu, mưu, cừu, hưu, cứu)
+                    (BaseVowel::U, BaseVowel::U) if d0 == Diacritic::None => {
+                        self.vowels[0].diacritic = Diacritic::Horn;
                         true
                     }
                     _ => false,
@@ -308,8 +308,13 @@ impl NucleusState {
                         if let Some(pos) = self.vowels.iter().rposition(|v| {
                             v.base == target_base && v.diacritic == Diacritic::Circumflex
                         }) {
-                            self.vowels[pos].diacritic = Diacritic::None;
-                            ModifierOutcome::Undone(make_raw(self))
+                            // If a coda consonant already exists, circumflex cannot be undone across the coda
+                            if coda.is_none() {
+                                self.vowels[pos].diacritic = Diacritic::None;
+                                ModifierOutcome::Undone(make_raw(self))
+                            } else {
+                                ModifierOutcome::NotApplied
+                            }
                         } else if self.toggle_circumflex(target_base) {
                             ModifierOutcome::Applied
                         } else {
@@ -318,7 +323,15 @@ impl NucleusState {
                     }
                     None => {
                         // Generic circumflex (VNI: 6)
-                        if self.toggle_circumflex(BaseVowel::A)
+                        // If coda exists and circumflex is already present, do not undo/toggle off across coda!
+                        if coda.is_some()
+                            && self
+                                .vowels
+                                .iter()
+                                .any(|v| v.diacritic == Diacritic::Circumflex)
+                        {
+                            ModifierOutcome::NotApplied
+                        } else if self.toggle_circumflex(BaseVowel::A)
                             || self.toggle_circumflex(BaseVowel::E)
                             || self.toggle_circumflex(BaseVowel::O)
                         {
@@ -333,12 +346,21 @@ impl NucleusState {
             KeyEffect::DStroke => {
                 if let Some(ref mut onset) = self.onset {
                     if !onset.chars.is_empty() && onset.chars[0].0.eq_ignore_ascii_case(&'d') {
-                        if config.method.is_telex_family() && onset.is_d_stroke {
-                            // Telex undo toggle: 3rd 'd' cancels 'đ' into 'dd'
-                            onset.is_d_stroke = false;
-                            ModifierOutcome::Undone(make_raw(self))
+                        if onset.is_d_stroke {
+                            // D-stroke is already active
+                            if coda.is_none() {
+                                if config.method.is_telex_family() {
+                                    onset.is_d_stroke = false;
+                                    ModifierOutcome::Undone(make_raw(self))
+                                } else {
+                                    onset.is_d_stroke = false;
+                                    ModifierOutcome::Applied
+                                }
+                            } else {
+                                ModifierOutcome::NotApplied
+                            }
                         } else {
-                            onset.is_d_stroke = !onset.is_d_stroke;
+                            onset.is_d_stroke = true;
                             ModifierOutcome::Applied
                         }
                     } else {
@@ -363,7 +385,7 @@ impl NucleusState {
 
                 if self.apply_horn(coda.is_some()) {
                     ModifierOutcome::Applied
-                } else if self.revert_horn() {
+                } else if coda.is_none() && self.revert_horn() {
                     ModifierOutcome::Undone(make_raw(self))
                 } else {
                     ModifierOutcome::NotApplied
@@ -385,12 +407,17 @@ impl NucleusState {
                     .rev()
                     .find(|v| v.base == BaseVowel::A)
                 {
-                    v.diacritic = if v.diacritic == Diacritic::Breve {
-                        Diacritic::None
+                    if v.diacritic == Diacritic::Breve {
+                        if coda.is_none() {
+                            v.diacritic = Diacritic::None;
+                            ModifierOutcome::Undone(make_raw(self))
+                        } else {
+                            ModifierOutcome::NotApplied
+                        }
                     } else {
-                        Diacritic::Breve
-                    };
-                    ModifierOutcome::Applied
+                        v.diacritic = Diacritic::Breve;
+                        ModifierOutcome::Applied
+                    }
                 } else {
                     ModifierOutcome::NotApplied
                 }

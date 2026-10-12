@@ -1,4 +1,4 @@
-﻿//! Features & soundpack guide component
+//! Features & soundpack guide component
 
 pub fn render() -> &'static str {
     r####"  <!-- Key Features -->
@@ -113,6 +113,54 @@ pub fn render() -> &'static str {
             <span>Tự động mở khóa khi có gói <code>switches\</code> trong config. <a href="#sound-guide">Xem hướng dẫn cài đặt &darr;</a></span>
           </div>
         </div>
+
+        <div class="spec-card">
+          <span class="spec-tag">BỀN BỈ &amp; ỔN ĐỊNH</span>
+          <div class="spec-title">Tự phục hồi sau khi máy ngủ &amp; khóa màn hình</div>
+          <div class="spec-desc">Chấm dứt hoàn toàn lỗi mất tiếng Việt hoặc tự viết hoa kỳ dị (<code>gÕ</code>, <code>tiẾng ViỆt</code>) mỗi khi laptop gập máy, khóa màn hình (<code>Win + L</code>) hay máy tự ngủ. Kora tự động nhận diện và làm mới trạng thái sẵn sàng để bạn gõ chuẩn xác ngay tức thì mà không cần khởi động lại ứng dụng.</div>
+          <div class="feature-demo-screen" data-feature="resume">
+            <div class="feature-screen-top">
+              <span class="screen-dot"></span>
+              <span class="screen-title">Tự phục hồi khi thức giấc</span>
+            </div>
+            <div class="feature-screen-content">
+              <span class="typing-text"></span><span class="typing-cursor"></span>
+            </div>
+            <div class="feature-screen-status">Tự động đồng bộ và sẵn sàng gõ tiếng Việt ngay khi mở máy</div>
+          </div>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-tag">ĐA HỒ SƠ ỨNG DỤNG</span>
+          <div class="spec-title">Tự đổi cấu hình theo Game &amp; Phần mềm</div>
+          <div class="spec-desc">Tự động phát hiện ứng dụng bạn đang trỏ tới để kích hoạt cấu hình tương ứng. Thoải mái tạo profile riêng cho từng tựa game, IDE lập trình hay phần mềm đồ họa với cơ chế kế thừa phân tầng thông minh.</div>
+          <div class="feature-demo-screen" data-feature="profile">
+            <div class="feature-screen-top">
+              <span class="screen-dot"></span>
+              <span class="screen-title">Nhận diện ứng dụng tự động</span>
+            </div>
+            <div class="feature-screen-content">
+              <span class="typing-text"></span><span class="typing-cursor"></span>
+            </div>
+            <div class="feature-screen-status">Tự động chuyển đổi profile theo ngữ cảnh ứng dụng</div>
+          </div>
+        </div>
+
+        <div class="spec-card">
+          <span class="spec-tag">BẢO VỆ PHÍM BẤM</span>
+          <div class="spec-title">Đổi phím vật lý &amp; Khóa phím chơi game</div>
+          <div class="spec-desc">Đổi phím vật lý theo thói quen (như <code>Caps Lock ➔ Ctrl</code>, <code>Insert ➔ Delete</code>) và khóa an toàn các phím bấm nhầm khi chơi game (khóa phím <code>Windows</code>, <code>Insert</code>...) mà không cần cài thêm phần mềm ngoài.</div>
+          <div class="feature-demo-screen" data-feature="remap">
+            <div class="feature-screen-top">
+              <span class="screen-dot"></span>
+              <span class="screen-title">Đổi phím &amp; Khóa phím</span>
+            </div>
+            <div class="feature-screen-content">
+              <span class="typing-text"></span><span class="typing-cursor"></span>
+            </div>
+            <div class="feature-screen-status">Lọc sạch phím thừa, bảo vệ thao tác khi chơi game</div>
+          </div>
+        </div>
       </div>
 
       <!-- Soundpack Installation Guide -->
@@ -120,7 +168,7 @@ pub fn render() -> &'static str {
         <div class="guide-header">
           <div class="guide-badge">HƯỚNG DẪN CÀI ĐẶT GÓI ÂM THANH</div>
           <h3 class="guide-title">Cách tải và cài đặt âm thanh phím cơ cho Kora</h3>
-          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~549 KB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
+          <p class="guide-subtitle">File chạy Kora được tối ưu siêu nhẹ (~1 MB) nên không kèm sẵn file âm thanh lớn. Hãy làm theo 3 bước đơn giản dưới đây để kích hoạt:</p>
         </div>
 
         <div class="guide-steps-grid">

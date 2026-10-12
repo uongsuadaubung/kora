@@ -42,7 +42,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // Tab 1: Macro
     check_use_macro: "Bật gõ tắt",
-    check_macro_in_english: "Gõ tắt cả khi ở tiếng Anh [E]",
+    check_macro_in_english: "Gõ tắt cả khi ở tiếng Anh",
     edit_macro_key_placeholder: "VD: vn, dc, fn",
     edit_macro_val_placeholder: "VD: Việt Nam, được, function()",
     btn_add_macro: "+ Thêm",
@@ -55,6 +55,8 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     col_action: "Hành động",
     action_edit: "Sửa",
     action_delete: "Xóa",
+    action_mute: "Tắt",
+    action_unmute: "Bật",
     action_combo: "Sửa   Xóa",
     macro_type_normal: "Bình thường",
     macro_type_start: "Đầu từ",
@@ -79,7 +81,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // Tab 3: About
     about_header_title: "ℹ Thông tin phần mềm",
-    about_header_sub: "Kora - Hệ sinh thái bàn phím & bộ gõ thế hệ mới bằng Rust",
+    about_header_sub: "Kora - Modern Input & Keyboard Suite",
     about_title: concat!("Kora v", env!("CARGO_PKG_VERSION")),
     about_ver: concat!("Phiên bản: ", env!("CARGO_PKG_VERSION")),
     about_author: "Tác giả: Mạnh Kiên (manhkien13041997@gmail.com)",
@@ -92,6 +94,13 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     btn_exit: "❌ Tắt Kora",
     btn_defaults: "Mặc định",
     btn_close: "Đóng",
+
+    // System Settings - Defaults Card
+    sys_defaults_title: "Khôi phục cài đặt gốc",
+    sys_defaults_desc: "Đặt lại toàn bộ thiết lập bộ gõ, giao diện và cấu hình về trạng thái mặc định ban đầu.",
+    btn_restore_defaults: "Khôi phục mặc định",
+    confirm_defaults_title: "Xác nhận khôi phục cài đặt gốc",
+    confirm_defaults_msg: "Bạn có chắc chắn muốn đặt lại toàn bộ cài đặt về mặc định ban đầu không? Mọi thay đổi cấu hình hiện tại sẽ bị xóa.",
 
     // Hotkey Capture Dialog
     hotkey_dialog_title: "⌨️ Phím tắt chuyển đổi tiếng Việt ⇄ tiếng Anh",
@@ -112,8 +121,8 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     btn_cancel: "Hủy bỏ",
 
     // System Tray Menu & Tooltips
-    tray_tooltip_vi: "Kora - Bàn phím & bộ gõ thế hệ mới (Tiếng Việt)",
-    tray_tooltip_en: "Kora - Bàn phím & bộ gõ thế hệ mới (Tiếng Anh)",
+    tray_tooltip_vi: "Kora - Modern Input & Keyboard Suite (Tiếng Việt)",
+    tray_tooltip_en: "Kora - Modern Input & Keyboard Suite (Tiếng Anh)",
     tray_toggle_vi: "Bật tiếng Việt",
     tray_method_telex: "Kiểu gõ Telex",
     tray_method_vni: "Kiểu gõ VNI",
@@ -132,8 +141,8 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     banner_root_title: "Toàn hệ thống",
     banner_root_desc: "Cấu hình nền mặc định cho mọi ứng dụng trên máy tính",
     banner_btn_delete: "🗑️ Xóa profile",
-    banner_status_active_prefix: "● Đang hoạt động • Tiến trình: ",
-    banner_status_inactive_prefix: "○ Tự động kích hoạt khi mở: ",
+    banner_status_active_prefix: "Tiến trình: ",
+    banner_status_inactive_prefix: "Tự động kích hoạt khi mở: ",
 
     // Tab 0: Typing
     typing_group_main: "Thiết lập bộ gõ tiếng Việt",

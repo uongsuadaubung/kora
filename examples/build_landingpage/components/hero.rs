@@ -1,4 +1,4 @@
-﻿//! Hero banner component
+//! Hero banner component
 
 pub fn render() -> &'static str {
     r####"  <!-- Hero Section -->
@@ -6,7 +6,7 @@ pub fn render() -> &'static str {
     <div class="container hero-container">
       <div class="hero-tag">
         <span class="pulse-indicator"></span>
-        <span>Bộ gõ tiếng Việt thế hệ mới cho Windows</span>
+        <span>Modern Input & Keyboard Suite for Windows</span>
       </div>
 
       <h1 class="hero-title">

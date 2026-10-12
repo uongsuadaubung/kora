@@ -1,11 +1,11 @@
-# Kora — Hệ sinh thái Bàn phím & Bộ gõ thế hệ mới bằng Rust
+# Kora — Modern Input & Keyboard Suite
 
 [![Rust](https://img.shields.io/badge/language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)]()
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 
-> 🚀 **Kora Core Engine:** Hệ sinh thái tiện ích bàn phím toàn diện (*Advanced Keyboard Suite*) viết bằng **Rust thuần** và Win32 GDI native: tích hợp Bộ gõ Tiếng Việt chuẩn xác cao, Đổi phím (Key Remap), Khóa phím chuyên dụng (Key Blocker), Không gian làm việc đa ứng dụng (Multi-Profile Workspace) và Giả lập âm thanh phím cơ WASAPI phòng thu.  
+> 🚀 **Kora Core Engine:** Bộ công cụ bàn phím & bộ gõ hiện đại (*Modern Input & Keyboard Suite*) viết bằng **Rust thuần** và Win32 GDI native: tích hợp Bộ gõ Tiếng Việt chuẩn xác cao, Đổi phím (Key Remap), Khóa phím chuyên dụng (Key Blocker), Không gian làm việc đa ứng dụng (Multi-Profile Workspace) và Giả lập âm thanh phím cơ WASAPI phòng thu.  
 > 📖 **Tài liệu kiến trúc chi tiết:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
@@ -14,14 +14,14 @@
 
 Ban đầu, dự án tập trung vào mục tiêu xây dựng một bộ gõ tiếng Việt siêu nhẹ, chuẩn xác và không lỗi vặt bằng ngôn ngữ Rust.
 
-Tuy nhiên, trong quá trình phát triển, quy mô ứng dụng đã vượt xa một bộ gõ thông thường:
+Tuy nhiên, trong quá trình phát triển, quy mô ứng dụng đã mở rộng thành một bộ công cụ bàn phím toàn diện:
 - Quản lý hồ sơ theo từng ứng dụng (*Multi-Profile App Detection*)
 - Đổi phím vật lý (*Key Remapping*)
 - Khóa phím thông minh chống bấm nhầm khi chơi game & làm việc (*Key Disabling*)
 - Giả lập âm thanh bàn phím cơ 48kHz (*WASAPI Mechanical Sound FX*)
 - Mở rộng viết tắt đa quy tắc (*Smart Macro Expander*)
 
-Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của một **Hệ sinh thái bàn phím đa năng, hiện đại và tinh tế**. Đằng sau cái tên 4 chữ cái ngắn gọn là 4 tầng ý nghĩa sâu sắc:
+Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của một **bộ công cụ bàn phím & bộ gõ hiện đại, tinh tế (Modern Input & Keyboard Suite)**. Đằng sau cái tên 4 chữ cái ngắn gọn là 4 tầng ý nghĩa sâu sắc:
 
 1. 🎵 **Âm thanh (Acoustics & Sound FX)**  
    *Kora* là tên một loại nhạc cụ dây truyền thống nổi tiếng với âm sắc trong trẻo, mộc mạc và thanh thoát. Đây là hình ảnh đại diện cho tính năng giả lập âm thanh phím cơ của Kora — biến từng nhịp gõ phím hằng ngày thành một trải nghiệm âm thanh sống động và giàu cảm xúc.
@@ -33,7 +33,7 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
    Trong tiếng Nhật, *Kōra* (甲羅) có nghĩa là chiếc mai rùa vững chắc. Kora hoạt động như một lớp khiên bảo vệ ở tầng nhân cấp thấp (*Windows Hook*): lọc sạch thao tác phím thừa, chặn phím bấm nhầm khi chơi game (khóa phím Windows, Insert, Caps Lock), ngăn ngừa xung đột dấu và giữ cho luồng thao tác luôn an toàn, liền mạch.
 
 4. ⚡ **Tối giản & Quốc tế (Minimalist & Global)**  
-   Bắt đầu bằng chữ **K** mạnh mẽ (*Keyboard / Kernel*) và kết thúc bằng nguyên âm mở `-a`, **Kora** mang phong cách của những công cụ phần mềm hiện đại thế hệ mới (như *Figma, Raycast, Sora*): phát âm dứt khoát, dễ nhớ và tự nhiên trên phạm vi toàn cầu.
+   Bắt đầu bằng chữ **K** mạnh mẽ (*Keyboard / Kernel*) và kết thúc bằng nguyên âm mở `-a`, **Kora** mang phong cách của những công cụ phần mềm hiện đại (như *Figma, Raycast, Sora*): phát âm dứt khoát, dễ nhớ và tự nhiên trên phạm vi toàn cầu.
 
 ---
 
@@ -54,7 +54,7 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
 
 ### 🏆 So sánh với các công cụ truyền thống
 
-| Tiêu chí | Kora (Rust Native) | Bộ gõ C/C++ truyền thống (UniKey/EVKey) | Bộ gõ nền tảng Web / Electron |
+| Tiêu chí | Kora (Rust Native) | Các bộ gõ C/C++ truyền thống khác | Bộ gõ nền tảng Web / Electron |
 | :--- | :--- | :---: | :---: |
 | **Dung lượng file thực thi (.exe)** | **~1 MB** | 1 MB – 5 MB | 80 MB – 150 MB |
 | **Mức chiếm dụng RAM khi chạy ngầm** | **< 1 MB** | 1.5 MB – 4 MB | 100 MB – 300 MB |
@@ -83,6 +83,7 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
 - **Deterministic Replay Buffer (SSOT)**: Quản lý chuỗi phím thô chính xác tuyệt đối, xóa ký tự qua `Backspace` không bao giờ bị lỗi vỡ dấu hay xuất hiện ký tự ma.
 - **Thông minh bỏ qua tiếng Anh (Smart English Bypass)**: Tự động nhận diện từ tiếng Anh phổ biến (`fix`, `server`, `first`, `word`,...) và khôi phục nguyên bản khi nhấn phím cách.
 - **Khôi phục từ xuyên khoảng trắng (Backspace across space)**: Cho phép lùi qua dấu cách để sửa lại từ vừa gõ mà không cần gõ lại từ đầu.
+- **Tự phục hồi sau khi máy ngủ & khóa màn hình (Self-healing Sleep & Lock Recovery)**: Lắng nghe sự kiện nguồn và phiên làm việc của Windows (`WM_POWERBROADCAST`, `WM_WTSSESSION_CHANGE`), tự động gắn lại Hook bàn phím và làm sạch toàn bộ cờ phím điều khiển kẹt (`Win`, `Ctrl`, `Alt`, `Shift`), giải quyết triệt để lỗi mất tiếng Việt hoặc lỗi gõ hoa vần (`gÕ`, `tiẾng ViỆt`) khi mở lại máy.
 
 ### 4. Gõ tắt Đa quy tắc (Smart Macro & Text Expander)
 - **3 chế độ kích hoạt**: Toàn từ (Normal), Bắt đầu từ (Start), Cuối từ (End).

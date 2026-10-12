@@ -1,8 +1,9 @@
 //! Tab 1: Macro controls (Gõ tắt)
 //! 3-Card Modern Layout: Master Options (Card 1), Action Bar (Card 2), ActionTable Component (Card 3)
 
+use crate::engine::profile::RuleOrigin;
 use crate::language::LanguageStrings;
-use crate::ui::components::action_table::ActionTable;
+use crate::ui::components::action_table::{ActionTable, ActionVariant, TableAction, TableRow};
 use crate::ui::win32::{HWND_TOP, InvalidateRect, SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW};
 use crate::ui::components::*;
 use crate::ui::tokens::{borders, id::*, layout, spacing};
@@ -110,33 +111,37 @@ impl TabMacro {
         Some(tab)
     }
 
-    pub fn trigger_edit_by_row(parent: isize, lv_hwnd: isize, idx: i32) {
-        let key = ActionTable::get_text(lv_hwnd, idx, 0);
-        let val = ActionTable::get_text(lv_hwnd, idx, 1);
-        let typ_str = ActionTable::get_text(lv_hwnd, idx, 2);
-        if key.is_empty() {
-            return;
-        }
-        let strings = crate::language::current();
-        let mtype = if typ_str == strings.macro_type_start {
-            crate::engine::macro_table::MacroType::StartConsonant
-        } else if typ_str == strings.macro_type_end {
-            crate::engine::macro_table::MacroType::EndConsonant
-        } else {
-            crate::engine::macro_table::MacroType::Normal
-        };
-
-        let data = crate::ui::views::dialogs::MacroEditData {
-            original_key: key.clone(),
-            key,
-            value: val,
-            macro_type: mtype,
-        };
+    pub fn trigger_edit(parent: isize, data: crate::ui::views::dialogs::MacroEditData) {
         crate::ui::views::dialogs::show_macro_dialog(parent, Some(data));
     }
 
-    pub fn trigger_delete_by_row(parent: isize, lv_hwnd: isize, idx: i32) {
-        let key_to_del = ActionTable::get_text(lv_hwnd, idx, 0);
+    pub fn toggle_macro_mute(key: String, mute: bool) {
+        let changed = crate::ui::controller::with_engine(|engine| {
+            let sel_id = engine.profile_manager.selected_id.clone();
+            if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                return false;
+            }
+            if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
+                if mute {
+                    child.overridden_macros.remove(&key.to_lowercase());
+                    if !child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&key)) {
+                        child.muted_macros.push(key);
+                    }
+                } else {
+                    child.muted_macros.retain(|k| !k.eq_ignore_ascii_case(&key));
+                }
+                crate::ui::controller::save(engine);
+                true
+            } else {
+                false
+            }
+        });
+        if changed == Some(true) {
+            crate::ui::controller::refresh_macro_list();
+        }
+    }
+
+    pub fn trigger_delete_by_key(parent: isize, key_to_del: String) {
         if key_to_del.is_empty() {
             return;
         }
@@ -152,40 +157,16 @@ impl TabMacro {
         .no_text(strings.btn_no);
 
         crate::ui::views::dialogs::show_confirm_dialog(parent, options, move || {
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
+            crate::ui::controller::with_engine(|engine| {
                 let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
+                if sel_id == crate::ui::GLOBAL_PROFILE_ID {
                     engine.macro_table.remove(&key_to_del);
                 } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                    let is_global = engine.macro_table.get(&key_to_del).is_some();
-                    if is_global {
-                        child.app_macros.retain(|m| m.key != key_to_del);
-                        child.overridden_macros.remove(&key_to_del);
-                        if !child.muted_macros.contains(&key_to_del) {
-                            child.muted_macros.push(key_to_del.clone());
-                        }
-                    } else {
-                        child.app_macros.retain(|m| m.key != key_to_del);
-                    }
+                    child.app_macros.retain(|m| !m.key.eq_ignore_ascii_case(&key_to_del));
                 }
-
-                crate::engine::config_store::save_config_all_debounced(
-                    engine.config(),
-                    &engine.macro_table,
-                    &engine.profile_manager,
-                );
-
-                if let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                    && let Some(ref ui) = *ui_guard
-                {
-                    let items = engine
-                        .profile_manager
-                        .resolve_macro_items_for_ui(&sel_id, &engine.macro_table.get_sorted_entries());
-                    ui.controls.tab_macro.populate_macro_items(&items);
-                }
-            }
+                crate::ui::controller::save(engine);
+            });
+            crate::ui::controller::refresh_macro_list();
         });
     }
 
@@ -260,74 +241,70 @@ impl TabMacro {
         profile.use_macro_in_english_mode = self.check_macro_in_english.tri_state();
     }
 
-    pub fn populate_macros(&self, macros: &[crate::engine::macro_table::MacroEntry]) {
-        self.list_macro.clear();
-        let strings = crate::language::current();
-        let parent = self.parent_hwnd;
-        let lv_hwnd = self.list_macro.hwnd();
-
-        let rows: Vec<TableRow> = macros
-            .iter()
-            .enumerate()
-            .map(|(idx, entry)| {
-                let idx = idx as i32;
-                let type_str = match entry.macro_type {
-                    crate::engine::macro_table::MacroType::Normal => strings.macro_type_normal,
-                    crate::engine::macro_table::MacroType::StartConsonant => strings.macro_type_start,
-                    crate::engine::macro_table::MacroType::EndConsonant => strings.macro_type_end,
-                };
-
-                TableRow::new()
-                    .text(&entry.key)
-                    .text(&entry.value)
-                    .secondary(type_str)
-                    .text("")
-                    .actions(vec![
-                        TableAction::edit(strings.action_edit, move || {
-                            Self::trigger_edit_by_row(parent, lv_hwnd, idx);
-                        }),
-                        TableAction::delete(strings.action_delete, move || {
-                            Self::trigger_delete_by_row(parent, lv_hwnd, idx);
-                        }),
-                    ])
-            })
-            .collect();
-
-        self.list_macro.set_rows(rows);
-    }
-
     /// Populates Macro ListView with resolved Live Inheritance items
     pub fn populate_macro_items(&self, items: &[crate::engine::profile::ResolvedMacroItem]) {
         self.list_macro.clear();
         let strings = crate::language::current();
         let parent = self.parent_hwnd;
-        let lv_hwnd = self.list_macro.hwnd();
 
         let rows: Vec<TableRow> = items
             .iter()
-            .enumerate()
-            .map(|(idx, entry)| {
-                let idx = idx as i32;
+            .map(|entry| {
                 let type_str = match entry.macro_type {
                     crate::engine::macro_table::MacroType::Normal => strings.macro_type_normal,
                     crate::engine::macro_table::MacroType::StartConsonant => strings.macro_type_start,
                     crate::engine::macro_table::MacroType::EndConsonant => strings.macro_type_end,
                 };
                 let origin_str = entry.origin.localized_badge_label(strings);
+                let entry_key = entry.key.clone();
+
+                let edit_data = crate::ui::views::dialogs::MacroEditData {
+                    original_key: entry.key.clone(),
+                    key: entry.key.clone(),
+                    value: entry.value.clone(),
+                    macro_type: entry.macro_type,
+                };
+
+                let mut actions = Vec::new();
+
+                match entry.origin {
+                    RuleOrigin::MutedGlobal => {
+                        let k = entry_key.clone();
+                        actions.push(
+                            TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                .with_callback(move || {
+                                    Self::toggle_macro_mute(k.clone(), false);
+                                }),
+                        );
+                    }
+                    RuleOrigin::InheritedGlobal | RuleOrigin::OverriddenGlobal => {
+                        let data = edit_data.clone();
+                        actions.push(TableAction::edit(strings.action_edit, move || {
+                            Self::trigger_edit(parent, data.clone());
+                        }));
+                        let k = entry_key.clone();
+                        actions.push(TableAction::delete(strings.action_mute, move || {
+                            Self::toggle_macro_mute(k.clone(), true);
+                        }));
+                    }
+                    RuleOrigin::Root | RuleOrigin::AppSpecific => {
+                        let data = edit_data.clone();
+                        actions.push(TableAction::edit(strings.action_edit, move || {
+                            Self::trigger_edit(parent, data.clone());
+                        }));
+                        let k = entry_key.clone();
+                        actions.push(TableAction::delete(strings.action_delete, move || {
+                            Self::trigger_delete_by_key(parent, k.clone());
+                        }));
+                    }
+                }
 
                 TableRow::new()
                     .key(&entry.key)
                     .text(&entry.value)
                     .secondary(type_str)
                     .text(origin_str)
-                    .actions(vec![
-                        TableAction::edit(strings.action_edit, move || {
-                            Self::trigger_edit_by_row(parent, lv_hwnd, idx);
-                        }),
-                        TableAction::delete(strings.action_delete, move || {
-                            Self::trigger_delete_by_row(parent, lv_hwnd, idx);
-                        }),
-                    ])
+                    .actions(actions)
             })
             .collect();
 
@@ -347,14 +324,9 @@ impl TabMacro {
         self.list_macro.set_column_title(4, strings.col_action);
         self.list_macro.refresh_header();
 
-        if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            let macros = engine
-                .profile_manager
-                .resolve_macro_items_for_ui(&sel_id, &engine.macro_table.get_sorted_entries());
-            self.populate_macro_items(&macros);
+        // Rows contain localized type/origin/action labels: rebuild them (lock released first).
+        if let Some(items) = crate::ui::controller::with_engine(|e| crate::ui::controller::selected_macro_items(e)) {
+            self.populate_macro_items(&items);
         }
     }
 
@@ -365,45 +337,23 @@ impl TabMacro {
         ctl_id: u32,
         notify_code: u32,
     ) -> bool {
+        use crate::ui::controller::EditTarget;
         match ctl_id {
             IDC_BTN_ADD_MACRO => {
                 crate::ui::views::dialogs::show_macro_dialog(self.parent_hwnd, None);
                 true
             }
-            IDC_CHECK_USE_MACRO | IDC_CHECK_MACRO_EN => {
-                if notify_code == 0 {
-                    if ctl_id == IDC_CHECK_USE_MACRO {
-                        self.update_macro_checkboxes_state();
-                    }
-                    if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                        && let Some(ref mut engine) = *guard
-                    {
-                        let sel_id = engine.profile_manager.selected_id.clone();
-                        if sel_id == "global" {
-                            self.read_config(engine.config_mut());
-                        } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                            self.read_profile(child);
-                        }
-                        crate::engine::config_store::save_config_all_debounced(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                    }
-                    true
-                } else {
-                    false
+            IDC_CHECK_USE_MACRO | IDC_CHECK_MACRO_EN if notify_code == 0 => {
+                if ctl_id == IDC_CHECK_USE_MACRO {
+                    self.update_macro_checkboxes_state();
                 }
+                crate::ui::controller::edit_selected(|target| match target {
+                    EditTarget::Global(cfg) => self.read_config(cfg),
+                    EditTarget::Child(child) => self.read_profile(child),
+                });
+                true
             }
             _ => false,
         }
-    }
-
-    pub fn handle_edit_macro_at(&self, idx: i32) {
-        Self::trigger_edit_by_row(self.parent_hwnd, self.list_macro.hwnd(), idx);
-    }
-
-    pub fn handle_del_macro_at(&self, idx: i32) {
-        Self::trigger_delete_by_row(self.parent_hwnd, self.list_macro.hwnd(), idx);
     }
 }

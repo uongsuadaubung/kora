@@ -21,18 +21,14 @@ pub struct MacroEditData {
 static DIALOG_PARENT_HWND: AtomicIsize = AtomicIsize::new(0);
 static CURRENT_EDIT_DATA: Mutex<Option<MacroEditData>> = Mutex::new(None);
 
+static REGISTERED: std::sync::Once = std::sync::Once::new();
+const CLASS_NAME: &str = "KoraMacroDialogClass";
+
 pub fn show_macro_dialog(parent: isize, edit_data: Option<MacroEditData>) {
-    let class_name = to_wide("KoraMacroDialogClass");
+    register_class_once(&REGISTERED, CLASS_NAME, macro_dialog_wnd_proc, 0);
 
     unsafe {
-        let mut wc: WNDCLASSEXW = std::mem::zeroed();
-        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-        wc.lpfn_wnd_proc = Some(macro_dialog_wnd_proc);
-        wc.h_instance = 0;
-        wc.h_cursor = LoadCursorW(0, 32512);
-        wc.lpsz_class_name = class_name.as_ptr();
-        RegisterClassExW(&wc);
-
+        let class_name = to_wide(CLASS_NAME);
         DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
         if let Ok(mut guard) = CURRENT_EDIT_DATA.lock() {
             *guard = edit_data.clone();
@@ -59,7 +55,7 @@ pub fn show_macro_dialog(parent: isize, edit_data: Option<MacroEditData>) {
             0x00010000 | 0x00000001,
             class_name.as_ptr(),
             to_wide(title).as_ptr(),
-            0x00080000 | 0x00020000 | 0x10000000 | 0x00C00000,
+            0x00080000 | 0x10000000 | 0x00C00000,
             x,
             y,
             width,
@@ -80,27 +76,21 @@ pub fn show_macro_dialog(parent: isize, edit_data: Option<MacroEditData>) {
     }
 }
 
+/// Standard Win32 Window Procedure for Macro Editor Dialog.
+///
+/// # Safety
+/// Must be invoked by Windows message dispatcher with valid window handle and parameters.
 pub unsafe extern "system" fn macro_dialog_wnd_proc(
     hwnd: isize,
     msg: u32,
     wparam: usize,
     lparam: isize,
 ) -> isize {
-    const WM_CREATE: u32 = 0x0001;
-    const WM_DESTROY: u32 = 0x0002;
-    const WM_COMMAND: u32 = 0x0111;
-    const WM_PAINT: u32 = 0x000F;
-    const WM_ERASEBKGND: u32 = 0x0014;
-    const WM_CLOSE: u32 = 0x0010;
-    const WM_DRAWITEM: u32 = 0x002B;
-    const WM_CTLCOLORSTATIC: u32 = 0x0138;
-    const WM_CTLCOLOREDIT: u32 = 0x0133;
-
     unsafe {
         match msg {
             WM_CREATE => {
-                let font_bold = create_app_font(10, FW_SEMIBOLD);
-                let font_normal = create_app_font(9, FW_NORMAL);
+                let font_bold = crate::ui::theme::cached_font(10, FW_SEMIBOLD);
+                let font_normal = crate::ui::theme::get_app_font_normal();
                 let strings = crate::language::current();
 
                 // 1. Shortcut Key
@@ -246,22 +236,18 @@ pub unsafe extern "system" fn macro_dialog_wnd_proc(
                 0
             }
             WM_CTLCOLORSTATIC => {
-                let is_dark = is_current_dark();
-                let palette = ThemePalette::get(is_dark);
+                let palette = ThemePalette::get(is_current_dark());
                 let hdc = wparam as isize;
                 SetTextColor(hdc, palette.text_primary);
                 SetBkColor(hdc, palette.bg_window);
-                let br = CreateSolidBrush(palette.bg_window);
-                br
+                crate::ui::theme::get_panel_bg_brush()
             }
             WM_CTLCOLOREDIT => {
-                let is_dark = is_current_dark();
-                let palette = ThemePalette::get(is_dark);
+                let palette = ThemePalette::get(is_current_dark());
                 let hdc = wparam as isize;
                 SetTextColor(hdc, palette.text_primary);
                 SetBkColor(hdc, palette.bg_input);
-                let br = CreateSolidBrush(palette.bg_input);
-                br
+                crate::ui::theme::get_input_bg_brush()
             }
             WM_COMMAND => {
                 let ctl_id = (wparam & 0xFFFF) as u32;
@@ -355,36 +341,38 @@ pub unsafe extern "system" fn macro_dialog_wnd_proc(
                             }
 
                             // Refresh ListView in parent UI
-                            if let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                                && let Some(ref ui) = *ui_guard
-                            {
-                                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                                    && let Some(ref engine) = *guard
-                                {
-                                    let sel_id = engine.profile_manager.selected_id.clone();
-                                    let items = engine
-                                        .profile_manager
-                                        .resolve_macro_items_for_ui(
-                                            &sel_id,
-                                            &engine.macro_table.get_sorted_entries(),
-                                        );
-                                    ui.controls.tab_macro.populate_macro_items(&items);
-                                }
+                            crate::ui::controller::refresh_macro_list();
+                            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                        } else {
+                            let target = if key.is_empty() { h_key } else { h_val };
+                            if target != 0 {
+                                SetFocus(target);
                             }
                         }
-
-                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
                     }
                     _ => {}
                 }
                 0
             }
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let vk = wparam as u32;
+                if vk == 0x1B {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    return 0;
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
+            }
             WM_CLOSE => {
+                let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
+                if parent != 0 {
+                    EnableWindow(parent, 1);
+                    SetForegroundWindow(parent);
+                }
                 DestroyWindow(hwnd);
                 0
             }
             WM_DESTROY => {
-                let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
+                let parent = DIALOG_PARENT_HWND.swap(0, Ordering::SeqCst);
                 if parent != 0 {
                     EnableWindow(parent, 1);
                     SetForegroundWindow(parent);

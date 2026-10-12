@@ -45,6 +45,13 @@ pub fn release_key_sound(vk: u32) {
     }
 }
 
+/// Resets all physical key down tracking bits (e.g. after sleep / lock / mode change)
+pub fn reset_key_sound_bits() {
+    for bits in &KEY_DOWN_BITS {
+        bits.store(0, Ordering::Relaxed);
+    }
+}
+
 /// Global trigger called directly from the Low-Level Keyboard Hook.
 /// Non-blocking try_send ensures hook latency remains strictly ~0.05 µs.
 pub fn trigger_key_sound(vk: u32) {

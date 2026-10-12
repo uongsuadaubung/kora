@@ -86,19 +86,20 @@ unsafe extern "system" {
     fn GetOpenFileNameW(ofn: *mut OPENFILENAMEW) -> i32;
 }
 
+static REGISTERED: std::sync::Once = std::sync::Once::new();
+const CLASS_NAME: &str = "KoraAddProfileDialogClass";
+const WM_APP_ENUM_DONE: u32 = 0x8000 + 104;
+
 pub fn show_add_profile_dialog(parent: isize) {
-    let class_name = to_wide("KoraAddProfileDialogClass");
+    register_class_once(
+        &REGISTERED,
+        CLASS_NAME,
+        add_profile_dialog_wnd_proc,
+        0x0002_0000,
+    );
 
     unsafe {
-        let mut wc: WNDCLASSEXW = std::mem::zeroed();
-        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-        wc.style = 0x0002_0000; // CS_DROPSHADOW
-        wc.lpfn_wnd_proc = Some(add_profile_dialog_wnd_proc);
-        wc.h_instance = 0;
-        wc.h_cursor = LoadCursorW(0, 32512);
-        wc.lpsz_class_name = class_name.as_ptr();
-        RegisterClassExW(&wc);
-
+        let class_name = to_wide(CLASS_NAME);
         DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
         SELECTED_ICON.store(DEFAULT_ICON, Ordering::SeqCst);
 
@@ -150,30 +151,47 @@ static RUNNING_APPS: Mutex<Vec<AppWindowEntry>> = Mutex::new(Vec::new());
 static VISIBLE_APPS: Mutex<Vec<AppWindowEntry>> = Mutex::new(Vec::new());
 static APP_TABLE: Mutex<Option<ActionTable>> = Mutex::new(None);
 
-unsafe extern "system" fn enum_windows_proc(hwnd: isize, _lparam: isize) -> i32 {
-    unsafe {
-        if IsWindowVisible(hwnd) == 0 {
-            return 1;
-        }
-        let title = window_text(hwnd);
-        if title.is_empty() || title.starts_with("Kora") {
-            return 1;
+fn scan_running_apps_async(hwnd: isize) {
+    std::thread::spawn(move || {
+        let mut list: Vec<AppWindowEntry> = Vec::new();
+        unsafe extern "system" fn worker_enum_proc(wnd: isize, lparam: isize) -> i32 {
+            unsafe {
+                if IsWindowVisible(wnd) == 0 {
+                    return 1;
+                }
+                let title = window_text(wnd);
+                if title.is_empty() || title.starts_with("Kora") {
+                    return 1;
+                }
+                let mut pid = 0u32;
+                GetWindowThreadProcessId(wnd, &mut pid);
+                let exe = get_process_name_for_pid(pid);
+                if !exe.is_empty() {
+                    let acc = &mut *(lparam as *mut Vec<AppWindowEntry>);
+                    if !acc.iter().any(|a| a.exe_name == exe) {
+                        acc.push(AppWindowEntry {
+                            title,
+                            exe_name: exe,
+                        });
+                    }
+                }
+                1
+            }
         }
 
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(hwnd, &mut pid);
-        let exe = get_process_name_for_pid(pid);
-        if !exe.is_empty()
-            && let Ok(mut list) = RUNNING_APPS.lock()
-            && !list.iter().any(|a| a.exe_name == exe)
-        {
-            list.push(AppWindowEntry {
-                title,
-                exe_name: exe,
-            });
+        unsafe {
+            EnumWindows(
+                Some(worker_enum_proc),
+                &mut list as *mut Vec<AppWindowEntry> as isize,
+            );
         }
-        1
-    }
+        if let Ok(mut g) = RUNNING_APPS.lock() {
+            *g = list;
+        }
+        unsafe {
+            PostMessageW(hwnd, WM_APP_ENUM_DONE, 0, 0);
+        }
+    });
 }
 
 fn window_text(hwnd: isize) -> String {
@@ -225,12 +243,8 @@ fn app_row(app: &AppWindowEntry) -> TableRow {
 /// Re-enumerates windows (if `rescan`) and refills the list using the search box filter
 fn refresh_running_apps(hwnd: isize, rescan: bool) {
     if rescan {
-        if let Ok(mut list) = RUNNING_APPS.lock() {
-            list.clear();
-        }
-        unsafe {
-            EnumWindows(Some(enum_windows_proc), 0);
-        }
+        scan_running_apps_async(hwnd);
+        return;
     }
     let query = window_text(unsafe { GetDlgItem(hwnd, IDC_EDIT_SEARCH_APPS as i32) })
         .trim()
@@ -335,11 +349,10 @@ unsafe fn paint(hwnd: isize) {
         round_box(hdc, &badge, palette.accent, palette.accent, 6);
         draw_text(hdc, "+", &badge, get_app_font_bold(), palette.text_white,
             DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        let title_font = create_app_font(11, FW_BOLD);
         draw_text(hdc, strings.dlg_add_prof_title,
             &RECT { left: PAD + 34, top: 0, right: W - 60, bottom: HEADER_H },
-            title_font, palette.text_primary, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-        DeleteObject(title_font);
+            crate::ui::theme::cached_font(11, FW_BOLD), palette.text_primary,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
         // Hint box (text vertically centered)
         let hint = RECT { left: PAD, top: HINT_Y, right: W - PAD, bottom: HINT_Y + HINT_H };
@@ -513,33 +526,37 @@ unsafe fn create_profile(hwnd: isize) {
             let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
             EnableWindow(parent, 1);
             ShowWindow(hwnd, SW_HIDE);
-            let controls = GetWindowLongPtrW(parent, GWLP_USERDATA)
-                as *const crate::ui::views::ControlPanelControls;
-            if parent != 0 && !controls.is_null() {
-                crate::ui::views::control_panel::SidebarControls::switch_to_profile(&*controls, parent, &id);
+            if parent != 0
+                && let Some(c) = crate::ui::controls().or_else(|| {
+                    let ptr = GetWindowLongPtrW(parent, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls;
+                    if !ptr.is_null() {
+                        Some(&*ptr)
+                    } else {
+                        None
+                    }
+                })
+            {
+                crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, parent, &id);
+            }
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+        } else {
+            let h_name = GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32);
+            if h_name != 0 {
+                SetFocus(h_name);
             }
         }
-
-        PostMessageW(hwnd, WM_CLOSE, 0, 0);
     }
 }
 
-const WM_CLOSE: u32 = 0x0010;
-
+/// # Safety
+///
+/// Win32 window procedure callback called by Windows OS message dispatch.
 pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
     hwnd: isize,
     msg: u32,
     wparam: usize,
     lparam: isize,
 ) -> isize {
-    const WM_CREATE: u32 = 0x0001;
-    const WM_DESTROY: u32 = 0x0002;
-    const WM_COMMAND: u32 = 0x0111;
-    const WM_ERASEBKGND: u32 = 0x0014;
-    const WM_DRAWITEM: u32 = 0x002B;
-    const WM_SETCURSOR: u32 = 0x0020;
-    const WM_NCHITTEST: u32 = 0x0084;
-    const WM_CTLCOLORSTATIC: u32 = 0x0138;
     const HTCLIENT: isize = 1;
     const HTCAPTION: isize = 2;
 
@@ -548,6 +565,18 @@ pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
             WM_CREATE => {
                 create_controls(hwnd);
                 0
+            }
+            WM_APP_ENUM_DONE => {
+                refresh_running_apps(hwnd, false);
+                0
+            }
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                let vk = wparam as u32;
+                if vk == 0x1B {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    return 0;
+                }
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_NCHITTEST => {
                 // Header strip drags the borderless window

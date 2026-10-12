@@ -89,7 +89,7 @@ impl Slider {
     }
 
     pub fn get_pos(&self) -> u32 {
-        unsafe { (SendMessageW(self.hwnd, TBM_GETPOS, 0, 0) as u32).min(100) }
+        unsafe { SendMessageW(self.hwnd, TBM_GETPOS, 0, 0) as u32 }
     }
 
     pub fn set_pos(&self, pos: u32) {

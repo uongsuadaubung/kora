@@ -1,4 +1,4 @@
-﻿//! Comparison table component
+//! Comparison table component
 
 pub fn render() -> &'static str {
     r####"  <!-- Comparison Table -->
@@ -112,16 +112,31 @@ pub fn render() -> &'static str {
 
             <tr>
               <td class="feature-name">
+                <strong>Thức dậy từ Sleep / Màn hình khóa</strong>
+                <span>Gập máy, Win + L, Windows tự ngủ</span>
+              </td>
+              <td class="legacy-td">
+                <span class="badge-fail">Kẹt phím &amp; Lỗi gõ hoa</span>
+                <p>Thường bị mất tiếng Việt, kẹt phím hoặc lỗi tự động viết hoa kỳ dị (<code>gÕ</code>, <code>tiẾng ViỆt</code>). Phải khởi động lại ứng dụng hoặc bấm phím lung tung để gõ lại.</p>
+              </td>
+              <td class="kora-td">
+                <span class="badge-win">Tự phục hồi 100%</span>
+                <p>Tự động nhận diện khi máy thức giấc và mở khóa, làm mới trạng thái bàn phím để bạn tiếp tục gõ tiếng Việt mượt mà ngay lập tức.</p>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="feature-name">
                 <strong>Mức độ ngốn máy & RAM</strong>
                 <span>Tài nguyên khi mở chạy ngầm cả ngày</span>
               </td>
               <td class="legacy-td">
-                <span class="badge-neutral">2.4 MB (cố định)</span>
-                <p>UniKey và OpenKey luôn chiếm từ 2.4 MB RAM trở lên dù ẩn hay mở cửa sổ.</p>
+                <span class="badge-neutral">2.4 MB – 5 MB+</span>
+                <p>Nhiều bộ gõ khác thường chiếm từ 2.4 MB đến hàng chục MB RAM dù ẩn hay mở cửa sổ.</p>
               </td>
               <td class="kora-td">
-                <span class="badge-win">Chỉ 0.7 MB &rarr; 1.5 MB</span>
-                <p>Khi ẩn cửa sổ chỉ tốn <strong>0.7 MB RAM</strong> (nhẹ hơn 70%). Khi mở bảng điều khiển cũng chỉ <strong>1.5 MB</strong> (<a href="#performance" style="color: #38bdf8; text-decoration: underline;">xem ảnh Task Manager &uarr;</a>).</p>
+                <span class="badge-win">Chỉ ~1 MB RAM</span>
+                <p>Khi ẩn cửa sổ chỉ tốn <strong>~1 MB RAM</strong>. Ngay cả khi mở toàn bộ giao diện bảng điều khiển cũng chỉ <strong>~1.5 MB</strong>.</p>
               </td>
             </tr>
 

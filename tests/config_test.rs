@@ -14,6 +14,14 @@ fn test_default_config_has_macro_disabled() {
         config.show_dialog_on_startup,
         "show_dialog_on_startup should default to true"
     );
+    assert!(
+        !config.remap_enabled,
+        "remap_enabled should default to false"
+    );
+    assert!(
+        !config.disable_enabled,
+        "disable_enabled should default to false"
+    );
 }
 
 #[test]
@@ -111,7 +119,7 @@ vn = Việt Nam
     assert!(!config.bracket_w);
     assert!(config.remember_history_across_space);
     assert!(config.sound_enabled);
-    assert_eq!(config.sound_profile, "NovelKeys Cream");
+    assert_eq!(&*config.sound_profile, "NovelKeys Cream");
     assert_eq!(config.sound_volume, 85);
     assert_eq!(config.language, kora::Language::English);
     assert!(!config.show_dialog_on_startup);
@@ -133,7 +141,7 @@ fn test_config_store_roundtrip() {
         show_dialog_on_startup: false,
         theme: UiTheme::Dark,
         sound_enabled: true,
-        sound_profile: "Topre".to_string(),
+        sound_profile: std::sync::Arc::from("Topre"),
         sound_volume: 80,
         ..Default::default()
     };
@@ -152,7 +160,7 @@ fn test_config_store_roundtrip() {
     assert!(!loaded_config.show_dialog_on_startup);
     assert_eq!(loaded_config.theme, UiTheme::Dark);
     assert!(loaded_config.sound_enabled);
-    assert_eq!(loaded_config.sound_profile, "Topre");
+    assert_eq!(&*loaded_config.sound_profile, "Topre");
     assert_eq!(loaded_config.sound_volume, 80);
     assert_eq!(loaded_macros.lookup("test"), Some("thử nghiệm".to_string()));
     assert_eq!(
@@ -304,3 +312,14 @@ switch_key = ctrl_space
     assert_eq!(loaded.switch_key, config2.switch_key);
     assert_eq!(loaded.switch_key_enabled, config2.switch_key_enabled);
 }
+
+#[test]
+fn test_modifier_reset_and_reinstall_hooks() {
+    #[cfg(target_os = "windows")]
+    {
+        kora::platform::reset_modifier_states();
+        kora::platform::reinstall_hooks();
+        kora::platform::reset_modifier_states();
+    }
+}
+

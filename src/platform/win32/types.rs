@@ -207,6 +207,24 @@ unsafe extern "system" {
     pub fn UnhookWinEvent(hWinEventHook: isize) -> i32;
 }
 
+pub const WM_POWERBROADCAST: u32 = 0x0218;
+pub const PBT_APMSUSPEND: usize = 0x0004;
+pub const PBT_APMRESUMESUSPEND: usize = 0x0007;
+pub const PBT_APMRESUMEAUTOMATIC: usize = 0x0012;
+
+pub const WM_WTSSESSION_CHANGE: u32 = 0x02B1;
+pub const WTS_CONSOLE_CONNECT: usize = 0x1;
+pub const WTS_SESSION_LOGON: usize = 0x5;
+pub const WTS_SESSION_LOCK: usize = 0x7;
+pub const WTS_SESSION_UNLOCK: usize = 0x8;
+pub const NOTIFY_FOR_THIS_SESSION: u32 = 0;
+
+#[link(name = "wtsapi32")]
+unsafe extern "system" {
+    pub fn WTSRegisterSessionNotification(hWnd: isize, dwFlags: u32) -> i32;
+    pub fn WTSUnRegisterSessionNotification(hWnd: isize) -> i32;
+}
+
 pub const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
 pub const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 pub const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;

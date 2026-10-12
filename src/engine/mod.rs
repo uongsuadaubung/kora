@@ -18,6 +18,7 @@ pub use profile::ProfileManager;
 #[derive(Debug, Clone)]
 pub struct VietnameseEngine {
     config: EngineConfig,
+    cached_effective_config: EngineConfig,
     pub buffer: TypingBuffer,
     pub macro_table: MacroTable,
     pub profile_manager: ProfileManager,
@@ -40,8 +41,10 @@ impl VietnameseEngine {
         } else {
             AsyncLogWriter::disabled()
         };
+        let cached_effective_config = config.clone();
         Self {
             config,
+            cached_effective_config,
             buffer: TypingBuffer::new(),
             macro_table: MacroTable::with_defaults(),
             profile_manager: ProfileManager::new(),
@@ -64,8 +67,24 @@ impl VietnameseEngine {
         &self.profile_manager.active_id
     }
 
-    pub fn effective_config(&self) -> EngineConfig {
-        self.profile_manager.resolve_effective_config(&self.profile_manager.active_id, &self.config)
+    pub fn refresh_effective_config(&mut self) {
+        if self.profile_manager.active_id == "global" {
+            self.cached_effective_config = self.config.clone();
+        } else {
+            self.cached_effective_config = self.profile_manager.resolve_effective_config(
+                &self.profile_manager.active_id,
+                &self.config,
+            );
+        }
+    }
+
+    #[inline(always)]
+    pub fn effective_config(&self) -> &EngineConfig {
+        if self.profile_manager.active_id == "global" {
+            &self.config
+        } else {
+            &self.cached_effective_config
+        }
     }
 
     pub fn effective_remaps(&self) -> Vec<profile::KeyRemapRule> {
@@ -86,6 +105,7 @@ impl VietnameseEngine {
     pub fn switch_profile_by_process(&mut self, exe_name: &str) -> (bool, String) {
         let (changed, new_id) = self.profile_manager.set_active_by_process(exe_name);
         if changed {
+            self.refresh_effective_config();
             self.reset();
             if self.config.debug {
                 self.log_debug(format!(
@@ -112,6 +132,7 @@ impl VietnameseEngine {
             }
             _ => self.config.enabled = new_state,
         }
+        self.refresh_effective_config();
         self.reset();
         new_state
     }
@@ -187,7 +208,11 @@ impl VietnameseEngine {
     /// Feed a character into the engine with hardware Shift & CapsLock state.
     pub fn on_key(&mut self, ch: char, is_shift: bool, is_caps: bool) -> EngineAction {
         // Settings of the active (foreground app) profile, resolved over the global config
-        let cfg = self.effective_config();
+        let cfg = if self.profile_manager.active_id == "global" {
+            self.config.clone()
+        } else {
+            self.cached_effective_config.clone()
+        };
         let prev_state_summary = if self.config.debug {
             self.buffer.state.summary()
         } else {
@@ -240,7 +265,7 @@ impl VietnameseEngine {
                 let backspaces = self.buffer.emitted_len;
                 let mut output: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
                 output.push(ch);
-                let current_raw = std::mem::take(&mut self.buffer.raw_keys);
+                let current_raw = self.buffer.raw_keys;
                 self.history.commit_word(current_raw, false);
                 self.buffer.clear();
                 self.buffer.raw_keys.push(raw_key);
@@ -252,7 +277,7 @@ impl VietnameseEngine {
                 return EngineAction::Replace { backspaces, output };
             }
 
-            let current_raw = std::mem::take(&mut self.buffer.raw_keys);
+            let current_raw = self.buffer.raw_keys;
             self.history.commit_word(current_raw, false);
             self.buffer.clear();
         }
@@ -268,7 +293,7 @@ impl VietnameseEngine {
             if matches!(test_state, crate::vietnamese::SyllableState::Passthrough(_))
                 || self.buffer.is_passthrough
             {
-                let current_raw = std::mem::take(&mut self.buffer.raw_keys);
+                let current_raw = self.buffer.raw_keys;
                 self.history.commit_word(current_raw, false);
                 self.history.add_space();
                 self.buffer.clear();
@@ -341,7 +366,7 @@ impl VietnameseEngine {
 
                 self.buffer.clear();
                 if ch == ' ' {
-                    self.history.commit_word(Vec::new(), false);
+                    self.history.commit_word(crate::vietnamese::InlineList::new(), false);
                     self.history.add_space();
                 } else {
                     self.history.clear();
@@ -384,7 +409,7 @@ impl VietnameseEngine {
 
                 if ch == ' ' {
                     self.history
-                        .commit_word(std::mem::take(&mut self.buffer.raw_keys), true);
+                        .commit_word(self.buffer.raw_keys, true);
                     self.history.add_space();
                 } else {
                     self.history.clear();
@@ -407,7 +432,7 @@ impl VietnameseEngine {
                 ));
             }
             if ch == ' ' {
-                let current_raw = std::mem::take(&mut self.buffer.raw_keys);
+                let current_raw = self.buffer.raw_keys;
                 self.history.commit_word(current_raw, false);
                 self.history.add_space();
             } else {
@@ -425,7 +450,11 @@ impl VietnameseEngine {
 
     /// Feed a backspace event
     pub fn on_backspace(&mut self) -> EngineAction {
-        let cfg = self.effective_config();
+        let cfg = if self.profile_manager.active_id == "global" {
+            self.config.clone()
+        } else {
+            self.cached_effective_config.clone()
+        };
         if !cfg.enabled {
             if cfg.use_macro
                 && cfg.use_macro_in_english_mode
@@ -465,7 +494,7 @@ impl VietnameseEngine {
                     self.buffer.restore_as_passthrough(raw_keys);
                 } else {
                     // Replay previous word into buffer
-                    for k in raw_keys {
+                    for &k in &raw_keys {
                         self.buffer.feed_key(k, &cfg);
                     }
                     self.buffer.is_restored_across_space = true;

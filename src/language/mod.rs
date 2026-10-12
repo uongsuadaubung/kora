@@ -127,6 +127,8 @@ pub struct LanguageStrings {
     pub col_action: &'static str,
     pub action_edit: &'static str,
     pub action_delete: &'static str,
+    pub action_mute: &'static str,
+    pub action_unmute: &'static str,
     pub action_combo: &'static str,
     pub macro_type_normal: &'static str,
     pub macro_type_start: &'static str,
@@ -164,6 +166,13 @@ pub struct LanguageStrings {
     pub btn_exit: &'static str,
     pub btn_defaults: &'static str,
     pub btn_close: &'static str,
+
+    // System Settings - Defaults Card
+    pub sys_defaults_title: &'static str,
+    pub sys_defaults_desc: &'static str,
+    pub btn_restore_defaults: &'static str,
+    pub confirm_defaults_title: &'static str,
+    pub confirm_defaults_msg: &'static str,
 
     // Hotkey Capture Dialog
     pub hotkey_dialog_title: &'static str,

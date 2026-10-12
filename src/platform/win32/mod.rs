@@ -37,6 +37,16 @@ pub fn notify_mode_change(is_vietnamese: bool) {
     }
 }
 
+/// Pre-translation filter for the main message loop; receives a `*const MSG`
+/// and returns `true` if the message was fully handled (e.g. `IsDialogMessageW`).
+pub type MessageFilter = fn(*const std::ffi::c_void) -> bool;
+static MESSAGE_FILTER: std::sync::OnceLock<MessageFilter> = std::sync::OnceLock::new();
+
+/// Registers the message-loop pre-translation filter (first registration wins).
+pub fn set_message_filter(filter: MessageFilter) {
+    let _ = MESSAGE_FILTER.set(filter);
+}
+
 fn is_ctrl_vk(vk: u32) -> bool {
     matches!(vk, 0x11 | 0xA2 | 0xA3) // VK_CONTROL, VK_LCONTROL, VK_RCONTROL
 }
@@ -59,6 +69,7 @@ fn is_modifier_vk(vk: u32) -> bool {
 
 pub const WM_HOTKEY_CAPTURED: u32 = 0x8000 + 101;
 pub const WM_REMAP_KEY_CAPTURED: u32 = 0x8000 + 102;
+pub const WM_HOTKEY_CANCELLED: u32 = 0x8000 + 103;
 
 static HOTKEY_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOTKEY_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -108,6 +119,67 @@ pub fn stop_hotkey_capture() {
     TRACKED_WIN.store(false, Ordering::SeqCst);
 }
 
+/// Resets all internal modifier and hotkey tracking flags to prevent stuck modifiers
+/// (e.g. after Win+L workstation lock, sleep, session change, or focus switch).
+pub fn reset_modifier_states() {
+    TRACKED_CTRL.store(false, Ordering::SeqCst);
+    TRACKED_SHIFT.store(false, Ordering::SeqCst);
+    TRACKED_ALT.store(false, Ordering::SeqCst);
+    TRACKED_WIN.store(false, Ordering::SeqCst);
+    HOTKEY_MOD_ARMED.store(false, Ordering::SeqCst);
+    sound::reset_key_sound_bits();
+}
+
+/// Reinstalls both low-level keyboard and mouse hooks, clears modifier states and engine buffer.
+/// Called when Windows resumes from sleep / Modern Standby or when the workstation is unlocked.
+pub fn reinstall_hooks() {
+    reset_modifier_states();
+
+    if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+        && let Some(ref mut engine) = *guard
+    {
+        engine.reset();
+    }
+
+    unsafe {
+        if let Ok(mut h_guard) = HOOK_HANDLE.lock() {
+            if *h_guard != 0 {
+                UnhookWindowsHookEx(*h_guard);
+                *h_guard = 0;
+            }
+            let kbd_hook = SetWindowsHookExW(
+                WH_KEYBOARD_LL,
+                low_level_keyboard_proc,
+                GetModuleHandleW(null_mut()),
+                0,
+            );
+            if kbd_hook != 0 {
+                *h_guard = kbd_hook;
+            } else {
+                eprintln!("[Kora] Không thể cài đặt lại Keyboard Hook!");
+            }
+        }
+
+        if let Ok(mut m_guard) = MOUSE_HOOK_HANDLE.lock() {
+            if *m_guard != 0 {
+                UnhookWindowsHookEx(*m_guard);
+                *m_guard = 0;
+            }
+            let mouse_hook = SetWindowsHookExW(
+                WH_MOUSE_LL,
+                low_level_mouse_proc,
+                GetModuleHandleW(null_mut()),
+                0,
+            );
+            if mouse_hook != 0 {
+                *m_guard = mouse_hook;
+            }
+        }
+    }
+
+    app_tracker::reinit_app_tracker();
+}
+
 pub fn get_captured_hotkey() -> Option<crate::engine::config::Hotkey> {
     if let Ok(guard) = CAPTURED_HOTKEY.lock() {
         *guard
@@ -122,19 +194,6 @@ pub fn get_captured_display_text() -> String {
     } else {
         String::new()
     }
-}
-
-pub fn clear_captured_hotkey() {
-    if let Ok(mut guard) = CAPTURED_HOTKEY.lock() {
-        *guard = None;
-    }
-    if let Ok(mut guard) = CAPTURE_DISPLAY_TEXT.lock() {
-        guard.clear();
-    }
-    TRACKED_CTRL.store(false, Ordering::SeqCst);
-    TRACKED_SHIFT.store(false, Ordering::SeqCst);
-    TRACKED_ALT.store(false, Ordering::SeqCst);
-    TRACKED_WIN.store(false, Ordering::SeqCst);
 }
 
 pub fn set_captured_hotkey(hotkey: Option<crate::engine::config::Hotkey>, display: &str) {
@@ -194,20 +253,31 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
 
             let vk = hook_struct.vk_code;
 
-            // Handle single key capture mode for Remap / Key Dialogs
+            // Handle single key capture mode for Remap / Key Dialogs.
+            // Only while the capture dialog is foreground: never steal keys typed into other apps.
             if REMAP_CAPTURE_ACTIVE.load(Ordering::SeqCst) {
-                if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
-                    let dialog_hwnd = REMAP_DIALOG_HWND.load(Ordering::SeqCst);
-                    if dialog_hwnd != 0 {
+                let dialog_hwnd = REMAP_DIALOG_HWND.load(Ordering::SeqCst);
+                if dialog_hwnd != 0 && GetForegroundWindow() == dialog_hwnd {
+                    if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
                         PostMessageW(dialog_hwnd, WM_REMAP_KEY_CAPTURED, vk as usize, 0);
                     }
+                    return 1;
                 }
-                return 1;
             }
 
-            // Handle hotkey capture mode for HotkeyCaptureDialog
-            if HOTKEY_CAPTURE_ACTIVE.load(Ordering::SeqCst) {
+            // Handle hotkey capture mode for HotkeyCaptureDialog (same foreground rule)
+            if HOTKEY_CAPTURE_ACTIVE.load(Ordering::SeqCst)
+                && HOTKEY_DIALOG_HWND.load(Ordering::SeqCst) == GetForegroundWindow()
+            {
                 if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
+                    if vk == 0x1B {
+                        stop_hotkey_capture();
+                        let dialog_hwnd = HOTKEY_DIALOG_HWND.load(Ordering::SeqCst);
+                        if dialog_hwnd != 0 {
+                            PostMessageW(dialog_hwnd, WM_HOTKEY_CANCELLED, 0, 0);
+                        }
+                        return 1;
+                    }
                     if is_ctrl_vk(vk) {
                         TRACKED_CTRL.store(true, Ordering::SeqCst);
                     }
@@ -221,19 +291,29 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                         TRACKED_WIN.store(true, Ordering::SeqCst);
                     }
 
-                    let is_shift = TRACKED_SHIFT.load(Ordering::SeqCst)
-                        || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0)
-                        || is_shift_vk(vk);
-                    let is_ctrl = TRACKED_CTRL.load(Ordering::SeqCst)
-                        || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0)
-                        || is_ctrl_vk(vk);
-                    let is_alt = TRACKED_ALT.load(Ordering::SeqCst)
-                        || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0)
-                        || is_alt_vk(vk);
-                    let is_win = TRACKED_WIN.load(Ordering::SeqCst)
-                        || ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
-                        || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0)
-                        || is_win_vk(vk);
+                    let async_shift = (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0;
+                    let async_ctrl = (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0;
+                    let async_alt = (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0;
+                    let async_win = ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
+                        || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0);
+
+                    if !async_shift && !is_shift_vk(vk) {
+                        TRACKED_SHIFT.store(false, Ordering::SeqCst);
+                    }
+                    if !async_ctrl && !is_ctrl_vk(vk) {
+                        TRACKED_CTRL.store(false, Ordering::SeqCst);
+                    }
+                    if !async_alt && !is_alt_vk(vk) {
+                        TRACKED_ALT.store(false, Ordering::SeqCst);
+                    }
+                    if !async_win && !is_win_vk(vk) {
+                        TRACKED_WIN.store(false, Ordering::SeqCst);
+                    }
+
+                    let is_shift = is_shift_vk(vk) || async_shift;
+                    let is_ctrl = is_ctrl_vk(vk) || async_ctrl;
+                    let is_alt = is_alt_vk(vk) || async_alt;
+                    let is_win = is_win_vk(vk) || async_win;
 
                     let is_mod = is_modifier_vk(vk);
                     let captured = crate::engine::config::Hotkey {
@@ -277,16 +357,19 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                         PostMessageW(dialog_hwnd, WM_HOTKEY_CAPTURED, 0, 0);
                     }
                 } else if w_param == WM_KEYUP || w_param == WM_SYSKEYUP {
-                    if is_ctrl_vk(vk) {
+                    if is_ctrl_vk(vk) || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0) {
                         TRACKED_CTRL.store(false, Ordering::SeqCst);
                     }
-                    if is_shift_vk(vk) {
+                    if is_shift_vk(vk) || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0) {
                         TRACKED_SHIFT.store(false, Ordering::SeqCst);
                     }
-                    if is_alt_vk(vk) {
+                    if is_alt_vk(vk) || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0) {
                         TRACKED_ALT.store(false, Ordering::SeqCst);
                     }
-                    if is_win_vk(vk) {
+                    if is_win_vk(vk)
+                        || (((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
+                            && ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) == 0))
+                    {
                         TRACKED_WIN.store(false, Ordering::SeqCst);
                     }
                 }
@@ -325,16 +408,19 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
 
             // Handle key-up events for modifier-only hotkey triggers (e.g. Ctrl + Shift toggle)
             if w_param == WM_KEYUP || w_param == WM_SYSKEYUP {
-                if is_ctrl_vk(vk) {
+                if is_ctrl_vk(vk) || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0) {
                     TRACKED_CTRL.store(false, Ordering::SeqCst);
                 }
-                if is_shift_vk(vk) {
+                if is_shift_vk(vk) || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0) {
                     TRACKED_SHIFT.store(false, Ordering::SeqCst);
                 }
-                if is_alt_vk(vk) {
+                if is_alt_vk(vk) || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0) {
                     TRACKED_ALT.store(false, Ordering::SeqCst);
                 }
-                if is_win_vk(vk) {
+                if is_win_vk(vk)
+                    || (((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
+                        && ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) == 0))
+                {
                     TRACKED_WIN.store(false, Ordering::SeqCst);
                 }
 
@@ -381,19 +467,32 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
 
                 // 2. Query hardware modifier states cleanly and reliably
                 let is_caps = (GetKeyState(VK_CAPITAL) & 1) != 0;
-                let is_shift = TRACKED_SHIFT.load(Ordering::SeqCst)
-                    || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0)
-                    || is_shift_vk(vk);
-                let is_ctrl = TRACKED_CTRL.load(Ordering::SeqCst)
-                    || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0)
-                    || is_ctrl_vk(vk);
-                let is_alt = TRACKED_ALT.load(Ordering::SeqCst)
-                    || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0)
-                    || is_alt_vk(vk);
-                let is_win = TRACKED_WIN.load(Ordering::SeqCst)
-                    || ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0)
-                    || is_win_vk(vk);
+
+                let async_shift = (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0;
+                let async_ctrl = (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0;
+                let async_alt = (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0;
+                let async_win = ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
+                    || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0);
+
+                // Self-healing synchronization: if physical key is NOT pressed and current VK is not that modifier,
+                // clear the tracked flag so missed KeyUp (e.g. from Win+L lock, sleep, Alt+Tab) never gets stuck!
+                if !async_shift && !is_shift_vk(vk) {
+                    TRACKED_SHIFT.store(false, Ordering::SeqCst);
+                }
+                if !async_ctrl && !is_ctrl_vk(vk) {
+                    TRACKED_CTRL.store(false, Ordering::SeqCst);
+                }
+                if !async_alt && !is_alt_vk(vk) {
+                    TRACKED_ALT.store(false, Ordering::SeqCst);
+                }
+                if !async_win && !is_win_vk(vk) {
+                    TRACKED_WIN.store(false, Ordering::SeqCst);
+                }
+
+                let is_shift = is_shift_vk(vk) || async_shift;
+                let is_ctrl = is_ctrl_vk(vk) || async_ctrl;
+                let is_alt = is_alt_vk(vk) || async_alt;
+                let is_win = is_win_vk(vk) || async_win;
 
                 // Check modifier-only hotkey arming (e.g. Ctrl + Shift)
                 if switch_key_enabled {
@@ -605,7 +704,13 @@ pub fn run_hook_loop(engine: VietnameseEngine, on_ready: impl FnOnce()) {
         app_tracker::init_app_tracker();
 
         let mut msg: MSG = std::mem::zeroed();
+        let filter = MESSAGE_FILTER.get().copied();
         while GetMessageW(&mut msg, 0, 0, 0) > 0 {
+            if let Some(f) = filter
+                && f(&msg as *const MSG as *const std::ffi::c_void)
+            {
+                continue;
+            }
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }

@@ -3,7 +3,7 @@
 use crate::engine::EngineConfig;
 use crate::engine::profile::AppProfile;
 use crate::language::LanguageStrings;
-use crate::ui::win32::{SW_HIDE, SW_SHOW, ShowWindow};
+use crate::ui::win32::{CBN_SELCHANGE, SW_HIDE, SW_SHOW, ShowWindow};
 use crate::ui::components::*;
 use crate::ui::tokens::id::*;
 
@@ -27,6 +27,8 @@ pub struct TabSound {
     pub slider_volume: Slider,
     pub lbl_volume_val: Label,
     pub sound_available: bool,
+    /// Switch profile names, scanned once at creation (index == combo index).
+    switch_profiles: Vec<String>,
 }
 
 impl TabSound {
@@ -138,6 +140,7 @@ impl TabSound {
             slider_volume,
             lbl_volume_val,
             sound_available,
+            switch_profiles,
         };
         tab.update_sound_controls_state();
         Some(tab)
@@ -150,19 +153,26 @@ impl TabSound {
         self.btn_test_sound.set_enabled(is_enabled);
     }
 
+    fn select_switch_profile(&self, name: &str) {
+        if let Some(pos) = self
+            .switch_profiles
+            .iter()
+            .position(|p| p.eq_ignore_ascii_case(name))
+        {
+            self.combo_switch_type.set_selected(pos);
+        }
+    }
+
+    fn selected_switch_profile(&self) -> Option<&String> {
+        self.switch_profiles.get(self.combo_switch_type.get_selected()?)
+    }
+
     pub fn load_config(&self, config: &EngineConfig) {
         self.check_sound_enabled.set_checked(config.sound_enabled);
         self.slider_volume.set_pos(config.sound_volume as u32);
         self.lbl_volume_val
             .set_text(&format!("{}%", config.sound_volume));
-
-        let switch_profiles = crate::engine::config_store::list_switch_profiles();
-        if let Some(pos) = switch_profiles
-            .iter()
-            .position(|p| p.eq_ignore_ascii_case(&config.sound_profile))
-        {
-            self.combo_switch_type.set_selected(pos);
-        }
+        self.select_switch_profile(&config.sound_profile);
         self.update_sound_controls_state();
     }
 
@@ -181,25 +191,15 @@ impl TabSound {
             .set_tri_state(profile.sound_enabled, global_config.sound_enabled);
         self.slider_volume.set_pos(vol as u32);
         self.lbl_volume_val.set_text(&format!("{}%", vol));
-
-        let switch_profiles = crate::engine::config_store::list_switch_profiles();
-        if let Some(pos) = switch_profiles
-            .iter()
-            .position(|p| p.eq_ignore_ascii_case(prof_name))
-        {
-            self.combo_switch_type.set_selected(pos);
-        }
+        self.select_switch_profile(prof_name);
         self.update_sound_controls_state();
     }
 
     pub fn read_config(&self, config: &mut EngineConfig) {
         config.sound_enabled = self.check_sound_enabled.is_checked();
         config.sound_volume = self.slider_volume.get_pos() as u8;
-        if let Some(sel) = self.combo_switch_type.get_selected() {
-            let switch_profiles = crate::engine::config_store::list_switch_profiles();
-            if let Some(name) = switch_profiles.get(sel) {
-                config.sound_profile = name.clone();
-            }
+        if let Some(name) = self.selected_switch_profile() {
+            config.sound_profile = std::sync::Arc::from(name.as_str());
         }
     }
 
@@ -207,11 +207,8 @@ impl TabSound {
     /// switch type only when the combo actually changes (keeps them inheriting otherwise).
     pub fn read_profile(&self, profile: &mut AppProfile, combo_changed: bool) {
         profile.sound_enabled = self.check_sound_enabled.tri_state();
-        if combo_changed
-            && let Some(sel) = self.combo_switch_type.get_selected()
-            && let Some(name) = crate::engine::config_store::list_switch_profiles().get(sel)
-        {
-            profile.sound_profile = Some(name.clone());
+        if combo_changed && let Some(name) = self.selected_switch_profile() {
+            profile.sound_profile = Some(std::sync::Arc::from(name.as_str()));
         }
     }
 
@@ -224,37 +221,29 @@ impl TabSound {
     }
 
     pub fn on_command(&self, _hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
+        use crate::ui::controller::{self, EditTarget};
         if ctl_id == IDC_BTN_TEST_SOUND {
             crate::platform::win32::sound::play_test_sound();
             return true;
         }
 
         let is_check = ctl_id == IDC_CHECK_SOUND_ENABLED && notify_code == 0;
-        let is_combo = ctl_id == IDC_COMBO_SWITCH_TYPE && notify_code == 1;
+        let is_combo = ctl_id == IDC_COMBO_SWITCH_TYPE && notify_code == CBN_SELCHANGE;
 
         if is_check || is_combo {
             if is_check {
                 self.update_sound_controls_state();
             }
+            controller::edit_selected_then(
+                |target| match target {
+                    EditTarget::Global(cfg) => self.read_config(cfg),
+                    EditTarget::Child(child) => self.read_profile(child, is_combo),
+                },
+                |engine| controller::reconfigure_sound(engine),
+            );
+            // Preview the newly selected switch (after reconfigure, outside the engine lock).
             if is_combo {
                 crate::platform::win32::sound::play_test_sound();
-            }
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
-                    self.read_config(engine.config_mut());
-                } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                    self.read_profile(child, is_combo);
-                }
-                crate::engine::config_store::save_config_all_debounced(
-                    engine.config(),
-                    &engine.macro_table,
-                    &engine.profile_manager,
-                );
-                let eff = engine.effective_config();
-                crate::platform::win32::sound::reconfigure_sound(eff.sound_enabled, &eff.sound_profile, eff.sound_volume);
             }
             return true;
         }
@@ -262,33 +251,39 @@ impl TabSound {
         false
     }
 
-    pub fn on_hscroll(&self, slider_hwnd: isize) -> bool {
-        if slider_hwnd == self.slider_volume.hwnd() {
-            let pos = self.slider_volume.get_pos();
-            self.lbl_volume_val.set_text(&format!("{pos}%"));
-
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
-                    engine.config_mut().sound_volume = pos as u8;
-                } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                    child.sound_volume = Some(pos as u8);
-                }
-
-                crate::engine::config_store::save_config_all_debounced(
-                    engine.config(),
-                    &engine.macro_table,
-                    &engine.profile_manager,
-                );
-                let eff = engine.effective_config();
-                crate::platform::win32::sound::reconfigure_sound(eff.sound_enabled, &eff.sound_profile, eff.sound_volume);
-            }
-            true
-        } else {
-            false
+    /// `WM_HSCROLL` from the volume trackbar. While dragging (`TB_THUMBTRACK`) only the
+    /// label is updated; the value is persisted once the thumb is released / keyboard step.
+    pub fn on_hscroll(&self, wparam: usize, slider_hwnd: isize) -> bool {
+        use crate::ui::controller;
+        const TB_THUMBTRACK: usize = 5;
+        if slider_hwnd != self.slider_volume.hwnd() {
+            return false;
         }
+        let pos = self.slider_volume.get_pos();
+        self.lbl_volume_val.set_text(&format!("{pos}%"));
+        if wparam & 0xFFFF == TB_THUMBTRACK {
+            return true;
+        }
+
+        let vol = pos as u8;
+        controller::with_engine(|engine| {
+            let pm = &mut engine.profile_manager;
+            let sel_id = pm.selected_id.clone();
+            let changed = if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                let cfg = engine.config_mut();
+                std::mem::replace(&mut cfg.sound_volume, vol) != vol
+            } else if let Some(child) = pm.get_profile_mut(&sel_id) {
+                child.sound_volume.replace(vol) != Some(vol)
+            } else {
+                false
+            };
+            // TB_THUMBPOSITION and TB_ENDTRACK both arrive on release: act once.
+            if changed {
+                controller::save(engine);
+                controller::reconfigure_sound(engine);
+            }
+        });
+        true
     }
 
     pub fn update_visibility(&self, visible: bool) {

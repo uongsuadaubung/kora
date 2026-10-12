@@ -11,6 +11,7 @@ use kora::{parse_config_all, serialize_config_all};
 #[test]
 fn test_live_inheritance_remap() {
     let mut manager = ProfileManager::new();
+    manager.global_profile.remap_enabled = Some(true);
 
     // 1. Setup Global Remaps:
     // CapsLock (0x14) -> Ctrl (0x11)
@@ -81,6 +82,7 @@ fn test_live_inheritance_remap() {
 #[test]
 fn test_live_inheritance_disable() {
     let mut manager = ProfileManager::new();
+    manager.global_profile.disable_enabled = Some(true);
 
     // Global disables: Insert (0x2D), Pause (0x13)
     manager.global_profile.app_disabled.push(0x2D);
@@ -181,8 +183,10 @@ fn test_live_inheritance_macro() {
 
 #[test]
 fn test_profile_ini_roundtrip() {
-    let mut config = EngineConfig::default();
-    config.method = InputMethod::Telex;
+    let config = EngineConfig {
+        method: InputMethod::Telex,
+        ..Default::default()
+    };
 
     let mut macros = MacroTable::new();
     macros.insert_typed_no_cache("vn", "Việt Nam", MacroType::Normal);
@@ -211,10 +215,10 @@ fn test_profile_ini_roundtrip() {
     let (parsed_cfg, parsed_macros, parsed_manager) = parse_config_all(&ini_str);
 
     assert_eq!(parsed_cfg.method, InputMethod::Telex);
-    assert!(parsed_cfg.remap_enabled);
-    assert!(parsed_cfg.disable_enabled);
-    assert_eq!(parsed_manager.global_profile.remap_enabled, Some(true));
-    assert_eq!(parsed_manager.global_profile.disable_enabled, Some(true));
+    assert!(!parsed_cfg.remap_enabled);
+    assert!(!parsed_cfg.disable_enabled);
+    assert_eq!(parsed_manager.global_profile.remap_enabled, Some(false));
+    assert_eq!(parsed_manager.global_profile.disable_enabled, Some(false));
     assert_eq!(parsed_macros.get("vn").unwrap().value, "Việt Nam");
 
     assert_eq!(parsed_manager.global_profile.app_remaps.len(), 1);

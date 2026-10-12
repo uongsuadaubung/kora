@@ -1,7 +1,7 @@
 use super::{action::EngineAction, config::EngineConfig};
 use crate::vietnamese::{InlineList, state::SyllableState};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RawKey {
     pub ch: char,
     pub is_upper: bool,
@@ -23,16 +23,16 @@ pub struct EvaluationResult {
     pub state: SyllableState,
     pub rendered: String,
     pub emitted_len: usize,
-    pub effective_raw_keys: Vec<RawKey>,
+    pub effective_raw_keys: InlineList<RawKey, 32>,
     pub last_action: EngineAction,
 }
 
 /// TypingBuffer managing word state with raw_keys as the Single Source of Truth.
 /// SyllableState is deterministically projected from raw_keys.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TypingBuffer {
     /// History of raw keys entered in this word session (Single Source of Truth)
-    pub raw_keys: Vec<RawKey>,
+    pub raw_keys: InlineList<RawKey, 32>,
     /// Projected state in the state machine (Empty, Onset, Nucleus, Coda, Passthrough)
     pub state: SyllableState,
     /// Length in chars of the rendered text currently emitted to the screen
@@ -43,6 +43,19 @@ pub struct TypingBuffer {
     pub is_passthrough: bool,
     /// Whether this buffer was restored from history across a space via backspace
     pub is_restored_across_space: bool,
+}
+
+impl Default for TypingBuffer {
+    fn default() -> Self {
+        Self {
+            raw_keys: InlineList::new(),
+            state: SyllableState::Empty,
+            emitted_len: 0,
+            last_rendered: String::with_capacity(32),
+            is_passthrough: false,
+            is_restored_across_space: false,
+        }
+    }
 }
 
 impl TypingBuffer {
@@ -64,11 +77,13 @@ impl TypingBuffer {
         self.is_restored_across_space = false;
     }
 
-    pub fn restore_as_passthrough(&mut self, keys: Vec<RawKey>) {
-        let text: String = keys.iter().map(|k| k.ch).collect();
-        self.emitted_len = text.encode_utf16().count();
-        self.state = SyllableState::Passthrough(InlineList::from(text.as_str()));
-        self.last_rendered = text;
+    pub fn restore_as_passthrough(&mut self, keys: InlineList<RawKey, 32>) {
+        self.last_rendered.clear();
+        for k in &keys {
+            self.last_rendered.push(k.ch);
+        }
+        self.emitted_len = self.last_rendered.encode_utf16().count();
+        self.state = SyllableState::Passthrough(InlineList::from(self.last_rendered.as_str()));
         self.raw_keys = keys;
         self.is_passthrough = true;
         self.is_restored_across_space = true;
@@ -78,38 +93,44 @@ impl TypingBuffer {
         self.raw_keys.is_empty()
     }
 
+
+
     /// Evaluates a sequence of RawKeys deterministically and returns an `EvaluationResult`.
     pub fn evaluate_keys(keys: &[RawKey], config: &EngineConfig) -> EvaluationResult {
         let mut state = SyllableState::Empty;
         let mut current_len = 0;
-        let mut effective = Vec::with_capacity(keys.len());
+        let mut effective = InlineList::<RawKey, 32>::new();
         let mut last_action = EngineAction::Passthrough;
-        let mut last_rendered = String::new();
+        let mut last_rendered = String::with_capacity(32);
 
         for (idx, &key) in keys.iter().enumerate() {
             effective.push(key);
             let was_nucleus_or_coda =
                 matches!(state, SyllableState::Nucleus(_) | SyllableState::Coda(_));
-            let prev_rendered = last_rendered.clone();
-            let prev_rendered_len = last_rendered.chars().count();
+            let was_unambiguous_vi = state.is_unambiguous_completed_vietnamese();
 
             let (mut next_state, mut action) = state.feed_key(key, current_len, config);
 
             // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-            // If the state machine just transitioned from a structured Vietnamese state into Passthrough,
-            // and the rendered text on screen had modifications (diacritics/tones),
+            // If the state machine transitioned from a structured Vietnamese state into Passthrough,
+            // and the syllable was NOT an unambiguous completed Vietnamese syllable,
             // rollback immediately to raw keys!
+            // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
+            // preserve the word as passthrough for immediate backspace recovery!
             if config.restore_on_wrong_spelling
                 && was_nucleus_or_coda
+                && !was_unambiguous_vi
                 && matches!(next_state, SyllableState::Passthrough(_))
                 && matches!(action, EngineAction::Passthrough)
             {
-                let raw_str: String = keys[..=idx].iter().map(|k| k.ch).collect();
-                let prev_raw_slice: String = keys[..idx].iter().map(|k| k.ch).collect();
-                if prev_rendered != prev_raw_slice {
+                let is_same_as_raw = last_rendered
+                    .chars()
+                    .eq(keys[..idx].iter().map(|k| k.ch));
+                if !is_same_as_raw {
+                    let raw_str: String = keys[..=idx].iter().map(|k| k.ch).collect();
                     next_state = SyllableState::Passthrough(InlineList::from(raw_str.as_str()));
                     action = EngineAction::Replace {
-                        backspaces: prev_rendered_len,
+                        backspaces: last_rendered.chars().count(),
                         output: raw_str,
                     };
                 }
@@ -188,30 +209,31 @@ impl TypingBuffer {
             self.state,
             SyllableState::Nucleus(_) | SyllableState::Coda(_)
         );
-        let prev_rendered = self.last_rendered.clone();
-        let prev_rendered_len = self.last_rendered.chars().count();
+        let was_unambiguous_vi = self.state.is_unambiguous_completed_vietnamese();
 
         let current_state = std::mem::take(&mut self.state);
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
 
         // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-        // If the state machine just transitioned from a structured Vietnamese state into Passthrough,
-        // and the rendered text on screen had modifications (diacritics/tones),
+        // If the state machine transitioned from a structured Vietnamese state into Passthrough,
+        // and the syllable was NOT an unambiguous completed Vietnamese syllable,
         // rollback immediately to raw keys!
+        // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
+        // preserve the word as passthrough for immediate backspace recovery!
         if config.restore_on_wrong_spelling
             && was_nucleus_or_coda
+            && !was_unambiguous_vi
             && matches!(next_state, SyllableState::Passthrough(_))
             && matches!(action, EngineAction::Passthrough)
         {
-            let raw_str: String = self.raw_keys.iter().map(|k| k.ch).collect();
-            let prev_raw_slice: String = self.raw_keys[..self.raw_keys.len() - 1]
-                .iter()
-                .map(|k| k.ch)
-                .collect();
-            if prev_rendered != prev_raw_slice {
+            let is_same_as_raw = self.last_rendered
+                .chars()
+                .eq(self.raw_keys[..self.raw_keys.len() - 1].iter().map(|k| k.ch));
+            if !is_same_as_raw {
+                let raw_str: String = self.raw_keys.iter().map(|k| k.ch).collect();
                 next_state = SyllableState::Passthrough(InlineList::from(raw_str.as_str()));
                 action = EngineAction::Replace {
-                    backspaces: prev_rendered_len,
+                    backspaces: self.last_rendered.chars().count(),
                     output: raw_str,
                 };
             }
@@ -224,7 +246,7 @@ impl TypingBuffer {
         // do not backspace and re-emit it. Only backspace the changed suffix ("o") and emit ("õ").
         // This eliminates duplicate characters ("ggõ") on browser address bars (Firefox, Chrome).
         let (action, new_emitted_len) = match action {
-            EngineAction::Replace { backspaces, output } => {
+            EngineAction::Replace { backspaces, mut output } => {
                 let full_output_utf16 = output.encode_utf16().count();
                 let mut prev_iter = self.last_rendered.chars();
                 let mut new_iter = output.chars();
@@ -248,9 +270,10 @@ impl TypingBuffer {
                         .nth(common)
                         .map(|(i, _)| i)
                         .unwrap_or(output.len());
+                    output.drain(..byte_offset);
                     EngineAction::Replace {
                         backspaces: opt_backspaces,
-                        output: output[byte_offset..].to_string(),
+                        output,
                     }
                 } else {
                     EngineAction::Replace { backspaces, output }

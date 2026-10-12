@@ -39,7 +39,7 @@ pub fn check_and_switch_profile() -> (bool, String) {
         && let Some(ref mut engine) = *guard
     {
         let (changed, new_id) = engine.switch_profile_by_process(&exe);
-        (changed, new_id, changed.then(|| engine.effective_config()))
+        (changed, new_id, changed.then(|| engine.effective_config().clone()))
     } else {
         return (false, "global".to_string());
     };
@@ -100,4 +100,11 @@ pub fn shutdown_app_tracker() {
         }
     }
 }
+
+/// Reinitializes the foreground app tracker after sleep / session change
+pub fn reinit_app_tracker() {
+    shutdown_app_tracker();
+    init_app_tracker();
+}
+
 

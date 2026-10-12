@@ -68,11 +68,6 @@ impl BadgeConfig {
             suffix: None,
         }
     }
-
-    pub fn with_suffix(mut self, suffix: impl Into<String>) -> Self {
-        self.suffix = Some(suffix.into());
-        self
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -128,13 +123,15 @@ impl std::fmt::Debug for TableAction {
     }
 }
 
+pub type CustomCellRenderer = Arc<dyn Fn(isize, &RECT, &ThemePalette) + Send + Sync>;
+
 #[derive(Clone)]
 pub enum TableCell {
     Text(String),
     SecondaryText(String),
     Badge(BadgeConfig),
     Actions(Vec<TableAction>),
-    Custom(Arc<dyn Fn(isize, &RECT, &ThemePalette) + Send + Sync>),
+    Custom(CustomCellRenderer),
 }
 
 impl std::fmt::Debug for TableCell {
@@ -501,8 +498,8 @@ unsafe extern "system" fn action_table_wndproc(
     }
 
     if msg == WM_MOUSEMOVE {
-        let x = (lparam & 0xFFFF) as i32;
-        let y = ((lparam >> 16) & 0xFFFF) as i32;
+        let x = (lparam as i16) as i32;
+        let y = ((lparam >> 16) as i16) as i32;
 
         let mut client_rc = RECT::default();
         unsafe { GetClientRect(hwnd, &mut client_rc); }
@@ -510,11 +507,11 @@ unsafe extern "system" fn action_table_wndproc(
         let height = client_rc.bottom - client_rc.top;
         let body_h = (height - header_h).max(0);
 
-        let (need_redraw, is_hand_cursor) = if let Ok(mut g) = state_mutex.lock() {
+        let (need_redraw, is_hand_cursor, dirty_row1, dirty_row2, sb_changed, is_drag) = if let Ok(mut g) = state_mutex.lock() {
             if g.is_dragging_scroll {
                 let total_h = g.rows.len() as i32 * ROW_HEIGHT;
                 let max_scroll = (total_h - body_h).max(0);
-                if max_scroll > 0 {
+                let changed = if max_scroll > 0 {
                     let track_top = header_h + 3;
                     let track_bottom = height - 3;
                     let track_h = (track_bottom - track_top).max(10);
@@ -522,9 +519,14 @@ unsafe extern "system" fn action_table_wndproc(
                     let travel = (track_h - thumb_h).max(1);
                     let delta_y = y - g.scroll_drag_start_y;
                     let scroll_delta = ((delta_y as f32 / travel as f32) * max_scroll as f32) as i32;
-                    g.scroll_y = (g.scroll_drag_start_val + scroll_delta).clamp(0, max_scroll);
-                }
-                (true, false)
+                    let new_scroll = (g.scroll_drag_start_val + scroll_delta).clamp(0, max_scroll);
+                    let changed = g.scroll_y != new_scroll;
+                    g.scroll_y = new_scroll;
+                    changed
+                } else {
+                    false
+                };
+                (changed, false, None, None, false, true)
             } else {
                 let old_hot_row = g.hover_row;
                 let old_action = g.hover_action;
@@ -576,17 +578,49 @@ unsafe extern "system" fn action_table_wndproc(
                     g.hover_action = ActionHover::None;
                 }
 
-                let changed = old_hot_row != g.hover_row || old_action != g.hover_action || old_hover_scroll != g.is_hover_scrollbar;
+                let row_changed = old_hot_row != g.hover_row || old_action != g.hover_action;
+                let sb_changed = old_hover_scroll != g.is_hover_scrollbar;
                 let hand = g.hover_action != ActionHover::None;
-                (changed, hand)
+                (row_changed || sb_changed, hand, old_hot_row, g.hover_row, sb_changed, false)
             }
         } else {
-            (false, false)
+            (false, false, None, None, false, false)
         };
 
         if need_redraw {
             unsafe {
-                InvalidateRect(hwnd, null_mut(), 0);
+                if is_drag {
+                    InvalidateRect(hwnd, null_mut(), 0);
+                } else {
+                    let scroll_y = state_mutex.lock().map(|g| g.scroll_y).unwrap_or(0);
+                    let invalidate_row = |r_opt: Option<usize>| {
+                        if let Some(r) = r_opt {
+                            let ry = header_h + (r as i32 * ROW_HEIGHT) - scroll_y;
+                            if ry < height && ry + ROW_HEIGHT > header_h {
+                                let r_rc = RECT {
+                                    left: 0,
+                                    top: ry.max(header_h),
+                                    right: width,
+                                    bottom: (ry + ROW_HEIGHT).min(height),
+                                };
+                                InvalidateRect(hwnd, &r_rc, 0);
+                            }
+                        }
+                    };
+                    invalidate_row(dirty_row1);
+                    if dirty_row1 != dirty_row2 {
+                        invalidate_row(dirty_row2);
+                    }
+                    if sb_changed {
+                        let sb_rc = RECT {
+                            left: width - 14,
+                            top: header_h,
+                            right: width,
+                            bottom: height,
+                        };
+                        InvalidateRect(hwnd, &sb_rc, 0);
+                    }
+                }
             }
         }
 
@@ -607,15 +641,14 @@ unsafe extern "system" fn action_table_wndproc(
         return 0;
     }
 
-    if msg == WM_SETCURSOR {
-        if let Ok(g) = state_mutex.lock() {
-            if g.hover_action != ActionHover::None {
-                unsafe {
-                    SetCursor(LoadCursorW(0, IDC_HAND_ID));
-                }
-                return 1;
-            }
+    if msg == WM_SETCURSOR
+        && let Ok(g) = state_mutex.lock()
+        && g.hover_action != ActionHover::None
+    {
+        unsafe {
+            SetCursor(LoadCursorW(0, IDC_HAND_ID));
         }
+        return 1;
     }
 
     if msg == WM_MOUSELEAVE {
@@ -637,8 +670,8 @@ unsafe extern "system" fn action_table_wndproc(
     }
 
     if msg == WM_LBUTTONDOWN {
-        let x = (lparam & 0xFFFF) as i32;
-        let y = ((lparam >> 16) & 0xFFFF) as i32;
+        let x = (lparam as i16) as i32;
+        let y = ((lparam >> 16) as i16) as i32;
 
         let mut client_rc = RECT::default();
         unsafe { GetClientRect(hwnd, &mut client_rc); }
@@ -691,11 +724,11 @@ unsafe extern "system" fn action_table_wndproc(
                     if let Some(row_cells) = g.rows.get(row) {
                         let mut found_cb = None;
                         for cell in row_cells {
-                            if let TableCell::Actions(actions) = cell {
-                                if let Some(act) = actions.get(action_idx) {
-                                    found_cb = act.on_click.clone();
-                                    break;
-                                }
+                            if let TableCell::Actions(actions) = cell
+                                && let Some(act) = actions.get(action_idx)
+                            {
+                                found_cb = act.on_click.clone();
+                                break;
                             }
                         }
                         found_cb
@@ -711,10 +744,8 @@ unsafe extern "system" fn action_table_wndproc(
                 return 0;
             }
             ActionHover::None => {
-                if let Some(row) = hot_row {
-                    if let Some(cb) = cb_sel {
-                        cb(row as i32);
-                    }
+                if let (Some(row), Some(cb)) = (hot_row, cb_sel) {
+                    cb(row as i32);
                 }
             }
         }
@@ -741,7 +772,9 @@ unsafe extern "system" fn action_table_wndproc(
 
     if msg == WM_LBUTTONDBLCLK {
         let cb = if let Ok(g) = state_mutex.lock() {
-            if let Some(row_idx) = g.hover_row {
+            if matches!(g.hover_action, ActionHover::Action { .. }) {
+                None
+            } else if let Some(row_idx) = g.hover_row {
                 if let Some(row_cells) = g.rows.get(row_idx) {
                     row_cells.iter().find_map(|cell| {
                         if let TableCell::Actions(actions) = cell {
@@ -825,8 +858,8 @@ fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
         let last_row = ((state.scroll_y + body_h + ROW_HEIGHT) / ROW_HEIGHT) as usize;
         let visible_range = first_row..last_row.min(state.rows.len());
 
-        let app_font = if state.font != 0 { state.font } else { create_app_font(9, FW_NORMAL) };
-        let app_font_bold = if state.font_bold != 0 { state.font_bold } else { create_app_font(9, FW_SEMIBOLD) };
+        let app_font = if state.font != 0 { state.font } else { crate::ui::theme::get_app_font_normal() };
+        let app_font_bold = if state.font_bold != 0 { state.font_bold } else { crate::ui::theme::get_app_font_bold() };
 
         for row_idx in visible_range {
             let row_y = header_h + (row_idx as i32 * ROW_HEIGHT) - state.scroll_y;
@@ -1128,17 +1161,10 @@ fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
         }
 
         // 5. Draw outer border
-        let frame_pen = CreatePen(PS_SOLID, 1, palette.border);
-        let null_br = CreateSolidBrush(0);
-        let op = SelectObject(mem_dc, frame_pen);
-        let ob = SelectObject(mem_dc, null_br);
-        // FrameRect or top-left-right-bottom edges
         let b_rc = RECT { left: 0, top: 0, right: width, bottom: height };
-        FrameRect(mem_dc, &b_rc, CreateSolidBrush(palette.border));
-        SelectObject(mem_dc, op);
-        SelectObject(mem_dc, ob);
-        DeleteObject(frame_pen);
-        DeleteObject(null_br);
+        let border_br = CreateSolidBrush(palette.border);
+        FrameRect(mem_dc, &b_rc, border_br);
+        DeleteObject(border_br);
 
         // 5. BitBlt entire buffer to window DC
         BitBlt(hdc, 0, 0, width, height, mem_dc, 0, 0, SRCCOPY);
@@ -1146,41 +1172,11 @@ fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
         SelectObject(mem_dc, old_bmp);
         DeleteObject(mem_bmp);
         DeleteDC(mem_dc);
-
-        if state.font == 0 && app_font != 0 {
-            DeleteObject(app_font);
-        }
-        if state.font_bold == 0 && app_font_bold != 0 {
-            DeleteObject(app_font_bold);
-        }
     }
 }
 
 impl ActionTable {
-    pub fn create(
-        parent: isize,
-        id: u32,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        font: isize,
-        columns: &[(&str, i32)],
-    ) -> Option<Self> {
-        let n = columns.len();
-        let mut defs = Vec::with_capacity(n);
-        for (i, &(title, w)) in columns.iter().enumerate() {
-            let is_action = i == n.saturating_sub(1);
-            let style = if is_action {
-                ColumnStyle::Action
-            } else {
-                ColumnStyle::Default
-            };
-            defs.push(ColumnDef::fixed(title, w, style));
-        }
-        Self::create_with_defs(parent, id, x, y, width, height, font, defs)
-    }
-
+    #[allow(clippy::too_many_arguments)]
     pub fn create_styled(
         parent: isize,
         id: u32,
@@ -1198,6 +1194,7 @@ impl ActionTable {
         Self::create_with_defs(parent, id, x, y, width, height, font, defs)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_with_defs(
         parent: isize,
         id: u32,
@@ -1210,7 +1207,7 @@ impl ActionTable {
     ) -> Option<Self> {
         ensure_class_registered();
 
-        let font_bold = create_app_font(9, FW_SEMIBOLD);
+        let font_bold = crate::ui::theme::get_app_font_bold();
 
         let state = Arc::new(Mutex::new(ActionTableState {
             columns,
@@ -1269,20 +1266,22 @@ impl ActionTable {
         self.set_raw_cells(cells);
     }
 
-    /// Data-driven projection from model items directly
-    pub fn set_items<T>(&self, items: &[T], f: impl Fn(&T) -> TableRow) {
-        let rows: Vec<TableRow> = items.iter().map(f).collect();
-        self.set_rows(rows);
-    }
-
     /// Low-level raw cells setter
     pub fn set_raw_cells(&self, rows: Vec<Vec<TableCell>>) {
         if let Ok(mut g) = self.state.lock() {
             g.rows = rows;
+            let total_rows = g.rows.len();
+            if let Some(r) = g.selected_row {
+                g.selected_row = if total_rows == 0 { None } else { Some(r.min(total_rows - 1)) };
+            }
+            if let Some(r) = g.hover_row {
+                g.hover_row = if total_rows == 0 { None } else { Some(r.min(total_rows - 1)) };
+            }
+            g.hover_action = ActionHover::None;
             let mut rc = RECT::default();
             unsafe { GetClientRect(self.hwnd, &mut rc); }
             let body_h = (rc.bottom - g.header_h).max(0);
-            let total_h = g.rows.len() as i32 * ROW_HEIGHT;
+            let total_h = total_rows as i32 * ROW_HEIGHT;
             let max_scroll = (total_h - body_h).max(0);
             if g.scroll_y > max_scroll {
                 g.scroll_y = max_scroll;
@@ -1318,49 +1317,36 @@ impl ActionTable {
         }
     }
 
-    pub fn get_selected_index(&self) -> Option<i32> {
-        if let Ok(g) = self.state.lock() {
-            g.selected_row.map(|r| r as i32)
-        } else {
-            None
-        }
-    }
-
     pub fn get_text(hwnd: isize, index: i32, sub_item: i32) -> String {
         unsafe {
             let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ActionTableState>;
             if !ptr.is_null() {
                 let state_mutex = &*ptr;
-                if let Ok(g) = state_mutex.lock() {
-                    if let Some(row) = g.rows.get(index as usize) {
-                        if let Some(cell) = row.get(sub_item as usize) {
-                            return match cell {
-                                TableCell::Text(s) => s.clone(),
-                                TableCell::SecondaryText(s) => s.clone(),
-                                TableCell::Badge(b) => b.text.clone(),
-                                TableCell::Actions(actions) => {
-                                    let labels: Vec<&str> = actions.iter().map(|a| a.label.as_str()).collect();
-                                    labels.join("   ")
-                                }
-                                _ => String::new(),
-                            };
+                if let Ok(g) = state_mutex.lock()
+                    && let Some(row) = g.rows.get(index as usize)
+                    && let Some(cell) = row.get(sub_item as usize)
+                {
+                    return match cell {
+                        TableCell::Text(s) => s.clone(),
+                        TableCell::SecondaryText(s) => s.clone(),
+                        TableCell::Badge(b) => b.text.clone(),
+                        TableCell::Actions(actions) => {
+                            let labels: Vec<&str> = actions.iter().map(|a| a.label.as_str()).collect();
+                            labels.join("   ")
                         }
-                    }
+                        _ => String::new(),
+                    };
                 }
             }
         }
         String::new()
     }
 
-    pub fn get_item_text(&self, index: i32, sub_item: i32) -> String {
-        Self::get_text(self.hwnd, index, sub_item)
-    }
-
     pub fn set_column_title(&self, idx: i32, title: &str) {
-        if let Ok(mut g) = self.state.lock() {
-            if let Some(col) = g.columns.get_mut(idx as usize) {
-                col.title = title.to_string();
-            }
+        if let Ok(mut g) = self.state.lock()
+            && let Some(col) = g.columns.get_mut(idx as usize)
+        {
+            col.title = title.to_string();
         }
         unsafe {
             InvalidateRect(self.hwnd, null_mut(), 0);

@@ -159,13 +159,14 @@ impl<const N: usize> From<&str> for InlineList<char, N> {
     }
 }
 
-impl<const N: usize> FromIterator<char> for InlineList<char, N> {
+impl<T: Copy + Default, const N: usize> FromIterator<T> for InlineList<T, N> {
     #[inline]
-    fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let mut list = Self::default();
-        for c in iter {
-            self::InlineList::push(&mut list, c);
+        for item in iter {
+            list.push(item);
         }
         list
     }
 }
+

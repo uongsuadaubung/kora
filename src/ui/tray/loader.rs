@@ -64,39 +64,39 @@ const SM_CXSMICON: i32 = 49;
 const SM_CYSMICON: i32 = 50;
 const LR_DEFAULTCOLOR: u32 = 0x0000;
 
-/// Detects whether Windows taskbar is currently using Dark Theme.
-/// On Windows 10 & 11, taskbar theme is determined by registry key:
-/// `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\SystemUsesLightTheme`
-/// - 0: Dark taskbar (modern white/monochrome icon is recommended)
-/// - 1: Light taskbar (classic colored icon is required; otherwise flat white icons are invisible!)
-pub fn is_windows_dark_taskbar() -> bool {
+/// Reads a DWORD from `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`.
+fn read_personalize_dword(name: &str) -> Option<u32> {
     let subkey: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize\0"
         .encode_utf16()
         .collect();
-    let val_name: Vec<u16> = "SystemUsesLightTheme\0".encode_utf16().collect();
+    let val_name: Vec<u16> = name.encode_utf16().chain(Some(0)).collect();
 
     let mut hkey: isize = 0;
     unsafe {
-        if RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, KEY_READ, &mut hkey) == 0 {
-            let mut val: u32 = 0;
-            let mut val_type: u32 = 0;
-            let mut val_len: u32 = std::mem::size_of::<u32>() as u32;
-            let res = RegQueryValueExW(
-                hkey,
-                val_name.as_ptr(),
-                std::ptr::null_mut(),
-                &mut val_type,
-                &mut val as *mut u32 as *mut u8,
-                &mut val_len,
-            );
-            RegCloseKey(hkey);
-            if res == 0 {
-                return val == 0;
-            }
+        if RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, KEY_READ, &mut hkey) != 0 {
+            return None;
         }
+        let mut val: u32 = 0;
+        let mut val_type: u32 = 0;
+        let mut val_len: u32 = std::mem::size_of::<u32>() as u32;
+        let res = RegQueryValueExW(
+            hkey,
+            val_name.as_ptr(),
+            std::ptr::null_mut(),
+            &mut val_type,
+            &mut val as *mut u32 as *mut u8,
+            &mut val_len,
+        );
+        RegCloseKey(hkey);
+        (res == 0).then_some(val)
     }
-    // Default to dark taskbar for fallback
-    true
+}
+
+/// Detects whether apps should use Dark Theme (`AppsUseLightTheme`). This — not the taskbar
+/// setting `SystemUsesLightTheme` — is what application windows follow
+/// (Win10 default: dark taskbar, light apps).
+pub fn is_windows_dark_apps() -> bool {
+    read_personalize_dword("AppsUseLightTheme").is_some_and(|v| v == 0)
 }
 
 /// Loads an HICON from raw ICO file bytes matching the desired system size.

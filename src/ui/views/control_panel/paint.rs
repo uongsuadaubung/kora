@@ -48,12 +48,17 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
         FillRect(hdc, &h_sep_rc, sep_brush);
         DeleteObject(sep_brush);
 
-        let controls_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls;
-        let mode = if !controls_ptr.is_null() {
-            (*controls_ptr).get_view_mode()
-        } else {
-            crate::ui::views::control_panel::ViewMode::Profile(0)
-        };
+        let mode = crate::ui::controls()
+            .map(|c| c.get_view_mode())
+            .or_else(|| {
+                let controls_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls;
+                if !controls_ptr.is_null() {
+                    Some((*controls_ptr).get_view_mode())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(crate::ui::views::control_panel::ViewMode::Profile(0));
 
         if matches!(
             mode,
@@ -141,6 +146,9 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
 
                 // Card 2: Giao diện (Theme) & Ngôn ngữ
                 RoundRect(hdc, 246, 248, right_bound, 368, radii::RADIUS_CARD, radii::RADIUS_CARD);
+
+                // Card 3: Khôi phục mặc định
+                RoundRect(hdc, 246, 384, right_bound, 472, radii::RADIUS_CARD, radii::RADIUS_CARD);
             }
             crate::ui::views::control_panel::ViewMode::About => {
                 // Main About Hero Card
@@ -161,7 +169,7 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
                 // Draw white letter 'K' inside logo box
                 SetBkMode(hdc, TRANSPARENT);
                 SetTextColor(hdc, palette.text_white);
-                let logo_font = create_app_font(
+                let logo_font = crate::ui::theme::cached_font(
                     crate::ui::tokens::typography::FONT_SIZE_HERO,
                     FW_BOLD,
                 );
@@ -180,7 +188,6 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
                     DT_CENTER | DT_VCENTER | DT_SINGLELINE,
                 );
                 SelectObject(hdc, old_f);
-                DeleteObject(logo_font);
             }
             _ => {
                 let body_rc = RECT {

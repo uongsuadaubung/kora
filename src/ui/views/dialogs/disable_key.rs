@@ -28,26 +28,23 @@ static DIALOG_PARENT_HWND: AtomicIsize = AtomicIsize::new(0);
 static DISPLAY_FONT: AtomicIsize = AtomicIsize::new(0);
 static STATE: Mutex<Option<DisableDialogState>> = Mutex::new(None);
 
+static REGISTERED: std::sync::Once = std::sync::Once::new();
+const CLASS_NAME: &str = "KoraDisableDialogClass";
+
 /// Displays the modal Key Disabling Dialog centered over the parent control panel
 pub fn show_disable_dialog(parent: isize) {
-    let class_name = to_wide("KoraDisableDialogClass");
+    register_class_once(&REGISTERED, CLASS_NAME, disable_dialog_wnd_proc, 0);
 
     unsafe {
-        let mut wc: WNDCLASSEXW = std::mem::zeroed();
-        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-        wc.lpfn_wnd_proc = Some(disable_dialog_wnd_proc);
-        wc.h_instance = 0;
-        wc.h_cursor = LoadCursorW(0, IDC_ARROW);
-        wc.lpsz_class_name = class_name.as_ptr();
-        RegisterClassExW(&wc);
-
+        let class_name = to_wide(CLASS_NAME);
         DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
 
         let strings = crate::language::current();
         let default_root_name = format!("🌐 {}", strings.banner_root_title);
         let target_display = {
-            let guard = ENGINE_INSTANCE.lock().unwrap();
-            if let Some(ref engine) = *guard {
+            if let Ok(guard) = ENGINE_INSTANCE.lock()
+                && let Some(ref engine) = *guard
+            {
                 let sel_id = engine.profile_manager.selected_id.clone();
                 if sel_id == "global" {
                     default_root_name
@@ -419,10 +416,9 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
 
                 if let Ok(mut guard) = STATE.lock()
                     && let Some(ref mut st) = *guard
+                    && let Some(ref b) = btn_box
                 {
-                    if let Some(ref b) = btn_box {
-                        st.hwnd_box = b.hwnd();
-                    }
+                    st.hwnd_box = b.hwnd();
                 }
 
                 0
@@ -605,6 +601,23 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                 }
                 0
             }
+            WM_ACTIVATE => {
+                if (wparam & 0xFFFF) == 0 {
+                    let mut h_box = 0;
+                    if let Ok(mut guard) = STATE.lock()
+                        && let Some(ref mut st) = *guard
+                        && st.is_listening
+                    {
+                        st.is_listening = false;
+                        h_box = st.hwnd_box;
+                    }
+                    stop_single_key_capture();
+                    if h_box != 0 {
+                        InvalidateRect(h_box, null_mut(), 1);
+                    }
+                }
+                0
+            }
             WM_COMMAND => {
                 let control_id = (wparam & 0xFFFF) as u32;
                 match control_id {
@@ -636,6 +649,7 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                         PostMessageW(hwnd, WM_CLOSE, 0, 0);
                     }
                     IDC_BTN_DISABLE_APPLY => {
+                        stop_single_key_capture();
                         let vk_opt = STATE
                             .lock()
                             .ok()
@@ -677,15 +691,7 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                             }
 
                             if changed {
-                                if let Ok(guard) = ENGINE_INSTANCE.lock()
-                                    && let Some(ref engine) = *guard
-                                    && let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                                    && let Some(ref ui) = *ui_guard
-                                {
-                                    let sel_id = engine.profile_manager.selected_id.clone();
-                                    let disable_items = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-                                    ui.controls.tab_remap.populate_disabled(&disable_items);
-                                }
+                                crate::ui::controller::refresh_disable_list();
                             }
 
                             PostMessageW(hwnd, WM_CLOSE, 0, 0);
@@ -698,10 +704,27 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
             WM_KEYDOWN | WM_SYSKEYDOWN => {
                 let vk = wparam as u32;
                 if vk == 0x1B {
-                    // Escape closes dialog
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    let mut was_listening = false;
+                    let mut h_box = 0;
+                    if let Ok(mut guard) = STATE.lock()
+                        && let Some(ref mut st) = *guard
+                        && st.is_listening
+                    {
+                        st.is_listening = false;
+                        was_listening = true;
+                        h_box = st.hwnd_box;
+                    }
+                    stop_single_key_capture();
+                    if was_listening {
+                        if h_box != 0 {
+                            InvalidateRect(h_box, null_mut(), 1);
+                        }
+                    } else {
+                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    }
+                    return 0;
                 }
-                0
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             WM_ERASEBKGND => 1,
             WM_CLOSE => {

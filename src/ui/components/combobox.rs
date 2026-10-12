@@ -13,7 +13,6 @@ const CB_ADDSTRING: u32 = 0x0143;
 const CB_SETCURSEL: u32 = 0x014E;
 const CB_GETCURSEL: u32 = 0x0147;
 const CB_RESETCONTENT: u32 = 0x014B;
-const CB_GETLBTEXTLEN: u32 = 0x0149;
 const CB_GETLBTEXT: u32 = 0x0148;
 const CB_SETITEMHEIGHT: u32 = 0x0153;
 const CB_ERR: isize = -1;
@@ -272,27 +271,5 @@ impl ComboBox {
         if let Some(sel) = selected {
             self.set_selected(sel);
         }
-    }
-
-    pub fn get_item_text(&self, index: usize) -> String {
-        unsafe {
-            let len = SendMessageW(self.hwnd, CB_GETLBTEXTLEN, index, 0);
-            if len <= 0 || len == CB_ERR {
-                return String::new();
-            }
-            let mut buf = vec![0u16; (len + 1) as usize];
-            let res = SendMessageW(self.hwnd, CB_GETLBTEXT, index, buf.as_mut_ptr() as isize);
-            if res != CB_ERR && res >= 0 {
-                String::from_utf16_lossy(&buf[..res as usize])
-            } else {
-                String::new()
-            }
-        }
-    }
-
-    pub fn get_selected_text(&self) -> Option<String> {
-        let sel = self.get_selected()?;
-        let text = self.get_item_text(sel);
-        if text.is_empty() { None } else { Some(text) }
     }
 }

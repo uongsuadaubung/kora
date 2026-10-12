@@ -42,7 +42,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // Tab 1: Macro
     check_use_macro: "Enable shorthand",
-    check_macro_in_english: "Also in English mode [E]",
+    check_macro_in_english: "Also in English mode",
     edit_macro_key_placeholder: "e.g. vn, dc, fn",
     edit_macro_val_placeholder: "e.g. Vietnam, function()",
     btn_add_macro: "+ Add",
@@ -55,6 +55,8 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     col_action: "Action",
     action_edit: "Edit",
     action_delete: "Delete",
+    action_mute: "Disable",
+    action_unmute: "Enable",
     action_combo: "Edit   Delete",
     macro_type_normal: "Normal",
     macro_type_start: "Start consonant",
@@ -79,7 +81,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // Tab 3: About
     about_header_title: "ℹ About Software",
-    about_header_sub: "Kora - Next-Gen Keyboard & Input Suite built with Rust",
+    about_header_sub: "Kora - Modern Input & Keyboard Suite built with Rust",
     about_title: concat!("Kora v", env!("CARGO_PKG_VERSION")),
     about_ver: concat!("Version: ", env!("CARGO_PKG_VERSION")),
     about_author: "Author: Manh Kien (manhkien13041997@gmail.com)",
@@ -92,6 +94,13 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     btn_exit: "❌ Exit Kora",
     btn_defaults: "Defaults",
     btn_close: "Close",
+
+    // System Settings - Defaults Card
+    sys_defaults_title: "Restore Default Settings",
+    sys_defaults_desc: "Reset all typing engine, theme, and system configurations back to their factory defaults.",
+    btn_restore_defaults: "Restore Defaults",
+    confirm_defaults_title: "Confirm Restore Defaults",
+    confirm_defaults_msg: "Are you sure you want to reset all settings to their factory defaults? All current custom settings will be lost.",
 
     // Hotkey Capture Dialog
     hotkey_dialog_title: "⌨️ Switch Shortcut: Vietnamese ⇄ English",
@@ -113,7 +122,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // System Tray Menu & Tooltips
     tray_tooltip_vi: "Kora - Vietnamese IME (Vietnamese)",
-    tray_tooltip_en: "Kora - Advanced Keyboard & Input Suite (English)",
+    tray_tooltip_en: "Kora - Modern Input & Keyboard Suite (English)",
     tray_toggle_vi: "Vietnamese Mode",
     tray_method_telex: "Telex Input",
     tray_method_vni: "VNI Input",
@@ -132,8 +141,8 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     banner_root_title: "System-wide",
     banner_root_desc: "Default base configuration for all applications",
     banner_btn_delete: "🗑️ Delete Profile",
-    banner_status_active_prefix: "● Active • Process: ",
-    banner_status_inactive_prefix: "○ Auto-activate on: ",
+    banner_status_active_prefix: "Process: ",
+    banner_status_inactive_prefix: "Auto-activate on: ",
 
     // Tab 0: Typing
     typing_group_main: "Vietnamese Input Settings",

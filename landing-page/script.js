@@ -1,4 +1,4 @@
-﻿// ==========================================================================
+// ==========================================================================
 // Kora Landing Page — Interactive Demo & Web Audio Sound Synthesizer
 // ==========================================================================
 
@@ -676,6 +676,47 @@ document.addEventListener('DOMContentLoaded', () => {
       { text: 'Holy Panda: cạch tạch...' },
       { pause: 500 },
       { text: 'Holy Panda: cạch tạch êm ái ♪', status: '13 bộ âm thanh phím cơ sống động' },
+      { pause: 2000 }
+    ],
+    resume: [
+      { text: '💤 Mở máy từ Sleep / Win+L...' },
+      { pause: 900 },
+      { text: '⚡ Tự động làm mới trạng thái bàn phím', status: 'Tự phục hồi thông minh sau khi mở máy' },
+      { pause: 800 },
+      { text: 'x' },
+      { text: 'xi' },
+      { text: 'xin' },
+      { text: 'xin c' },
+      { text: 'xin ch' },
+      { text: 'xin cha' },
+      { text: 'xin chào', status: 'Gõ tiếng Việt mượt mà (không lỗi hoa, không mất dấu)' },
+      { pause: 600 },
+      { text: 'xin chào V' },
+      { text: 'xin chào Vi' },
+      { text: 'xin chào Việ' },
+      { text: 'xin chào Việt' },
+      { text: 'xin chào Việt N' },
+      { text: 'xin chào Việt Na' },
+      { text: 'xin chào Việt Nam' },
+      { text: 'xin chào Việt Nam!', status: '100% tự phục hồi, không cần khởi động lại app' },
+      { pause: 2200 }
+    ],
+    profile: [
+      { text: 'Chuyển sang 🎮 CS2 / Valorant...' },
+      { pause: 800 },
+      { text: 'Kora ➔ Kích hoạt profile "Game"', status: 'Khóa phím Win, tắt dấu tiếng Việt để di chuyển WASD' },
+      { pause: 1200 },
+      { text: 'Chuyển sang 💻 VS Code / Word...' },
+      { pause: 800 },
+      { text: 'Kora ➔ Kích hoạt profile "Code/Doc"', status: 'Bật tiếng Việt Telex, mở khóa phím tắt lập trình' },
+      { pause: 2000 }
+    ],
+    remap: [
+      { text: 'Bấm Caps Lock ➔ Chuyển thành phím Ctrl', status: 'Đổi phím vật lý theo thói quen lập trình' },
+      { pause: 1200 },
+      { text: 'Bấm phím Insert ➔ Chuyển thành Delete', status: 'Chống đè nhầm chế độ ghi đè văn bản' },
+      { pause: 1200 },
+      { text: 'Bấm phím Win khi chơi game ➔ Đã chặn', status: 'Khóa phím an toàn, không văng màn hình desktop' },
       { pause: 2000 }
     ]
   };

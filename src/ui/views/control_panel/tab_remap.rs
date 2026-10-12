@@ -2,8 +2,10 @@
 //! Sub-tab layout: a segmented bar switches between the Remap and Disable panels,
 //! each panel = toggle + add button + full-height ActionTable inside one shared card.
 
-use crate::engine::profile::{ResolvedDisableItem, ResolvedRemapItem};
-use crate::ui::components::action_table::{ActionTable, ColumnStyle, TableAction, TableRow};
+use crate::engine::profile::{ResolvedDisableItem, ResolvedRemapItem, RuleOrigin};
+use crate::ui::components::action_table::{
+    ActionTable, ActionVariant, ColumnStyle, TableAction, TableRow,
+};
 use crate::ui::components::{ButtonVariant, CheckBox, PushButton, TabBar};
 use crate::ui::tokens::{id::*, layout, spacing};
 use crate::ui::win32::{
@@ -73,7 +75,7 @@ impl TabRemapDisable {
             TITLE_HEIGHT,
             hfont_bold,
         )?;
-        check_remap_enabled.set_checked(true);
+        check_remap_enabled.set_checked(false);
 
         let btn_add_remap = PushButton::create_with_variant(
             parent,
@@ -115,7 +117,7 @@ impl TabRemapDisable {
             TITLE_HEIGHT,
             hfont_bold,
         )?;
-        check_disable_enabled.set_checked(true);
+        check_disable_enabled.set_checked(false);
 
         let btn_add_disable = PushButton::create_with_variant(
             parent,
@@ -210,28 +212,39 @@ impl TabRemapDisable {
         profile.disable_enabled = self.check_disable_enabled.tri_state();
     }
 
-    pub fn trigger_delete_remap_by_row(parent: isize, row_idx: i32) {
-        let item_info = if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            let remap_items = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-            remap_items
-                .get(row_idx as usize)
-                .map(|item| (item.from_vk, item.from_name.clone(), item.to_name.clone()))
-        } else {
-            None
-        };
+    pub fn toggle_remap_mute(from_vk: u32, mute: bool) {
+        let changed = crate::ui::controller::with_engine(|engine| {
+            let pm = &mut engine.profile_manager;
+            let sel_id = pm.selected_id.clone();
+            if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                return false;
+            }
+            if let Some(child) = pm.get_profile_mut(&sel_id) {
+                if mute {
+                    child.overridden_remaps.remove(&from_vk);
+                    if !child.muted_remaps.contains(&from_vk) {
+                        child.muted_remaps.push(from_vk);
+                    }
+                } else {
+                    child.muted_remaps.retain(|&v| v != from_vk);
+                }
+                crate::ui::controller::save(engine);
+                true
+            } else {
+                false
+            }
+        });
+        if changed == Some(true) {
+            crate::ui::controller::refresh_remap_list();
+        }
+    }
 
-        let Some((from_vk, from_name, to_name)) = item_info else {
-            return;
-        };
-
+    pub fn trigger_delete_remap(parent: isize, from_vk: u32, from_name: &str, to_name: &str) {
         let strings = crate::language::current();
         let message = strings
             .confirm_delete_remap_msg
-            .replace("{from}", &from_name)
-            .replace("{to}", &to_name);
+            .replace("{from}", from_name)
+            .replace("{to}", to_name);
 
         let options = crate::ui::views::dialogs::ConfirmDialogOptions::new(
             strings.confirm_delete_title,
@@ -242,80 +255,60 @@ impl TabRemapDisable {
         .no_text(strings.btn_no);
 
         crate::ui::views::dialogs::show_confirm_dialog(parent, options, move || {
-            let mut changed = false;
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
-                    engine
-                        .profile_manager
-                        .global_profile
-                        .app_remaps
-                        .retain(|r| r.from_vk != from_vk);
-                    changed = true;
+            let changed = crate::ui::controller::with_engine(|engine| {
+                let pm = &mut engine.profile_manager;
+                let sel_id = pm.selected_id.clone();
+                let changed = if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                    pm.global_profile.app_remaps.retain(|r| r.from_vk != from_vk);
+                    true
+                } else if let Some(child) = pm.get_profile_mut(&sel_id) {
+                    child.app_remaps.retain(|r| r.from_vk != from_vk);
+                    true
                 } else {
-                    let is_global = engine
-                        .profile_manager
-                        .global_profile
-                        .app_remaps
-                        .iter()
-                        .any(|r| r.from_vk == from_vk);
-                    if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                        if is_global {
-                            child.overridden_remaps.remove(&from_vk);
-                            if !child.muted_remaps.contains(&from_vk) {
-                                child.muted_remaps.push(from_vk);
-                            }
-                        } else {
-                            child.app_remaps.retain(|r| r.from_vk != from_vk);
-                        }
-                        changed = true;
-                    }
-                }
+                    false
+                };
                 if changed {
-                    crate::engine::config_store::save_config_all_debounced(
-                        engine.config(),
-                        &engine.macro_table,
-                        &engine.profile_manager,
-                    );
+                    crate::ui::controller::save(engine);
                 }
-            }
-            if changed {
-                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                    && let Some(ref engine) = *guard
-                    && let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                    && let Some(ref ui) = *ui_guard
-                {
-                    let sel_id = engine.profile_manager.selected_id.clone();
-                    let remap_items = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-                    ui.controls.tab_remap.populate_remaps(&remap_items);
-                }
+                changed
+            });
+            if changed == Some(true) {
+                crate::ui::controller::refresh_remap_list();
             }
         });
     }
 
-    pub fn trigger_delete_disable_by_row(parent: isize, row_idx: i32) {
-        let item_info = if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            let disable_items = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-            disable_items
-                .get(row_idx as usize)
-                .map(|item| (item.vk, item.key_name.clone()))
-        } else {
-            None
-        };
+    pub fn toggle_disable_mute(vk: u32, mute: bool) {
+        let changed = crate::ui::controller::with_engine(|engine| {
+            let pm = &mut engine.profile_manager;
+            let sel_id = pm.selected_id.clone();
+            if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                return false;
+            }
+            if let Some(child) = pm.get_profile_mut(&sel_id) {
+                if mute {
+                    if !child.unmuted_disabled.contains(&vk) {
+                        child.unmuted_disabled.push(vk);
+                    }
+                } else {
+                    child.unmuted_disabled.retain(|&v| v != vk);
+                }
+                crate::ui::controller::save(engine);
+                true
+            } else {
+                false
+            }
+        });
+        if changed == Some(true) {
+            crate::ui::controller::refresh_disable_list();
+        }
+    }
 
-        let Some((vk, key_name)) = item_info else {
-            return;
-        };
-
+    pub fn trigger_delete_disable(parent: isize, vk: u32, key_name: &str) {
         let strings = crate::language::current();
         let message = strings
             .confirm_delete_disable_msg
-            .replace("{key}", &key_name);
+            .replace("{key}", key_name);
 
         let options = crate::ui::views::dialogs::ConfirmDialogOptions::new(
             strings.confirm_delete_title,
@@ -326,133 +319,74 @@ impl TabRemapDisable {
         .no_text(strings.btn_no);
 
         crate::ui::views::dialogs::show_confirm_dialog(parent, options, move || {
-            let mut changed = false;
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id == "global" {
-                    engine
-                        .profile_manager
-                        .global_profile
-                        .app_disabled
-                        .retain(|&v| v != vk);
-                    changed = true;
+            let changed = crate::ui::controller::with_engine(|engine| {
+                let pm = &mut engine.profile_manager;
+                let sel_id = pm.selected_id.clone();
+                let changed = if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                    pm.global_profile.app_disabled.retain(|&v| v != vk);
+                    true
+                } else if let Some(child) = pm.get_profile_mut(&sel_id) {
+                    child.app_disabled.retain(|&v| v != vk);
+                    true
                 } else {
-                    let is_global = engine
-                        .profile_manager
-                        .global_profile
-                        .app_disabled
-                        .contains(&vk);
-                    if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                        if is_global {
-                            if !child.unmuted_disabled.contains(&vk) {
-                                child.unmuted_disabled.push(vk);
-                            }
-                        } else {
-                            child.app_disabled.retain(|&v| v != vk);
-                        }
-                        changed = true;
-                    }
-                }
+                    false
+                };
                 if changed {
-                    crate::engine::config_store::save_config_all_debounced(
-                        engine.config(),
-                        &engine.macro_table,
-                        &engine.profile_manager,
-                    );
+                    crate::ui::controller::save(engine);
                 }
-            }
-            if changed {
-                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                    && let Some(ref engine) = *guard
-                    && let Ok(ui_guard) = crate::ui::UI_MANAGER.try_lock()
-                    && let Some(ref ui) = *ui_guard
-                {
-                    let sel_id = engine.profile_manager.selected_id.clone();
-                    let disable_items = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-                    ui.controls.tab_remap.populate_disabled(&disable_items);
-                }
+                changed
+            });
+            if changed == Some(true) {
+                crate::ui::controller::refresh_disable_list();
             }
         });
     }
 
     pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
+        use crate::ui::controller::EditTarget;
         match ctl_id {
             IDC_TAB_KEYS_SUB => {
                 self.update_visibility(true);
                 true
             }
-            IDC_CHECK_REMAP_ENABLED => {
-                if notify_code == 0 {
+            IDC_CHECK_REMAP_ENABLED | IDC_CHECK_DISABLE_ENABLED => {
+                if notify_code != 0 {
+                    return false;
+                }
+                let is_remap = ctl_id == IDC_CHECK_REMAP_ENABLED;
+                if is_remap {
                     self.update_remap_controls_state();
-                    if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                        && let Some(ref mut engine) = *guard
-                    {
-                        let sel_id = engine.profile_manager.selected_id.clone();
-                        if sel_id == "global" {
-                            self.read_config(engine.config_mut());
-                            engine.profile_manager.global_profile.remap_enabled =
-                                Some(self.check_remap_enabled.is_checked());
-                        } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                            self.read_profile(child);
-                        }
-                        crate::engine::config_store::save_config_all_debounced(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                    }
-                    true
                 } else {
-                    false
-                }
-            }
-            IDC_CHECK_DISABLE_ENABLED => {
-                if notify_code == 0 {
                     self.update_disable_controls_state();
-                    if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                        && let Some(ref mut engine) = *guard
-                    {
-                        let sel_id = engine.profile_manager.selected_id.clone();
-                        if sel_id == "global" {
-                            self.read_config(engine.config_mut());
-                            engine.profile_manager.global_profile.disable_enabled =
-                                Some(self.check_disable_enabled.is_checked());
-                        } else if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
-                            self.read_profile(child);
-                        }
-                        crate::engine::config_store::save_config_all_debounced(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                    }
-                    true
-                } else {
-                    false
                 }
+                let remap_on = self.check_remap_enabled.is_checked();
+                let disable_on = self.check_disable_enabled.is_checked();
+                crate::ui::controller::edit_selected_then(
+                    |target| match target {
+                        EditTarget::Global(cfg) => self.read_config(cfg),
+                        EditTarget::Child(child) => self.read_profile(child),
+                    },
+                    |engine| {
+                        // Root profile mirrors the global toggle in its profile record too.
+                        let pm = &mut engine.profile_manager;
+                        if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
+                            if is_remap {
+                                pm.global_profile.remap_enabled = Some(remap_on);
+                            } else {
+                                pm.global_profile.disable_enabled = Some(disable_on);
+                            }
+                        }
+                    },
+                );
+                true
             }
+            // The dialogs are modeless and refresh the lists themselves on save.
             IDC_BTN_ADD_REMAP => {
                 crate::ui::views::dialogs::show_remap_dialog(hwnd);
-                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                    && let Some(ref engine) = *guard
-                {
-                    let sel_id = engine.profile_manager.selected_id.clone();
-                    let remap_items = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-                    self.populate_remaps(&remap_items);
-                }
                 true
             }
             IDC_BTN_ADD_DISABLE => {
                 crate::ui::views::dialogs::show_disable_dialog(hwnd);
-                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                    && let Some(ref engine) = *guard
-                {
-                    let sel_id = engine.profile_manager.selected_id.clone();
-                    let disable_items = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-                    self.populate_disabled(&disable_items);
-                }
                 true
             }
             _ => false,
@@ -467,24 +401,48 @@ impl TabRemapDisable {
 
         let rows: Vec<TableRow> = items
             .iter()
-            .enumerate()
-            .map(|(idx, item)| {
-                let idx = idx as i32;
+            .map(|item| {
                 let from_vk = item.from_vk;
                 let to_vk = item.to_vk;
+                let from_name = item.from_name.clone();
+                let to_name = item.to_name.clone();
 
-                let actions = vec![
-                    TableAction::edit(strings.action_edit, move || {
-                        crate::ui::views::dialogs::show_remap_dialog_with_keys(
-                            parent,
-                            Some(from_vk),
-                            Some(to_vk),
+                let mut actions = Vec::new();
+
+                match item.origin {
+                    RuleOrigin::MutedGlobal => {
+                        actions.push(
+                            TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                .with_callback(move || {
+                                    Self::toggle_remap_mute(from_vk, false);
+                                }),
                         );
-                    }),
-                    TableAction::delete(strings.action_delete, move || {
-                        Self::trigger_delete_remap_by_row(parent, idx);
-                    }),
-                ];
+                    }
+                    RuleOrigin::InheritedGlobal | RuleOrigin::OverriddenGlobal => {
+                        actions.push(TableAction::edit(strings.action_edit, move || {
+                            crate::ui::views::dialogs::show_remap_dialog_with_keys(
+                                parent,
+                                Some(from_vk),
+                                Some(to_vk),
+                            );
+                        }));
+                        actions.push(TableAction::delete(strings.action_mute, move || {
+                            Self::toggle_remap_mute(from_vk, true);
+                        }));
+                    }
+                    RuleOrigin::Root | RuleOrigin::AppSpecific => {
+                        actions.push(TableAction::edit(strings.action_edit, move || {
+                            crate::ui::views::dialogs::show_remap_dialog_with_keys(
+                                parent,
+                                Some(from_vk),
+                                Some(to_vk),
+                            );
+                        }));
+                        actions.push(TableAction::delete(strings.action_delete, move || {
+                            Self::trigger_delete_remap(parent, from_vk, &from_name, &to_name);
+                        }));
+                    }
+                }
 
                 TableRow::new()
                     .key_with_arrow(&item.from_name)
@@ -505,9 +463,9 @@ impl TabRemapDisable {
 
         let rows: Vec<TableRow> = items
             .iter()
-            .enumerate()
-            .map(|(idx, item)| {
-                let idx = idx as i32;
+            .map(|item| {
+                let vk = item.vk;
+                let key_name = item.key_name.clone();
                 let status = if item.is_active {
                     strings.status_blocked
                 } else {
@@ -515,11 +473,28 @@ impl TabRemapDisable {
                 };
                 let key_label = format!("🚫 {}", item.key_name);
 
-                let actions = vec![
-                    TableAction::delete(strings.action_delete, move || {
-                        Self::trigger_delete_disable_by_row(parent, idx);
-                    }),
-                ];
+                let mut actions = Vec::new();
+
+                match item.origin {
+                    RuleOrigin::MutedGlobal => {
+                        actions.push(
+                            TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                .with_callback(move || {
+                                    Self::toggle_disable_mute(vk, false);
+                                }),
+                        );
+                    }
+                    RuleOrigin::InheritedGlobal | RuleOrigin::OverriddenGlobal => {
+                        actions.push(TableAction::delete(strings.action_mute, move || {
+                            Self::toggle_disable_mute(vk, true);
+                        }));
+                    }
+                    RuleOrigin::Root | RuleOrigin::AppSpecific => {
+                        actions.push(TableAction::delete(strings.action_delete, move || {
+                            Self::trigger_delete_disable(parent, vk, &key_name);
+                        }));
+                    }
+                }
 
                 TableRow::new()
                     .danger_key(&key_label)
@@ -551,14 +526,16 @@ impl TabRemapDisable {
         self.list_disable.set_column_title(3, strings.col_action);
         self.list_disable.refresh_header();
 
-        if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            let remap_items = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-            self.populate_remaps(&remap_items);
-            let disable_items = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-            self.populate_disabled(&disable_items);
+        // Rows contain localized labels: rebuild them (engine lock released first).
+        let items = crate::ui::controller::with_engine(|e| {
+            (
+                crate::ui::controller::selected_remap_items(e),
+                crate::ui::controller::selected_disable_items(e),
+            )
+        });
+        if let Some((remaps, disabled)) = items {
+            self.populate_remaps(&remaps);
+            self.populate_disabled(&disabled);
         }
     }
 

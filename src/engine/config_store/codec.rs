@@ -124,7 +124,7 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                     "bracket_w" => child.bracket_w = Some(val_bool),
                     "remember_history" | "remember_history_across_space" => child.remember_history_across_space = Some(val_bool),
                     "sound_enabled" => child.sound_enabled = Some(val_bool),
-                    "switch" | "sound_profile" => child.sound_profile = Some(val.to_string()),
+                    "switch" | "sound_profile" => child.sound_profile = Some(std::sync::Arc::from(val)),
                     "volume" | "sound_volume" => child.sound_volume = Some(val_l.parse().unwrap_or(50).clamp(0, 100)),
                     "use_macro" => child.use_macro = Some(val_bool),
                     "use_macro_in_english" | "macro_in_english" => child.use_macro_in_english_mode = Some(val_bool),
@@ -250,7 +250,7 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                     config.language = val_l.parse().unwrap_or_default();
                 }
                 (_, "sound_profile") | (_, "switch") | (_, "switch_type") => {
-                    config.sound_profile = val.trim().to_string();
+                    config.sound_profile = std::sync::Arc::from(val.trim());
                 }
                 (_, "sound_volume") | (_, "volume") => {
                     config.sound_volume = val_l.parse().unwrap_or(50).clamp(0, 100);
@@ -292,7 +292,7 @@ pub fn serialize_config_all(
     profiles: &ProfileManager,
 ) -> String {
     let mut out = String::from(
-        "# Cấu hình Kora - Hệ sinh thái Bàn phím & Bộ gõ thế hệ mới\n# Đường dẫn: ~/.config/kora/config.ini\n\n",
+        "# Cấu hình Kora - Modern Input & Keyboard Suite\n# Đường dẫn: ~/.config/kora/config.ini\n\n",
     );
 
     out.push_str("[general]\n");
@@ -358,45 +358,41 @@ pub fn serialize_config_all(
     out.push('\n');
 
     // [remap]
-    if !config.remap_enabled || !profiles.global_profile.app_remaps.is_empty() {
-        out.push_str("[remap]\n");
-        out.push_str(&format!("enabled = {}\n", config.remap_enabled));
-        if !profiles.global_profile.app_remaps.is_empty() {
-            out.push_str("# Đổi phím toàn hệ thống: <Phím gốc> = <Phím đích>\n");
-            for r in &profiles.global_profile.app_remaps {
-                let from_str = if !r.from_name.is_empty() {
-                    &r.from_name
-                } else {
-                    "Key"
-                };
-                let to_str = if !r.to_name.is_empty() {
-                    &r.to_name
-                } else {
-                    "Key"
-                };
-                out.push_str(&format!("{} = {}\n", from_str, to_str));
-            }
+    out.push_str("[remap]\n");
+    out.push_str(&format!("enabled = {}\n", config.remap_enabled));
+    if !profiles.global_profile.app_remaps.is_empty() {
+        out.push_str("# Đổi phím toàn hệ thống: <Phím gốc> = <Phím đích>\n");
+        for r in &profiles.global_profile.app_remaps {
+            let from_str = if !r.from_name.is_empty() {
+                &r.from_name
+            } else {
+                "Key"
+            };
+            let to_str = if !r.to_name.is_empty() {
+                &r.to_name
+            } else {
+                "Key"
+            };
+            out.push_str(&format!("{} = {}\n", from_str, to_str));
         }
-        out.push('\n');
     }
+    out.push('\n');
 
     // [disable]
-    if !config.disable_enabled || !profiles.global_profile.app_disabled.is_empty() {
-        out.push_str("[disable]\n");
-        out.push_str(&format!("enabled = {}\n", config.disable_enabled));
-        if !profiles.global_profile.app_disabled.is_empty() {
-            out.push_str("# Phím vô hiệu hóa toàn hệ thống (cách nhau bởi dấu phẩy)\n");
-            let names: Vec<String> = profiles
-                .global_profile
-                .app_disabled
-                .iter()
-                .map(|&vk| crate::engine::config::hotkey::vk_to_name(vk).to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            out.push_str(&format!("keys = {}\n", names.join(", ")));
-        }
-        out.push('\n');
+    out.push_str("[disable]\n");
+    out.push_str(&format!("enabled = {}\n", config.disable_enabled));
+    if !profiles.global_profile.app_disabled.is_empty() {
+        out.push_str("# Phím vô hiệu hóa toàn hệ thống (cách nhau bởi dấu phẩy)\n");
+        let names: Vec<String> = profiles
+            .global_profile
+            .app_disabled
+            .iter()
+            .map(|&vk| crate::engine::config::hotkey::vk_to_name(vk).to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        out.push_str(&format!("keys = {}\n", names.join(", ")));
     }
+    out.push('\n');
 
     // Child Profiles
     for child in &profiles.profiles {

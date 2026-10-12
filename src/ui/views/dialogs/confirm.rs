@@ -1,15 +1,13 @@
 //! Modal Confirmation Dialog for Kora UI
 //! Generic, reusable Yes/No dialog with customizable title, message, button labels, and danger styling.
 
+use super::{attach_state, close_modal, detach_state, forward_draw_item, open_modal, state, ModalSpec};
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
 use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
-use crate::ui::tokens::borders;
 use crate::ui::tokens::id::{IDC_CONFIRM_BTN_NO, IDC_CONFIRM_BTN_YES};
 use crate::ui::win32::*;
-use std::ptr::null_mut;
-use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::Mutex;
+use std::sync::Once;
 
 /// Options for configuring a confirmation dialog
 #[derive(Debug, Clone)]
@@ -64,11 +62,21 @@ impl Default for ConfirmDialogOptions {
 
 type ConfirmCallback = Box<dyn FnOnce() + Send + 'static>;
 
-static DIALOG_PARENT_HWND: AtomicIsize = AtomicIsize::new(0);
-static CURRENT_OPTIONS: Mutex<Option<ConfirmDialogOptions>> = Mutex::new(None);
-static CURRENT_CALLBACK: Mutex<Option<ConfirmCallback>> = Mutex::new(None);
+/// Per-window state (owned by the dialog through `GWLP_USERDATA`).
+struct ConfirmState {
+    parent: isize,
+    options: ConfirmDialogOptions,
+    /// UTF-16 message, converted once instead of on every paint.
+    message_w: Vec<u16>,
+    callback: Option<ConfirmCallback>,
+}
 
-const CONFIRM_BTN_SUBCLASS_ID: usize = 9911;
+const CLASS_NAME: &str = "KoraConfirmDialogClass";
+static CLASS_REGISTERED: Once = Once::new();
+
+const DIALOG_W: i32 = 430;
+const DIALOG_H: i32 = 195;
+const FOOTER_Y: i32 = 100;
 
 /// Displays a modal confirmation dialog centered over the parent window.
 /// The `on_confirm` closure is executed when the user clicks Yes or presses Enter.
@@ -76,84 +84,94 @@ pub fn show_confirm_dialog<F>(parent: isize, options: ConfirmDialogOptions, on_c
 where
     F: FnOnce() + Send + 'static,
 {
-    let class_name = to_wide("KoraConfirmDialogClass");
+    register_class_once(&CLASS_REGISTERED, CLASS_NAME, confirm_dialog_wnd_proc, 0);
+    let title = options.title.clone();
+    let st = Box::new(ConfirmState {
+        parent,
+        message_w: to_wide(&options.message),
+        options,
+        callback: Some(Box::new(on_confirm)),
+    });
+    open_modal(
+        parent,
+        &ModalSpec {
+            class_name: CLASS_NAME,
+            title: &title,
+            width: DIALOG_W,
+            height: DIALOG_H,
+            ex_style: WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
+            // Pure modal dialog: no minimize, no maximize, only Close [X]
+            style: WS_CAPTION | WS_SYSMENU | WS_VISIBLE,
+        },
+        st,
+    );
+}
+
+/// Runs the confirm callback (taken out of the state first, so a callback that
+/// opens another dialog cannot observe this one) and closes the dialog.
+unsafe fn confirm_and_close(hwnd: isize) {
+    let cb = unsafe { state::<ConfirmState>(hwnd) }.and_then(|s| s.callback.take());
+    if let Some(cb) = cb {
+        cb();
+    }
+    unsafe {
+        PostMessageW(hwnd, 0x0010 /* WM_CLOSE */, 0, 0);
+    }
+}
+
+unsafe fn cancel_and_close(hwnd: isize) {
+    unsafe {
+        if let Some(s) = state::<ConfirmState>(hwnd) {
+            s.callback = None;
+        }
+        PostMessageW(hwnd, 0x0010 /* WM_CLOSE */, 0, 0);
+    }
+}
+
+fn paint(hwnd: isize, hdc: isize, st: &ConfirmState) {
+    let palette = ThemePalette::get(is_current_dark());
+    let is_danger = st.options.is_danger;
+
+    let mut rc_client = RECT::default();
+    unsafe { GetClientRect(hwnd, &mut rc_client) };
+
+    // 1. Window main body background
+    fill_rect_color(hdc, &rc_client, palette.bg_window);
+
+    // 2. Footer background and separator line
+    let rc_footer = RECT { top: FOOTER_Y, ..rc_client };
+    fill_rect_color(hdc, &rc_footer, palette.bg_sidebar);
+    draw_line(hdc, 0, FOOTER_Y, rc_client.right, FOOTER_Y, palette.border);
+
+    // 3. Vibrant Colored Icon Badge (Warning or Info)
+    let badge_size = 40;
+    let rc_badge = RECT { left: 20, top: 24, right: 20 + badge_size, bottom: 24 + badge_size };
+    let badge_color = if is_danger { palette.danger_border } else { palette.accent };
+    fill_ellipse(hdc, &rc_badge, badge_color);
 
     unsafe {
-        let mut wc: WNDCLASSEXW = std::mem::zeroed();
-        wc.cb_size = std::mem::size_of::<WNDCLASSEXW>() as u32;
-        wc.lpfn_wnd_proc = Some(confirm_dialog_wnd_proc);
-        wc.h_instance = 0;
-        wc.h_cursor = LoadCursorW(0, IDC_ARROW);
-        wc.lpsz_class_name = class_name.as_ptr();
-        RegisterClassExW(&wc);
+        SetBkMode(hdc, TRANSPARENT);
 
-        DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
-        let title = options.title.clone();
-        if let Ok(mut g) = CURRENT_OPTIONS.lock() {
-            *g = Some(options);
-        }
-        if let Ok(mut g) = CURRENT_CALLBACK.lock() {
-            *g = Some(Box::new(on_confirm));
-        }
+        // Centered glyph: bold pure white "!" for danger, "i" for info
+        let mut rc_glyph = rc_badge;
+        let glyph: &[u16] = if is_danger { &[b'!' as u16, 0] } else { &[b'i' as u16, 0] };
+        let font_glyph = crate::ui::theme::cached_font(if is_danger { 18 } else { 16 }, FW_BOLD);
+        let prev_font = SelectObject(hdc, font_glyph);
+        SetTextColor(hdc, palette.text_white);
+        DrawTextW(hdc, glyph.as_ptr(), -1, &mut rc_glyph, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-        let width = 430;
-        let height = 195;
-
-        let mut rc: RECT = std::mem::zeroed();
-        GetWindowRect(parent, &mut rc);
-        let x = rc.left + ((rc.right - rc.left) - width) / 2;
-        let y = rc.top + ((rc.bottom - rc.top) - height) / 2;
-
-        EnableWindow(parent, 0);
-
-        let hwnd = CreateWindowExW(
-            WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME,
-            class_name.as_ptr(),
-            to_wide(&title).as_ptr(),
-            WS_CAPTION | WS_SYSMENU | WS_VISIBLE, // Pure modal dialog: no minimize, no maximize, only Close [X]
-            x,
-            y,
-            width,
-            height,
-            parent,
-            0,
-            0,
-            null_mut(),
-        );
-
-        if hwnd != 0 {
-            apply_modern_window_styling(hwnd, is_current_dark());
-            ShowWindow(hwnd, SW_SHOW);
-            SetForegroundWindow(hwnd);
-        } else {
-            EnableWindow(parent, 1);
-        }
+        // 4. Message text (word wrapped)
+        let mut rc_msg = RECT { left: 74, top: 22, right: rc_client.right - 20, bottom: FOOTER_Y - 8 };
+        SelectObject(hdc, get_app_font_normal());
+        SetTextColor(hdc, palette.text_primary);
+        DrawTextW(hdc, st.message_w.as_ptr(), -1, &mut rc_msg, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+        SelectObject(hdc, prev_font);
     }
 }
 
-unsafe extern "system" fn confirm_button_subclass_proc(
-    hwnd: isize,
-    msg: u32,
-    wparam: usize,
-    lparam: isize,
-    _uid: usize,
-    ref_data: usize,
-) -> isize {
-    const WM_KEYDOWN: u32 = 0x0100;
-    if msg == WM_KEYDOWN {
-        let vk = wparam as u32;
-        let dlg_hwnd = ref_data as isize;
-        if vk == 0x1B {
-            // VK_ESCAPE cancels dialog
-            unsafe {
-                PostMessageW(dlg_hwnd, 0x0010 /* WM_CLOSE */, 0, 0);
-            }
-            return 0;
-        }
-    }
-    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
-}
-
+/// # Safety
+///
+/// Win32 window procedure callback called by Windows OS message dispatch.
 pub unsafe extern "system" fn confirm_dialog_wnd_proc(
     hwnd: isize,
     msg: u32,
@@ -161,47 +179,20 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
     lparam: isize,
 ) -> isize {
     const WM_CREATE: u32 = 0x0001;
-    const WM_DESTROY: u32 = 0x0002;
     const WM_COMMAND: u32 = 0x0111;
-    const WM_PAINT: u32 = 0x000F;
     const WM_ERASEBKGND: u32 = 0x0014;
     const WM_CLOSE: u32 = 0x0010;
     const WM_DRAWITEM: u32 = 0x002B;
     const WM_KEYDOWN: u32 = 0x0100;
-    const WM_SYSKEYDOWN: u32 = 0x0104;
-
-    #[repr(C)]
-    #[allow(non_camel_case_types)]
-    struct DRAWITEMSTRUCT {
-        ctl_type: u32,
-        ctl_id: u32,
-        item_id: u32,
-        item_action: u32,
-        item_state: u32,
-        hwnd_item: isize,
-        hdc: isize,
-        rc_item: RECT,
-        item_data: usize,
-    }
+    const WM_NCDESTROY: u32 = 0x0082;
 
     unsafe {
         match msg {
             WM_CREATE => {
-                let (is_danger, yes_text, no_text) = {
-                    if let Ok(guard) = CURRENT_OPTIONS.lock()
-                        && let Some(ref opts) = *guard
-                    {
-                        (opts.is_danger, opts.yes_text.clone(), opts.no_text.clone())
-                    } else {
-                        let strings = crate::language::current();
-                        (false, strings.btn_yes.to_string(), strings.btn_no.to_string())
-                    }
-                };
-
-                let font_bold = get_app_font_bold();
-                let font_normal = get_app_font_normal();
-                let is_dark = is_current_dark();
-                let palette = ThemePalette::get(is_dark);
+                attach_state::<ConfirmState>(hwnd, lparam);
+                let Some(st) = state::<ConfirmState>(hwnd) else { return -1 };
+                let is_danger = st.options.is_danger;
+                let palette = ThemePalette::get(is_current_dark());
 
                 let yes_variant = if is_danger {
                     ButtonVariant::Danger
@@ -213,12 +204,12 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                 let btn_no = PushButton::create_with_variant(
                     hwnd,
                     IDC_CONFIRM_BTN_NO,
-                    &no_text,
+                    &st.options.no_text,
                     210,
                     110,
                     92,
                     32,
-                    font_normal,
+                    get_app_font_normal(),
                     ButtonVariant::Secondary,
                     Some(palette.bg_sidebar),
                 );
@@ -227,235 +218,72 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                 let btn_yes = PushButton::create_with_variant(
                     hwnd,
                     IDC_CONFIRM_BTN_YES,
-                    &yes_text,
+                    &st.options.yes_text,
                     310,
                     110,
                     94,
                     32,
-                    font_bold,
+                    get_app_font_bold(),
                     yes_variant,
                     Some(palette.bg_sidebar),
                 );
 
-                // Subclass buttons to catch VK_ESCAPE while focused
-                if let Some(ref b) = btn_no {
-                    SetWindowSubclass(
-                        b.hwnd(),
-                        confirm_button_subclass_proc,
-                        CONFIRM_BTN_SUBCLASS_ID,
-                        hwnd as usize,
-                    );
-                }
-                if let Some(ref b) = btn_yes {
-                    SetWindowSubclass(
-                        b.hwnd(),
-                        confirm_button_subclass_proc,
-                        CONFIRM_BTN_SUBCLASS_ID,
-                        hwnd as usize,
-                    );
-                }
-
                 // Default focus: focus No on danger actions to prevent accidental deletion
-                if is_danger {
-                    if let Some(ref b) = btn_no {
-                        SetFocus(b.hwnd());
-                    }
-                } else if let Some(ref b) = btn_yes {
+                let focus = if is_danger { btn_no } else { btn_yes };
+                if let Some(ref b) = focus {
                     SetFocus(b.hwnd());
                 }
-
                 0
             }
             WM_PAINT => {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 if hdc != 0 {
-                    let is_dark = is_current_dark();
-                    let palette = ThemePalette::get(is_dark);
-
-                    let (is_danger, message) = {
-                        if let Ok(guard) = CURRENT_OPTIONS.lock()
-                            && let Some(ref opts) = *guard
-                        {
-                            (opts.is_danger, opts.message.clone())
-                        } else {
-                            (false, String::new())
+                    if let Some(st) = state::<ConfirmState>(hwnd) {
+                        match BackBuffer::new(hdc, DIALOG_W, DIALOG_H) {
+                            Some(buf) => paint(hwnd, buf.hdc(), st),
+                            None => paint(hwnd, hdc, st),
                         }
-                    };
-
-                    let mut rc_client = RECT::default();
-                    GetClientRect(hwnd, &mut rc_client);
-
-                    // 1. Window main body background
-                    let brush_bg = CreateSolidBrush(palette.bg_window);
-                    FillRect(hdc, &rc_client, brush_bg);
-                    DeleteObject(brush_bg);
-
-                    // 2. Footer background and separator line
-                    let footer_y = 100;
-                    let rc_footer = RECT {
-                        left: 0,
-                        top: footer_y,
-                        right: rc_client.right,
-                        bottom: rc_client.bottom,
-                    };
-                    let brush_footer = CreateSolidBrush(palette.bg_sidebar);
-                    FillRect(hdc, &rc_footer, brush_footer);
-                    DeleteObject(brush_footer);
-
-                    let pen_sep = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
-                    let prev_pen = SelectObject(hdc, pen_sep);
-                    MoveToEx(hdc, 0, footer_y, null_mut());
-                    LineTo(hdc, rc_client.right, footer_y);
-                    SelectObject(hdc, prev_pen);
-                    DeleteObject(pen_sep);
-
-                    // 3. Vibrant Colored Icon Badge (Warning or Info)
-                    let badge_size = 40;
-                    let badge_x = 20;
-                    let badge_y = 24;
-                    let rc_badge = RECT {
-                        left: badge_x,
-                        top: badge_y,
-                        right: badge_x + badge_size,
-                        bottom: badge_y + badge_size,
-                    };
-
-                    let badge_color = if is_danger {
-                        palette.danger_border
-                    } else {
-                        palette.accent
-                    };
-
-                    let brush_badge = CreateSolidBrush(badge_color);
-                    let pen_badge = CreatePen(PS_SOLID, 1, badge_color);
-                    let prev_brush = SelectObject(hdc, brush_badge);
-                    let prev_pen = SelectObject(hdc, pen_badge);
-                    Ellipse(
-                        hdc,
-                        rc_badge.left,
-                        rc_badge.top,
-                        rc_badge.right,
-                        rc_badge.bottom,
-                    );
-                    SelectObject(hdc, prev_brush);
-                    SelectObject(hdc, prev_pen);
-                    DeleteObject(brush_badge);
-                    DeleteObject(pen_badge);
-
-                    // Centered glyph: bold pure white "!" for danger, "i" for info
-                    let mut rc_glyph = rc_badge;
-                    let glyph = if is_danger { "!" } else { "i" };
-                    let glyph_w = to_wide(glyph);
-                    let font_glyph = create_app_font(if is_danger { 18 } else { 16 }, FW_BOLD);
-                    let prev_font = SelectObject(hdc, font_glyph);
-                    SetBkMode(hdc, 1);
-                    SetTextColor(hdc, palette.text_white);
-                    DrawTextW(
-                        hdc,
-                        glyph_w.as_ptr(),
-                        -1,
-                        &mut rc_glyph,
-                        DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-                    );
-                    SelectObject(hdc, prev_font);
-                    DeleteObject(font_glyph);
-
-                    // 4. Message text (word wrapped)
-                    let mut rc_msg = RECT {
-                        left: 74,
-                        top: 22,
-                        right: rc_client.right - 20,
-                        bottom: footer_y - 8,
-                    };
-                    let msg_w = to_wide(&message);
-                    let font_msg = get_app_font_normal();
-                    let prev_font = SelectObject(hdc, font_msg);
-                    SetBkMode(hdc, 1);
-                    SetTextColor(hdc, palette.text_primary);
-                    DrawTextW(
-                        hdc,
-                        msg_w.as_ptr(),
-                        -1,
-                        &mut rc_msg,
-                        DT_LEFT | DT_WORDBREAK | DT_NOPREFIX,
-                    );
-                    SelectObject(hdc, prev_font);
-
+                    }
                     EndPaint(hwnd, &ps);
                 }
                 0
             }
             WM_ERASEBKGND => 1,
             WM_COMMAND => {
-                let id = (wparam & 0xFFFF) as u32;
+                let mut id = (wparam & 0xFFFF) as u32;
+                if id == IDOK {
+                    // Enter: activates the focused button (No stays No on danger dialogs)
+                    id = super::resolve_enter_command(hwnd, IDC_CONFIRM_BTN_YES);
+                }
                 if id == IDC_CONFIRM_BTN_YES {
-                    if let Ok(mut guard) = CURRENT_CALLBACK.lock()
-                        && let Some(cb) = guard.take()
-                    {
-                        cb();
-                    }
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                } else if id == IDC_CONFIRM_BTN_NO {
-                    if let Ok(mut guard) = CURRENT_CALLBACK.lock() {
-                        guard.take();
-                    }
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    confirm_and_close(hwnd);
+                } else if id == IDC_CONFIRM_BTN_NO || id == IDCANCEL {
+                    cancel_and_close(hwnd);
                 }
                 0
             }
-            WM_KEYDOWN | WM_SYSKEYDOWN => {
-                let vk = wparam as u32;
-                if vk == 0x1B {
-                    // Escape cancels
-                    if let Ok(mut guard) = CURRENT_CALLBACK.lock() {
-                        guard.take();
-                    }
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    return 0;
-                } else if vk == 0x0D {
-                    // Enter confirms
-                    if let Ok(mut guard) = CURRENT_CALLBACK.lock()
-                        && let Some(cb) = guard.take()
-                    {
-                        cb();
-                    }
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    return 0;
+            WM_KEYDOWN => {
+                // Only reached when the dialog itself has focus (no child focused).
+                match wparam as u32 {
+                    0x1B => cancel_and_close(hwnd),  // Escape cancels
+                    0x0D => confirm_and_close(hwnd), // Enter confirms
+                    _ => {}
                 }
                 0
             }
-            WM_DRAWITEM => {
-                let dis = &*(lparam as *const DRAWITEMSTRUCT);
-                if dis.hwnd_item != 0 {
-                    let res = SendMessageW(dis.hwnd_item, OCM_DRAWITEM, wparam, lparam);
-                    if res != 0 {
-                        return res;
-                    }
-                }
-                0
-            }
+            WM_DRAWITEM => forward_draw_item(wparam, lparam),
             WM_CLOSE => {
-                let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
-                if parent != 0 {
-                    EnableWindow(parent, 1);
-                    SetForegroundWindow(parent);
-                }
-                DestroyWindow(hwnd);
+                let parent = state::<ConfirmState>(hwnd).map_or(0, |s| s.parent);
+                close_modal(hwnd, parent);
                 0
             }
-            WM_DESTROY => {
-                let parent = DIALOG_PARENT_HWND.swap(0, Ordering::SeqCst);
-                if parent != 0 {
-                    EnableWindow(parent, 1);
+            WM_NCDESTROY => {
+                if let Some(st) = detach_state::<ConfirmState>(hwnd) {
+                    // Safety net for abnormal destruction (e.g. owner destroyed first).
+                    EnableWindow(st.parent, 1);
                 }
-                if let Ok(mut g) = CURRENT_OPTIONS.lock() {
-                    *g = None;
-                }
-                if let Ok(mut g) = CURRENT_CALLBACK.lock() {
-                    *g = None;
-                }
-                0
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }

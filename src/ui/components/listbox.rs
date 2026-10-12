@@ -5,14 +5,10 @@ use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
 pub const LB_ADDSTRING: u32 = 0x0180;
-pub const LB_INSERTSTRING: u32 = 0x0181;
-pub const LB_DELETESTRING: u32 = 0x0182;
 pub const LB_RESETCONTENT: u32 = 0x0184;
 pub const LB_SETCURSEL: u32 = 0x0186;
 pub const LB_GETCURSEL: u32 = 0x0188;
-pub const LB_GETCOUNT: u32 = 0x018B;
 pub const LB_SETITEMHEIGHT: u32 = 0x01A0;
-pub const LB_GETITEMHEIGHT: u32 = 0x01A1;
 
 pub const LBS_NOTIFY: u32 = 0x0001;
 pub const LBS_OWNERDRAWFIXED: u32 = 0x0010;
@@ -194,31 +190,6 @@ impl ListBox {
         unsafe {
             SendMessageW(self.hwnd, LB_SETCURSEL, index as usize, 0);
             InvalidateRect(self.hwnd, null_mut(), 1);
-        }
-    }
-
-    pub fn get_count(&self) -> i32 {
-        unsafe { SendMessageW(self.hwnd, LB_GETCOUNT, 0, 0) as i32 }
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        unsafe { IsWindowEnabled(self.hwnd) != 0 }
-    }
-
-    pub fn set_enabled(&self, enabled: bool) {
-        unsafe {
-            EnableWindow(self.hwnd, enabled as i32);
-            InvalidateRect(self.hwnd, null_mut(), 1);
-        }
-    }
-
-    pub fn is_visible(&self) -> bool {
-        unsafe { IsWindowVisible(self.hwnd) != 0 }
-    }
-
-    pub fn set_visible(&self, visible: bool) {
-        unsafe {
-            ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
     }
 }

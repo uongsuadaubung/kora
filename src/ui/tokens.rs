@@ -5,24 +5,18 @@
 pub mod typography {
     pub const FONT_SIZE_HERO: i32 = 18;
     pub const FONT_SIZE_TITLE: i32 = 13;
-    pub const FONT_SIZE_CARD_HEADER: i32 = 10;
     pub const FONT_SIZE_BODY: i32 = 9;
     pub const FONT_SIZE_SUBTITLE: i32 = 9;
-    pub const FONT_SIZE_BADGE: i32 = 8;
 }
 
 /// Spacing scale (used for margins, paddings, gaps, and offsets)
 pub mod spacing {
-    pub const SPACE_2: i32 = 2;
     pub const SPACE_4: i32 = 4;
-    pub const SPACE_6: i32 = 6;
     pub const SPACE_8: i32 = 8;
     pub const SPACE_10: i32 = 10;
     pub const SPACE_12: i32 = 12;
     pub const SPACE_14: i32 = 14;
     pub const SPACE_16: i32 = 16;
-    pub const SPACE_20: i32 = 20;
-    pub const SPACE_24: i32 = 24;
 }
 
 /// Border tokens (border widths)
@@ -34,7 +28,6 @@ pub mod borders {
 /// Corner radius tokens (used with RoundRect for borders and fills)
 pub mod radii {
     pub const RADIUS_TINY: i32 = 2;       // Small indicators, checkboxes (13x13)
-    pub const RADIUS_SM: i32 = 4;         // Small tags, badges
     pub const RADIUS_MD: i32 = 6;         // Standard buttons, list items, badge pills
     pub const RADIUS_CARD: i32 = 8;       // Main content cards, tabs
     pub const RADIUS_LG: i32 = 10;        // Hero logos, dialog containers
@@ -43,7 +36,7 @@ pub mod radii {
 
 /// Layout and coordinate tokens (Dimensions, Margins, and Positions)
 pub mod layout {
-    use super::{radii, spacing};
+    use super::spacing;
 
     // Window Client Area
     pub const WINDOW_CLIENT_WIDTH: i32 = 820;
@@ -53,8 +46,6 @@ pub mod layout {
     pub const SIDEBAR_X: i32 = spacing::SPACE_8;
     pub const SIDEBAR_WIDTH: i32 = 214;
     pub const SIDEBAR_DIVIDER_X: i32 = 230;
-    pub const SIDEBAR_TITLE_Y: i32 = spacing::SPACE_14;
-    pub const SIDEBAR_TITLE_HEIGHT: i32 = 22;
     pub const SIDEBAR_LIST_Y: i32 = 44;
     pub const SIDEBAR_LIST_HEIGHT: i32 = 452;
     pub const SIDEBAR_ITEM_HEIGHT: i32 = 48;
@@ -82,9 +73,7 @@ pub mod layout {
     pub const TAB_BAR_HEIGHT: i32 = 32;
 
     // Content cards & bounds
-    pub const CONTENT_X: i32 = 246;
     pub const CARD_MARGIN_RIGHT: i32 = spacing::SPACE_14;
-    pub const CARD_CORNER_RADIUS: i32 = radii::RADIUS_CARD;
 
     // Profile Subtab Content Cards
     pub const CARD_X: i32 = TAB_BAR_X;
@@ -98,7 +87,6 @@ pub mod layout {
 
     // Footer dimensions
     pub const FOOTER_Y: i32 = 548;
-    pub const FOOTER_HEIGHT: i32 = 32;
 }
 
 /// Centralized Control Identifiers (Win32 IDC_*)
@@ -119,26 +107,16 @@ pub mod id {
     pub const IDC_COMBO_TYPING_MODE: u32 = 302;
     pub const IDC_BTN_SWITCH_KEY: u32 = 303;
     pub const IDC_CHECK_SWITCH_KEY: u32 = 304;
-    pub const IDC_CHECK_CTRL_SHIFT: u32 = IDC_CHECK_SWITCH_KEY; // Alias
     pub const IDC_LABEL_SWITCH_KEY_BADGE: u32 = 305;
     pub const IDC_CHECK_RESTORE_WRONG: u32 = 402;
-    pub const IDC_CHECK_FREE_MARKING: u32 = 403;
-    pub const IDC_CHECK_BRACKET_W: u32 = 403; // Alias
-    pub const IDC_CHECK_REMEMBER_HISTORY: u32 = 404;
     pub const IDC_CHECK_AUTO_UPPER: u32 = 405;
 
     // 400..419: Tab Bar & Macro Controls
     pub const IDC_TAB_MAIN: u32 = 400;
     pub const IDC_CHECK_USE_MACRO: u32 = 406;
-    pub const IDC_EDIT_MACRO_KEY: u32 = 407;
-    pub const IDC_EDIT_MACRO_VALUE: u32 = 408;
     pub const IDC_BTN_ADD_MACRO: u32 = 409;
     pub const IDC_LIST_MACRO: u32 = 410;
-    pub const IDC_BTN_DEL_MACRO: u32 = 411;
-    pub const IDC_BTN_CANCEL_MACRO: u32 = 412;
-    pub const IDC_BTN_EDIT_MACRO: u32 = 413;
     pub const IDC_CHECK_MACRO_EN: u32 = 414;
-    pub const IDC_COMBO_MACRO_TYPE: u32 = 417;
 
     // 420..429: System Settings Controls
     pub const IDC_CHECK_AUTOSTART: u32 = 420;
@@ -170,6 +148,11 @@ pub mod id {
     pub const IDC_BTN_TEST_SOUND: u32 = 443;
     pub const IDC_LABEL_VOLUME_VAL: u32 = 444;
 
+    // 450..459: Restore Defaults Card Controls
+    pub const IDC_LABEL_DEFAULTS_TITLE: u32 = 450;
+    pub const IDC_LABEL_DEFAULTS_DESC: u32 = 451;
+    pub const IDC_BTN_RESTORE_DEFAULTS: u32 = 452;
+
     // 500..509: Sidebar & Profile Banner Controls
     pub const IDC_SIDEBAR_TITLE: u32 = 500;
     pub const IDC_BTN_ADD_PROFILE: u32 = 501;
@@ -182,10 +165,8 @@ pub mod id {
 
     // 510..519: Remap & Disable Key Controls
     pub const IDC_BTN_ADD_REMAP: u32 = 510;
-    pub const IDC_BTN_DEL_REMAP: u32 = 511;
     pub const IDC_LIST_REMAP: u32 = 512;
     pub const IDC_BTN_ADD_DISABLE: u32 = 513;
-    pub const IDC_BTN_DEL_DISABLE: u32 = 514;
     pub const IDC_LIST_DISABLE: u32 = 515;
     pub const IDC_CHECK_REMAP_ENABLED: u32 = 516;
     pub const IDC_CHECK_DISABLE_ENABLED: u32 = 517;
@@ -196,7 +177,6 @@ pub mod id {
     pub const IDC_BTN_DEFAULTS: u32 = 601;
     pub const IDC_BTN_CLOSE: u32 = 602;
     pub const IDC_BTN_HOTKEY_SAVE: u32 = 603;
-    pub const IDC_BTN_HOTKEY_CLEAR: u32 = 604;
     pub const IDC_BTN_HOTKEY_CANCEL: u32 = 605;
     pub const IDC_LABEL_HOTKEY_DISPLAY: u32 = 606;
     pub const IDC_BTN_HOTKEY_PRESET_CTRL_SHIFT: u32 = 607;

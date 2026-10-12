@@ -197,7 +197,7 @@ fn test_group_7_macro_expansion_with_casing() {
 fn test_benchmark_throughput() {
     let mut engine = VietnameseEngine::new(EngineConfig::default());
     let paragraph =
-        "tooi gox tieengs vieetj raats nhanh vaf muwowjt maf treen heej thoongs OpenKey moqis ";
+        "tooi gox tieengs vieetj raats nhanh vaf muwowjt maf treen heej thoongs Kora moqis ";
     let total_chars = paragraph.chars().count();
     let iterations = 10_000;
 
@@ -209,10 +209,26 @@ fn test_benchmark_throughput() {
     let total_keystrokes = total_chars * iterations;
     let keys_per_sec = (total_keystrokes as f64) / elapsed.as_secs_f64();
     println!(
-        "\n===> BENCHMARK: {} keys typed in {:?}. Speed: {:.0} keys/sec ({:.2} microseconds/key)",
+        "\n===> BENCHMARK (Full Screen Simulation): {} keys typed in {:?}. Speed: {:.0} keys/sec ({:.2} microseconds/key)",
         total_keystrokes,
         elapsed,
         keys_per_sec,
         (elapsed.as_micros() as f64) / (total_keystrokes as f64)
+    );
+
+    let chars: Vec<char> = paragraph.chars().collect();
+    let start_raw = std::time::Instant::now();
+    for _ in 0..iterations {
+        for &ch in &chars {
+            std::hint::black_box(engine.on_key(ch, ch.is_uppercase(), false));
+        }
+    }
+    let elapsed_raw = start_raw.elapsed();
+    let speed_raw = (total_keystrokes as f64) / elapsed_raw.as_secs_f64();
+    println!(
+        "===> BENCHMARK (Pure Engine on_key): Speed: {:.0} keys/sec ({:.3} microseconds/key = {:.0} ns)",
+        speed_raw,
+        (elapsed_raw.as_nanos() as f64) / 1000.0 / (total_keystrokes as f64),
+        (elapsed_raw.as_nanos() as f64) / (total_keystrokes as f64)
     );
 }

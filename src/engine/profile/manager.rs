@@ -181,7 +181,7 @@ impl ProfileManager {
     /// Resolves effective active KeyRemapRules for the hook execution
     /// Formula: (Global \ Muted) U Overridden U AppSpecific
     pub fn resolve_effective_remaps(&self, profile_id: &str) -> Vec<KeyRemapRule> {
-        let global_enabled = self.global_profile.remap_enabled.unwrap_or(true);
+        let global_enabled = self.global_profile.remap_enabled.unwrap_or(false);
         let global_remaps = &self.global_profile.app_remaps;
         if profile_id == "global" {
             if !global_enabled {
@@ -234,7 +234,7 @@ impl ProfileManager {
     /// Resolves effective disabled keys (VK codes) for hook execution
     /// Formula: (Global \ Unmuted) U AppDisabled
     pub fn resolve_effective_disabled(&self, profile_id: &str) -> Vec<u32> {
-        let global_enabled = self.global_profile.disable_enabled.unwrap_or(true);
+        let global_enabled = self.global_profile.disable_enabled.unwrap_or(false);
         let global_disabled = &self.global_profile.app_disabled;
         if profile_id == "global" {
             if !global_enabled {

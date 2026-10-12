@@ -3,6 +3,7 @@
 
 pub mod colors;
 pub mod components;
+pub mod controller;
 pub mod theme;
 pub mod tokens;
 pub mod tray;
@@ -15,149 +16,129 @@ pub use win32::*;
 pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
 pub use tokens::*;
 
-use crate::engine::profile::AppProfile;
 use crate::ui::theme::recreate_theme_brushes;
 use crate::ui::tray::{get_small_icon_size, load_icon_from_memory, TrayHandler};
 use crate::ui::views::ControlPanelControls;
 use crate::ui::wnd_proc::{control_panel_wnd_proc, tray_helper_wnd_proc};
+use std::cell::{Cell, RefCell};
 use std::ptr::null_mut;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 static APP_ICO_BYTES: &[u8] = include_bytes!("../../assets/icon.ico");
 
-pub static UI_MANAGER: Mutex<Option<UiState>> = Mutex::new(None);
-
-
-pub struct UiState {
-    pub h_helper: isize,
-    pub h_panel: isize,
-    pub tray: TrayHandler,
-    pub controls: ControlPanelControls,
-    pub hfont_normal: isize,
-    pub hfont_bold: isize,
+thread_local! {
+    /// UI state, created once by `init_ui` and kept for the process lifetime.
+    /// Thread-local: the whole UI (and the keyboard hook) runs on one thread, so no
+    /// lock is needed and other threads simply get `None`.
+    static UI: Cell<Option<&'static UiState>> = const { Cell::new(None) };
 }
 
-impl UiState {
-    pub fn on_command(&mut self, hwnd: isize, control_id: u32, notify_code: u32) -> bool {
-        let handled = self.controls.on_command(hwnd, control_id, notify_code);
-        if control_id == crate::ui::tokens::id::IDC_COMBO_TYPING_MODE {
-            if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref engine) = *guard
-            {
-                self.tray.set_vietnamese_mode(engine.effective_config().enabled);
-            }
-        } else if control_id == crate::ui::tokens::id::IDC_COMBO_THEME
-            || control_id == crate::ui::tokens::id::IDC_COMBO_LANG
-        {
-            self.tray.refresh_icon();
+/// The UI state; `None` before `init_ui` finished or when called off the UI thread.
+pub fn ui() -> Option<&'static UiState> {
+    UI.with(Cell::get)
+}
+
+/// Shortcut for the control panel controls (see [`ui`]).
+pub fn controls() -> Option<&'static ControlPanelControls> {
+    ui().map(|u| &u.controls)
+}
+
+/// Hidden helper window (tray owner). Used as the target for messages posted from the hook.
+static HELPER_HWND: AtomicIsize = AtomicIsize::new(0);
+
+/// Posted to the helper window when the typing mode toggles (wparam = 1 for Vietnamese).
+pub const WM_APP_MODE_CHANGED: u32 = 0x8000 + 120;
+
+/// Posted to the control panel by the update-check worker; lparam = `Box<UpdateStatus>` raw ptr.
+pub const WM_APP_UPDATE_CHECKED: u32 = 0x8000 + 121;
+
+/// Id of the root ("Mặc định") profile in `ProfileManager`.
+pub const GLOBAL_PROFILE_ID: &str = "global";
+
+pub struct UiState {
+    pub h_panel: isize,
+    pub tray: RefCell<TrayHandler>,
+    pub controls: ControlPanelControls,
+}
+
+/// Mode-change callback for the keyboard hook. It runs inside the hook while ENGINE_INSTANCE
+/// is locked, so it must not touch UI state synchronously: just post to the UI message queue.
+pub fn post_mode_change(is_vietnamese: bool) {
+    let h = HELPER_HWND.load(Ordering::Relaxed);
+    if h != 0 {
+        unsafe {
+            PostMessageW(h, WM_APP_MODE_CHANGED, is_vietnamese as usize, 0);
         }
-        handled
     }
+}
+
+/// Typing-mode combo index for the profile currently selected in the panel.
+/// Root layout: [Vietnamese, English]; child layout: [Inherit, Vietnamese, English].
+fn selected_mode_combo_index() -> Option<usize> {
+    use crate::engine::profile::LanguageMode;
+    let guard = crate::platform::win32::ENGINE_INSTANCE.lock().ok()?;
+    let engine = guard.as_ref()?;
+    let pm = &engine.profile_manager;
+    Some(match pm.get_profile(&pm.selected_id) {
+        Some(p) if !p.is_root => match p.mode {
+            LanguageMode::Inherit => 0,
+            LanguageMode::Vietnamese => 1,
+            LanguageMode::English => 2,
+        },
+        _ => {
+            if engine.config().enabled {
+                0
+            } else {
+                1
+            }
+        }
+    })
 }
 
 pub fn show_control_panel() {
-    let (cfg, selected_profile, is_active, all_profiles, active_id, remaps, disabled, macros) = {
-        if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
-            if let Some(ref engine) = *guard {
-                let sel_id = engine.profile_manager.selected_id.clone();
-                let act_id = engine.profile_manager.active_id.clone();
-                let is_act = sel_id == act_id;
-                let prof = engine
-                    .profile_manager
-                    .get_profile(&sel_id)
-                    .cloned()
-                    .unwrap_or_else(|| engine.profile_manager.global_profile.clone());
-                let all: Vec<AppProfile> = engine
-                    .profile_manager
-                    .all_profiles()
-                    .into_iter()
-                    .cloned()
-                    .collect();
-                let r = engine.profile_manager.resolve_remap_items_for_ui(&sel_id);
-                let d = engine.profile_manager.resolve_disable_items_for_ui(&sel_id);
-                let m = engine
-                    .profile_manager
-                    .resolve_macro_items_for_ui(&sel_id, &engine.macro_table.get_sorted_entries());
-                (
-                    Some(engine.config().clone()),
-                    Some(prof),
-                    is_act,
-                    all,
-                    act_id,
-                    r,
-                    d,
-                    m,
-                )
-            } else {
-                (
-                    None,
-                    None,
-                    false,
-                    Vec::new(),
-                    String::new(),
-                    Vec::new(),
-                    Vec::new(),
-                    Vec::new(),
-                )
-            }
-        } else {
-            (
-                None,
-                None,
-                false,
-                Vec::new(),
-                String::new(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-            )
-        }
-    };
+    let Some(ui) = ui() else { return };
+    let c = &ui.controls;
+    let Some(cfg) = c.refresh_from_engine() else { return };
 
-    if let Ok(ui_guard) = UI_MANAGER.try_lock()
-        && let Some(ref ui) = *ui_guard
-    {
-        unsafe {
-            if let Some(ref c) = cfg {
-                ui.controls.load_config(c);
-                crate::language::set_current_language(c.language);
-                ui.controls.update_language(c.language);
-                let strings = crate::language::get_strings(c.language);
-                SetWindowTextW(ui.h_panel, to_wide(strings.window_title).as_ptr());
-                let is_dark = resolve_is_dark(c.theme);
-                apply_ui_theme(ui.h_panel, &ui.controls, is_dark);
+    // Language / theme are kept in sync by their own handlers (system tab, defaults,
+    // WM_SETTINGCHANGE); only re-apply here if they drifted while hidden.
+    if crate::language::current_language() != cfg.language {
+        c.update_language(cfg.language);
+        let strings = crate::language::get_strings(cfg.language);
+        unsafe { SetWindowTextW(ui.h_panel, to_wide(strings.window_title).as_ptr()) };
+    }
+    let is_dark = resolve_is_dark(cfg.theme);
+    if is_dark != is_current_dark() {
+        apply_ui_theme(ui.h_panel, c, is_dark);
+    }
 
-                if let Some(ref prof) = selected_profile {
-                    let all_refs: Vec<&AppProfile> = all_profiles.iter().collect();
-                    ui.controls
-                        .load_profile_data(prof, is_active, c, &all_refs, &active_id);
-                }
-            }
-            ui.controls.tab_remap.populate_remaps(&remaps);
-            ui.controls.tab_remap.populate_disabled(&disabled);
-            ui.controls.populate_macro_items(&macros);
-            ui.controls
-                .update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(
-                    ui.controls.tab_bar.get_cur_sel(),
-                ));
-            let h_panel = ui.h_panel;
-            InvalidateRect(h_panel, null_mut(), 0);
-            drop(ui_guard);
-            ShowWindow(h_panel, SW_SHOW);
-            SetForegroundWindow(h_panel);
-        }
+    c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
+    unsafe {
+        InvalidateRect(ui.h_panel, null_mut(), 0);
+        ShowWindow(ui.h_panel, SW_SHOW);
+        SetForegroundWindow(ui.h_panel);
     }
 }
 
+/// Hides the control panel and trims the process working set back to ~1-2 MB.
+pub fn hide_control_panel() {
+    if let Some(ui) = ui() {
+        unsafe {
+            ShowWindow(ui.h_panel, SW_HIDE);
+        }
+    }
+    crate::platform::win32::trim_working_set();
+}
+
+/// Syncs the tray icon and the typing-mode combo after a mode change.
+/// Must be called on the UI thread without holding ENGINE_INSTANCE.
 pub fn update_tray_icon(is_vietnamese: bool) {
-    if let Ok(mut ui_guard) = UI_MANAGER.lock()
-        && let Some(ref mut ui) = *ui_guard
-    {
-        ui.tray.set_vietnamese_mode(is_vietnamese);
-        ui.controls
-            .tab_typing
-            .combo_mode
-            .set_selected(if is_vietnamese { 0 } else { 1 });
+    let combo_idx = selected_mode_combo_index();
+    if let Some(ui) = ui() {
+        ui.tray.borrow_mut().set_vietnamese_mode(is_vietnamese);
+        if let Some(idx) = combo_idx {
+            ui.controls.tab_typing.combo_mode.set_selected(idx);
+        }
     }
 }
 
@@ -168,22 +149,14 @@ pub fn init_ui() -> bool {
     let class_helper_name = to_wide("KoraHelperClass");
     let class_panel_name = to_wide("KoraControlPanelClass");
 
-    let (cfg_theme, cfg_lang, init_config) = {
-        let guard = crate::platform::win32::ENGINE_INSTANCE.lock().unwrap();
-        if let Some(ref e) = *guard {
-            (
-                e.config().theme,
-                e.config().language,
-                Some(e.config().clone()),
-            )
-        } else {
-            (
-                crate::engine::config::UiTheme::Auto,
-                crate::language::Language::Vietnamese,
-                None,
-            )
-        }
-    };
+    let (cfg_theme, cfg_lang) = crate::platform::win32::ENGINE_INSTANCE
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().map(|e| (e.config().theme, e.config().language)))
+        .unwrap_or((
+            crate::engine::config::UiTheme::Auto,
+            crate::language::Language::Vietnamese,
+        ));
     crate::language::set_current_language(cfg_lang);
     let is_dark = resolve_is_dark(cfg_theme);
     set_preferred_app_mode(is_dark);
@@ -236,13 +209,15 @@ pub fn init_ui() -> bool {
             return false;
         }
 
+        // Register helper window for Windows session change notifications (lock, unlock, logon)
+        WTSRegisterSessionNotification(h_helper, NOTIFY_FOR_THIS_SESSION);
+
         // 4. Create Tray Handler
         let tray = TrayHandler::new(h_helper);
 
-        // 5. Create Fonts (Segoe UI 9pt normal, 9pt semibold)
-        let hfont_normal = create_app_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_NORMAL);
-        let hfont_bold = create_app_font(crate::ui::tokens::typography::FONT_SIZE_BODY, FW_SEMIBOLD);
-        crate::ui::theme::set_app_fonts(hfont_normal, hfont_bold);
+        // 5. Fonts (Segoe UI 9pt normal, 9pt semibold) from the shared font cache
+        let hfont_normal = crate::ui::theme::get_app_font_normal();
+        let hfont_bold = crate::ui::theme::get_app_font_bold();
 
         // 6. Create Control Panel Window with WS_EX_APPWINDOW to display on Windows Taskbar
         // Ensure client area is exactly 820x590 for 2-column multi-profile layout
@@ -304,7 +279,8 @@ pub fn init_ui() -> bool {
         };
         center_window(h_panel, target_w, target_h);
 
-        // Create all components inside Control Panel
+        // Create all components inside Control Panel (texts use the current language;
+        // data is loaded by `show_control_panel` when the panel is first shown)
         let controls = match ControlPanelControls::create(h_panel, hfont_normal, hfont_bold) {
             Some(c) => c,
             None => {
@@ -313,35 +289,25 @@ pub fn init_ui() -> bool {
             }
         };
 
-        // Load initial config and synchronize language
-        if let Some(ref c) = init_config {
-            controls.load_config(c);
-            controls.update_language(cfg_lang);
-        }
-
         // Apply theme styling across all controls
         apply_ui_theme(h_panel, &controls, is_dark);
 
         // Initial view mode: Profile Tab 0 (Typing)
         controls.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(0));
 
-        let mut ui_guard = UI_MANAGER.lock().unwrap();
-        *ui_guard = Some(UiState {
-            h_helper,
+        // Lives for the rest of the process; leaked once so handlers get a plain `&'static`.
+        let state: &'static UiState = Box::leak(Box::new(UiState {
             h_panel,
-            tray,
+            tray: RefCell::new(tray),
             controls,
-            hfont_normal,
-            hfont_bold,
-        });
-
-        if let Some(ref ui) = *ui_guard {
-            SetWindowLongPtrW(
-                h_panel,
-                GWLP_USERDATA,
-                &ui.controls as *const _ as isize,
-            );
-        }
+        }));
+        SetWindowLongPtrW(
+            h_panel,
+            GWLP_USERDATA,
+            &state.controls as *const _ as isize,
+        );
+        UI.with(|cell| cell.set(Some(state)));
+        HELPER_HWND.store(h_helper, Ordering::Relaxed);
 
         true
     }

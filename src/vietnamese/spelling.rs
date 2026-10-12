@@ -97,7 +97,7 @@ pub fn is_valid_intermediate_vowel_combination(vowels: &[VowelLetter]) -> bool {
             let v1 = (vowels[1].base, vowels[1].diacritic);
             matches!(
                 (v0, v1),
-                // Intermediate typing bases for iê, yê, uô, ươ, uê, ê, êu
+                // Intermediate typing bases for iê, yê, uô, ươ, uê, ê, êu, ưu
                 (
                     (BaseVowel::I, Diacritic::None),
                     (BaseVowel::E, Diacritic::None)
@@ -110,6 +110,9 @@ pub fn is_valid_intermediate_vowel_combination(vowels: &[VowelLetter]) -> bool {
                 ) | (
                     (BaseVowel::U, Diacritic::None),
                     (BaseVowel::E, Diacritic::None)
+                ) | (
+                    (BaseVowel::U, Diacritic::None),
+                    (BaseVowel::U, Diacritic::None)
                 ) | (
                     (BaseVowel::E, Diacritic::None),
                     (BaseVowel::E, Diacritic::None)

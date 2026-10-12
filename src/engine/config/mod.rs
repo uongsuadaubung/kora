@@ -48,7 +48,7 @@ pub struct EngineConfig {
     /// Bật/tắt âm thanh phím cơ
     pub sound_enabled: bool,
     /// Tên profile switch phím cơ (tương ứng với tên thư mục trong ~/.config/kora/switches/)
-    pub sound_profile: String,
+    pub sound_profile: std::sync::Arc<str>,
     /// Âm lượng phím cơ (0% - 100%)
     pub sound_volume: u8,
 
@@ -64,7 +64,7 @@ pub struct EngineConfig {
     /// Bật chế độ debug log (ghi nhận vết từng phím, trạng thái state machine và output)
     pub debug: bool,
     /// Đường dẫn file lưu nhật ký debug log trên ổ đĩa
-    pub debug_file_path: Option<String>,
+    pub debug_file_path: Option<std::sync::Arc<str>>,
 }
 
 impl Default for EngineConfig {
@@ -83,14 +83,14 @@ impl Default for EngineConfig {
             switch_key_enabled: true,
             switch_key: Hotkey::default(),
             switch_with_ctrl_shift: true,
-            remap_enabled: true,
-            disable_enabled: true,
+            remap_enabled: false,
+            disable_enabled: false,
             sound_enabled: false,
-            sound_profile: "Holy Panda".to_string(),
+            sound_profile: std::sync::Arc::from("Holy Panda"),
             sound_volume: 50,
             show_dialog_on_startup: true,
             debug: false,
-            debug_file_path: Some("kora_debug.log".to_string()),
+            debug_file_path: Some(std::sync::Arc::from("kora_debug.log")),
         }
     }
 }

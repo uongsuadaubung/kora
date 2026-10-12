@@ -30,6 +30,7 @@ use crate::ui::components::*;
 use crate::ui::win32::{InvalidateRect, MEASUREITEMSTRUCT};
 pub use crate::ui::tokens::id::*;
 pub use crate::ui::tokens::layout::*;
+use std::cell::Cell;
 use std::ptr::null_mut;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,13 +51,23 @@ pub struct ControlPanelControls {
     pub tab_system: TabSystem,
     pub tab_about: TabAbout,
     pub footer: FooterControls,
-    pub current_view_mode: std::sync::RwLock<ViewMode>,
+    pub current_view_mode: Cell<ViewMode>,
+}
+
+/// Engine data needed to populate the panel, copied out under one short lock.
+struct EngineSnapshot {
+    config: EngineConfig,
+    selected: AppProfile,
+    all_profiles: Vec<AppProfile>,
+    remaps: Vec<crate::engine::profile::ResolvedRemapItem>,
+    disabled: Vec<crate::engine::profile::ResolvedDisableItem>,
+    macros: Vec<crate::engine::profile::ResolvedMacroItem>,
 }
 
 impl ControlPanelControls {
     pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
         let sidebar = SidebarControls::create(parent, hfont_normal, hfont_bold)?;
-        let banner = ProfileBanner::create(parent, hfont_normal, hfont_bold)?;
+        let banner = ProfileBanner::create(parent, hfont_normal)?;
 
         let strings = crate::language::current();
         let tab_bar = TabBar::create(
@@ -90,121 +101,76 @@ impl ControlPanelControls {
             tab_system,
             tab_about,
             footer,
-            current_view_mode: std::sync::RwLock::new(ViewMode::Profile(0)),
+            current_view_mode: Cell::new(ViewMode::Profile(0)),
         })
     }
 
     pub fn get_view_mode(&self) -> ViewMode {
-        self.current_view_mode
-            .read()
-            .map(|g| *g)
-            .unwrap_or(ViewMode::Profile(0))
+        self.current_view_mode.get()
     }
 
     /// Dynamically switches visibility between Profile Subtabs, System Settings, and About
     pub fn update_view_mode(&self, mode: ViewMode) {
-        if let Ok(mut lock) = self.current_view_mode.write() {
-            *lock = mode;
-        }
+        self.current_view_mode.set(mode);
         self.sidebar.set_view_mode(mode);
-        match mode {
-            ViewMode::Profile(subtab) => {
-                self.banner.set_visible(true);
-                self.tab_bar.set_visible(true);
-                self.tab_typing.update_visibility(subtab == 0);
-                self.tab_remap.update_visibility(subtab == 1);
-                self.tab_sound.update_visibility(subtab == 2);
-                self.tab_macro.update_visibility(subtab == 3);
-                self.tab_system.update_visibility(false);
-                self.tab_about.update_visibility(false);
-            }
-            ViewMode::SystemSettings => {
-                self.banner.set_visible(false);
-                self.tab_bar.set_visible(false);
-                self.tab_typing.update_visibility(false);
-                self.tab_remap.update_visibility(false);
-                self.tab_sound.update_visibility(false);
-                self.tab_macro.update_visibility(false);
-                self.tab_system.update_visibility(true);
-                self.tab_about.update_visibility(false);
-            }
-            ViewMode::About => {
-                self.banner.set_visible(false);
-                self.tab_bar.set_visible(false);
-                self.tab_typing.update_visibility(false);
-                self.tab_remap.update_visibility(false);
-                self.tab_sound.update_visibility(false);
-                self.tab_macro.update_visibility(false);
-                self.tab_system.update_visibility(false);
-                self.tab_about.update_visibility(true);
-            }
-        }
+        let subtab = match mode {
+            ViewMode::Profile(t) => Some(t),
+            _ => None,
+        };
+        let is_profile = subtab.is_some();
+        self.banner.set_visible(is_profile);
+        self.tab_bar.set_visible(is_profile);
+        self.tab_typing.update_visibility(subtab == Some(0));
+        self.tab_remap.update_visibility(subtab == Some(1));
+        self.tab_sound.update_visibility(subtab == Some(2));
+        self.tab_macro.update_visibility(subtab == Some(3));
+        self.tab_system.update_visibility(mode == ViewMode::SystemSettings);
+        self.tab_about.update_visibility(mode == ViewMode::About);
         unsafe {
             InvalidateRect(self.sidebar.btn_system_settings.hwnd(), null_mut(), 0);
             InvalidateRect(self.sidebar.btn_about.hwnd(), null_mut(), 0);
         }
     }
 
-    pub fn update_tab_visibility(&self, cur_tab: usize) {
-        self.update_view_mode(ViewMode::Profile(cur_tab));
-    }
-
-    pub fn populate_macros(&self, macros: &[crate::engine::macro_table::MacroEntry]) {
-        self.tab_macro.populate_macros(macros);
-    }
-
     pub fn populate_macro_items(&self, items: &[crate::engine::profile::ResolvedMacroItem]) {
         self.tab_macro.populate_macro_items(items);
     }
 
-    pub fn update_sound_controls_state(&self) {
-        self.tab_sound.update_sound_controls_state();
-    }
+    /// Snapshots the engine state under a short lock, then loads it into every view
+    /// (sidebar, banner, all tabs, lists). Does not change the view mode.
+    /// Must be called without holding `ENGINE_INSTANCE`. Returns the global config.
+    pub fn refresh_from_engine(&self) -> Option<EngineConfig> {
+        let snap = {
+            let guard = crate::platform::win32::ENGINE_INSTANCE.lock().ok()?;
+            let engine = guard.as_ref()?;
+            let pm = &engine.profile_manager;
+            let sel_id = pm.selected_id.as_str();
+            EngineSnapshot {
+                config: engine.config().clone(),
+                selected: pm
+                    .get_profile(sel_id)
+                    .cloned()
+                    .unwrap_or_else(|| pm.global_profile.clone()),
+                all_profiles: pm.all_profiles().into_iter().cloned().collect(),
+                remaps: pm.resolve_remap_items_for_ui(sel_id),
+                disabled: pm.resolve_disable_items_for_ui(sel_id),
+                macros: pm.resolve_macro_items_for_ui(sel_id, &engine.macro_table.get_sorted_entries()),
+            }
+        };
 
-    pub fn update_macro_checkboxes_state(&self) {
-        self.tab_macro.update_macro_checkboxes_state();
-    }
-
-
-    /// Populates current selected profile state into the UI
-    pub fn load_profile_data(
-        &self,
-        profile: &AppProfile,
-        is_active: bool,
-        global_config: &EngineConfig,
-        all_profiles: &[&AppProfile],
-        active_id: &str,
-    ) {
-        self.sidebar
-            .populate_profiles(all_profiles, &profile.id, active_id);
-        self.banner.update_profile(profile, is_active);
-        self.tab_typing.load_profile(profile, global_config);
-        self.tab_remap.load_profile(profile, global_config);
-        self.tab_sound.load_profile(profile, global_config);
-        self.tab_macro.load_profile(profile, global_config);
-        self.tab_system.load_config(global_config);
-    }
-
-    pub fn load_config(&self, config: &EngineConfig) {
-        self.tab_typing.load_config(config);
-        self.tab_remap.load_config(config);
-        self.tab_sound.load_config(config);
-        self.tab_macro.load_config(config);
-        self.tab_system.load_config(config);
-    }
-
-    pub fn read_config(&self, config: &mut EngineConfig) {
-        self.tab_typing.read_config(config);
-        self.tab_remap.read_config(config);
-        self.tab_sound.read_config(config);
-        self.tab_macro.read_config(config);
-        self.tab_system.read_config(config);
-    }
-
-    pub fn read_profile(&self, profile: &mut AppProfile) {
-        self.tab_typing.read_profile(profile);
-        self.tab_remap.read_profile(profile);
-        self.tab_sound.read_profile(profile, false);
+        let all_refs: Vec<&AppProfile> = snap.all_profiles.iter().collect();
+        let (profile, cfg) = (&snap.selected, &snap.config);
+        self.sidebar.populate_profiles(&all_refs, &profile.id);
+        self.banner.update_profile(profile);
+        self.tab_typing.load_profile(profile, cfg);
+        self.tab_remap.load_profile(profile, cfg);
+        self.tab_sound.load_profile(profile, cfg);
+        self.tab_macro.load_profile(profile, cfg);
+        self.tab_system.load_config(cfg);
+        self.tab_remap.populate_remaps(&snap.remaps);
+        self.tab_remap.populate_disabled(&snap.disabled);
+        self.populate_macro_items(&snap.macros);
+        Some(snap.config)
     }
 
     pub fn update_language(&self, lang: Language) {
@@ -281,7 +247,7 @@ impl ControlPanelControls {
         if self.footer.on_command(hwnd, ctrl_id, self) {
             return true;
         }
-        if self.banner.on_command(hwnd, ctrl_id, self) {
+        if self.banner.on_command(hwnd, ctrl_id) {
             return true;
         }
         if self.sidebar.on_command(hwnd, ctrl_id, notify_code, self) {
@@ -309,8 +275,8 @@ impl ControlPanelControls {
     }
 
     /// Master dispatcher for WM_HSCROLL across all components
-    pub fn on_hscroll(&self, slider_hwnd: isize) -> bool {
-        self.tab_sound.on_hscroll(slider_hwnd)
+    pub fn on_hscroll(&self, wparam: usize, slider_hwnd: isize) -> bool {
+        self.tab_sound.on_hscroll(wparam, slider_hwnd)
     }
 
     /// Master dispatcher for WM_MEASUREITEM across all components

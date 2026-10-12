@@ -116,6 +116,128 @@ impl SyllableState {
         }
     }
 
+    /// Checks whether this state represents an unambiguous, completed Vietnamese syllable
+    /// that must NEVER be destructively rolled back into raw keys when an invalid key arrives.
+    ///
+    /// When an extra character arrives after an unambiguous Vietnamese syllable (e.g. "nấu" + 'c' -> "nấuc",
+    /// "hiện" + 'e' -> "hiệne", "bạn" + 'k' -> "bạnk", "được" + 'w' -> "đượcw"),
+    /// the syllable is preserved as passthrough so that hitting Backspace immediately restores
+    /// the original Vietnamese word without screen flicker or raw key destruction.
+    pub fn is_unambiguous_completed_vietnamese(&self) -> bool {
+        if !self.is_valid_spelling() {
+            return false;
+        }
+
+        let (nucleus, coda) = match self {
+            SyllableState::Nucleus(n) => (n, &[][..]),
+            SyllableState::Coda(c) => (&c.nucleus, c.coda.as_slice()),
+            _ => return false,
+        };
+
+        let onset = nucleus.onset.as_ref();
+        let vowels = &nucleus.vowels;
+        let tone = nucleus.tone;
+
+        // 1. D-stroke ('đ'): purely Vietnamese, impossible in English.
+        if onset.is_some_and(|o| o.is_d_stroke) {
+            return true;
+        }
+
+        // 2. Horn ('ơ', 'ư') or Breve ('ă'): purely Vietnamese diacritics.
+        // Exception for English words starting with 'w' (which Telex interprets as standalone 'ư'):
+        // When onset is None, words starting with 'w' are English unless they form a valid Vietnamese
+        // word (with coda like "ước", "ương", or "ưa", or with tone like "ừ", "ứ").
+        // Bare 'w' in "what", "write", "win", "word", "work" must rollback cleanly.
+        if vowels.iter().any(|v| {
+            matches!(
+                v.diacritic,
+                Diacritic::Horn | Diacritic::Breve
+            )
+        }) {
+            if onset.is_none() && vowels[0].base == BaseVowel::U && vowels[0].diacritic == Diacritic::Horn {
+                if coda.is_empty() {
+                    let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
+                    let is_valid_standalone_u = vowels.len() == 1
+                        && matches!(tone, Tone::Grave | Tone::Acute);
+                    if !is_ua && !is_valid_standalone_u {
+                        return false;
+                    }
+                }
+            } else {
+                let is_bare_uo_horn = vowels.len() == 2
+                    && vowels[0].base == BaseVowel::U
+                    && vowels[0].diacritic == Diacritic::Horn
+                    && vowels[1].base == BaseVowel::O
+                    && vowels[1].diacritic == Diacritic::Horn;
+
+                if is_bare_uo_horn && coda.is_empty() {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // 3. Circumflex on 'A' ('â' from Telex 'aa' / VNI '6'): purely Vietnamese.
+        if vowels.iter().any(|v| {
+            v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex
+        }) {
+            return true;
+        }
+
+        // 4. Tone DotBelow (nặng / Telex 'j' / VNI '5'): purely Vietnamese.
+        if tone == Tone::DotBelow {
+            return true;
+        }
+
+        // 5. Circumflex on 'E' or 'O' ('ê', 'ô'):
+        // In English, 'ee' and 'oo' are common (e.g. "meet", "good", "cool").
+        // But once 'ê' or 'ô' has a tone (e.g. "bố", "đến", "mến") or a coda (e.g. "công", "tiếng", "bông"),
+        // it cannot be an English 'good' or 'meet'!
+        if vowels.iter().any(|v| {
+            matches!(v.base, BaseVowel::E | BaseVowel::O) && v.diacritic == Diacritic::Circumflex
+        }) && (tone != Tone::None || !coda.is_empty())
+        {
+            return true;
+        }
+
+        // 6. Vietnamese Diphthong / Triphthong with Tone (e.g. "nấu", "mái", "chào", "nghỉ", "ngày"):
+        // English words with two plain vowels like "mail", "boat", "coin" have Tone::None.
+        // A multi-vowel syllable with a tone is unambiguous Vietnamese.
+        if vowels.len() >= 2 && tone != Tone::None {
+            if onset.is_none()
+                && vowels[0].base == BaseVowel::U
+                && coda.is_empty()
+                && vowels[1].base != BaseVowel::A
+            {
+                return false;
+            }
+            let is_bare_uo = vowels.len() == 2
+                && vowels[0].base == BaseVowel::U
+                && vowels[1].base == BaseVowel::O;
+
+            if !(is_bare_uo && coda.is_empty()) {
+                return true;
+            }
+        }
+
+        // 7. Completed Coda with Tone (e.g. "bóng", "sách", "toán", "chính", "mát"):
+        // Exception: English '-st' words (e.g. "test", "list", "post") where a single plain vowel
+        // was marked with acute tone 's' followed by coda 't' (e.g. "tét" in "testing", "lít" in "listing").
+        if !coda.is_empty() && tone != Tone::None {
+            let is_english_st_pattern = vowels.len() == 1
+                && vowels[0].diacritic == Diacritic::None
+                && tone == Tone::Acute
+                && coda.len() == 1
+                && coda[0].0.eq_ignore_ascii_case(&'t');
+
+            if !is_english_st_pattern {
+                return true;
+            }
+        }
+
+        false
+    }
+
     /// Converts this state into a Syllable for validation, if it is a structured syllable state
     pub fn to_syllable(&self) -> Option<Syllable> {
         match self {

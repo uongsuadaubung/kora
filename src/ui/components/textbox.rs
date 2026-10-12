@@ -124,7 +124,7 @@ unsafe extern "system" fn container_subclass_proc(
         let parent = unsafe { GetParent(hwnd) };
         if parent != 0 {
             let code = (wparam >> 16) as u16;
-            let id = uid_subclass as u16;
+            let id = unsafe { GetDlgCtrlID(hwnd) } as u16;
             let new_wparam = ((code as usize) << 16) | (id as usize);
             unsafe {
                 SendMessageW(parent, WM_COMMAND, new_wparam, hwnd);
@@ -407,6 +407,7 @@ impl TextBox {
     }
 
     /// Declarative helper: creates a TextBox with a placeholder in 1 line
+    #[allow(clippy::too_many_arguments)]
     pub fn create_with_placeholder(
         parent: isize,
         id: u32,
@@ -422,10 +423,6 @@ impl TextBox {
 
     pub fn hwnd(&self) -> isize {
         self.container_hwnd
-    }
-
-    pub fn inner_hwnd(&self) -> isize {
-        self.inner_hwnd
     }
 
     pub fn id(&self) -> u32 {
@@ -446,6 +443,14 @@ impl TextBox {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        unsafe { GetWindowTextLengthW(self.inner_hwnd) == 0 }
+    }
+
+    pub fn clear(&self) {
+        self.set_text("");
+    }
+
     pub fn set_text(&self, text: &str) {
         let wide = to_wide(text);
         unsafe {
@@ -458,47 +463,6 @@ impl TextBox {
         let wide = to_wide(text);
         unsafe {
             SendMessageW(self.inner_hwnd, WM_SET_CUE_BANNER, 0, wide.as_ptr() as isize);
-        }
-    }
-
-    #[inline]
-    pub fn set_placeholder(&self, placeholder: &str) {
-        self.set_cue_banner(placeholder);
-    }
-
-    pub fn clear(&self) {
-        self.set_text("");
-    }
-
-    pub fn is_empty(&self) -> bool {
-        unsafe { GetWindowTextLengthW(self.inner_hwnd) == 0 }
-    }
-
-    pub fn select_all(&self) {
-        const EM_SETSEL: u32 = 0x00B1;
-        unsafe {
-            SendMessageW(self.inner_hwnd, EM_SETSEL, 0, -1);
-        }
-    }
-
-    pub fn set_enabled(&self, enabled: bool) {
-        unsafe {
-            EnableWindow(self.container_hwnd, enabled as i32);
-            EnableWindow(self.inner_hwnd, enabled as i32);
-        }
-    }
-
-    pub fn is_enabled(&self) -> bool {
-        unsafe { IsWindowEnabled(self.inner_hwnd) != 0 }
-    }
-
-    pub fn is_visible(&self) -> bool {
-        unsafe { IsWindowVisible(self.container_hwnd) != 0 }
-    }
-
-    pub fn set_visible(&self, visible: bool) {
-        unsafe {
-            ShowWindow(self.container_hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
     }
 }
