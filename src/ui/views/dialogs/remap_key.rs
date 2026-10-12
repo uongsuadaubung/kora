@@ -152,22 +152,7 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
     unsafe {
         match msg {
             WM_CREATE => {
-                let hfont_large = CreateFontW(
-                    20,
-                    0,
-                    0,
-                    0,
-                    700,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    0,
-                    5,
-                    0,
-                    to_wide("Segoe UI").as_ptr(),
-                );
+                let hfont_large = super::base::create_display_font();
                 DISPLAY_FONT.store(hfont_large, Ordering::SeqCst);
 
                 let strings = crate::language::current();
@@ -185,7 +170,6 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 );
                 if let Some(ref btn) = btn_from {
                     btn.set_custom_drawer(move |dis, is_dark| {
-                        let palette = ThemePalette::get(is_dark);
                         let (is_listening, vk_opt) = STATE
                             .lock()
                             .ok()
@@ -194,70 +178,18 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                             })
                             .unwrap_or((false, None));
 
-                        // 0. Erase background of the button with dialog background to eliminate white corners
-                        let br_bg = CreateSolidBrush(palette.bg_window);
-                        FillRect(dis.hdc, &dis.rc_item, br_bg);
-                        DeleteObject(br_bg);
-
-                        let bg_color = if is_listening {
-                            if is_dark { 0x003A2810 } else { 0x00F8EFEA }
-                        } else {
-                            palette.bg_input
-                        };
-
-                        let brush = CreateSolidBrush(bg_color);
-                        let pen = CreatePen(PS_SOLID, borders::WIDTH_FOCUS, palette.accent);
-                        let prev_brush = SelectObject(dis.hdc, brush);
-                        let prev_pen = SelectObject(dis.hdc, pen);
-
-                        RoundRect(
-                            dis.hdc,
-                            dis.rc_item.left,
-                            dis.rc_item.top,
-                            dis.rc_item.right,
-                            dis.rc_item.bottom,
-                            radii::RADIUS_MD,
-                            radii::RADIUS_MD,
-                        );
-
-                        SelectObject(dis.hdc, prev_brush);
-                        SelectObject(dis.hdc, prev_pen);
-                        DeleteObject(brush);
-                        DeleteObject(pen);
-
-                        SetBkMode(dis.hdc, TRANSPARENT);
                         let strings = crate::language::current();
-                        let (text_color, text) = if is_listening {
-                            (palette.accent, strings.dlg_remap_listening)
+                        let (text, is_placeholder) = if is_listening {
+                            (strings.dlg_remap_listening, false)
                         } else if let Some(vk) = vk_opt {
                             let name = vk_to_name(vk);
-                            let t = if name.is_empty() { "Key" } else { name };
-                            (palette.accent, t)
+                            (if name.is_empty() { "Key" } else { name }, false)
                         } else {
-                            (palette.text_secondary, strings.dlg_remap_unassigned)
+                            (strings.dlg_remap_unassigned, true)
                         };
-                        SetTextColor(dis.hdc, text_color);
 
                         let font = DISPLAY_FONT.load(Ordering::SeqCst);
-                        let prev_font = if font != 0 {
-                            SelectObject(dis.hdc, font)
-                        } else {
-                            0
-                        };
-
-                        let wide_text = to_wide(text);
-                        let mut rc = dis.rc_item;
-                        DrawTextW(
-                            dis.hdc,
-                            wide_text.as_ptr(),
-                            -1,
-                            &mut rc,
-                            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-                        );
-
-                        if prev_font != 0 {
-                            SelectObject(dis.hdc, prev_font);
-                        }
+                        super::base::draw_key_box(dis, is_dark, is_listening, text, is_placeholder, false, font);
                         true
                     });
                 }
@@ -275,7 +207,6 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 );
                 if let Some(ref btn) = btn_to {
                     btn.set_custom_drawer(move |dis, is_dark| {
-                        let palette = ThemePalette::get(is_dark);
                         let (is_listening, vk_opt) = STATE
                             .lock()
                             .ok()
@@ -284,70 +215,18 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                             })
                             .unwrap_or((false, None));
 
-                        // 0. Erase background of the button with dialog background to eliminate white corners
-                        let br_bg = CreateSolidBrush(palette.bg_window);
-                        FillRect(dis.hdc, &dis.rc_item, br_bg);
-                        DeleteObject(br_bg);
-
-                        let bg_color = if is_listening {
-                            if is_dark { 0x003A2810 } else { 0x00F8EFEA }
-                        } else {
-                            palette.bg_input
-                        };
-
-                        let brush = CreateSolidBrush(bg_color);
-                        let pen = CreatePen(PS_SOLID, borders::WIDTH_FOCUS, palette.accent);
-                        let prev_brush = SelectObject(dis.hdc, brush);
-                        let prev_pen = SelectObject(dis.hdc, pen);
-
-                        RoundRect(
-                            dis.hdc,
-                            dis.rc_item.left,
-                            dis.rc_item.top,
-                            dis.rc_item.right,
-                            dis.rc_item.bottom,
-                            radii::RADIUS_MD,
-                            radii::RADIUS_MD,
-                        );
-
-                        SelectObject(dis.hdc, prev_brush);
-                        SelectObject(dis.hdc, prev_pen);
-                        DeleteObject(brush);
-                        DeleteObject(pen);
-
-                        SetBkMode(dis.hdc, TRANSPARENT);
                         let strings = crate::language::current();
-                        let (text_color, text) = if is_listening {
-                            (palette.accent, strings.dlg_remap_listening)
+                        let (text, is_placeholder) = if is_listening {
+                            (strings.dlg_remap_listening, false)
                         } else if let Some(vk) = vk_opt {
                             let name = vk_to_name(vk);
-                            let t = if name.is_empty() { "Key" } else { name };
-                            (palette.accent, t)
+                            (if name.is_empty() { "Key" } else { name }, false)
                         } else {
-                            (palette.text_secondary, strings.dlg_remap_unassigned)
+                            (strings.dlg_remap_unassigned, true)
                         };
-                        SetTextColor(dis.hdc, text_color);
 
                         let font = DISPLAY_FONT.load(Ordering::SeqCst);
-                        let prev_font = if font != 0 {
-                            SelectObject(dis.hdc, font)
-                        } else {
-                            0
-                        };
-
-                        let wide_text = to_wide(text);
-                        let mut rc = dis.rc_item;
-                        DrawTextW(
-                            dis.hdc,
-                            wide_text.as_ptr(),
-                            -1,
-                            &mut rc,
-                            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-                        );
-
-                        if prev_font != 0 {
-                            SelectObject(dis.hdc, prev_font);
-                        }
+                        super::base::draw_key_box(dis, is_dark, is_listening, text, is_placeholder, false, font);
                         true
                     });
                 }

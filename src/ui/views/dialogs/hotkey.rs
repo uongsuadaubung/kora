@@ -156,22 +156,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
     unsafe {
         match msg {
             WM_CREATE => {
-                let hfont_large = CreateFontW(
-                    20,
-                    0,
-                    0,
-                    0,
-                    700,
-                    0,
-                    0,
-                    0,
-                    1,
-                    0,
-                    0,
-                    5,
-                    0,
-                    to_wide("Segoe UI").as_ptr(),
-                );
+                let hfont_large = super::base::create_display_font();
                 DISPLAY_FONT.store(hfont_large, Ordering::SeqCst);
 
                 let strings = crate::language::current();
@@ -189,7 +174,6 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                 );
                 if let Some(ref btn) = btn_display {
                     btn.set_custom_drawer(move |dis, is_dark| {
-                        let palette = ThemePalette::get(is_dark);
                         let (is_listening, text) = STATE
                             .lock()
                             .ok()
@@ -198,63 +182,8 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             })
                             .unwrap_or((false, "Ctrl + Shift".to_string()));
 
-                        let bg_color = if is_listening {
-                            if is_dark {
-                                0x003A2810 // Subtle dark cyan/blue tint
-                            } else {
-                                0x00F8EFEA // Light soft blue tint
-                            }
-                        } else {
-                            palette.bg_input
-                        };
-
-                        let br_bg = CreateSolidBrush(palette.bg_window);
-                        FillRect(dis.hdc, &dis.rc_item, br_bg);
-                        DeleteObject(br_bg);
-
-                        let brush = CreateSolidBrush(bg_color);
-                        let pen = CreatePen(PS_SOLID, borders::WIDTH_FOCUS, palette.accent);
-                        let prev_brush = SelectObject(dis.hdc, brush);
-                        let prev_pen = SelectObject(dis.hdc, pen);
-
-                        RoundRect(
-                            dis.hdc,
-                            dis.rc_item.left,
-                            dis.rc_item.top,
-                            dis.rc_item.right,
-                            dis.rc_item.bottom,
-                            radii::RADIUS_MD,
-                            radii::RADIUS_MD,
-                        );
-
-                        SelectObject(dis.hdc, prev_brush);
-                        SelectObject(dis.hdc, prev_pen);
-                        DeleteObject(brush);
-                        DeleteObject(pen);
-
-                        SetBkMode(dis.hdc, TRANSPARENT);
-                        SetTextColor(dis.hdc, palette.accent);
-
                         let font = DISPLAY_FONT.load(Ordering::SeqCst);
-                        let prev_font = if font != 0 {
-                            SelectObject(dis.hdc, font)
-                        } else {
-                            0
-                        };
-
-                        let mut rc = dis.rc_item;
-                        let wide_text = to_wide(&text);
-                        DrawTextW(
-                            dis.hdc,
-                            wide_text.as_ptr(),
-                            -1,
-                            &mut rc,
-                            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-                        );
-
-                        if prev_font != 0 {
-                            SelectObject(dis.hdc, prev_font);
-                        }
+                        super::base::draw_key_box(dis, is_dark, is_listening, &text, false, false, font);
                         true
                     });
                 }

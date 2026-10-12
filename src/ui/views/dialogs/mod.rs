@@ -1,6 +1,7 @@
 //! Modal Dialog Views for Kora UI
 
 pub mod add_profile;
+pub mod base;
 pub mod confirm;
 pub mod disable_key;
 pub mod hotkey;
@@ -8,6 +9,7 @@ pub mod macro_editor;
 pub mod remap_key;
 
 pub use add_profile::show_add_profile_dialog;
+pub use base::*;
 pub use confirm::{show_confirm_dialog, ConfirmDialogOptions};
 pub use disable_key::show_disable_dialog;
 pub use hotkey::show_hotkey_dialog;
