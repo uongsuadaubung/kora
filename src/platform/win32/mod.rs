@@ -5,6 +5,7 @@ pub mod app_detect;
 pub mod app_tracker;
 pub mod capture;
 pub mod injector;
+pub mod macro_executor;
 pub mod sound;
 pub mod types;
 
@@ -12,6 +13,7 @@ pub use app_detect::*;
 pub use app_tracker::*;
 pub use capture::*;
 pub use injector::*;
+pub use macro_executor::*;
 pub use sound::*;
 pub use types::*;
 
@@ -187,17 +189,24 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
 
             let vk = hook_struct.vk_code;
 
-            // Handle single key capture mode for Remap / Key Dialogs.
-            if let Some(res) = capture::handle_remap_capture(vk, w_param) {
-                return res;
+            // ========================================================================
+            // EXCLUSIVE CAPTURE SANDBOX:
+            // When any capture mode is active and the capture dialog is active,
+            // 100% of keystrokes are intercepted and swallowed.
+            // NO internal hotkey (switch mode), NO key macro, NO remap, NO disable,
+            // NO Vietnamese typing engine, and NO Windows system shortcut can trigger!
+            // ========================================================================
+            if capture::is_any_capture_active() && capture::is_capture_dialog_active() {
+                if let Some(res) = capture::handle_single_key_capture(vk, w_param) {
+                    return res;
+                }
+                if let Some(res) = capture::handle_combo_capture(vk, w_param) {
+                    return res;
+                }
+                return 1;
             }
 
-            // Handle hotkey capture mode for HotkeyCaptureDialog
-            if let Some(res) = capture::handle_hotkey_capture(vk, w_param) {
-                return res;
-            }
-
-            let (is_disabled, remap_target, switch_key_enabled, switch_key) =
+            let (is_disabled, remap_target, macro_actions, switch_key_enabled, switch_key) =
                 if let Ok(guard) = ENGINE_INSTANCE.lock() {
                     if let Some(ref engine) = *guard {
                         let eff_cfg = engine.effective_config();
@@ -207,12 +216,21 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                             .into_iter()
                             .find(|r| r.from_vk == vk)
                             .map(|r| r.to_vk);
-                        (disabled, remap, eff_cfg.switch_key_enabled, eff_cfg.switch_key)
+                        let key_macro = if eff_cfg.key_macro_enabled {
+                            engine
+                                .effective_key_macros()
+                                .into_iter()
+                                .find(|m| m.trigger_vk == vk)
+                                .map(|m| m.actions)
+                        } else {
+                            None
+                        };
+                        (disabled, remap, key_macro, eff_cfg.switch_key_enabled, eff_cfg.switch_key)
                     } else {
-                        (false, None, true, crate::engine::config::Hotkey::default())
+                        (false, None, None, true, crate::engine::config::Hotkey::default())
                     }
                 } else {
-                    (false, None, true, crate::engine::config::Hotkey::default())
+                    (false, None, None, true, crate::engine::config::Hotkey::default())
                 };
 
             // 1. Intercept Key Disabling: swallow event completely
@@ -224,6 +242,15 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
             if let Some(target_vk) = remap_target {
                 let is_up = w_param == WM_KEYUP || w_param == WM_SYSKEYUP;
                 send_vk_event(target_vk, is_up);
+                return 1;
+            }
+
+            // 3. Intercept Key Macro: swallow original event and trigger macro asynchronously
+            if let Some(actions) = macro_actions {
+                let is_down = w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN;
+                if is_down {
+                    macro_executor::execute_actions(actions);
+                }
                 return 1;
             }
 

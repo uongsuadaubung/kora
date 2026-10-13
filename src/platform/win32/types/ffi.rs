@@ -28,6 +28,9 @@ pub type WINEVENTPROC = unsafe extern "system" fn(
 // ============================================================================
 pub const WH_KEYBOARD_LL: i32 = 13;
 pub const WH_MOUSE_LL: i32 = 14;
+pub const GA_PARENT: u32 = 1;
+pub const GA_ROOT: u32 = 2;
+pub const GA_ROOTOWNER: u32 = 3;
 
 #[link(name = "user32")]
 unsafe extern "system" {
@@ -59,6 +62,7 @@ unsafe extern "system" {
 
     // --- Quản lý cửa sổ & Luồng ứng dụng ---
     pub fn GetForegroundWindow() -> isize;
+    pub fn GetAncestor(hWnd: isize, gaFlags: u32) -> isize;
     pub fn GetWindowThreadProcessId(hWnd: isize, lpdwProcessId: *mut u32) -> u32;
     pub fn GetGUIThreadInfo(idThread: u32, pgui: *mut GUITHREADINFO) -> i32;
     pub fn GetClassNameW(hWnd: isize, lpClassName: *mut u16, nMaxCount: i32) -> i32;

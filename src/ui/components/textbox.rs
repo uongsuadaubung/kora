@@ -32,7 +32,6 @@ unsafe extern "system" {
 const WS_CHILD: u32 = 0x40000000;
 const WS_VISIBLE: u32 = 0x10000000;
 const WS_TABSTOP: u32 = 0x00010000;
-const WS_CLIPCHILDREN: u32 = 0x02000000;
 const ES_AUTOHSCROLL: u32 = 0x0080;
 const WM_SETFONT: u32 = 0x0030;
 
@@ -56,6 +55,7 @@ unsafe extern "system" fn container_subclass_proc(
     const WM_SETCURSOR: u32 = 0x0020;
     const WM_SETFOCUS: u32 = 0x0007;
     const WM_CTLCOLOREDIT: u32 = 0x0133;
+    const WM_CTLCOLORSTATIC: u32 = 0x0138;
     const WM_GETTEXT: u32 = 0x000D;
     const WM_GETTEXTLENGTH: u32 = 0x000E;
     const WM_SETTEXT: u32 = 0x000C;
@@ -106,7 +106,7 @@ unsafe extern "system" fn container_subclass_proc(
         return unsafe { SendMessageW(data.inner_edit, msg, wparam, lparam) };
     }
 
-    if msg == WM_CTLCOLOREDIT {
+    if msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORSTATIC {
         let hdc = wparam as isize;
         let is_dark = crate::ui::is_current_dark();
         let palette = crate::ui::colors::ThemePalette::get(is_dark);
@@ -117,6 +117,7 @@ unsafe extern "system" fn container_subclass_proc(
             if br != 0 {
                 return br;
             }
+            return CreateSolidBrush(palette.bg_input);
         }
     }
 
@@ -217,6 +218,7 @@ unsafe extern "system" fn edit_subclass_proc(
     const WM_KILLFOCUS: u32 = 0x0008;
     const WM_NCDESTROY: u32 = 0x0082;
     const WM_SET_CUE_BANNER: u32 = 0x8000 + 10;
+    const EM_SETCUEBANNER: u32 = 0x1501;
 
     if msg == WM_NCDESTROY {
         if ref_data != 0 {
@@ -237,6 +239,9 @@ unsafe extern "system" fn edit_subclass_proc(
     if msg == WM_SET_CUE_BANNER {
         let text_ptr = lparam as *const u16;
         if !text_ptr.is_null() {
+            unsafe {
+                SendMessageW(hwnd, EM_SETCUEBANNER, 1, lparam);
+            }
             let mut len = 0;
             while unsafe { *text_ptr.add(len) } != 0 {
                 len += 1;
@@ -262,7 +267,7 @@ unsafe extern "system" fn edit_subclass_proc(
 
     if msg == WM_PAINT {
         let res = unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
-        if !data.cue.is_empty() {
+        if !data.cue.is_empty() && data.cue.first().copied().unwrap_or(0) != 0 {
             unsafe {
                 if GetWindowTextLengthW(hwnd) == 0 && GetFocus() != hwnd {
                     let hdc = GetDC(hwnd);
@@ -271,18 +276,29 @@ unsafe extern "system" fn edit_subclass_proc(
                         let palette = crate::ui::colors::ThemePalette::get(is_dark);
                         let mut rc = RECT::default();
                         GetClientRect(hwnd, &mut rc);
+
+                        // Clear background cleanly first so font anti-aliasing NEVER accumulates or blurs on hover!
+                        let bg_brush = CreateSolidBrush(palette.bg_input);
+                        FillRect(hdc, &rc, bg_brush);
+                        DeleteObject(bg_brush);
+
                         SetBkMode(hdc, TRANSPARENT);
                         SetTextColor(hdc, palette.text_secondary);
-                        if data.font != 0 {
-                            SelectObject(hdc, data.font);
-                        }
+                        let old_font = if data.font != 0 {
+                            SelectObject(hdc, data.font)
+                        } else {
+                            0
+                        };
                         DrawTextW(
                             hdc,
                             data.cue.as_ptr(),
-                            data.cue.len() as i32 - 1,
+                            -1,
                             &mut rc,
-                            DT_VCENTER | DT_SINGLELINE,
+                            DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                         );
+                        if old_font != 0 {
+                            SelectObject(hdc, old_font);
+                        }
                         ReleaseDC(hwnd, hdc);
                     }
                 }
@@ -294,6 +310,7 @@ unsafe extern "system" fn edit_subclass_proc(
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
+#[derive(Clone, Copy)]
 pub struct TextBox {
     container_hwnd: isize,
     inner_hwnd: isize,
@@ -319,7 +336,7 @@ impl TextBox {
                 0,
                 to_wide("STATIC").as_ptr(),
                 null_mut(),
-                WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_CLIPCHILDREN,
+                WS_CHILD | WS_VISIBLE | WS_TABSTOP,
                 x,
                 y,
                 width,
@@ -399,6 +416,14 @@ impl TextBox {
             );
         }
 
+        if !cue_banner.is_empty() {
+            const EM_SETCUEBANNER: u32 = 0x1501;
+            let cue_wide = to_wide(cue_banner);
+            unsafe {
+                SendMessageW(inner_edit, EM_SETCUEBANNER, 1, cue_wide.as_ptr() as isize);
+            }
+        }
+
         Some(Self {
             container_hwnd: container,
             inner_hwnd: inner_edit,
@@ -460,8 +485,10 @@ impl TextBox {
 
     pub fn set_cue_banner(&self, text: &str) {
         const WM_SET_CUE_BANNER: u32 = 0x8000 + 10;
+        const EM_SETCUEBANNER: u32 = 0x1501;
         let wide = to_wide(text);
         unsafe {
+            SendMessageW(self.inner_hwnd, EM_SETCUEBANNER, 1, wide.as_ptr() as isize);
             SendMessageW(self.inner_hwnd, WM_SET_CUE_BANNER, 0, wide.as_ptr() as isize);
         }
     }

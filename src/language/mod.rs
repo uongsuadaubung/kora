@@ -235,11 +235,13 @@ pub struct LanguageStrings {
     pub typing_inherit_global: &'static str,
     pub typing_inherit_prefix: &'static str,
 
-    // Tab 2: Remap & Disable
+    // Tab 2: Remap, Disable & Key Macro
     pub remap_table_title: &'static str,
     pub disable_table_title: &'static str,
+    pub key_macro_table_title: &'static str,
     pub keys_sub_remap: &'static str,
     pub keys_sub_disable: &'static str,
+    pub keys_sub_macro: &'static str,
     pub status_active: &'static str,
     pub status_disabled: &'static str,
     pub status_blocked: &'static str,
@@ -253,10 +255,14 @@ pub struct LanguageStrings {
     pub col_origin: &'static str,
     pub col_status: &'static str,
     pub col_disable_key: &'static str,
+    pub col_key_macro_trigger: &'static str,
+    pub col_key_macro_name: &'static str,
     pub btn_add_remap: &'static str,
     pub btn_del_remap: &'static str,
     pub btn_add_disable: &'static str,
     pub btn_del_disable: &'static str,
+    pub btn_add_key_macro: &'static str,
+    pub btn_del_key_macro: &'static str,
 
     // Dialogs
     pub dlg_add_prof_title: &'static str,
@@ -304,9 +310,28 @@ pub struct LanguageStrings {
     pub dlg_macro_lbl_val: &'static str,
     pub dlg_macro_lbl_type: &'static str,
 
+    // Key Macro Dialog
+    pub dlg_key_macro_title_add: &'static str,
+    pub dlg_key_macro_title_edit: &'static str,
+    pub dlg_key_macro_trigger_lbl: &'static str,
+    pub dlg_key_macro_trigger_hint: &'static str,
+    pub dlg_key_macro_name_lbl: &'static str,
+    pub dlg_key_macro_name_placeholder: &'static str,
+    pub dlg_key_macro_actions_lbl: &'static str,
+    pub dlg_key_macro_col_index: &'static str,
+    pub dlg_key_macro_col_type: &'static str,
+    pub dlg_key_macro_col_val: &'static str,
+    pub dlg_key_macro_col_order: &'static str,
+    pub dlg_key_macro_col_action: &'static str,
+    pub dlg_key_macro_empty_actions: &'static str,
+    pub dlg_key_macro_insert_title: &'static str,
+    pub dlg_key_macro_btn_add_step: &'static str,
+    pub dlg_key_macro_dsl_preview: &'static str,
+
     // Confirm Dialog
     pub confirm_delete_title: &'static str,
     pub confirm_delete_macro_msg: &'static str,
+    pub confirm_delete_key_macro_msg: &'static str,
     pub confirm_delete_remap_msg: &'static str,
     pub confirm_delete_disable_msg: &'static str,
     pub confirm_delete_profile_msg: &'static str,

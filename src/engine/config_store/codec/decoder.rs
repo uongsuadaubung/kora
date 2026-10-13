@@ -4,7 +4,7 @@ use crate::engine::config::EngineConfig;
 use crate::engine::config::hotkey::name_to_vk;
 use crate::engine::macro_table::{MacroEntry, MacroTable, MacroType};
 use crate::engine::profile::{
-    AppProfile, KeyRemapRule, LanguageMode, MethodMode, ProfileManager,
+    AppProfile, KeyMacroRule, KeyRemapRule, LanguageMode, MacroAction, MethodMode, ProfileManager,
 };
 use std::collections::HashMap;
 
@@ -60,7 +60,16 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 } else {
                     (val, MacroType::Normal)
                 };
-                macros.insert_typed_no_cache(key, real_val, mtype);
+                if key.eq_ignore_ascii_case("muted") || key.eq_ignore_ascii_case("muted_macros") {
+                    for m in val.split(',') {
+                        let m_trim = m.trim();
+                        if !m_trim.is_empty() && !profiles.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(m_trim)) {
+                            profiles.global_profile.muted_macros.push(m_trim.to_string());
+                        }
+                    }
+                } else {
+                    macros.insert_typed_no_cache(key, real_val, mtype);
+                }
             }
         } else if current_section == "remap" {
             let key_l = key.to_lowercase();
@@ -69,6 +78,14 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
                 config.remap_enabled = val_bool;
                 profiles.global_profile.remap_enabled = Some(val_bool);
+            } else if key_l == "muted" || key_l == "muted_remaps" {
+                for k in val.split(',') {
+                    if let Some(vk) = name_to_vk(k.trim()) {
+                        if !profiles.global_profile.muted_remaps.contains(&vk) {
+                            profiles.global_profile.muted_remaps.push(vk);
+                        }
+                    }
+                }
             } else if let (Some(f_vk), Some(t_vk)) = (name_to_vk(key), name_to_vk(val)) {
                 let rule = KeyRemapRule::new(f_vk, t_vk);
                 if !profiles.global_profile.app_remaps.iter().any(|r| r.from_vk == f_vk) {
@@ -90,11 +107,45 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                         }
                     }
                 }
+            } else if key_l == "allow_disabled" || key_l == "unmuted_disabled" || key_l == "muted" {
+                for k in val.split(',') {
+                    if let Some(vk) = name_to_vk(k.trim()) {
+                        if !profiles.global_profile.unmuted_disabled.contains(&vk) {
+                            profiles.global_profile.unmuted_disabled.push(vk);
+                        }
+                    }
+                }
             } else if let Some(vk) = name_to_vk(key) {
                 let val_l = val.to_lowercase();
                 let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
                 if val_bool && !profiles.global_profile.app_disabled.contains(&vk) {
                     profiles.global_profile.app_disabled.push(vk);
+                }
+            }
+        } else if current_section == "key_macro" || current_section == "key_macros" {
+            let key_l = key.to_lowercase();
+            if key_l == "enabled" || key_l == "key_macro_enabled" {
+                let val_l = val.to_lowercase();
+                let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
+                config.key_macro_enabled = val_bool;
+                profiles.global_profile.key_macro_enabled = Some(val_bool);
+            } else if key_l == "muted" || key_l == "muted_key_macros" {
+                for k in val.split(',') {
+                    if let Some(vk) = name_to_vk(k.trim()) {
+                        if !profiles.global_profile.muted_key_macros.contains(&vk) {
+                            profiles.global_profile.muted_key_macros.push(vk);
+                        }
+                    }
+                }
+            } else if let Some(trig_vk) = name_to_vk(key) {
+                let (name, dsl) = if let Some((n, d)) = val.split_once('|') {
+                    (n.trim().to_string(), d.trim())
+                } else {
+                    (format!("Macro {}", key), val.trim())
+                };
+                let actions = MacroAction::dsl_to_actions(dsl);
+                if !profiles.global_profile.app_key_macros.iter().any(|m| m.trigger_vk == trig_vk) {
+                    profiles.global_profile.app_key_macros.push(KeyMacroRule::new(trig_vk, name, actions));
                 }
             }
         } else if let Some(p_id) = current_section.strip_prefix("profile:") {
@@ -204,6 +255,42 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                             });
                         }
                     }
+                    "key_macro_enabled" | "enable_key_macro" => child.key_macro_enabled = Some(val_bool),
+                    "muted_key_macros" => {
+                        for k in val.split(',') {
+                            if let Some(vk) = name_to_vk(k.trim()) {
+                                if !child.muted_key_macros.contains(&vk) {
+                                    child.muted_key_macros.push(vk);
+                                }
+                            }
+                        }
+                    }
+                    "override_key_macro" | "override_key_macros" => {
+                        if let Some((k, v)) = val.split_once(['=', ':']) {
+                            if let Some(trig_vk) = name_to_vk(k.trim()) {
+                                let (name, dsl) = if let Some((n, d)) = v.split_once('|') {
+                                    (n.trim().to_string(), d.trim())
+                                } else {
+                                    (format!("Macro {}", k.trim()), v.trim())
+                                };
+                                let actions = MacroAction::dsl_to_actions(dsl);
+                                child.overridden_key_macros.insert(trig_vk, (name, actions));
+                            }
+                        }
+                    }
+                    "app_key_macro" | "app_key_macros" => {
+                        if let Some((k, v)) = val.split_once(['=', ':']) {
+                            if let Some(trig_vk) = name_to_vk(k.trim()) {
+                                let (name, dsl) = if let Some((n, d)) = v.split_once('|') {
+                                    (n.trim().to_string(), d.trim())
+                                } else {
+                                    (format!("Macro {}", k.trim()), v.trim())
+                                };
+                                let actions = MacroAction::dsl_to_actions(dsl);
+                                child.app_key_macros.push(KeyMacroRule::new(trig_vk, name, actions));
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -213,6 +300,9 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
             let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
 
             match (current_section.as_str(), key_l.as_str()) {
+                ("key_macro", "enabled") | (_, "key_macro_enabled") => {
+                    config.key_macro_enabled = val_bool;
+                }
                 ("sound", "enabled") | (_, "sound_enabled") | (_, "sound") => {
                     config.sound_enabled = val_bool;
                 }

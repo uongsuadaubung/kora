@@ -61,6 +61,7 @@ struct EngineSnapshot {
     all_profiles: Vec<AppProfile>,
     remaps: Vec<crate::engine::profile::ResolvedRemapItem>,
     disabled: Vec<crate::engine::profile::ResolvedDisableItem>,
+    key_macros: Vec<crate::engine::profile::ResolvedKeyMacroItem>,
     macros: Vec<crate::engine::profile::ResolvedMacroItem>,
 }
 
@@ -154,6 +155,7 @@ impl ControlPanelControls {
                 all_profiles: pm.all_profiles().into_iter().cloned().collect(),
                 remaps: pm.resolve_remap_items_for_ui(sel_id),
                 disabled: pm.resolve_disable_items_for_ui(sel_id),
+                key_macros: pm.resolve_key_macro_items_for_ui(sel_id),
                 macros: pm.resolve_macro_items_for_ui(sel_id, &engine.macro_table.get_sorted_entries()),
             }
         };
@@ -169,6 +171,7 @@ impl ControlPanelControls {
         self.tab_system.load_config(cfg);
         self.tab_keys.populate_remaps(&snap.remaps);
         self.tab_keys.populate_disabled(&snap.disabled);
+        self.tab_keys.populate_key_macros(&snap.key_macros);
         self.populate_macro_items(&snap.macros);
         Some(snap.config)
     }

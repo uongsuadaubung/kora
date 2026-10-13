@@ -56,10 +56,10 @@ impl RemapPanel {
             TABLE_HEIGHT,
             hfont_normal,
             &[
-                (strings.col_remap_from, 150, ColumnStyle::KeyBadgeWithArrow),
-                (strings.col_remap_to, 140, ColumnStyle::KeyBadge),
-                (strings.col_origin, 140, ColumnStyle::Default),
-                (strings.col_action, 100, ColumnStyle::Action),
+                (strings.col_remap_from, 145, ColumnStyle::KeyBadgeWithArrow),
+                (strings.col_remap_to, 135, ColumnStyle::KeyBadge),
+                (strings.col_origin, 125, ColumnStyle::Default),
+                (strings.col_action, 125, ColumnStyle::Action),
             ],
         )?;
 
@@ -120,7 +120,7 @@ impl RemapPanel {
                                 Some(to_vk),
                             );
                         }));
-                        actions.push(TableAction::delete(strings.action_mute, move || {
+                        actions.push(TableAction::secondary(strings.action_mute, move || {
                             Self::toggle_mute(from_vk, true);
                         }));
                     }
@@ -132,6 +132,18 @@ impl RemapPanel {
                                 Some(to_vk),
                             );
                         }));
+                        if item.is_active {
+                            actions.push(TableAction::secondary(strings.action_mute, move || {
+                                Self::toggle_mute(from_vk, true);
+                            }));
+                        } else {
+                            actions.push(
+                                TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                    .with_callback(move || {
+                                        Self::toggle_mute(from_vk, false);
+                                    }),
+                            );
+                        }
                         actions.push(TableAction::delete(strings.action_delete, move || {
                             Self::trigger_delete(parent_hwnd, from_vk, &from_name, &to_name);
                         }));
@@ -154,22 +166,44 @@ impl RemapPanel {
             let pm = &mut engine.profile_manager;
             let sel_id = pm.selected_id.clone();
             if sel_id == crate::ui::GLOBAL_PROFILE_ID {
-                return false;
-            }
-            if let Some(child) = pm.get_profile_mut(&sel_id) {
+                let target_profile = &mut pm.global_profile;
+                if mute {
+                    target_profile.overridden_remaps.remove(&from_vk);
+                    if !target_profile.muted_remaps.contains(&from_vk) {
+                        target_profile.muted_remaps.push(from_vk);
+                    }
+                } else {
+                    target_profile.muted_remaps.retain(|&v| v != from_vk);
+                }
+            } else {
+                let is_root_muted = pm.global_profile.muted_remaps.contains(&from_vk);
+                let global_rule = pm
+                    .global_profile
+                    .app_remaps
+                    .iter()
+                    .find(|r| r.from_vk == from_vk)
+                    .cloned();
+                let child = match pm.get_profile_mut(&sel_id) {
+                    Some(c) => c,
+                    None => return false,
+                };
                 if mute {
                     child.overridden_remaps.remove(&from_vk);
+                    child.app_remaps.retain(|r| r.from_vk != from_vk);
                     if !child.muted_remaps.contains(&from_vk) {
                         child.muted_remaps.push(from_vk);
                     }
                 } else {
                     child.muted_remaps.retain(|&v| v != from_vk);
+                    if is_root_muted && !child.app_remaps.iter().any(|r| r.from_vk == from_vk) {
+                        if let Some(rule) = global_rule {
+                            child.app_remaps.push(rule);
+                        }
+                    }
                 }
-                crate::ui::controller::save(engine);
-                true
-            } else {
-                false
             }
+            crate::ui::controller::save(engine);
+            true
         });
         if changed == Some(true) {
             crate::ui::controller::refresh_remap_list();

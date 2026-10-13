@@ -63,6 +63,30 @@ pub struct ThemePalette {
     pub danger_text: u32,
     /// Danger button hover text
     pub danger_text_hover: u32,
+    /// Info / blue badge background
+    pub info_bg: u32,
+    /// Info badge border
+    pub info_border: u32,
+    /// Info badge text
+    pub info_text: u32,
+    /// Warning / amber badge background
+    pub warning_bg: u32,
+    /// Warning badge border
+    pub warning_border: u32,
+    /// Warning badge text
+    pub warning_text: u32,
+    /// Success / green badge background
+    pub success_bg: u32,
+    /// Success badge border
+    pub success_border: u32,
+    /// Success badge text
+    pub success_text: u32,
+    /// Purple / violet badge background
+    pub purple_bg: u32,
+    /// Purple badge border
+    pub purple_border: u32,
+    /// Purple badge text
+    pub purple_text: u32,
 }
 
 /// Private helper to pack RGB bytes into a Win32 COLORREF (0x00BBGGRR).
@@ -102,6 +126,18 @@ pub const DARK_PALETTE: ThemePalette = ThemePalette {
     danger_border: rgb(216, 68, 58),    // Danger red border
     danger_text: rgb(255, 119, 102),    // Danger readable red text
     danger_text_hover: rgb(255, 136, 120), // Danger hover text
+    info_bg: rgb(20, 38, 60),           // Dark blue tint
+    info_border: rgb(35, 75, 120),      // Dark blue border
+    info_text: rgb(88, 166, 255),       // Light blue text
+    warning_bg: rgb(50, 36, 18),        // Dark amber tint
+    warning_border: rgb(110, 80, 28),   // Dark amber border
+    warning_text: rgb(245, 175, 65),    // Warm amber text
+    success_bg: rgb(18, 42, 26),        // Dark green tint
+    success_border: rgb(35, 90, 52),    // Dark green border
+    success_text: rgb(75, 210, 120),    // Vibrant green text
+    purple_bg: rgb(40, 25, 55),         // Dark purple tint
+    purple_border: rgb(90, 50, 125),    // Dark purple border
+    purple_text: rgb(195, 145, 250),    // Soft lavender text
 };
 
 /// Light Theme Palette (Windows 11 Fluent Light inspired)
@@ -135,6 +171,18 @@ pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
     danger_border: rgb(216, 68, 58),    // Red border
     danger_text: rgb(197, 21, 21),      // Red text
     danger_text_hover: rgb(197, 21, 21), // Red hover text
+    info_bg: rgb(230, 242, 255),        // Soft light blue tint
+    info_border: rgb(180, 215, 255),    // Light blue border
+    info_text: rgb(0, 102, 204),        // Deep readable blue text
+    warning_bg: rgb(255, 248, 230),     // Soft light amber tint
+    warning_border: rgb(245, 215, 140), // Light amber border
+    warning_text: rgb(180, 100, 10),    // Dark amber text
+    success_bg: rgb(232, 250, 238),     // Soft light green tint
+    success_border: rgb(160, 230, 185), // Light green border
+    success_text: rgb(16, 124, 65),     // Dark forest green text
+    purple_bg: rgb(248, 238, 255),      // Soft light purple tint
+    purple_border: rgb(220, 185, 250),  // Light purple border
+    purple_text: rgb(125, 45, 185),     // Dark purple text
 };
 
 impl ThemePalette {

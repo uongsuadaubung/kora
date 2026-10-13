@@ -38,11 +38,13 @@ pub struct EngineConfig {
     /// Tương thích ngược: true nếu switch_key là Ctrl + Shift
     pub switch_with_ctrl_shift: bool,
 
-    // --- 2.5 Key Remapping & Disabling ---
+    // --- 2.5 Key Remapping, Disabling & Key Macro ---
     /// Bật/tắt tính năng đổi phím (Key Remapping)
     pub remap_enabled: bool,
     /// Bật/tắt tính năng khóa/vô hiệu hóa phím (Disable Keys)
     pub disable_enabled: bool,
+    /// Bật/tắt tính năng phím macro (Key Macro)
+    pub key_macro_enabled: bool,
 
     // --- 3. Sound Effects (WASAPI) ---
     /// Bật/tắt âm thanh phím cơ
@@ -85,6 +87,7 @@ impl Default for EngineConfig {
             switch_with_ctrl_shift: true,
             remap_enabled: false,
             disable_enabled: false,
+            key_macro_enabled: false,
             sound_enabled: false,
             sound_profile: std::sync::Arc::from("Holy Panda"),
             sound_volume: 50,

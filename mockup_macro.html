@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kora - Quản Lý Bàn Phím (Phím Macro)</title>
+  <style>
+    :root {
+      --bg-window: #1E1E1E;
+      --bg-sidebar: #252526;
+      --bg-card: #2D2D30;
+      --bg-card-header: #28282B;
+      --bg-input: #333337;
+      --text-primary: #F1F1F1;
+      --text-secondary: #9E9E9E;
+      --border: #3E3E42;
+      --border-subtle: #333336;
+      --tab-active-bg: #3E3E42;
+      --tab-track-bg: #202022;
+      --tab-pill-active: #38383C;
+      --accent: #0078D4;
+      --accent-hover: #1684D8;
+      --danger: #F44747;
+      --danger-hover: #D83B3B;
+      --font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body.light-theme {
+      --bg-window: #F8F8F8;
+      --bg-sidebar: #F0F0F0;
+      --bg-card: #FFFFFF;
+      --bg-card-header: #FAFAFA;
+      --bg-input: #FFFFFF;
+      --text-primary: #1E1E1E;
+      --text-secondary: #6E6E6E;
+      --border: #E0E0E0;
+      --border-subtle: #EAEAEA;
+      --tab-active-bg: #E4E4E4;
+      --tab-track-bg: #E8E8E8;
+      --tab-pill-active: #FFFFFF;
+      --accent: #0066CC;
+      --accent-hover: #0078D4;
+      --danger: #D83B3B;
+      --danger-hover: #B82A2A;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: #111;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 12.5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .top-toolbar {
+      width: 820px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .top-toolbar button {
+      background: #2D2D30;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .top-toolbar button:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* Main Window */
+    .app-window {
+      width: 820px;
+      height: 600px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Title Bar */
+    .titlebar {
+      height: 38px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .titlebar-logo {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 11px;
+    }
+
+    /* Window Body: 2 Columns */
+    .window-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar (khung app tinh gọn) */
+    .sidebar {
+      width: 220px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-title {
+      padding: 12px 14px 6px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .profile-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .profile-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s;
+    }
+
+    .profile-item:hover {
+      background: var(--tab-active-bg);
+    }
+
+    .profile-item.active {
+      background: var(--tab-active-bg);
+      border-color: var(--border);
+    }
+
+    .profile-item-icon {
+      font-size: 15px;
+      width: 18px;
+      text-align: center;
+    }
+
+    .profile-item-name {
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sidebar-footer-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .sidebar-footer-btn:hover {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+    }
+
+    /* Right Main Area */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-window);
+      overflow: hidden;
+    }
+
+    .profile-banner {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card-header);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Level 1 Navigation Tabs (Khung app Kora) */
+    .main-nav-tabs {
+      display: flex;
+      padding: 0 18px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      gap: 22px;
+    }
+
+    .main-nav-tab {
+      padding: 9px 2px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .main-nav-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .main-nav-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Level 2 Sub-Tabs Bar: Quản lý bàn phím chia 3 tab */
+    .subtabs-bar-container {
+      padding: 12px 18px 8px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+
+    .segmented-tabs {
+      display: inline-flex;
+      background: var(--tab-track-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .segmented-tab-btn {
+      padding: 5px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 4px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.12s;
+    }
+
+    .segmented-tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .segmented-tab-btn.active {
+      background: var(--tab-pill-active);
+      color: var(--text-primary);
+      border-color: var(--border);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Single Card Area: Chiếm trọn chiều cao còn lại (Không xếp chồng) */
+    .tab-content {
+      flex: 1;
+      padding: 6px 18px 16px 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .single-card {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      min-height: 28px;
+    }
+
+    .card-title-text {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--bg-input);
+    }
+
+    /* Buttons */
+    .btn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.1s;
+    }
+
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      color: white;
+      border-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: #E8112315;
+      border-color: var(--danger);
+    }
+
+    /* Key Badge */
+    .key-badge {
+      display: inline-block;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-weight: bold;
+      color: var(--accent);
+    }
+
+    .key-badge-danger {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    /* Action Pipeline Flow Badges */
+    .action-flow {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px;
+      line-height: 1.5;
+    }
+
+    .action-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1.5px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: monospace;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      white-space: nowrap;
+    }
+
+    .pill-press {
+      color: var(--accent);
+      border-color: rgba(0, 120, 212, 0.4);
+      background: rgba(0, 120, 212, 0.08);
+    }
+
+    .pill-down {
+      color: #E2C08D;
+      border-color: rgba(226, 192, 141, 0.35);
+      background: rgba(226, 192, 141, 0.08);
+    }
+
+    .pill-up {
+      color: #4EC9B0;
+      border-color: rgba(78, 201, 176, 0.35);
+      background: rgba(78, 201, 176, 0.08);
+    }
+
+    .pill-delay {
+      color: var(--text-secondary);
+      border-color: var(--border-subtle);
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 10.5px;
+    }
+
+    .pill-text {
+      color: #9CDCFE;
+      border-color: rgba(156, 220, 254, 0.3);
+      background: rgba(156, 220, 254, 0.08);
+      font-style: italic;
+    }
+
+    .flow-arrow {
+      color: var(--text-secondary);
+      font-size: 9px;
+      opacity: 0.5;
+      user-select: none;
+    }
+
+    /* Compact Action Flow Styles (Tinh gọn & Thoáng mắt) */
+    .compact-action-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+    }
+
+    .compact-keys {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: nowrap;
+    }
+
+    .compact-key-pill {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: monospace;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+      white-space: nowrap;
+    }
+
+    .compact-key-pill.pill-down {
+      color: #E2C08D;
+      border-color: rgba(226, 192, 141, 0.35);
+    }
+
+    .compact-key-pill.pill-up {
+      color: #4EC9B0;
+      border-color: rgba(78, 201, 176, 0.35);
+    }
+
+    .compact-text-pill {
+      background: rgba(78, 201, 176, 0.08);
+      border: 1px solid rgba(78, 201, 176, 0.3);
+      color: #4EC9B0;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .compact-sep {
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: bold;
+      opacity: 0.45;
+      user-select: none;
+    }
+
+    .compact-more {
+      color: var(--text-secondary);
+      font-size: 10px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .compact-meta-tag {
+      font-size: 10px;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      padding: 1.5px 7px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    /* Data Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: none;
+    }
+
+    .data-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      padding: 8px 12px;
+      background: var(--bg-card-header);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .data-table td {
+      padding: 7px 12px;
+      font-size: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .data-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    input[type="text"], input[type="number"], select {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, select:focus {
+      border-color: var(--accent);
+    }
+
+    .check-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .check-row input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent);
+    }
+
+    /* Modal Backdrop */
+    .modal-backdrop {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .modal-window {
+      width: 580px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-size: 13.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-close-btn {
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 16px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .modal-close-btn:hover {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+    }
+
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel-footer {
+      height: 44px;
+      background: var(--bg-card-header);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    /* Key Capture Box */
+    .key-capture-box {
+      height: 34px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: bold;
+      color: var(--accent);
+      transition: all 0.15s;
+    }
+
+    .key-capture-box:hover {
+      border-color: var(--accent);
+    }
+
+    .key-capture-box.listening {
+      border-color: var(--accent);
+      background: rgba(0, 120, 212, 0.15);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Toolbar -->
+  <div class="top-toolbar">
+    <span style="font-weight: 600; font-size: 12px; color: var(--text-secondary);">MOCKUP KORA - QUẢN LÝ BÀN PHÍM (3 SUB-TABS)</span>
+    <button onclick="toggleTheme()">🌓 Đổi Giao Diện Sáng / Tối</button>
+  </div>
+
+  <!-- Main Window -->
+  <div class="app-window" id="mainWindow">
+    <!-- Titlebar -->
+    <div class="titlebar">
+      <div class="titlebar-brand">
+        <div class="titlebar-logo">K</div>
+        <span>Kora - Bộ Gõ Tiếng Việt & Quản Lý Bàn Phím</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-secondary);">v0.6.0</div>
+    </div>
+
+    <!-- Window Body: 2 Columns Layout -->
+    <div class="window-body">
+      <!-- Left Sidebar (Khung app tinh gọn) -->
+      <div class="sidebar">
+        <div class="sidebar-title">HỒ SƠ ỨNG DỤNG</div>
+        <div class="profile-tree">
+          <div class="profile-item active" onclick="switchProfile('global')">
+            <span class="profile-item-icon">🌐</span>
+            <div class="profile-item-name">Toàn hệ thống</div>
+          </div>
+          <div class="profile-item" onclick="switchProfile('cs2')">
+            <span class="profile-item-icon">🎮</span>
+            <div class="profile-item-name">Counter-Strike 2</div>
+          </div>
+          <div class="profile-item" onclick="switchProfile('vscode')">
+            <span class="profile-item-icon">💻</span>
+            <div class="profile-item-name">Visual Studio Code</div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-footer-btn"><span>⚙️</span> <span>Cài đặt chung</span></div>
+          <div class="sidebar-footer-btn"><span>ℹ️</span> <span>Thông tin</span></div>
+        </div>
+      </div>
+
+      <!-- Right Main Area -->
+      <div class="main-area">
+        <!-- Profile Banner -->
+        <div class="profile-banner">
+          <div>
+            <span style="font-size: 13px; font-weight: 700;" id="bannerTitle">🌐 Toàn hệ thống</span>
+            <span style="font-size: 11.5px; color: var(--text-secondary); margin-left: 6px;" id="bannerSub">(Cấu hình mặc định mọi ứng dụng)</span>
+          </div>
+        </div>
+
+        <!-- Main Navigation Tabs (Cấp 1) -->
+        <div class="main-nav-tabs">
+          <div class="main-nav-tab">⌨️ Bộ gõ & Phím tắt</div>
+          <div class="main-nav-tab active">🔄 Quản lý phím</div>
+          <div class="main-nav-tab">🔊 Âm thanh gõ</div>
+          <div class="main-nav-tab">⚡ Gõ tắt</div>
+        </div>
+
+        <!-- Sub-Tabs Bar: Quản lý bàn phím chia làm 3 Sub-Tabs riêng biệt (Cấp 2) -->
+        <div class="subtabs-bar-container">
+          <div class="segmented-tabs">
+            <button class="segmented-tab-btn" id="subtabRemap" onclick="switchSubTab('remap')">
+              <span>🔄</span> <span>Đổi phím</span>
+            </button>
+            <button class="segmented-tab-btn" id="subtabDisable" onclick="switchSubTab('disable')">
+              <span>🚫</span> <span>Khóa phím</span>
+            </button>
+            <button class="segmented-tab-btn active" id="subtabMacro" onclick="switchSubTab('macro')">
+              <span>⚡</span> <span>Phím Macro</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab Content Body: DUY NHẤT 1 CARD CHIẾM TRỌN DIỆN TÍCH (KHÔNG XẾP CHỒNG) -->
+        <div class="tab-content">
+          <div class="single-card" id="cardContainer">
+            <!-- Dynamic Sub-panel content rendered here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================================================== -->
+    <!-- MODAL: THIẾT LẬP PHÍM MACRO (MACRO EDITOR DIALOG)   -->
+    <!-- ==================================================== -->
+    <div class="modal-backdrop" id="editorModal">
+      <div class="modal-window">
+        <div class="modal-header">
+          <h3>
+            <span style="background:var(--accent); color:white; border-radius:4px; padding:2px 6px; font-size:12px;">⚡</span>
+            <span id="modalTitle">Thiết Lập Phím Macro</span>
+          </h3>
+          <span class="modal-close-btn" onclick="closeModal()">✕</span>
+        </div>
+
+        <div class="modal-body">
+          <!-- Phím kích hoạt & Tên mô tả (2 cột) -->
+          <div style="display: grid; grid-template-columns: 160px 1fr; gap: 12px;">
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 4px;">
+                PHÍM KÍCH HOẠT:
+              </label>
+              <div class="key-capture-box" id="boxTriggerKey" onclick="listenTriggerKey()">
+                <span id="txtTriggerKey"></span>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 4px;">
+                TÊN MÔ TẢ (TÙY CHỌN):
+              </label>
+              <input type="text" id="inputMacroName" placeholder="VD: Nhảy Bunny Hop, Format Code..." style="height: 34px; width: 100%;">
+            </div>
+          </div>
+
+          <!-- Bảng chuỗi hành động theo thứ tự -->
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
+                Chuỗi Hành Động Theo Thứ Tự:
+              </label>
+              <span style="font-size: 11px; color: var(--text-secondary);" id="lblStepCount">4 bước</span>
+            </div>
+
+            <div style="border: 1px solid var(--border); border-radius: 4px; max-height: 160px; overflow-y: auto;">
+              <table class="data-table" style="border: none;">
+                <thead>
+                  <tr>
+                    <th style="width: 32px; text-align: center;">#</th>
+                    <th style="width: 140px;">Hành động</th>
+                    <th>Phím / Tham số</th>
+                    <th style="width: 65px; text-align: center;">Thứ tự</th>
+                    <th style="width: 45px; text-align: center;">Xóa</th>
+                  </tr>
+                </thead>
+                <tbody id="actionTableBody">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Thanh chèn bước trực tiếp (Inline Add Step) -->
+          <div>
+            <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); display: block; margin-bottom: 5px; text-transform: uppercase;">
+              Chèn Thêm Hành Động Vào Chuỗi:
+            </label>
+            <div style="display: flex; gap: 8px; align-items: center; background: var(--bg-card-header); padding: 8px 10px; border: 1px dashed var(--border); border-radius: 5px;">
+              <select id="selActionType" onchange="onActionTypeChange(this.value)" style="height: 34px; width: 145px;">
+                <option value="press">⚡ Nhấn (press)</option>
+                <option value="down">⬇️ Giữ (down)</option>
+                <option value="up">⬆️ Nhả (up)</option>
+                <option value="delay">⏱️ Chờ (delay ms)</option>
+                <option value="text">🔤 Gõ chữ (text)</option>
+              </select>
+
+              <div id="areaValueInput" style="flex: 1;">
+                <!-- dynamic value input area -->
+              </div>
+
+              <button class="btn btn-primary" style="height: 34px; white-space: nowrap;" onclick="addCurrentStep()">
+                + Thêm bước
+              </button>
+            </div>
+          </div>
+
+          <!-- Thanh xem trước DSL -->
+          <div style="background: var(--bg-card-header); border: 1px solid var(--border); border-radius: 5px; padding: 7px 12px; display: flex; gap: 8px; align-items: center;">
+            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">DSL:</span>
+            <code id="txtDslPreview" style="font-family: monospace; color: #4EC9B0; font-size: 12px; word-break: break-all;">(Trống)</code>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="panel-footer">
+          <span style="font-size: 11px; color: var(--text-secondary);">Click vào ô để bấm phím tự động nhận diện</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn" onclick="closeModal()">Hủy bỏ</button>
+            <button class="btn btn-primary" onclick="saveMacro()">Lưu Macro</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // --- Mock Data ---
+    const profileMacros = {
+      global: [
+        {
+          id: 1,
+          trigger: 'F1',
+          name: 'Bunny Hop Game',
+          origin: 'root',
+          actions: [
+            { type: 'down', val: 'W' },
+            { type: 'delay', val: '150' },
+            { type: 'press', val: 'Space' },
+            { type: 'delay', val: '40' },
+            { type: 'up', val: 'W' }
+          ]
+        },
+        {
+          id: 2,
+          trigger: 'F2',
+          name: 'Format Code IDE',
+          origin: 'root',
+          actions: [
+            { type: 'press', val: 'Ctrl+Shift+L' }
+          ]
+        }
+      ],
+      cs2: [
+        {
+          id: 3,
+          trigger: 'F1',
+          name: 'Bunny Hop CS2',
+          origin: 'overridden',
+          actions: [
+            { type: 'down', val: 'W' },
+            { type: 'delay', val: '120' },
+            { type: 'press', val: 'Space' },
+            { type: 'up', val: 'W' }
+          ]
+        },
+        {
+          id: 2,
+          trigger: 'F2',
+          name: 'Format Code IDE',
+          origin: 'inherited',
+          actions: [
+            { type: 'press', val: 'Ctrl+Shift+L' }
+          ]
+        },
+        {
+          id: 4,
+          trigger: 'F3',
+          name: 'Mua AK-47 & Giáp',
+          origin: 'app_specific',
+          actions: [
+            { type: 'press', val: 'B' },
+            { type: 'delay', val: '80' },
+            { type: 'press', val: '4' },
+            { type: 'delay', val: '40' },
+            { type: 'press', val: '2' }
+          ]
+        }
+      ],
+      vscode: [
+        {
+          id: 1,
+          trigger: 'F1',
+          name: 'Bunny Hop Game',
+          origin: 'inherited',
+          actions: [
+            { type: 'down', val: 'W' },
+            { type: 'delay', val: '150' },
+            { type: 'press', val: 'Space' },
+            { type: 'delay', val: '40' },
+            { type: 'up', val: 'W' }
+          ]
+        },
+        {
+          id: 5,
+          trigger: 'F2',
+          name: 'Format Document',
+          origin: 'overridden',
+          actions: [
+            { type: 'press', val: 'Ctrl+Shift+P' },
+            { type: 'delay', val: '100' },
+            { type: 'text', val: 'Format Document' },
+            { type: 'press', val: 'Enter' }
+          ]
+        }
+      ]
+    };
+
+    const profileRemaps = {
+      global: [
+        { from: 'Caps Lock', to: 'Left Ctrl', origin: 'root' },
+        { from: 'Insert', to: 'Delete', origin: 'root' }
+      ],
+      cs2: [
+        { from: 'Caps Lock', to: 'Left Ctrl', origin: 'inherited' },
+        { from: 'Insert', to: 'Delete', origin: 'inherited' },
+        { from: 'F1', to: 'Escape', origin: 'app_specific' }
+      ],
+      vscode: [
+        { from: 'Caps Lock', to: 'Left Ctrl', origin: 'inherited' },
+        { from: 'Insert', to: 'Delete', origin: 'inherited' }
+      ]
+    };
+
+    const profileDisables = {
+      global: [
+        { key: 'Left Windows', status: 'Đang chặn', origin: 'root' }
+      ],
+      cs2: [
+        { key: 'Left Windows', status: 'Đang chặn', origin: 'inherited' },
+        { key: 'Right Windows', status: 'Đang chặn', origin: 'app_specific' }
+      ],
+      vscode: [
+        { key: 'Left Windows', status: 'Đã tạm mở', origin: 'overridden' }
+      ]
+    };
+
+    const profileMacroEnabled = { global: true, cs2: true, vscode: true };
+    const profileRemapEnabled = { global: true, cs2: true, vscode: true };
+    const profileDisableEnabled = { global: true, cs2: true, vscode: true };
+
+    // Helper: Nguồn gốc ở Toàn hệ thống để RỖNG (""), profile con mới hiện Kế thừa / Ghi đè / Riêng app
+    function getOriginLabel(origin, isRoot) {
+      if (isRoot || !origin || origin === 'root') {
+        return '';
+      }
+      if (origin === 'inherited') {
+        return '<span style="color:var(--text-secondary); font-size:11.5px;">🌐 Kế thừa</span>';
+      }
+      if (origin === 'overridden') {
+        return '<span style="color:#E2C08D; font-size:11.5px; font-weight:600;">✏️ Ghi đè</span>';
+      }
+      if (origin === 'app_specific') {
+        return '<span style="color:var(--accent); font-size:11.5px; font-weight:600;">✨ Riêng app</span>';
+      }
+      if (origin === 'muted') {
+        return '<span style="color:var(--danger); font-size:11.5px;">🚫 Đã tắt</span>';
+      }
+      return `<span style="color:var(--text-secondary); font-size:11.5px;">${origin}</span>`;
+    }
+
+    let macroViewMode = 'compact'; // 'compact' (tinh gọn) | 'detailed' (đầy đủ)
+    let activeProfileId = 'global';
+    let activeSubTab = 'macro'; // 'remap' | 'disable' | 'macro'
+    let currentEditingId = null;
+    let editingActions = [];
+    let listeningTarget = null; // 'trigger' | 'stepKey'
+
+    function setViewMode(mode) {
+      macroViewMode = mode;
+      const btnC = document.getElementById('btnViewCompact');
+      const btnD = document.getElementById('btnViewDetailed');
+      if (btnC && btnD) {
+        if (mode === 'compact') {
+          btnC.style.background = 'var(--accent)';
+          btnC.style.borderColor = 'var(--accent)';
+          btnC.style.color = 'white';
+          btnC.style.fontWeight = '600';
+          btnD.style.background = 'transparent';
+          btnD.style.borderColor = 'transparent';
+          btnD.style.color = 'var(--text-secondary)';
+          btnD.style.fontWeight = 'normal';
+        } else {
+          btnD.style.background = 'var(--accent)';
+          btnD.style.borderColor = 'var(--accent)';
+          btnD.style.color = 'white';
+          btnD.style.fontWeight = '600';
+          btnC.style.background = 'transparent';
+          btnC.style.borderColor = 'transparent';
+          btnC.style.color = 'var(--text-secondary)';
+          btnC.style.fontWeight = 'normal';
+        }
+      }
+      renderCurrentSubPanel();
+    }
+
+    function toggleMacroMaster(checked) {
+      profileMacroEnabled[activeProfileId] = checked;
+      renderCurrentSubPanel();
+    }
+
+    function toggleRemapMaster(checked) {
+      profileRemapEnabled[activeProfileId] = checked;
+      renderCurrentSubPanel();
+    }
+
+    function toggleDisableMaster(checked) {
+      profileDisableEnabled[activeProfileId] = checked;
+      renderCurrentSubPanel();
+    }
+
+    // --- Sub-Tab Switching ---
+    function switchSubTab(tab) {
+      activeSubTab = tab;
+      document.getElementById('subtabRemap').classList.toggle('active', tab === 'remap');
+      document.getElementById('subtabDisable').classList.toggle('active', tab === 'disable');
+      document.getElementById('subtabMacro').classList.toggle('active', tab === 'macro');
+      renderCurrentSubPanel();
+    }
+
+    // --- Profile Switching ---
+    function switchProfile(pid) {
+      activeProfileId = pid;
+      document.querySelectorAll('.profile-item').forEach(el => el.classList.remove('active'));
+      const items = document.querySelectorAll('.profile-item');
+      if (pid === 'global') {
+        items[0].classList.add('active');
+        document.getElementById('bannerTitle').innerText = '🌐 Toàn hệ thống';
+        document.getElementById('bannerSub').innerText = '(Cấu hình mặc định mọi ứng dụng)';
+      } else if (pid === 'cs2') {
+        items[1].classList.add('active');
+        document.getElementById('bannerTitle').innerText = '🎮 Counter-Strike 2';
+        document.getElementById('bannerSub').innerText = '(Áp dụng khi đang chơi CS2)';
+      } else if (pid === 'vscode') {
+        items[2].classList.add('active');
+        document.getElementById('bannerTitle').innerText = '💻 Visual Studio Code';
+        document.getElementById('bannerSub').innerText = '(Áp dụng khi soạn code VS Code)';
+      }
+      renderCurrentSubPanel();
+    }
+
+    // --- Render Content into the Single Card ---
+    function renderCurrentSubPanel() {
+      const card = document.getElementById('cardContainer');
+      const isRoot = activeProfileId === 'global';
+
+      if (activeSubTab === 'macro') {
+        const isMacroOn = profileMacroEnabled[activeProfileId] !== false;
+        const list = profileMacros[activeProfileId] || [];
+        card.innerHTML = `
+          <div class="card-header-row">
+            <label class="check-row">
+              <input type="checkbox" id="checkMacroMaster" ${isMacroOn ? 'checked' : ''} onchange="toggleMacroMaster(this.checked)">
+              <span>Bật phím macro</span>
+            </label>
+            <button class="btn btn-primary" id="btnAddMacro" ${!isMacroOn ? 'disabled style="opacity:0.45; cursor:not-allowed;"' : ''} onclick="openCreateModal()">+ Thêm Macro</button>
+          </div>
+
+          <div class="table-container" style="${!isMacroOn ? 'opacity:0.45; pointer-events:none;' : ''}">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 120px;">Phím bấm</th>
+                  <th>Tên mô tả</th>
+                  <th style="width: 130px;">Nguồn gốc</th>
+                  <th style="width: 110px; text-align: right;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody id="macroListBody">
+                ${list.length === 0 ? `
+                  <tr><td colspan="4" style="text-align:center; padding:24px; color:var(--text-secondary);">Chưa có phím Macro nào. Bấm "+ Thêm Macro" để tạo mới.</td></tr>
+                ` : list.map(m => `
+                  <tr title="Chuỗi hành động: ${buildDsl(m.actions)}">
+                    <td><span class="key-badge">${m.trigger}</span></td>
+                    <td><b>${m.name || 'Phím Macro'}</b></td>
+                    <td>${getOriginLabel(m.origin, isRoot)}</td>
+                    <td style="text-align: right;">
+                      <button class="btn" style="padding:2px 8px; font-size:11px;" onclick="openEditModal(${m.id})">Sửa</button>
+                      <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;" onclick="deleteMacro(${m.id})">Xóa</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (activeSubTab === 'remap') {
+        const isRemapOn = profileRemapEnabled[activeProfileId] !== false;
+        const list = profileRemaps[activeProfileId] || [];
+        card.innerHTML = `
+          <div class="card-header-row">
+            <label class="check-row">
+              <input type="checkbox" id="checkRemapMaster" ${isRemapOn ? 'checked' : ''} onchange="toggleRemapMaster(this.checked)">
+              <span>Bật đổi phím</span>
+            </label>
+            <button class="btn btn-primary" ${!isRemapOn ? 'disabled style="opacity:0.45; cursor:not-allowed;"' : ''}>+ Đổi phím</button>
+          </div>
+
+          <div class="table-container" style="${!isRemapOn ? 'opacity:0.45; pointer-events:none;' : ''}">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 240px;">Phím gốc ➜ Phím đích</th>
+                  <th style="width: 150px;">Nguồn gốc</th>
+                  <th style="text-align: right; width: 110px;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(r => `
+                  <tr>
+                    <td><span class="key-badge">${r.from}</span> <span style="color:var(--text-secondary); margin:0 4px;">➜</span> <span class="key-badge">${r.to}</span></td>
+                    <td>${getOriginLabel(r.origin, isRoot)}</td>
+                    <td style="text-align: right;">
+                      <button class="btn" style="padding:2px 8px; font-size:11px;">Sửa</button>
+                      <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;">Xóa</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      } else if (activeSubTab === 'disable') {
+        const isDisableOn = profileDisableEnabled[activeProfileId] !== false;
+        const list = profileDisables[activeProfileId] || [];
+        card.innerHTML = `
+          <div class="card-header-row">
+            <label class="check-row">
+              <input type="checkbox" id="checkDisableMaster" ${isDisableOn ? 'checked' : ''} onchange="toggleDisableMaster(this.checked)">
+              <span>Bật chặn phím</span>
+            </label>
+            <button class="btn btn-primary" ${!isDisableOn ? 'disabled style="opacity:0.45; cursor:not-allowed;"' : ''}>+ Chặn phím</button>
+          </div>
+
+          <div class="table-container" style="${!isDisableOn ? 'opacity:0.45; pointer-events:none;' : ''}">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 180px;">Phím bị chặn</th>
+                  <th style="width: 160px;">Trạng thái</th>
+                  <th style="width: 140px;">Nguồn gốc</th>
+                  <th style="text-align: right; width: 110px;">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${list.map(d => `
+                  <tr>
+                    <td><span class="key-badge key-badge-danger">${d.key}</span></td>
+                    <td><span style="color:var(--danger); font-weight:600;">${d.status}</span></td>
+                    <td>${getOriginLabel(d.origin, isRoot)}</td>
+                    <td style="text-align: right;">
+                      <button class="btn" style="padding:2px 8px; font-size:11px;">Mở</button>
+                      <button class="btn btn-danger" style="padding:2px 8px; font-size:11px;">Xóa</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+
+    function buildDsl(actions) {
+      if (!actions || actions.length === 0) return '(Trống)';
+      return actions.map(a => `${a.type}(${a.val})`).join(' + ');
+    }
+
+    function renderActionFlow(actions) {
+      if (!actions || actions.length === 0) {
+        return '<span style="color:var(--text-secondary); font-style:italic;">(Trống)</span>';
+      }
+      const dslTitle = buildDsl(actions);
+      return `<div class="action-flow" title="${dslTitle}">` + actions.map(act => {
+        if (act.type === 'press') {
+          return `<span class="action-pill pill-press" title="Nhấn: ${act.val}">${act.val}</span>`;
+        } else if (act.type === 'down') {
+          return `<span class="action-pill pill-down" title="Giữ: ${act.val}"><span style="font-size:10px;">⬇</span> ${act.val}</span>`;
+        } else if (act.type === 'up') {
+          return `<span class="action-pill pill-up" title="Nhả: ${act.val}"><span style="font-size:10px;">⬆</span> ${act.val}</span>`;
+        } else if (act.type === 'delay') {
+          return `<span class="action-pill pill-delay" title="Chờ: ${act.val}ms">⏱ ${act.val}ms</span>`;
+        } else if (act.type === 'text') {
+          return `<span class="action-pill pill-text" title="Gõ văn bản: ${act.val}">🔤 "${act.val}"</span>`;
+        }
+        return `<span class="action-pill">${act.val}</span>`;
+      }).join('<span class="flow-arrow">➔</span>') + `</div>`;
+    }
+
+    // Hiển thị chuỗi phím tinh gọn (lọc delay, chỉ hiện phím cốt lõi & badge số bước)
+    function renderActionFlowCompact(actions) {
+      if (!actions || actions.length === 0) {
+        return '<span style="color:var(--text-secondary); font-style:italic;">(Trống)</span>';
+      }
+
+      let totalDelay = 0;
+      let keySteps = [];
+
+      for (const act of actions) {
+        if (act.type === 'delay') {
+          totalDelay += parseInt(act.val) || 0;
+        } else if (act.type === 'text') {
+          keySteps.push({ type: 'text', val: `"${act.val}"` });
+        } else if (act.type === 'press') {
+          keySteps.push({ type: 'press', val: act.val });
+        } else if (act.type === 'down') {
+          keySteps.push({ type: 'down', val: `⬇${act.val}` });
+        } else if (act.type === 'up') {
+          keySteps.push({ type: 'up', val: `⬆${act.val}` });
+        }
+      }
+
+      // Tối đa 4 phím/hành động chính, nếu nhiều hơn thì hiển thị +N
+      const maxShow = 4;
+      const visible = keySteps.slice(0, maxShow);
+      const remaining = keySteps.length - maxShow;
+
+      const keysHtml = visible.map(s => {
+        if (s.type === 'text') {
+          return `<span class="compact-text-pill" title="${s.val}">🔤 ${s.val}</span>`;
+        }
+        let cls = 'compact-key-pill';
+        if (s.type === 'down') cls += ' pill-down';
+        if (s.type === 'up') cls += ' pill-up';
+        return `<span class="${cls}">${s.val}</span>`;
+      }).join('<span class="compact-sep">›</span>');
+
+      const moreHtml = remaining > 0 ? `<span class="compact-more">+${remaining}</span>` : '';
+
+      // Tag tổng hợp số bước & tổng delay
+      const meta = [];
+      if (actions.length > 1) meta.push(`${actions.length} bước`);
+      if (totalDelay > 0) meta.push(`${totalDelay}ms`);
+
+      const metaHtml = meta.length > 0 
+        ? `<span class="compact-meta-tag">${meta.join(' • ')}</span>` 
+        : '';
+
+      return `
+        <div class="compact-action-row" title="${buildDsl(actions)}">
+          <div class="compact-keys">${keysHtml}${moreHtml}</div>
+          ${metaHtml}
+        </div>
+      `;
+    }
+
+    function deleteMacro(id) {
+      if (confirm('Bạn có chắc muốn xóa Macro này?')) {
+        profileMacros[activeProfileId] = profileMacros[activeProfileId].filter(x => x.id !== id);
+        renderCurrentSubPanel();
+      }
+    }
+
+    // --- Modal Editor ---
+    function openCreateModal() {
+      currentEditingId = null;
+      document.getElementById('modalTitle').innerText = 'Thiết Lập Phím Macro Mới';
+      document.getElementById('txtTriggerKey').innerText = '';
+      document.getElementById('inputMacroName').value = '';
+      editingActions = [];
+      resetInlineInput();
+      renderActionTable();
+      document.getElementById('editorModal').style.display = 'flex';
+      stopListening();
+    }
+
+    function openEditModal(id) {
+      const list = profileMacros[activeProfileId] || [];
+      const m = list.find(x => x.id === id);
+      if (!m) return;
+      currentEditingId = id;
+      document.getElementById('modalTitle').innerText = `Chỉnh Sửa Phím Macro [${m.trigger}]`;
+      document.getElementById('txtTriggerKey').innerText = m.trigger;
+      document.getElementById('inputMacroName').value = m.name || '';
+      editingActions = JSON.parse(JSON.stringify(m.actions));
+      resetInlineInput();
+      renderActionTable();
+      document.getElementById('editorModal').style.display = 'flex';
+      stopListening();
+    }
+
+    function closeModal() {
+      document.getElementById('editorModal').style.display = 'none';
+      stopListening();
+    }
+
+    // --- Render Action Table in Modal ---
+    function renderActionTable() {
+      const tbody = document.getElementById('actionTableBody');
+      document.getElementById('lblStepCount').innerText = `${editingActions.length} bước`;
+
+      if (editingActions.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:16px; color:var(--text-secondary);">Chưa có hành động nào trong chuỗi. Hãy thêm bên dưới.</td></tr>`;
+        document.getElementById('txtDslPreview').innerText = '(Trống)';
+        return;
+      }
+
+      tbody.innerHTML = editingActions.map((act, i) => {
+        let typeText = '';
+        let valFormatted = '';
+
+        if (act.type === 'press') {
+          typeText = '⚡ Nhấn (press)';
+          valFormatted = `<span class="key-badge">${act.val}</span>`;
+        } else if (act.type === 'down') {
+          typeText = '⬇️ Giữ (down)';
+          valFormatted = `<span class="key-badge">${act.val}</span>`;
+        } else if (act.type === 'up') {
+          typeText = '⬆️ Nhả (up)';
+          valFormatted = `<span class="key-badge">${act.val}</span>`;
+        } else if (act.type === 'delay') {
+          typeText = '⏱️ Chờ (delay)';
+          valFormatted = `<span style="font-family:monospace; font-weight:bold;">${act.val} ms</span> <small style="color:var(--text-secondary);">(${(parseInt(act.val)/1000).toFixed(2)}s)</small>`;
+        } else if (act.type === 'text') {
+          typeText = '🔤 Gõ (text)';
+          valFormatted = `<span style="color:#4EC9B0;">"${act.val}"</span>`;
+        }
+
+        return `
+          <tr>
+            <td style="text-align: center; color: var(--text-secondary); font-size: 11px;">${i + 1}</td>
+            <td style="font-weight: 600;">${typeText}</td>
+            <td>${valFormatted}</td>
+            <td style="text-align: center;">
+              <button class="btn" style="padding: 1px 4px; font-size: 10px;" onclick="moveStep(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+              <button class="btn" style="padding: 1px 4px; font-size: 10px;" onclick="moveStep(${i}, 1)" ${i === editingActions.length - 1 ? 'disabled' : ''}>↓</button>
+            </td>
+            <td style="text-align: center;">
+              <button class="btn btn-danger" style="padding: 1px 5px; font-size: 10.5px;" onclick="removeStep(${i})">✕</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('txtDslPreview').innerText = buildDsl(editingActions);
+    }
+
+    function moveStep(index, delta) {
+      const newIndex = index + delta;
+      if (newIndex < 0 || newIndex >= editingActions.length) return;
+      const item = editingActions.splice(index, 1)[0];
+      editingActions.splice(newIndex, 0, item);
+      renderActionTable();
+    }
+
+    function removeStep(index) {
+      editingActions.splice(index, 1);
+      renderActionTable();
+    }
+
+    // --- Inline Add Step Controls ---
+    function onActionTypeChange(type) {
+      const area = document.getElementById('areaValueInput');
+      stopListening();
+
+      if (type === 'press' || type === 'down' || type === 'up') {
+        area.innerHTML = `
+          <div class="key-capture-box" id="boxStepKey" onclick="listenStepKey()">
+            <span id="txtStepKey"></span>
+          </div>
+        `;
+      } else if (type === 'delay') {
+        area.innerHTML = `
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="number" id="inputDelayMs" value="150" min="10" max="10000" step="10" style="width:90px; height:34px; text-align:center; font-family:monospace; font-weight:bold;">
+            <span style="font-size:11.5px; color:var(--text-secondary);">mili-giây (ms)</span>
+          </div>
+        `;
+      } else if (type === 'text') {
+        area.innerHTML = `
+          <input type="text" id="inputTextString" placeholder="Nhập chuỗi văn bản cần gõ tự động..." style="width:100%; height:34px;">
+        `;
+      }
+    }
+
+    function resetInlineInput() {
+      document.getElementById('selActionType').value = 'press';
+      onActionTypeChange('press');
+    }
+
+    function addCurrentStep() {
+      const type = document.getElementById('selActionType').value;
+      let val = '';
+
+      if (type === 'press' || type === 'down' || type === 'up') {
+        val = document.getElementById('txtStepKey').innerText.trim();
+        if (!val || val.includes('Bấm phím')) {
+          alert('Vui lòng bấm phím hoặc tổ hợp phím hợp lệ!');
+          return;
+        }
+        val = val.replace(/\s*\+\s*/g, '+');
+      } else if (type === 'delay') {
+        val = document.getElementById('inputDelayMs').value.trim();
+        if (!val || isNaN(val) || parseInt(val) <= 0) {
+          alert('Vui lòng nhập số mili-giây hợp lệ!');
+          return;
+        }
+      } else if (type === 'text') {
+        val = document.getElementById('inputTextString').value.trim();
+        if (!val) {
+          alert('Vui lòng nhập chuỗi văn bản!');
+          return;
+        }
+      }
+
+      editingActions.push({ type, val });
+      resetInlineInput();
+      renderActionTable();
+    }
+
+    // --- Key Capture Logic ---
+    function listenTriggerKey() {
+      listeningTarget = 'trigger';
+      const b = document.getElementById('boxTriggerKey');
+      b.classList.add('listening');
+      document.getElementById('txtTriggerKey').innerText = 'Bấm phím...';
+    }
+
+    function listenStepKey() {
+      listeningTarget = 'stepKey';
+      const b = document.getElementById('boxStepKey');
+      b.classList.add('listening');
+      document.getElementById('txtStepKey').innerText = 'Bấm phím / tổ hợp...';
+    }
+
+    function stopListening() {
+      listeningTarget = null;
+      const bt = document.getElementById('boxTriggerKey');
+      if (bt) bt.classList.remove('listening');
+      const bs = document.getElementById('boxStepKey');
+      if (bs) bs.classList.remove('listening');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (!listeningTarget) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Trigger Key (Single Physical Key)
+      if (listeningTarget === 'trigger') {
+        let name = e.key;
+        if (e.code === 'Space') name = 'Space';
+        else if (e.code === 'CapsLock') name = 'Caps Lock';
+        else if (e.code === 'Escape') name = 'Escape';
+        else if (e.code === 'Insert') name = 'Insert';
+        else if (e.code === 'Delete') name = 'Delete';
+        else if (name.length === 1) name = name.toUpperCase();
+
+        document.getElementById('txtTriggerKey').innerText = name;
+        stopListening();
+        return;
+      }
+
+      // Step Key
+      if (listeningTarget === 'stepKey') {
+        const type = document.getElementById('selActionType').value;
+
+        if (type === 'press') {
+          let parts = [];
+          if (e.ctrlKey) parts.push('Ctrl');
+          if (e.altKey) parts.push('Alt');
+          if (e.shiftKey) parts.push('Shift');
+          if (e.metaKey) parts.push('Windows');
+
+          let keyName = e.key;
+          if (['Control', 'Alt', 'Shift', 'Meta'].includes(keyName)) {
+            if (parts.length > 0) {
+              document.getElementById('txtStepKey').innerText = parts.join(' + ');
+            }
+            return;
+          }
+
+          if (e.code === 'Space') keyName = 'Space';
+          else if (e.code === 'CapsLock') keyName = 'Caps Lock';
+          else if (e.code === 'Escape') keyName = 'Escape';
+          else if (e.code === 'Enter') keyName = 'Enter';
+          else if (e.code === 'Tab') keyName = 'Tab';
+          else if (keyName.length === 1) keyName = keyName.toUpperCase();
+
+          if (!parts.includes(keyName)) parts.push(keyName);
+          document.getElementById('txtStepKey').innerText = parts.join(' + ');
+          stopListening();
+        } else {
+          // Single key for down / up
+          let name = e.key;
+          if (e.code === 'Space') name = 'Space';
+          else if (e.code === 'CapsLock') name = 'Caps Lock';
+          else if (e.code === 'ControlLeft' || e.code === 'ControlRight') name = 'Ctrl';
+          else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') name = 'Shift';
+          else if (e.code === 'AltLeft' || e.code === 'AltRight') name = 'Alt';
+          else if (name.length === 1) name = name.toUpperCase();
+
+          document.getElementById('txtStepKey').innerText = name;
+          stopListening();
+        }
+      }
+    });
+
+    // --- Save Macro ---
+    function saveMacro() {
+      const trigger = document.getElementById('txtTriggerKey').innerText.trim();
+      const name = document.getElementById('inputMacroName').value.trim() || 'Phím Macro';
+
+      if (!trigger || trigger.includes('Bấm phím')) {
+        alert('Vui lòng chọn phím kích hoạt!');
+        return;
+      }
+
+      if (editingActions.length === 0) {
+        alert('Chuỗi hành động phải có ít nhất 1 bước!');
+        return;
+      }
+
+      const list = profileMacros[activeProfileId] || [];
+
+      if (currentEditingId !== null) {
+        const m = list.find(x => x.id === currentEditingId);
+        if (m) {
+          m.trigger = trigger;
+          m.name = name;
+          m.actions = editingActions;
+          if (activeProfileId !== 'global' && m.origin === 'inherited') {
+            m.origin = 'overridden';
+          }
+        }
+      } else {
+        list.push({
+          id: Date.now(),
+          trigger,
+          name,
+          actions: editingActions,
+          origin: activeProfileId === 'global' ? 'root' : 'app_specific'
+        });
+      }
+
+      closeModal();
+      renderCurrentSubPanel();
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+    }
+
+    // Init
+    renderCurrentSubPanel();
+  </script>
+</body>
+</html>

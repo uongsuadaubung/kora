@@ -4,7 +4,7 @@
 
 use crate::engine::config::hotkey::vk_to_name;
 use crate::platform::win32::{
-    start_single_key_capture, stop_single_key_capture, ENGINE_INSTANCE, WM_REMAP_KEY_CAPTURED,
+    start_single_key_capture, stop_single_key_capture, ENGINE_INSTANCE, WM_SINGLE_KEY_CAPTURED,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -513,7 +513,7 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                 }
                 0
             }
-            WM_REMAP_KEY_CAPTURED => {
+            WM_SINGLE_KEY_CAPTURED => {
                 let vk = wparam as u32;
                 let mut h_box = 0;
 
@@ -527,7 +527,8 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                 }
 
                 if h_box != 0 {
-                    InvalidateRect(h_box, null_mut(), 1);
+                    InvalidateRect(h_box, null_mut(), 0);
+                    UpdateWindow(h_box);
                 }
                 0
             }

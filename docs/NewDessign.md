@@ -392,93 +392,48 @@ Khu vực nội dung cấu hình bên phải được tổ chức thành các ta
 └─────────────────────────────┴───────────────────────────────────────────────────────┘
 ```
 
-### 8.2. Thiết Kế Hộp Thoại Modal "Thêm / Sửa Phím Macro" (Macro Editor Dialog)
+#### 8.2. Thiết Kế Hộp Thoại Modal "Thêm / Sửa Phím Macro" (Macro Editor Dialog)
 
-Kích thước hộp thoại: $560 \times 460$ px, áp dụng kiến trúc **Bảng Hành Động Trực Quan (Action Table) kết hợp Bắt Phím Vật Lý Tự Động (Physical Key Capture)**:
+Kích thước hộp thoại: $580 \times 480$ px, thiết kế tối giản, sạch sẽ theo chuẩn **Windows 11 Fluent UI**, loại bỏ toàn bộ sub-dialog rườm rà:
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│ ⚡ Thiết lập Phím Macro (Key Macro Editor)        [X]  │
+│ ⌨️ Thêm / Sửa Phím Macro                           [X] │
 ├────────────────────────────────────────────────────────┤
-│ Tên mô tả:      [Combo Nhảy Game                     ] │
-│ Phím kích hoạt: [ Bấm phím kích hoạt... (F1)         ] │
+│ Phím kích hoạt: [ F1 ]      Tên mô tả: [Nhảy Bunny Hop]│
 │                                                        │
-│ Danh sách các bước hành động (Action Table):           │
-│ ┌───┬─────────┬───────────────────────────┬──────────┐ │
-│ │ # │ Hành động│ Phím / Giá trị            │ Thao tác │ │
-│ ├───┼─────────┼───────────────────────────┼──────────┤ │
-│ │ 1 │ down    │ W                         │  [Xóa]   │ │
-│ │ 2 │ delay   │ 200 ms                    │  [Xóa]   │ │
-│ │ 3 │ press   │ Space                     │  [Xóa]   │ │
-│ │ 4 │ delay   │ 50 ms                     │  [Xóa]   │ │
-│ │ 5 │ up      │ W                         │  [Xóa]   │ │
-│ │ 6 │ press   │ Ctrl + Shift + L          │  [Xóa]   │ │
-│ └───┴─────────┴───────────────────────────┴──────────┘ │
+│ Chuỗi hành động theo thứ tự (Action Sequence):         │
+│ ┌───┬──────────────────┬────────────────┬──────┬─────┐ │
+│ │ # │ Hành động        │ Phím / Tham số │Thứ tự│ Xóa │ │
+│ ├───┼──────────────────┼────────────────┼──────┼─────┤ │
+│ │ 1 │ ⬇️ Giữ (down)    │ W              │ ↑  ↓ │  ✕  │ │
+│ │ 2 │ ⏱️ Chờ (delay)   │ 150 ms (0.15s) │ ↑  ↓ │  ✕  │ │
+│ │ 3 │ ⚡ Nhấn (press)  │ Space          │ ↑  ↓ │  ✕  │ │
+│ │ 4 │ ⬆️ Nhả (up)      │ W              │ ↑  ↓ │  ✕  │ │
+│ └───┴──────────────────┴────────────────┴──────┴─────┘ │
 │                                                        │
-│ ➕ THÊM BƯỚC MỚI VÀO CUỐI:                             │
-│ ┌────────────────────────────────────────────────────┐ │
-│ │ [🎯 Gõ Phím/Tổ Hợp (Press)]  [⬇ Nhấn Giữ (Down)]   │ │
-│ │ [⬆ Nhả Phím (Up)]            [⏳ Chờ (Delay ms)]    │ │
-│ │ [📝 Đoạn Chữ (Text)]                               │ │
-│ └────────────────────────────────────────────────────┘ │
+│ Chèn hành động mới vào chuỗi (Thao tác trực tiếp):     │
+│ ┌──────────────────────┬──────────────────────┬──────┐ │
+│ │ [⚡ Nhấn (press) ▼] │ [ Ctrl + Shift + L ] │[+Thêm│ │
+│ └──────────────────────┴──────────────────────┴──────┘ │
+│   * Loại press/down/up: Click vào ô để bấm phím tự bắt │
+│   * Loại delay: Ô số mili-giây (ms)                    │
+│   * Loại text: Ô gõ chuỗi văn bản                      │
 │                                                        │
-│ Xem trước cú pháp DSL tự động sinh:                    │
-│ down(W) + delay(200) + press(Space) + delay(50)...     │
+│ Xem trước cú pháp Pipeline (DSL):                      │
+│ down(W) + delay(150) + press(Space) + up(W)            │
+│                                                        │
+│ Mẫu gợi ý: [Bunny Hop CS2] [Format Code] [Mua AK-47]   │
 ├────────────────────────────────────────────────────────┤
 │                                  [ Lưu Macro ]  [ Hủy ]│
 └────────────────────────────────────────────────────────┘
 ```
 
-#### Cơ Chế Bắt Phím Vật Lý Tự Động (Physical Key Capture Integration):
-* Người dùng **hoàn toàn không cần gõ tên phím bằng tay**:
-  1. Khi bấm **`[🎯 Gõ Phím/Tổ Hợp (Press)]`**: Hệ thống tận dụng module bắt phím có sẵn (`hotkey.rs` / `remap_key.rs`). Người dùng chỉ việc bấm tổ hợp thực tế trên bàn phím (ví dụ bấm `Ctrl + Shift + L` hoặc phím đơn `Space`), hệ thống tự động bóc tách và thêm ngay dòng: `press | Ctrl + Shift + L`.
-  2. Khi bấm **`[⬇ Nhấn Giữ (Down)]`**: Bấm phím muốn giữ (e.g. `W`) $\to$ thêm dòng `down | W`.
-  3. Khi bấm **`[⬆ Nhả Phím (Up)]`**: Bấm phím muốn nhả (e.g. `W`) $\to$ thêm dòng `up | W`.
-  4. Khi bấm **`[⏳ Chờ (Delay ms)]`**: Hộp thoại nhỏ nhập mili-giây (gợi ý sẵn `100` / `200` ms) $\to$ thêm dòng `delay | 200 ms`.
-  5. Khi bấm **`[📝 Đoạn Chữ (Text)]`**: Ô nhập chuỗi ký tự dài (email, mật khẩu) $\to$ thêm dòng `text | admin@kora.io`.
-* **Đồng bộ hai chiều (Bi-directional Sync):**
-  - Mọi thao tác thêm/xóa dòng trong bảng Action Table tự động cập nhật chuỗi DSL nguyên bản.
-  - Khi lưu lại, chuỗi DSL được ghi trực tiếp vào file cấu hình `config.ini` và ngược lại khi mở hộp thoại sửa, chuỗi DSL được phân tích tự động hiển thị lên bảng.
-
----
-
-### 8.3. Thiết Kế Hộp Thoại Con "Thêm / Chỉnh Sửa 1 Hành Động" (Action Editor Dialog)
-
-Kích thước hộp thoại: $520 \times 440$ px, mở đè trực tiếp lên trên Macro Editor khi người dùng bấm thêm hoặc sửa một dòng hành động:
-
-```
-┌────────────────────────────────────────────────────────┐
-│ 🎯 Thêm / Sửa Hành Động (Action Editor)            [X] │
-├────────────────────────────────────────────────────────┤
-│ 1. CHỌN LOẠI HÀNH ĐỘNG:                                │
-│ [ ⚡ Press ]  [ ⬇ Down ]  [ ⬆ Up ]  [ ⏱ Delay ] [ 🔤 Text ] │
-│                                                        │
-│ 💡 Nhấn nhanh (Press): Gửi 1 lần Down rồi Up ngay lập │
-│ tức. Hỗ trợ phím đơn (Space) hoặc tổ hợp (Ctrl+Shift+L)│
-│                                                        │
-│ 2. THIẾT LẬP GIÁ TRỊ / BẮT PHÍM:                       │
-│ ┌────────────────────────────────────────────────────┐ │
-│ │                Ctrl + Shift + L                    │ │
-│ └────────────────────────────────────────────────────┘ │
-│ Click vào ô để bấm phím hoặc tổ hợp phím trên bàn phím │
-│                                                        │
-│ Gợi ý chọn nhanh:                                      │
-│ [Ctrl+Shift+L] [Space] [Enter] [Escape] [Tab] [F5]     │
-│ [Ctrl+C] [Ctrl+V] [Alt+Tab]                            │
-│                                                        │
-│ (Khi chọn ⏱ Delay: Có ô nhập ms + Thanh kéo Slider    │
-│  từ 10ms đến 2000ms + Chip mốc: 30ms, 80ms, 150ms...)  │
-│                                                        │
-│ (Khi chọn 🔤 Text: Có ô nhập chuỗi văn bản tự động gõ) │
-│                                                        │
-│ 3. LỆNH DSL TƯƠNG ỨNG SINH RA:                         │
-│ ┌────────────────────────────────────────────────────┐ │
-│ │ press(Ctrl+Shift+L)                                │ │
-│ └────────────────────────────────────────────────────┘ │
-├────────────────────────────────────────────────────────┤
-│                               [➕ Thêm vào chuỗi] [Hủy]│
-└────────────────────────────────────────────────────────┘
-```
+#### Ưu Điểm Thiết Kế Tinh Gọn (Inline Action Builder):
+1. **Không mở sub-modal chồng chất (Zero Modal-in-modal):** Toàn bộ thao tác cấu hình diễn ra ngay trên 1 màn hình duy nhất. Người dùng chọn loại hành động từ dropdown, ô giá trị bên cạnh tự động chuyển đổi tương ứng (khung bắt phím vật lý / ô nhập số ms / ô gõ text), bấm `+ Thêm bước` là dòng mới được nối ngay vào bảng.
+2. **Hỗ trợ sắp xếp thứ tự linh hoạt (Reordering):** Hai nút mũi tên `↑` `↓` ở mỗi dòng cho phép tinh chỉnh thứ tự thực thi của pipeline một cách trực quan mà không cần xóa đi gõ lại.
+3. **Màu sắc trang nhã, không màu mè:** Tông xám tối trung tính (Dark Slate) chuẩn Windows, mã phím hiển thị dạng key badge nhẹ nhàng, thanh lịch.
+4. **File thử nghiệm độc lập:** Toàn bộ nguyên mẫu tương tác hoàn chỉnh được đặt tại [`mockup_macro.html`](file:///c:/Users/kien.hm/Desktop/OpenKey/mockup_macro.html).
 
 ---
 

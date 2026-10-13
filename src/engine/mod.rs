@@ -95,6 +95,10 @@ impl VietnameseEngine {
         self.profile_manager.resolve_effective_disabled(&self.profile_manager.active_id)
     }
 
+    pub fn effective_key_macros(&self) -> Vec<profile::KeyMacroRule> {
+        self.profile_manager.resolve_effective_key_macros(&self.profile_manager.active_id)
+    }
+
     pub fn effective_macros(&self) -> Vec<crate::engine::macro_table::MacroEntry> {
         self.profile_manager.resolve_effective_macros(
             &self.profile_manager.active_id,

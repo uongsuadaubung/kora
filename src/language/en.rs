@@ -163,11 +163,13 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     typing_inherit_global: "🌐 Inherit System-wide",
     typing_inherit_prefix: "Inherited",
 
-    // Tab 2: Remap & Disable
+    // Tab 2: Remap, Disable & Key Macro
     remap_table_title: "Enable key remapping",
     disable_table_title: "Enable key blocking",
+    key_macro_table_title: "Enable key macros",
     keys_sub_remap: "Remap",
     keys_sub_disable: "Block",
+    keys_sub_macro: "Key Macro",
     status_active: "🟢 Active",
     status_disabled: "⚪ Disabled",
     status_blocked: "Blocked completely system-wide",
@@ -181,10 +183,14 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     col_origin: "Origin",
     col_status: "Status",
     col_disable_key: "Blocked Key",
+    col_key_macro_trigger: "Trigger Key",
+    col_key_macro_name: "Description",
     btn_add_remap: "+ Remap Key",
     btn_del_remap: "Delete",
     btn_add_disable: "+ Block Key",
     btn_del_disable: "Delete",
+    btn_add_key_macro: "+ Add Macro",
+    btn_del_key_macro: "Delete",
 
     // Dialogs
     dlg_add_prof_title: "Add New Application Profile",
@@ -232,9 +238,28 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     dlg_macro_lbl_val: "Replacement content:",
     dlg_macro_lbl_type: "Typing rule:",
 
+    // Key Macro Dialog
+    dlg_key_macro_title_add: "Setup New Key Macro",
+    dlg_key_macro_title_edit: "Edit Key Macro",
+    dlg_key_macro_trigger_lbl: "Trigger Key:",
+    dlg_key_macro_trigger_hint: "Click box to capture trigger key",
+    dlg_key_macro_name_lbl: "Name / Description:",
+    dlg_key_macro_name_placeholder: "e.g. Format Code...",
+    dlg_key_macro_actions_lbl: "Action Execution Sequence:",
+    dlg_key_macro_col_index: "#",
+    dlg_key_macro_col_type: "Type",
+    dlg_key_macro_col_val: "Value / Key",
+    dlg_key_macro_col_order: "Order",
+    dlg_key_macro_col_action: "Delete",
+    dlg_key_macro_empty_actions: "No actions in sequence yet. Add below.",
+    dlg_key_macro_insert_title: "Insert new action into sequence:",
+    dlg_key_macro_btn_add_step: "+ Add Step",
+    dlg_key_macro_dsl_preview: "Pipeline DSL Preview:",
+
     // Confirm Dialog
     confirm_delete_title: "Confirm Deletion",
     confirm_delete_macro_msg: "Are you sure you want to delete shorthand",
+    confirm_delete_key_macro_msg: "Are you sure you want to delete key macro {key} ({name})?",
     confirm_delete_remap_msg: "Are you sure you want to delete key remap rule {from} ➔ {to}?",
     confirm_delete_disable_msg: "Are you sure you want to unblock key {key}?",
     confirm_delete_profile_msg: "Are you sure you want to delete profile \"{name}\"? All of its custom settings will be lost.",

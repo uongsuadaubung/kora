@@ -5,12 +5,14 @@
 //! - Sub-tab 2 (extensible): Key Macro (Phím macro)
 
 pub mod panel_disable;
+pub mod panel_macro;
 pub mod panel_remap;
 
 pub use panel_disable::DisablePanel;
+pub use panel_macro::MacroPanel;
 pub use panel_remap::RemapPanel;
 
-use crate::engine::profile::{ResolvedDisableItem, ResolvedRemapItem};
+use crate::engine::profile::{ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem};
 use crate::ui::components::TabBar;
 use crate::ui::tokens::{id::*, layout, spacing};
 use crate::ui::win32::{
@@ -48,13 +50,18 @@ pub struct TabKeys {
     pub sub_tabs: TabBar,
     pub remap: RemapPanel,
     pub disable: DisablePanel,
+    pub key_macro: MacroPanel,
 }
 
 impl TabKeys {
     pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
         let strings = crate::language::current();
 
-        let sub_titles = [strings.keys_sub_remap, strings.keys_sub_disable];
+        let sub_titles = [
+            strings.keys_sub_remap,
+            strings.keys_sub_disable,
+            strings.keys_sub_macro,
+        ];
         let sub_tabs = TabBar::create(
             parent,
             IDC_TAB_KEYS_SUB,
@@ -69,12 +76,14 @@ impl TabKeys {
 
         let remap = RemapPanel::create(parent, hfont_normal, hfont_bold)?;
         let disable = DisablePanel::create(parent, hfont_normal, hfont_bold)?;
+        let key_macro = MacroPanel::create(parent, hfont_normal, hfont_bold)?;
 
         let tab = Self {
             parent_hwnd: parent,
             sub_tabs,
             remap,
             disable,
+            key_macro,
         };
         Some(tab)
     }
@@ -87,6 +96,11 @@ impl TabKeys {
             .check_enabled
             .set_checked(config.disable_enabled);
         self.disable.update_controls_state();
+
+        self.key_macro
+            .check_enabled
+            .set_checked(config.key_macro_enabled);
+        self.key_macro.update_controls_state();
     }
 
     pub fn load_profile(
@@ -107,16 +121,23 @@ impl TabKeys {
             .check_enabled
             .set_tri_state(profile.disable_enabled, global_config.disable_enabled);
         self.disable.update_controls_state();
+
+        self.key_macro
+            .check_enabled
+            .set_tri_state(profile.key_macro_enabled, global_config.key_macro_enabled);
+        self.key_macro.update_controls_state();
     }
 
     pub fn read_config(&self, config: &mut crate::engine::EngineConfig) {
         config.remap_enabled = self.remap.check_enabled.is_checked();
         config.disable_enabled = self.disable.check_enabled.is_checked();
+        config.key_macro_enabled = self.key_macro.check_enabled.is_checked();
     }
 
     pub fn read_profile(&self, profile: &mut crate::engine::profile::AppProfile) {
         profile.remap_enabled = self.remap.check_enabled.tri_state();
         profile.disable_enabled = self.disable.check_enabled.tri_state();
+        profile.key_macro_enabled = self.key_macro.check_enabled.tri_state();
     }
 
     pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
@@ -126,18 +147,19 @@ impl TabKeys {
                 self.update_visibility(true);
                 true
             }
-            IDC_CHECK_REMAP_ENABLED | IDC_CHECK_DISABLE_ENABLED => {
+            IDC_CHECK_REMAP_ENABLED | IDC_CHECK_DISABLE_ENABLED | IDC_CHECK_KEY_MACRO_ENABLED => {
                 if notify_code != 0 {
                     return false;
                 }
-                let is_remap = ctl_id == IDC_CHECK_REMAP_ENABLED;
-                if is_remap {
-                    self.remap.update_controls_state();
-                } else {
-                    self.disable.update_controls_state();
+                match ctl_id {
+                    IDC_CHECK_REMAP_ENABLED => self.remap.update_controls_state(),
+                    IDC_CHECK_DISABLE_ENABLED => self.disable.update_controls_state(),
+                    IDC_CHECK_KEY_MACRO_ENABLED => self.key_macro.update_controls_state(),
+                    _ => {}
                 }
                 let remap_on = self.remap.check_enabled.is_checked();
                 let disable_on = self.disable.check_enabled.is_checked();
+                let macro_on = self.key_macro.check_enabled.is_checked();
                 crate::ui::controller::edit_selected_then(
                     |target| match target {
                         EditTarget::Global(cfg) => self.read_config(cfg),
@@ -147,23 +169,27 @@ impl TabKeys {
                         // Root profile mirrors the global toggle in its profile record too.
                         let pm = &mut engine.profile_manager;
                         if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
-                            if is_remap {
-                                pm.global_profile.remap_enabled = Some(remap_on);
-                            } else {
-                                pm.global_profile.disable_enabled = Some(disable_on);
+                            match ctl_id {
+                                IDC_CHECK_REMAP_ENABLED => pm.global_profile.remap_enabled = Some(remap_on),
+                                IDC_CHECK_DISABLE_ENABLED => pm.global_profile.disable_enabled = Some(disable_on),
+                                IDC_CHECK_KEY_MACRO_ENABLED => pm.global_profile.key_macro_enabled = Some(macro_on),
+                                _ => {}
                             }
                         }
                     },
                 );
                 true
             }
-            // The dialogs are modeless and refresh the lists themselves on save.
             IDC_BTN_ADD_REMAP => {
                 crate::ui::views::dialogs::show_remap_dialog(hwnd);
                 true
             }
             IDC_BTN_ADD_DISABLE => {
                 crate::ui::views::dialogs::show_disable_dialog(hwnd);
+                true
+            }
+            IDC_BTN_ADD_KEY_MACRO => {
+                crate::ui::views::dialogs::show_key_macro_dialog(hwnd);
                 true
             }
             _ => false,
@@ -180,22 +206,33 @@ impl TabKeys {
         self.disable.populate(items, self.parent_hwnd);
     }
 
+    /// Populates Key Macro ActionTable with resolved Live Inheritance items
+    pub fn populate_key_macros(&self, items: &[ResolvedKeyMacroItem]) {
+        self.key_macro.populate(items, self.parent_hwnd);
+    }
+
     pub fn update_language(&self, strings: &crate::language::LanguageStrings) {
-        self.sub_tabs
-            .set_tabs(&[strings.keys_sub_remap, strings.keys_sub_disable]);
+        self.sub_tabs.set_tabs(&[
+            strings.keys_sub_remap,
+            strings.keys_sub_disable,
+            strings.keys_sub_macro,
+        ]);
         self.remap.update_language(strings);
         self.disable.update_language(strings);
+        self.key_macro.update_language(strings);
 
         // Rows contain localized labels: rebuild them (engine lock released first).
         let items = crate::ui::controller::with_engine(|e| {
             (
                 crate::ui::controller::selected_remap_items(e),
                 crate::ui::controller::selected_disable_items(e),
+                crate::ui::controller::selected_key_macro_items(e),
             )
         });
-        if let Some((remaps, disabled)) = items {
+        if let Some((remaps, disabled, macros)) = items {
             self.populate_remaps(&remaps);
             self.populate_disabled(&disabled);
+            self.populate_key_macros(&macros);
         }
     }
 
@@ -204,6 +241,7 @@ impl TabKeys {
         let panels = [
             (self.remap.hwnds(), visible && sub == 0),
             (self.disable.hwnds(), visible && sub == 1),
+            (self.key_macro.hwnds(), visible && sub == 2),
         ];
         unsafe {
             ShowWindow(

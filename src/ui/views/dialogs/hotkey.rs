@@ -5,8 +5,8 @@ use crate::engine::config::Hotkey;
 use crate::engine::config_store;
 use crate::platform::win32::{
     get_captured_display_text, get_captured_hotkey, get_pending_modifier_hotkey,
-    set_captured_hotkey, start_hotkey_capture, stop_hotkey_capture, ENGINE_INSTANCE,
-    WM_HOTKEY_CANCELLED, WM_HOTKEY_CAPTURED,
+    set_captured_hotkey, start_combo_capture, stop_combo_capture, ENGINE_INSTANCE,
+    WM_COMBO_CANCELLED, WM_COMBO_CAPTURED,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -460,7 +460,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                 }
                 0
             }
-            WM_HOTKEY_CAPTURED => {
+            WM_COMBO_CAPTURED => {
                 let text = get_captured_display_text();
                 let hotkey = get_captured_hotkey();
                 let mut disp_hwnd = 0;
@@ -474,17 +474,18 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                         if hotkey.is_some() {
                             st.current_hotkey = hotkey;
                             st.is_listening = false;
-                            stop_hotkey_capture();
+                            stop_combo_capture();
                         }
                     }
                 }
 
                 if disp_hwnd != 0 {
-                    InvalidateRect(disp_hwnd, null_mut(), 1);
+                    InvalidateRect(disp_hwnd, null_mut(), 0);
+                    UpdateWindow(disp_hwnd);
                 }
                 0
             }
-            WM_HOTKEY_CANCELLED => {
+            WM_COMBO_CANCELLED => {
                 let mut disp_hwnd = 0;
                 if let Ok(mut guard) = STATE.lock()
                     && let Some(ref mut st) = *guard
@@ -497,7 +498,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     };
                     disp_hwnd = st.hwnd_display_box;
                 }
-                stop_hotkey_capture();
+                stop_combo_capture();
                 if disp_hwnd != 0 {
                     InvalidateRect(disp_hwnd, null_mut(), 1);
                 }
@@ -518,7 +519,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                         };
                         disp_hwnd = st.hwnd_display_box;
                     }
-                    stop_hotkey_capture();
+                    stop_combo_capture();
                     if disp_hwnd != 0 {
                         InvalidateRect(disp_hwnd, null_mut(), 1);
                     }
@@ -539,7 +540,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             st.display_text = strings.hotkey_listening.to_string();
                             disp_hwnd = st.hwnd_display_box;
                         }
-                        start_hotkey_capture(hwnd);
+                        start_combo_capture(hwnd, false);
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
@@ -556,7 +557,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             disp_hwnd = st.hwnd_display_box;
                             set_captured_hotkey(st.current_hotkey, &st.display_text);
                         }
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
@@ -573,7 +574,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             disp_hwnd = st.hwnd_display_box;
                             set_captured_hotkey(st.current_hotkey, &st.display_text);
                         }
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
@@ -590,7 +591,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             disp_hwnd = st.hwnd_display_box;
                             set_captured_hotkey(st.current_hotkey, &st.display_text);
                         }
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
@@ -607,7 +608,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             disp_hwnd = st.hwnd_display_box;
                             set_captured_hotkey(st.current_hotkey, &st.display_text);
                         }
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
@@ -625,13 +626,13 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                             disp_hwnd = st.hwnd_display_box;
                             set_captured_hotkey(None, &st.display_text);
                         }
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         if disp_hwnd != 0 {
                             InvalidateRect(disp_hwnd, null_mut(), 1);
                         }
                     }
                     IDC_BTN_HOTKEY_SAVE => {
-                        stop_hotkey_capture();
+                        stop_combo_capture();
                         let state_opt = STATE.lock().ok().and_then(|g| g.clone());
                         if let Some(mut st) = state_opt {
                             if st.is_listening {
@@ -723,7 +724,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
             }
             WM_ERASEBKGND => 1,
             WM_CLOSE => {
-                stop_hotkey_capture();
+                stop_combo_capture();
                 let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
                 if parent != 0 {
                     EnableWindow(parent, 1);
@@ -733,7 +734,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                 0
             }
             WM_DESTROY => {
-                stop_hotkey_capture();
+                stop_combo_capture();
                 let font = DISPLAY_FONT.swap(0, Ordering::SeqCst);
                 if font != 0 {
                     DeleteObject(font);

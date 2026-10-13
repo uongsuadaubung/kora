@@ -138,6 +138,146 @@ pub struct ResolvedDisableItem {
     pub is_active: bool,
 }
 
+/// Single action within a Key Macro automation sequence
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MacroAction {
+    Press(String),
+    KeyDown(String),
+    KeyUp(String),
+    Delay(u32),
+    Text(String),
+}
+
+impl MacroAction {
+    pub fn action_type_str(&self) -> &'static str {
+        match self {
+            Self::Press(_) => "press",
+            Self::KeyDown(_) => "down",
+            Self::KeyUp(_) => "up",
+            Self::Delay(_) => "delay",
+            Self::Text(_) => "text",
+        }
+    }
+
+    pub fn value_str(&self) -> String {
+        match self {
+            Self::Press(s) | Self::KeyDown(s) | Self::KeyUp(s) | Self::Text(s) => s.clone(),
+            Self::Delay(ms) => ms.to_string(),
+        }
+    }
+
+    pub fn to_dsl(&self) -> String {
+        match self {
+            Self::Press(s) => format!("press({})", s),
+            Self::KeyDown(s) => format!("down({})", s),
+            Self::KeyUp(s) => format!("up({})", s),
+            Self::Delay(ms) => format!("delay({})", ms),
+            Self::Text(s) => format!("text({})", s),
+        }
+    }
+
+    pub fn actions_to_dsl(actions: &[MacroAction]) -> String {
+        if actions.is_empty() {
+            return String::new();
+        }
+        actions.iter().map(|a| a.to_dsl()).collect::<Vec<_>>().join(" + ")
+    }
+
+    pub fn dsl_to_actions(dsl: &str) -> Vec<MacroAction> {
+        let mut actions = Vec::new();
+        let trimmed = dsl.trim();
+        if trimmed.is_empty() {
+            return actions;
+        }
+
+        let mut chars = trimmed.char_indices().peekable();
+        while let Some(&(start_idx, ch)) = chars.peek() {
+            if ch.is_whitespace() || ch == '+' {
+                chars.next();
+                continue;
+            }
+
+            let open_paren = match trimmed[start_idx..].find('(') {
+                Some(pos) => start_idx + pos,
+                None => break,
+            };
+            let func_name = trimmed[start_idx..open_paren].trim().to_ascii_lowercase();
+
+            let close_paren = match trimmed[open_paren + 1..].find(')') {
+                Some(pos) => open_paren + 1 + pos,
+                None => break,
+            };
+            let content = trimmed[open_paren + 1..close_paren].trim();
+
+            match func_name.as_str() {
+                "press" => actions.push(MacroAction::Press(content.to_string())),
+                "down" | "keydown" => actions.push(MacroAction::KeyDown(content.to_string())),
+                "up" | "keyup" => actions.push(MacroAction::KeyUp(content.to_string())),
+                "delay" | "sleep" | "wait" => {
+                    let ms = content.parse::<u32>().unwrap_or(0);
+                    actions.push(MacroAction::Delay(ms));
+                }
+                "text" => actions.push(MacroAction::Text(content.to_string())),
+                _ => {}
+            }
+
+            while let Some(&(i, _)) = chars.peek() {
+                chars.next();
+                if i >= close_paren {
+                    break;
+                }
+            }
+        }
+
+        actions
+    }
+}
+
+/// Single hardware key macro automation rule
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyMacroRule {
+    pub trigger_vk: u32,
+    pub trigger_name: String,
+    pub name: String,
+    pub actions: Vec<MacroAction>,
+}
+
+impl KeyMacroRule {
+    pub fn new(trigger_vk: u32, name: impl Into<String>, actions: Vec<MacroAction>) -> Self {
+        Self {
+            trigger_vk,
+            trigger_name: crate::engine::config::hotkey::vk_to_name(trigger_vk).to_string(),
+            name: name.into(),
+            actions,
+        }
+    }
+
+    pub fn with_trigger_name(
+        trigger_vk: u32,
+        trigger_name: String,
+        name: impl Into<String>,
+        actions: Vec<MacroAction>,
+    ) -> Self {
+        Self {
+            trigger_vk,
+            trigger_name,
+            name: name.into(),
+            actions,
+        }
+    }
+}
+
+/// Resolved item for Key Macro table in UI
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedKeyMacroItem {
+    pub trigger_vk: u32,
+    pub trigger_name: String,
+    pub name: String,
+    pub actions: Vec<MacroAction>,
+    pub origin: RuleOrigin,
+    pub is_active: bool,
+}
+
 /// Resolved item for Macro table in UI
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedMacroItem {
@@ -189,6 +329,12 @@ pub struct AppProfile {
     pub muted_macros: Vec<String>,
     pub overridden_macros: HashMap<String, (String, MacroType)>,
     pub app_macros: Vec<MacroEntry>,
+
+    // 6. Key Macro (Hardware Key Automation, Delta inheritance)
+    pub key_macro_enabled: Option<bool>,
+    pub muted_key_macros: Vec<u32>,
+    pub overridden_key_macros: HashMap<u32, (String, Vec<MacroAction>)>,
+    pub app_key_macros: Vec<KeyMacroRule>,
 }
 
 impl AppProfile {
@@ -223,6 +369,10 @@ impl AppProfile {
             muted_macros: Vec::new(),
             overridden_macros: HashMap::new(),
             app_macros: Vec::new(),
+            key_macro_enabled: Some(false),
+            muted_key_macros: Vec::new(),
+            overridden_key_macros: HashMap::new(),
+            app_key_macros: Vec::new(),
         }
     }
 
@@ -264,6 +414,10 @@ impl AppProfile {
             muted_macros: Vec::new(),
             overridden_macros: HashMap::new(),
             app_macros: Vec::new(),
+            key_macro_enabled: None,
+            muted_key_macros: Vec::new(),
+            overridden_key_macros: HashMap::new(),
+            app_key_macros: Vec::new(),
         }
     }
 

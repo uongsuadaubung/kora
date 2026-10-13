@@ -52,7 +52,7 @@ pub fn create_modal_dialog(
             right: client_width,
             bottom: client_height,
         };
-        let style = 0x00080000 | 0x10000000 | 0x00C00000; // WS_SYSMENU | WS_VISIBLE | WS_CAPTION
+        let style = 0x00080000 | 0x10000000 | 0x00C00000 | 0x02000000; // WS_SYSMENU | WS_VISIBLE | WS_CAPTION | WS_CLIPCHILDREN
         let ex_style = 0x00010000 | 0x00000001; // WS_EX_CONTROLPARENT | WS_EX_DLGMODALFRAME
         AdjustWindowRect(&mut rc, style, 0);
 

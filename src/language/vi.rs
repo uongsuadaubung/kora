@@ -163,11 +163,13 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     typing_inherit_global: "🌐 Kế thừa toàn hệ thống",
     typing_inherit_prefix: "Kế thừa",
 
-    // Tab 2: Remap & Disable
+    // Tab 2: Remap, Disable & Key Macro
     remap_table_title: "Bật đổi phím",
     disable_table_title: "Bật chặn phím",
+    key_macro_table_title: "Bật phím macro",
     keys_sub_remap: "Đổi phím",
     keys_sub_disable: "Chặn phím",
+    keys_sub_macro: "Phím macro",
     status_active: "🟢 Đang hoạt động",
     status_disabled: "⚪ Bị vô hiệu",
     status_blocked: "Bị chặn hoàn toàn trên toàn máy tính",
@@ -181,10 +183,14 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     col_origin: "Nguồn gốc",
     col_status: "Trạng thái",
     col_disable_key: "Phím bị chặn",
+    col_key_macro_trigger: "Phím bấm",
+    col_key_macro_name: "Tên mô tả",
     btn_add_remap: "+ Đổi phím",
     btn_del_remap: "Xóa",
     btn_add_disable: "+ Chặn phím",
     btn_del_disable: "Xóa",
+    btn_add_key_macro: "+ Thêm Macro",
+    btn_del_key_macro: "Xóa",
 
     // Dialogs
     dlg_add_prof_title: "Thêm hồ sơ ứng dụng mới",
@@ -232,9 +238,28 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     dlg_macro_lbl_val: "Nội dung thay thế:",
     dlg_macro_lbl_type: "Quy tắc gõ:",
 
+    // Key Macro Dialog
+    dlg_key_macro_title_add: "Thiết lập phím macro mới",
+    dlg_key_macro_title_edit: "Chỉnh sửa phím macro",
+    dlg_key_macro_trigger_lbl: "Phím kích hoạt:",
+    dlg_key_macro_trigger_hint: "Click ô để bấm phím kích hoạt",
+    dlg_key_macro_name_lbl: "Tên gợi nhớ / mô tả:",
+    dlg_key_macro_name_placeholder: "VD: Format Code...",
+    dlg_key_macro_actions_lbl: "Chuỗi hành động thực thi:",
+    dlg_key_macro_col_index: "#",
+    dlg_key_macro_col_type: "Loại",
+    dlg_key_macro_col_val: "Giá trị / Phím",
+    dlg_key_macro_col_order: "Thứ tự",
+    dlg_key_macro_col_action: "Xóa",
+    dlg_key_macro_empty_actions: "Chưa có hành động nào trong chuỗi. Hãy thêm bên dưới.",
+    dlg_key_macro_insert_title: "Chèn hành động mới vào chuỗi:",
+    dlg_key_macro_btn_add_step: "+ Thêm bước",
+    dlg_key_macro_dsl_preview: "Xem trước cú pháp Pipeline (DSL):",
+
     // Confirm Dialog
     confirm_delete_title: "Xác nhận xóa",
     confirm_delete_macro_msg: "Bạn có chắc chắn muốn xóa mục gõ tắt",
+    confirm_delete_key_macro_msg: "Bạn có chắc chắn muốn xóa phím macro {key} ({name})?",
     confirm_delete_remap_msg: "Bạn có chắc chắn muốn xóa quy tắc đổi phím {from} ➔ {to}?",
     confirm_delete_disable_msg: "Bạn có chắc chắn muốn bỏ chặn phím {key}?",
     confirm_delete_profile_msg: "Bạn có chắc chắn muốn xóa profile \"{name}\"? Mọi thiết lập riêng của profile này sẽ bị mất.",

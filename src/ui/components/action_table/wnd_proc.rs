@@ -160,10 +160,10 @@ pub unsafe extern "system" fn action_table_wndproc(
                                             right: col_x + col_w,
                                             bottom: row_y + ROW_HEIGHT - 1,
                                         };
-                                        let btn_rects = get_dynamic_action_button_rects(&cell_rc, actions.len());
+                                        let btn_rects = get_dynamic_action_button_rects(&cell_rc, actions);
                                         for (act_idx, btn_rc) in btn_rects.iter().enumerate() {
                                             if pt_in_rect(x, y, btn_rc) {
-                                                action_hover = ActionHover::Action { row: row_idx, action_idx: act_idx };
+                                                action_hover = ActionHover::Action { row: row_idx, col: col_idx, action_idx: act_idx };
                                                 break;
                                             }
                                         }
@@ -303,8 +303,38 @@ pub unsafe extern "system" fn action_table_wndproc(
                 }
                 (ActionHover::None, None, None, true)
             } else {
-                let act = g.hover_action;
-                let hr = g.hover_row;
+                let mut act = g.hover_action;
+                let mut hr = g.hover_row;
+                if act == ActionHover::None && y >= header_h && y < client_rc.bottom {
+                    let row_idx = ((y - header_h + g.scroll_y) / ROW_HEIGHT) as usize;
+                    if row_idx < g.rows.len() {
+                        hr = Some(row_idx);
+                        let col_rects = compute_column_rects(&g.columns, width);
+                        let row_y = header_h + (row_idx as i32 * ROW_HEIGHT) - g.scroll_y;
+                        if let Some(row_cells) = g.rows.get(row_idx) {
+                            for (col_idx, &(col_x, col_w)) in col_rects.iter().enumerate() {
+                                if x >= col_x && x < col_x + col_w {
+                                    if let Some(TableCell::Actions(actions)) = row_cells.get(col_idx) {
+                                        let cell_rc = RECT {
+                                            left: col_x,
+                                            top: row_y,
+                                            right: col_x + col_w,
+                                            bottom: row_y + ROW_HEIGHT - 1,
+                                        };
+                                        let btn_rects = get_dynamic_action_button_rects(&cell_rc, actions);
+                                        for (act_idx, btn_rc) in btn_rects.iter().enumerate() {
+                                            if pt_in_rect(x, y, btn_rc) {
+                                                act = ActionHover::Action { row: row_idx, col: col_idx, action_idx: act_idx };
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
                 if hr.is_some() {
                     g.selected_row = hr;
                 }
@@ -323,19 +353,13 @@ pub unsafe extern "system" fn action_table_wndproc(
         }
 
         match action {
-            ActionHover::Action { row, action_idx } => {
+            ActionHover::Action { row, col, action_idx } => {
                 let cb = if let Ok(g) = state_mutex.lock() {
-                    if let Some(row_cells) = g.rows.get(row) {
-                        let mut found_cb = None;
-                        for cell in row_cells {
-                            if let TableCell::Actions(actions) = cell
-                                && let Some(act) = actions.get(action_idx)
-                            {
-                                found_cb = act.on_click.clone();
-                                break;
-                            }
-                        }
-                        found_cb
+                    if let Some(row_cells) = g.rows.get(row)
+                        && let Some(TableCell::Actions(actions)) = row_cells.get(col)
+                        && let Some(act) = actions.get(action_idx)
+                    {
+                        act.on_click.clone()
                     } else {
                         None
                     }

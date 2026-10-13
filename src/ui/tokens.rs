@@ -167,7 +167,7 @@ pub mod id {
     pub const IDC_BANNER_TITLE: u32 = 506;
     pub const IDC_BANNER_STATUS: u32 = 507;
 
-    // 510..519: Remap & Disable Key Controls
+    // 510..529: Remap, Disable & Key Macro Controls
     pub const IDC_BTN_ADD_REMAP: u32 = 510;
     pub const IDC_LIST_REMAP: u32 = 512;
     pub const IDC_BTN_ADD_DISABLE: u32 = 513;
@@ -175,6 +175,9 @@ pub mod id {
     pub const IDC_CHECK_REMAP_ENABLED: u32 = 516;
     pub const IDC_CHECK_DISABLE_ENABLED: u32 = 517;
     pub const IDC_TAB_KEYS_SUB: u32 = 518;
+    pub const IDC_BTN_ADD_KEY_MACRO: u32 = 520;
+    pub const IDC_LIST_KEY_MACRO: u32 = 521;
+    pub const IDC_CHECK_KEY_MACRO_ENABLED: u32 = 522;
 
     // 600..609: Footer Actions & Hotkey Dialog
     pub const IDC_BTN_EXIT: u32 = 600;
@@ -230,5 +233,17 @@ pub mod id {
     // 830..839: Confirm Dialog
     pub const IDC_CONFIRM_BTN_YES: u32 = 831;
     pub const IDC_CONFIRM_BTN_NO: u32 = 832;
+
+    // 840..859: Key Macro Dialog
+    pub const IDC_KEY_MACRO_DLG_TRIGGER: u32 = 841;
+    pub const IDC_KEY_MACRO_DLG_NAME: u32 = 842;
+    pub const IDC_KEY_MACRO_DLG_TYPE_COMBO: u32 = 843;
+    pub const IDC_KEY_MACRO_DLG_STEP_KEY: u32 = 844;
+    pub const IDC_KEY_MACRO_DLG_STEP_DELAY: u32 = 845;
+    pub const IDC_KEY_MACRO_DLG_STEP_TEXT: u32 = 846;
+    pub const IDC_KEY_MACRO_DLG_BTN_ADD_STEP: u32 = 847;
+    pub const IDC_KEY_MACRO_DLG_LIST_ACTIONS: u32 = 848;
+    pub const IDC_KEY_MACRO_DLG_SAVE: u32 = 849;
+    pub const IDC_KEY_MACRO_DLG_CANCEL: u32 = 850;
 }
 

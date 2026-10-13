@@ -93,10 +93,10 @@ impl TabMacro {
             hfont_normal,
             &[
                 (strings.col_macro_key, 90, ColumnStyle::KeyBadge),
-                (strings.col_macro_val, 160, ColumnStyle::Default),
+                (strings.col_macro_val, 150, ColumnStyle::Default),
                 (strings.col_macro_type, 75, ColumnStyle::CenterSecondary),
-                (strings.col_origin, 125, ColumnStyle::Default),
-                (strings.col_action, 104, ColumnStyle::Action),
+                (strings.col_origin, 115, ColumnStyle::Default),
+                (strings.col_action, 124, ColumnStyle::Action),
             ],
         )?;
 
@@ -117,24 +117,58 @@ impl TabMacro {
 
     pub fn toggle_macro_mute(key: String, mute: bool) {
         let changed = crate::ui::controller::with_engine(|engine| {
-            let sel_id = engine.profile_manager.selected_id.clone();
+            let pm = &mut engine.profile_manager;
+            let sel_id = pm.selected_id.clone();
             if sel_id == crate::ui::GLOBAL_PROFILE_ID {
-                return false;
-            }
-            if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
+                let target_profile = &mut pm.global_profile;
+                if mute {
+                    target_profile.overridden_macros.remove(&key.to_lowercase());
+                    if !target_profile
+                        .muted_macros
+                        .iter()
+                        .any(|k| k.eq_ignore_ascii_case(&key))
+                    {
+                        target_profile.muted_macros.push(key);
+                    }
+                } else {
+                    target_profile
+                        .muted_macros
+                        .retain(|k| !k.eq_ignore_ascii_case(&key));
+                }
+            } else {
+                let is_root_muted = pm
+                    .global_profile
+                    .muted_macros
+                    .iter()
+                    .any(|k| k.eq_ignore_ascii_case(&key));
+                let global_macro = engine.macro_table.get(&key).cloned();
+                let child = match pm.get_profile_mut(&sel_id) {
+                    Some(c) => c,
+                    None => return false,
+                };
                 if mute {
                     child.overridden_macros.remove(&key.to_lowercase());
-                    if !child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&key)) {
+                    child.app_macros.retain(|m| !m.key.eq_ignore_ascii_case(&key));
+                    if !child
+                        .muted_macros
+                        .iter()
+                        .any(|k| k.eq_ignore_ascii_case(&key))
+                    {
                         child.muted_macros.push(key);
                     }
                 } else {
-                    child.muted_macros.retain(|k| !k.eq_ignore_ascii_case(&key));
+                    child
+                        .muted_macros
+                        .retain(|k| !k.eq_ignore_ascii_case(&key));
+                    if is_root_muted && !child.app_macros.iter().any(|m| m.key.eq_ignore_ascii_case(&key)) {
+                        if let Some(m) = global_macro {
+                            child.app_macros.push(m);
+                        }
+                    }
                 }
-                crate::ui::controller::save(engine);
-                true
-            } else {
-                false
             }
+            crate::ui::controller::save(engine);
+            true
         });
         if changed == Some(true) {
             crate::ui::controller::refresh_macro_list();
@@ -283,7 +317,7 @@ impl TabMacro {
                             Self::trigger_edit(parent, data.clone());
                         }));
                         let k = entry_key.clone();
-                        actions.push(TableAction::delete(strings.action_mute, move || {
+                        actions.push(TableAction::secondary(strings.action_mute, move || {
                             Self::toggle_macro_mute(k.clone(), true);
                         }));
                     }
@@ -293,8 +327,21 @@ impl TabMacro {
                             Self::trigger_edit(parent, data.clone());
                         }));
                         let k = entry_key.clone();
+                        if entry.is_active {
+                            actions.push(TableAction::secondary(strings.action_mute, move || {
+                                Self::toggle_macro_mute(k.clone(), true);
+                            }));
+                        } else {
+                            actions.push(
+                                TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                    .with_callback(move || {
+                                        Self::toggle_macro_mute(k.clone(), false);
+                                    }),
+                            );
+                        }
+                        let k_del = entry_key.clone();
                         actions.push(TableAction::delete(strings.action_delete, move || {
-                            Self::trigger_delete_by_key(parent, k.clone());
+                            Self::trigger_delete_by_key(parent, k_del.clone());
                         }));
                     }
                 }

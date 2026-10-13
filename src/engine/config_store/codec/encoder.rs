@@ -3,7 +3,7 @@
 use crate::engine::config::EngineConfig;
 use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::macro_table::{MacroTable, MacroType};
-use crate::engine::profile::{LanguageMode, MethodMode, ProfileManager};
+use crate::engine::profile::{LanguageMode, MethodMode, ProfileManager, MacroAction};
 
 /// Serializes EngineConfig and MacroTable into unified INI string format
 pub fn serialize_config_and_macros(config: &EngineConfig, macros: &MacroTable) -> String {
@@ -81,6 +81,9 @@ pub fn serialize_config_all(
             ));
         }
     }
+    if !profiles.global_profile.muted_macros.is_empty() {
+        out.push_str(&format!("muted = {}\n", profiles.global_profile.muted_macros.join(", ")));
+    }
     out.push('\n');
 
     // [remap]
@@ -102,6 +105,16 @@ pub fn serialize_config_all(
             out.push_str(&format!("{} = {}\n", from_str, to_str));
         }
     }
+    if !profiles.global_profile.muted_remaps.is_empty() {
+        let names: Vec<String> = profiles
+            .global_profile
+            .muted_remaps
+            .iter()
+            .map(|&vk| vk_to_name(vk).to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        out.push_str(&format!("muted = {}\n", names.join(", ")));
+    }
     out.push('\n');
 
     // [disable]
@@ -117,6 +130,43 @@ pub fn serialize_config_all(
             .filter(|s| !s.is_empty())
             .collect();
         out.push_str(&format!("keys = {}\n", names.join(", ")));
+    }
+    if !profiles.global_profile.unmuted_disabled.is_empty() {
+        let names: Vec<String> = profiles
+            .global_profile
+            .unmuted_disabled
+            .iter()
+            .map(|&vk| vk_to_name(vk).to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        out.push_str(&format!("allow_disabled = {}\n", names.join(", ")));
+    }
+    out.push('\n');
+
+    // [key_macro]
+    out.push_str("[key_macro]\n");
+    out.push_str(&format!("enabled = {}\n", config.key_macro_enabled));
+    if !profiles.global_profile.app_key_macros.is_empty() {
+        out.push_str("# Phím macro toàn hệ thống: <Phím kích hoạt> = <Tên> | <DSL>\n");
+        for m in &profiles.global_profile.app_key_macros {
+            let trig_str = if !m.trigger_name.is_empty() {
+                &m.trigger_name
+            } else {
+                "Key"
+            };
+            let dsl = MacroAction::actions_to_dsl(&m.actions);
+            out.push_str(&format!("{} = {} | {}\n", trig_str, m.name, dsl));
+        }
+    }
+    if !profiles.global_profile.muted_key_macros.is_empty() {
+        let names: Vec<String> = profiles
+            .global_profile
+            .muted_key_macros
+            .iter()
+            .map(|&vk| vk_to_name(vk).to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        out.push_str(&format!("muted = {}\n", names.join(", ")));
     }
     out.push('\n');
 
@@ -247,6 +297,33 @@ pub fn serialize_config_all(
                     m.macro_type.as_str()
                 ));
             }
+        }
+
+        if let Some(km_en) = child.key_macro_enabled {
+            out.push_str(&format!("key_macro_enabled = {}\n", km_en));
+        }
+        if !child.muted_key_macros.is_empty() {
+            let names: Vec<String> = child
+                .muted_key_macros
+                .iter()
+                .map(|&vk| vk_to_name(vk).to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            out.push_str(&format!("muted_key_macros = {}\n", names.join(", ")));
+        }
+        for (&trig_vk, (nm, actions)) in &child.overridden_key_macros {
+            let trig_nm = vk_to_name(trig_vk);
+            let dsl = MacroAction::actions_to_dsl(actions);
+            out.push_str(&format!("override_key_macro = {} = {} | {}\n", trig_nm, nm, dsl));
+        }
+        for m in &child.app_key_macros {
+            let trig_nm = if !m.trigger_name.is_empty() {
+                &m.trigger_name
+            } else {
+                "Key"
+            };
+            let dsl = MacroAction::actions_to_dsl(&m.actions);
+            out.push_str(&format!("app_key_macro = {} = {} | {}\n", trig_nm, m.name, dsl));
         }
         out.push('\n');
     }

@@ -117,11 +117,23 @@ impl DisablePanel {
                         );
                     }
                     RuleOrigin::InheritedGlobal | RuleOrigin::OverriddenGlobal => {
-                        actions.push(TableAction::delete(strings.action_mute, move || {
+                        actions.push(TableAction::secondary(strings.action_mute, move || {
                             Self::toggle_mute(vk, true);
                         }));
                     }
                     RuleOrigin::Root | RuleOrigin::AppSpecific => {
+                        if item.is_active {
+                            actions.push(TableAction::secondary(strings.action_mute, move || {
+                                Self::toggle_mute(vk, true);
+                            }));
+                        } else {
+                            actions.push(
+                                TableAction::new(strings.action_unmute, ActionVariant::Primary)
+                                    .with_callback(move || {
+                                        Self::toggle_mute(vk, false);
+                                    }),
+                            );
+                        }
                         actions.push(TableAction::delete(strings.action_delete, move || {
                             Self::trigger_delete(parent_hwnd, vk, &key_name);
                         }));
@@ -144,21 +156,34 @@ impl DisablePanel {
             let pm = &mut engine.profile_manager;
             let sel_id = pm.selected_id.clone();
             if sel_id == crate::ui::GLOBAL_PROFILE_ID {
-                return false;
-            }
-            if let Some(child) = pm.get_profile_mut(&sel_id) {
+                let target_profile = &mut pm.global_profile;
+                if mute {
+                    if !target_profile.unmuted_disabled.contains(&vk) {
+                        target_profile.unmuted_disabled.push(vk);
+                    }
+                } else {
+                    target_profile.unmuted_disabled.retain(|&v| v != vk);
+                }
+            } else {
+                let is_root_unmuted = pm.global_profile.unmuted_disabled.contains(&vk);
+                let child = match pm.get_profile_mut(&sel_id) {
+                    Some(c) => c,
+                    None => return false,
+                };
                 if mute {
                     if !child.unmuted_disabled.contains(&vk) {
                         child.unmuted_disabled.push(vk);
                     }
+                    child.app_disabled.retain(|&v| v != vk);
                 } else {
                     child.unmuted_disabled.retain(|&v| v != vk);
+                    if is_root_unmuted && !child.app_disabled.contains(&vk) {
+                        child.app_disabled.push(vk);
+                    }
                 }
-                crate::ui::controller::save(engine);
-                true
-            } else {
-                false
             }
+            crate::ui::controller::save(engine);
+            true
         });
         if changed == Some(true) {
             crate::ui::controller::refresh_disable_list();

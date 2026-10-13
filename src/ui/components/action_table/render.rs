@@ -15,20 +15,38 @@ pub fn pt_in_rect(x: i32, y: i32, rc: &RECT) -> bool {
     x >= rc.left && x <= rc.right && y >= rc.top && y <= rc.bottom
 }
 
-pub fn get_dynamic_action_button_rects(rc: &RECT, count: usize) -> Vec<RECT> {
+pub fn get_dynamic_action_button_rects(rc: &RECT, actions: &[TableAction]) -> Vec<RECT> {
+    let count = actions.len();
     if count == 0 {
         return Vec::new();
     }
-    let (btn_width, spacing) = match count {
-        1 => (46, 0),
-        2 => (38, 6),
-        _ => (34, 6),
+    let col_w = rc.right - rc.left;
+    let is_short_icons = actions.iter().all(|a| a.label.chars().count() <= 2);
+
+    let (max_btn_w, spacing) = if is_short_icons {
+        match count {
+            1 => (28, 0),
+            2 => (26, 4),
+            _ => (24, 3),
+        }
+    } else {
+        match count {
+            1 => (48, 0),
+            2 => (38, 4),
+            _ => (36, 3),
+        }
     };
+
+    let pad = 3;
+    let avail_w = (col_w - pad * 2).max(10);
+    let total_spacing = spacing * (count as i32 - 1);
+    let btn_width = ((avail_w - total_spacing) / count as i32).min(max_btn_w).max(18);
+
     let btn_height = (rc.bottom - rc.top).saturating_sub(6).max(18);
     let top_offset = rc.top + ((rc.bottom - rc.top) - btn_height) / 2;
-    let col_w = rc.right - rc.left;
-    let total_w = (btn_width * count as i32) + (spacing * (count as i32 - 1));
-    let start_x = rc.left + ((col_w - total_w) / 2).max(4);
+
+    let total_w = (btn_width * count as i32) + total_spacing;
+    let start_x = rc.left + ((col_w - total_w) / 2).max(pad);
 
     let mut rects = Vec::with_capacity(count);
     for i in 0..count {
@@ -218,6 +236,17 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
                                 let (bg_clr, border_clr, text_clr) = match cfg.variant {
                                     BadgeVariant::KeyPill => (palette.bg_card, palette.border, palette.text_link),
                                     BadgeVariant::Danger => (palette.danger_bg, palette.danger_border, palette.danger_text),
+                                    BadgeVariant::Secondary => {
+                                        if is_dark {
+                                            (palette.tab_active_bg, palette.border_separator, palette.text_primary)
+                                        } else {
+                                            (palette.tab_active_bg, palette.border, palette.text_primary)
+                                        }
+                                    }
+                                    BadgeVariant::Info => (palette.info_bg, palette.info_border, palette.info_text),
+                                    BadgeVariant::Warning => (palette.warning_bg, palette.warning_border, palette.warning_text),
+                                    BadgeVariant::Success => (palette.success_bg, palette.success_border, palette.success_text),
+                                    BadgeVariant::Purple => (palette.purple_bg, palette.purple_border, palette.purple_text),
                                 };
 
                                 let wide_text = to_wide(&cfg.text);
@@ -314,10 +343,10 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
                                 let old_f = SelectObject(mem_dc, app_font_bold);
                                 SetBkMode(mem_dc, TRANSPARENT);
 
-                                let btn_rects = get_dynamic_action_button_rects(&cell_rc, actions.len());
+                                let btn_rects = get_dynamic_action_button_rects(&cell_rc, actions);
                                 for (act_idx, act) in actions.iter().enumerate() {
                                     if let Some(rc_btn) = btn_rects.get(act_idx) {
-                                        let is_h = state.hover_action == ActionHover::Action { row: row_idx, action_idx: act_idx };
+                                        let is_h = state.hover_action == ActionHover::Action { row: row_idx, col: col_idx, action_idx: act_idx };
                                         let (bg_clr, border_clr, text_clr) = match act.variant {
                                             ActionVariant::Primary => {
                                                 if is_h {

@@ -50,7 +50,21 @@ pub fn get_tab_card_brush() -> isize {
 }
 
 pub fn get_input_bg_brush() -> isize {
-    INPUT_BG_BRUSH.load(Ordering::Relaxed)
+    let br = INPUT_BG_BRUSH.load(Ordering::Relaxed);
+    if br != 0 {
+        return br;
+    }
+    let palette = ThemePalette::get(is_current_dark());
+    let new_br = unsafe { CreateSolidBrush(palette.bg_input) };
+    if INPUT_BG_BRUSH
+        .compare_exchange(0, new_br, Ordering::SeqCst, Ordering::Relaxed)
+        .is_ok()
+    {
+        new_br
+    } else {
+        unsafe { DeleteObject(new_br) };
+        INPUT_BG_BRUSH.load(Ordering::Relaxed)
+    }
 }
 
 pub fn get_sidebar_bg_brush() -> isize {

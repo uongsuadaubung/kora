@@ -21,6 +21,11 @@ pub const DT_RIGHT: u32 = 0x00000002;
 pub enum BadgeVariant {
     KeyPill,
     Danger,
+    Secondary,
+    Info,
+    Warning,
+    Success,
+    Purple,
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +56,46 @@ impl BadgeConfig {
         Self {
             text: text.into(),
             variant: BadgeVariant::Danger,
+            suffix: None,
+        }
+    }
+
+    pub fn secondary(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            variant: BadgeVariant::Secondary,
+            suffix: None,
+        }
+    }
+
+    pub fn info(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            variant: BadgeVariant::Info,
+            suffix: None,
+        }
+    }
+
+    pub fn warning(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            variant: BadgeVariant::Warning,
+            suffix: None,
+        }
+    }
+
+    pub fn success(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            variant: BadgeVariant::Success,
+            suffix: None,
+        }
+    }
+
+    pub fn purple(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            variant: BadgeVariant::Purple,
             suffix: None,
         }
     }
@@ -252,7 +297,7 @@ impl ColumnDef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionHover {
     None,
-    Action { row: usize, action_idx: usize },
+    Action { row: usize, col: usize, action_idx: usize },
 }
 
 pub type ActionCallback = Arc<dyn Fn(i32) + Send + Sync>;

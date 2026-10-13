@@ -8,7 +8,9 @@
 //! thread): the keyboard hook runs on the same thread and would self-deadlock.
 
 use super::GLOBAL_PROFILE_ID;
-use crate::engine::profile::{AppProfile, ResolvedDisableItem, ResolvedMacroItem, ResolvedRemapItem};
+use crate::engine::profile::{
+    AppProfile, ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedMacroItem, ResolvedRemapItem,
+};
 use crate::engine::{EngineConfig, VietnameseEngine};
 use crate::platform::win32::ENGINE_INSTANCE;
 
@@ -92,6 +94,12 @@ pub fn selected_disable_items(engine: &VietnameseEngine) -> Vec<ResolvedDisableI
     pm.resolve_disable_items_for_ui(&pm.selected_id)
 }
 
+/// Key Macro list rows for the selected profile.
+pub fn selected_key_macro_items(engine: &VietnameseEngine) -> Vec<ResolvedKeyMacroItem> {
+    let pm = &engine.profile_manager;
+    pm.resolve_key_macro_items_for_ui(&pm.selected_id)
+}
+
 /// Re-populates the macro list from the engine (call without holding the engine lock).
 pub fn refresh_macro_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_macro_items(e)), super::controls()) {
@@ -110,5 +118,12 @@ pub fn refresh_remap_list() {
 pub fn refresh_disable_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_disable_items(e)), super::controls()) {
         c.tab_keys.populate_disabled(&items);
+    }
+}
+
+/// Re-populates the key macro list from the engine (call without holding the engine lock).
+pub fn refresh_key_macro_list() {
+    if let (Some(items), Some(c)) = (with_engine(|e| selected_key_macro_items(e)), super::controls()) {
+        c.tab_keys.populate_key_macros(&items);
     }
 }

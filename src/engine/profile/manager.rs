@@ -173,6 +173,9 @@ impl ProfileManager {
             if let Some(d) = child.disable_enabled {
                 cfg.disable_enabled = d;
             }
+            if let Some(km) = child.key_macro_enabled {
+                cfg.key_macro_enabled = km;
+            }
         }
 
         cfg
@@ -187,7 +190,11 @@ impl ProfileManager {
             if !global_enabled {
                 return Vec::new();
             }
-            return global_remaps.clone();
+            return global_remaps
+                .iter()
+                .filter(|r| !self.global_profile.muted_remaps.contains(&r.from_vk))
+                .cloned()
+                .collect();
         }
 
         let child = match self.get_profile(profile_id) {
@@ -196,7 +203,11 @@ impl ProfileManager {
                 if !global_enabled {
                     return Vec::new();
                 }
-                return global_remaps.clone();
+                return global_remaps
+                    .iter()
+                    .filter(|r| !self.global_profile.muted_remaps.contains(&r.from_vk))
+                    .cloned()
+                    .collect();
             }
         };
 
@@ -209,19 +220,25 @@ impl ProfileManager {
 
         // 1. Process Global rules with overrides and mutes
         for rule in global_remaps {
+            if child.app_remaps.iter().any(|ar| ar.from_vk == rule.from_vk) {
+                continue; // Handled as AppSpecific in step 2
+            }
             if child.muted_remaps.contains(&rule.from_vk) {
                 // Tombstone: muted in child
                 continue;
             }
             if let Some(&overridden_to_vk) = child.overridden_remaps.get(&rule.from_vk) {
                 result.push(KeyRemapRule::new(rule.from_vk, overridden_to_vk));
-            } else {
+            } else if !self.global_profile.muted_remaps.contains(&rule.from_vk) {
                 result.push(rule.clone());
             }
         }
 
         // 2. Add app-specific rules
         for rule in &child.app_remaps {
+            if child.muted_remaps.contains(&rule.from_vk) {
+                continue;
+            }
             // Avoid duplicate from_vk
             if !result.iter().any(|r| r.from_vk == rule.from_vk) {
                 result.push(rule.clone());
@@ -240,7 +257,11 @@ impl ProfileManager {
             if !global_enabled {
                 return Vec::new();
             }
-            return global_disabled.clone();
+            return global_disabled
+                .iter()
+                .filter(|&&vk| !self.global_profile.unmuted_disabled.contains(&vk))
+                .copied()
+                .collect();
         }
 
         let child = match self.get_profile(profile_id) {
@@ -249,7 +270,11 @@ impl ProfileManager {
                 if !global_enabled {
                     return Vec::new();
                 }
-                return global_disabled.clone();
+                return global_disabled
+                    .iter()
+                    .filter(|&&vk| !self.global_profile.unmuted_disabled.contains(&vk))
+                    .copied()
+                    .collect();
             }
         };
 
@@ -260,15 +285,18 @@ impl ProfileManager {
 
         let mut result = Vec::new();
 
-        // 1. Global disabled keys unless unmuted by child
+        // 1. Global disabled keys unless unmuted by root or unmuted by child
         for &vk in global_disabled {
-            if !child.unmuted_disabled.contains(&vk) {
+            if !self.global_profile.unmuted_disabled.contains(&vk) && !child.unmuted_disabled.contains(&vk) {
                 result.push(vk);
             }
         }
 
         // 2. App-specific disabled keys
         for &vk in &child.app_disabled {
+            if child.unmuted_disabled.contains(&vk) {
+                continue;
+            }
             if !result.contains(&vk) {
                 result.push(vk);
             }
@@ -281,12 +309,20 @@ impl ProfileManager {
     /// Formula: (Global \ Muted) U Overridden U AppSpecific
     pub fn resolve_effective_macros(&self, profile_id: &str, global_macros: &[MacroEntry]) -> Vec<MacroEntry> {
         if profile_id == "global" {
-            return global_macros.to_vec();
+            return global_macros
+                .iter()
+                .filter(|entry| !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)))
+                .cloned()
+                .collect();
         }
 
         let child = match self.get_profile(profile_id) {
             Some(c) => c,
-            None => return global_macros.to_vec(),
+            None => return global_macros
+                .iter()
+                .filter(|entry| !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)))
+                .cloned()
+                .collect(),
         };
 
         let mut map: HashMap<String, MacroEntry> = HashMap::new();
@@ -305,19 +341,89 @@ impl ProfileManager {
                         macro_type: *over_type,
                     },
                 );
-            } else {
+            } else if !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)) {
                 map.insert(entry.key.to_lowercase(), entry.clone());
             }
         }
 
         // 2. Child app-specific macros
         for entry in &child.app_macros {
+            if child.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)) {
+                continue;
+            }
             map.insert(entry.key.to_lowercase(), entry.clone());
         }
 
         let mut res: Vec<MacroEntry> = map.into_values().collect();
         res.sort_by(|a, b| a.key.cmp(&b.key));
         res
+    }
+
+    /// Resolves effective active KeyMacroRules for the hook execution
+    /// Formula: (Global \ Muted) U Overridden U AppSpecific
+    pub fn resolve_effective_key_macros(&self, profile_id: &str) -> Vec<KeyMacroRule> {
+        let global_enabled = self.global_profile.key_macro_enabled.unwrap_or(false);
+        let global_macros = &self.global_profile.app_key_macros;
+        if profile_id == "global" {
+            if !global_enabled {
+                return Vec::new();
+            }
+            return global_macros
+                .iter()
+                .filter(|m| !self.global_profile.muted_key_macros.contains(&m.trigger_vk))
+                .cloned()
+                .collect();
+        }
+
+        let child = match self.get_profile(profile_id) {
+            Some(c) => c,
+            None => {
+                if !global_enabled {
+                    return Vec::new();
+                }
+                return global_macros
+                    .iter()
+                    .filter(|m| !self.global_profile.muted_key_macros.contains(&m.trigger_vk))
+                    .cloned()
+                    .collect();
+            }
+        };
+
+        let is_enabled = child.key_macro_enabled.unwrap_or(global_enabled);
+        if !is_enabled {
+            return Vec::new();
+        }
+
+        let mut result = Vec::new();
+
+        // 1. Process Global rules with overrides and mutes
+        for rule in global_macros {
+            if child.muted_key_macros.contains(&rule.trigger_vk) {
+                continue; // Tombstone: muted in child
+            }
+            if let Some((overridden_name, overridden_actions)) = child.overridden_key_macros.get(&rule.trigger_vk) {
+                result.push(KeyMacroRule::with_trigger_name(
+                    rule.trigger_vk,
+                    rule.trigger_name.clone(),
+                    overridden_name.clone(),
+                    overridden_actions.clone(),
+                ));
+            } else if !self.global_profile.muted_key_macros.contains(&rule.trigger_vk) {
+                result.push(rule.clone());
+            }
+        }
+
+        // 2. Add app-specific rules
+        for rule in &child.app_key_macros {
+            if child.muted_key_macros.contains(&rule.trigger_vk) {
+                continue;
+            }
+            if !result.iter().any(|r| r.trigger_vk == rule.trigger_vk) {
+                result.push(rule.clone());
+            }
+        }
+
+        result
     }
 
     // =========================================================================
@@ -327,16 +433,19 @@ impl ProfileManager {
     /// Builds UI list items for Key Remapping table
     pub fn resolve_remap_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedRemapItem> {
         let global_remaps = &self.global_profile.app_remaps;
-        if profile_id == "global" || self.get_profile(profile_id).map_or(false, |p| p.is_root) {
+        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
             return global_remaps
                 .iter()
-                .map(|r| ResolvedRemapItem {
-                    from_vk: r.from_vk,
-                    to_vk: r.to_vk,
-                    from_name: r.from_name.clone(),
-                    to_name: r.to_name.clone(),
-                    origin: RuleOrigin::Root,
-                    is_active: true,
+                .map(|r| {
+                    let is_muted = self.global_profile.muted_remaps.contains(&r.from_vk);
+                    ResolvedRemapItem {
+                        from_vk: r.from_vk,
+                        to_vk: r.to_vk,
+                        from_name: r.from_name.clone(),
+                        to_name: r.to_name.clone(),
+                        origin: RuleOrigin::Root,
+                        is_active: !is_muted,
+                    }
                 })
                 .collect();
         }
@@ -350,6 +459,9 @@ impl ProfileManager {
 
         // 1. All global items with their child state
         for r in global_remaps {
+            if child.app_remaps.iter().any(|ar| ar.from_vk == r.from_vk) {
+                continue; // Handled as AppSpecific in step 2
+            }
             if child.muted_remaps.contains(&r.from_vk) {
                 items.push(ResolvedRemapItem {
                     from_vk: r.from_vk,
@@ -368,6 +480,15 @@ impl ProfileManager {
                     origin: RuleOrigin::OverriddenGlobal,
                     is_active: true,
                 });
+            } else if self.global_profile.muted_remaps.contains(&r.from_vk) {
+                items.push(ResolvedRemapItem {
+                    from_vk: r.from_vk,
+                    to_vk: r.to_vk,
+                    from_name: r.from_name.clone(),
+                    to_name: r.to_name.clone(),
+                    origin: RuleOrigin::MutedGlobal,
+                    is_active: false,
+                });
             } else {
                 items.push(ResolvedRemapItem {
                     from_vk: r.from_vk,
@@ -382,13 +503,14 @@ impl ProfileManager {
 
         // 2. Child app-specific items
         for r in &child.app_remaps {
+            let is_muted = child.muted_remaps.contains(&r.from_vk);
             items.push(ResolvedRemapItem {
                 from_vk: r.from_vk,
                 to_vk: r.to_vk,
                 from_name: r.from_name.clone(),
                 to_name: r.to_name.clone(),
                 origin: RuleOrigin::AppSpecific,
-                is_active: true,
+                is_active: !is_muted,
             });
         }
 
@@ -398,14 +520,17 @@ impl ProfileManager {
     /// Builds UI list items for Key Disabling table
     pub fn resolve_disable_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedDisableItem> {
         let global_disabled = &self.global_profile.app_disabled;
-        if profile_id == "global" || self.get_profile(profile_id).map_or(false, |p| p.is_root) {
+        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
             return global_disabled
                 .iter()
-                .map(|&vk| ResolvedDisableItem {
-                    vk,
-                    key_name: crate::engine::config::hotkey::vk_to_name(vk).to_string(),
-                    origin: RuleOrigin::Root,
-                    is_active: true,
+                .map(|&vk| {
+                    let is_muted = self.global_profile.unmuted_disabled.contains(&vk);
+                    ResolvedDisableItem {
+                        vk,
+                        key_name: crate::engine::config::hotkey::vk_to_name(vk).to_string(),
+                        origin: RuleOrigin::Root,
+                        is_active: !is_muted,
+                    }
                 })
                 .collect();
         }
@@ -419,7 +544,10 @@ impl ProfileManager {
 
         // 1. All global disabled items with child status
         for &vk in global_disabled {
-            if child.unmuted_disabled.contains(&vk) {
+            if child.app_disabled.contains(&vk) {
+                continue; // Handled as AppSpecific in step 2
+            }
+            if child.unmuted_disabled.contains(&vk) || self.global_profile.unmuted_disabled.contains(&vk) {
                 items.push(ResolvedDisableItem {
                     vk,
                     key_name: crate::engine::config::hotkey::vk_to_name(vk).to_string(),
@@ -438,11 +566,12 @@ impl ProfileManager {
 
         // 2. Child app-specific disabled items
         for &vk in &child.app_disabled {
+            let is_muted = child.unmuted_disabled.contains(&vk);
             items.push(ResolvedDisableItem {
                 vk,
                 key_name: crate::engine::config::hotkey::vk_to_name(vk).to_string(),
                 origin: RuleOrigin::AppSpecific,
-                is_active: true,
+                is_active: !is_muted,
             });
         }
 
@@ -451,15 +580,18 @@ impl ProfileManager {
 
     /// Builds UI list items for Macro table
     pub fn resolve_macro_items_for_ui(&self, profile_id: &str, global_macros: &[MacroEntry]) -> Vec<ResolvedMacroItem> {
-        if profile_id == "global" || self.get_profile(profile_id).map_or(false, |p| p.is_root) {
+        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
             return global_macros
                 .iter()
-                .map(|m| ResolvedMacroItem {
-                    key: m.key.clone(),
-                    value: m.value.clone(),
-                    macro_type: m.macro_type,
-                    origin: RuleOrigin::Root,
-                    is_active: true,
+                .map(|m| {
+                    let is_muted = self.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key));
+                    ResolvedMacroItem {
+                        key: m.key.clone(),
+                        value: m.value.clone(),
+                        macro_type: m.macro_type,
+                        origin: RuleOrigin::Root,
+                        is_active: !is_muted,
+                    }
                 })
                 .collect();
         }
@@ -473,6 +605,9 @@ impl ProfileManager {
 
         // 1. Global macros with child status
         for m in global_macros {
+            if child.app_macros.iter().any(|am| am.key.eq_ignore_ascii_case(&m.key)) {
+                continue; // Handled as AppSpecific in step 2
+            }
             if child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key)) {
                 items.push(ResolvedMacroItem {
                     key: m.key.clone(),
@@ -489,6 +624,14 @@ impl ProfileManager {
                     origin: RuleOrigin::OverriddenGlobal,
                     is_active: true,
                 });
+            } else if self.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key)) {
+                items.push(ResolvedMacroItem {
+                    key: m.key.clone(),
+                    value: m.value.clone(),
+                    macro_type: m.macro_type,
+                    origin: RuleOrigin::MutedGlobal,
+                    is_active: false,
+                });
             } else {
                 items.push(ResolvedMacroItem {
                     key: m.key.clone(),
@@ -502,16 +645,104 @@ impl ProfileManager {
 
         // 2. Child app-specific macros
         for m in &child.app_macros {
+            let is_muted = child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key));
             items.push(ResolvedMacroItem {
                 key: m.key.clone(),
                 value: m.value.clone(),
                 macro_type: m.macro_type,
                 origin: RuleOrigin::AppSpecific,
-                is_active: true,
+                is_active: !is_muted,
             });
         }
 
         items.sort_by(|a, b| a.key.cmp(&b.key));
+        items
+    }
+
+    /// Builds UI list items for Key Macro table
+    pub fn resolve_key_macro_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedKeyMacroItem> {
+        let global_macros = &self.global_profile.app_key_macros;
+        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
+            return global_macros
+                .iter()
+                .map(|m| {
+                    let is_muted = self.global_profile.muted_key_macros.contains(&m.trigger_vk);
+                    ResolvedKeyMacroItem {
+                        trigger_vk: m.trigger_vk,
+                        trigger_name: m.trigger_name.clone(),
+                        name: m.name.clone(),
+                        actions: m.actions.clone(),
+                        origin: RuleOrigin::Root,
+                        is_active: !is_muted,
+                    }
+                })
+                .collect();
+        }
+
+        let child = match self.get_profile(profile_id) {
+            Some(c) => c,
+            None => return Vec::new(),
+        };
+
+        let mut items = Vec::new();
+
+        // 1. All global items with their child state
+        for m in global_macros {
+            if child.app_key_macros.iter().any(|akm| akm.trigger_vk == m.trigger_vk) {
+                continue; // Handled as AppSpecific in step 2
+            }
+            if child.muted_key_macros.contains(&m.trigger_vk) {
+                items.push(ResolvedKeyMacroItem {
+                    trigger_vk: m.trigger_vk,
+                    trigger_name: m.trigger_name.clone(),
+                    name: m.name.clone(),
+                    actions: m.actions.clone(),
+                    origin: RuleOrigin::MutedGlobal,
+                    is_active: false,
+                });
+            } else if let Some((over_name, over_actions)) = child.overridden_key_macros.get(&m.trigger_vk) {
+                items.push(ResolvedKeyMacroItem {
+                    trigger_vk: m.trigger_vk,
+                    trigger_name: m.trigger_name.clone(),
+                    name: over_name.clone(),
+                    actions: over_actions.clone(),
+                    origin: RuleOrigin::OverriddenGlobal,
+                    is_active: true,
+                });
+            } else if self.global_profile.muted_key_macros.contains(&m.trigger_vk) {
+                items.push(ResolvedKeyMacroItem {
+                    trigger_vk: m.trigger_vk,
+                    trigger_name: m.trigger_name.clone(),
+                    name: m.name.clone(),
+                    actions: m.actions.clone(),
+                    origin: RuleOrigin::MutedGlobal,
+                    is_active: false,
+                });
+            } else {
+                items.push(ResolvedKeyMacroItem {
+                    trigger_vk: m.trigger_vk,
+                    trigger_name: m.trigger_name.clone(),
+                    name: m.name.clone(),
+                    actions: m.actions.clone(),
+                    origin: RuleOrigin::InheritedGlobal,
+                    is_active: true,
+                });
+            }
+        }
+
+        // 2. Child app-specific macros
+        for m in &child.app_key_macros {
+            let is_muted = child.muted_key_macros.contains(&m.trigger_vk);
+            items.push(ResolvedKeyMacroItem {
+                trigger_vk: m.trigger_vk,
+                trigger_name: m.trigger_name.clone(),
+                name: m.name.clone(),
+                actions: m.actions.clone(),
+                origin: RuleOrigin::AppSpecific,
+                is_active: !is_muted,
+            });
+        }
+
         items
     }
 }

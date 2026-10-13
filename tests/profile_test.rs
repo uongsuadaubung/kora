@@ -274,3 +274,298 @@ fn test_engine_types_with_active_child_profile() {
     engine.reset();
     assert!(type_word(&mut engine));
 }
+
+#[test]
+fn test_macro_action_dsl() {
+    use kora::engine::profile::MacroAction;
+
+    let actions = vec![
+        MacroAction::KeyDown("W".into()),
+        MacroAction::Delay(150),
+        MacroAction::Press("Ctrl+Shift+L".into()),
+        MacroAction::Delay(50),
+        MacroAction::KeyUp("W".into()),
+        MacroAction::Text("glhf".into()),
+    ];
+
+    let dsl = MacroAction::actions_to_dsl(&actions);
+    assert_eq!(
+        dsl,
+        "down(W) + delay(150) + press(Ctrl+Shift+L) + delay(50) + up(W) + text(glhf)"
+    );
+
+    let parsed = MacroAction::dsl_to_actions(&dsl);
+    assert_eq!(parsed, actions);
+}
+
+#[test]
+fn test_live_inheritance_key_macro() {
+    use kora::engine::profile::{KeyMacroRule, MacroAction};
+
+    let mut manager = ProfileManager::new();
+    manager.global_profile.key_macro_enabled = Some(true);
+
+    // Global Key Macros:
+    // F1 -> "Bunny Hop" | down(Space) + delay(15) + up(Space)
+    // F2 -> "Buy AK" | press(B) + delay(50) + press(4)
+    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x70,
+        "Bunny Hop",
+        vec![
+            MacroAction::KeyDown("Space".into()),
+            MacroAction::Delay(15),
+            MacroAction::KeyUp("Space".into()),
+        ],
+    ));
+    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x71,
+        "Buy AK",
+        vec![
+            MacroAction::Press("B".into()),
+            MacroAction::Delay(50),
+            MacroAction::Press("4".into()),
+        ],
+    ));
+
+    // Child Profile "cs2":
+    // - Mutes F1 (0x70)
+    // - Overrides F2 (0x71) -> "Custom Buy"
+    // - Adds App-Specific: F3 (0x72) -> "Quick Drop"
+    let mut cs2 = AppProfile::new_child("cs2", "Counter-Strike 2", "cs2.exe", "🎮");
+    cs2.muted_key_macros.push(0x70);
+    cs2.overridden_key_macros.insert(
+        0x71,
+        (
+            "Custom Buy".into(),
+            vec![
+                MacroAction::Press("B".into()),
+                MacroAction::Delay(100),
+                MacroAction::Press("5".into()),
+            ],
+        ),
+    );
+    cs2.app_key_macros.push(KeyMacroRule::new(
+        0x72,
+        "Quick Drop",
+        vec![
+            MacroAction::Press("G".into()),
+            MacroAction::Delay(20),
+            MacroAction::Press("1".into()),
+        ],
+    ));
+    manager.add_profile(cs2);
+
+    // 1. Resolve effective key macros for CS2
+    let effective = manager.resolve_effective_key_macros("cs2");
+    assert_eq!(effective.len(), 2);
+
+    // F1 is muted
+    assert!(effective.iter().all(|m| m.trigger_vk != 0x70));
+
+    // F2 is overridden
+    let f2 = effective.iter().find(|m| m.trigger_vk == 0x71).unwrap();
+    assert_eq!(f2.name, "Custom Buy");
+    assert_eq!(f2.actions.len(), 3);
+
+    // F3 is app-specific
+    let f3 = effective.iter().find(|m| m.trigger_vk == 0x72).unwrap();
+    assert_eq!(f3.name, "Quick Drop");
+
+    // 2. UI items for CS2
+    let ui_items = manager.resolve_key_macro_items_for_ui("cs2");
+    assert_eq!(ui_items.len(), 3);
+
+    let f1_ui = ui_items.iter().find(|i| i.trigger_vk == 0x70).unwrap();
+    assert_eq!(f1_ui.origin, RuleOrigin::MutedGlobal);
+    assert!(!f1_ui.is_active);
+
+    let f2_ui = ui_items.iter().find(|i| i.trigger_vk == 0x71).unwrap();
+    assert_eq!(f2_ui.origin, RuleOrigin::OverriddenGlobal);
+    assert!(f2_ui.is_active);
+
+    let f3_ui = ui_items.iter().find(|i| i.trigger_vk == 0x72).unwrap();
+    assert_eq!(f3_ui.origin, RuleOrigin::AppSpecific);
+    assert!(f3_ui.is_active);
+
+    // 3. UI items for Global (Root) must have RuleOrigin::Root and empty badge label
+    let global_ui = manager.resolve_key_macro_items_for_ui("global");
+    assert_eq!(global_ui.len(), 2);
+    assert_eq!(global_ui[0].origin, RuleOrigin::Root);
+    assert_eq!(global_ui[0].origin.badge_label(), "");
+    assert_eq!(global_ui[1].origin, RuleOrigin::Root);
+    assert_eq!(global_ui[1].origin.badge_label(), "");
+}
+
+#[test]
+fn test_key_macro_ini_roundtrip() {
+    use kora::engine::profile::{KeyMacroRule, MacroAction};
+
+    let mut config = EngineConfig::default();
+    config.key_macro_enabled = true;
+    let macros = MacroTable::new();
+    let mut profiles = ProfileManager::new();
+    profiles.global_profile.key_macro_enabled = Some(true);
+
+    profiles.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x70, // F1
+        "BHop",
+        vec![
+            MacroAction::KeyDown("Space".into()),
+            MacroAction::Delay(20),
+            MacroAction::KeyUp("Space".into()),
+        ],
+    ));
+
+    let mut child = AppProfile::new_child("game", "Game", "game.exe", "🎮");
+    child.key_macro_enabled = Some(true);
+    child.app_key_macros.push(KeyMacroRule::new(
+        0x71, // F2
+        "Drop Weapon",
+        vec![
+            MacroAction::Press("G".into()),
+            MacroAction::Delay(10),
+            MacroAction::Press("1".into()),
+        ],
+    ));
+    profiles.add_profile(child);
+
+    let ini_str = serialize_config_all(&config, &macros, &profiles);
+    assert!(ini_str.contains("[key_macro]"));
+    assert!(ini_str.contains("enabled = true"));
+    assert!(ini_str.contains("F1 = BHop | down(Space) + delay(20) + up(Space)"));
+    assert!(ini_str.contains("app_key_macro = F2 = Drop Weapon | press(G) + delay(10) + press(1)"));
+
+    let (parsed_cfg, _, parsed_profiles) = parse_config_all(&ini_str);
+    assert!(parsed_cfg.key_macro_enabled);
+    assert_eq!(parsed_profiles.global_profile.app_key_macros.len(), 1);
+    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].trigger_vk, 0x70);
+    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].name, "BHop");
+    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].actions.len(), 3);
+
+    let parsed_child = parsed_profiles.get_profile("game").unwrap();
+    assert_eq!(parsed_child.app_key_macros.len(), 1);
+    assert_eq!(parsed_child.app_key_macros[0].trigger_vk, 0x71);
+    assert_eq!(parsed_child.app_key_macros[0].name, "Drop Weapon");
+    assert_eq!(parsed_child.app_key_macros[0].actions.len(), 3);
+}
+
+#[test]
+fn test_child_inherits_root_muted_state() {
+    use kora::engine::profile::{KeyMacroRule, MacroAction};
+
+    let mut manager = ProfileManager::new();
+    manager.global_profile.remap_enabled = Some(true);
+    manager.global_profile.disable_enabled = Some(true);
+    manager.global_profile.key_macro_enabled = Some(true);
+
+    // 1. Remap: Root has 0x14 (CapsLock) and 0x91 (ScrollLock)
+    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
+    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x91, 0xAD));
+    // Root mutes 0x14
+    manager.global_profile.muted_remaps.push(0x14);
+
+    // 2. Disable: Root disables 0x2D (Insert) and 0x13 (Pause)
+    manager.global_profile.app_disabled.push(0x2D);
+    manager.global_profile.app_disabled.push(0x13);
+    // Root turns off block for 0x2D
+    manager.global_profile.unmuted_disabled.push(0x2D);
+
+    // 3. Macro: Root has "btw" and "omw"
+    let global_macros = vec![
+        MacroEntry {
+            key: "btw".into(),
+            value: "by the way".into(),
+            macro_type: MacroType::Normal,
+        },
+        MacroEntry {
+            key: "omw".into(),
+            value: "on my way".into(),
+            macro_type: MacroType::Normal,
+        },
+    ];
+    // Root mutes "btw"
+    manager.global_profile.muted_macros.push("btw".into());
+
+    // 4. Key Macro: Root has 0x70 (F1) and 0x71 (F2)
+    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x70,
+        "F1 Macro",
+        vec![MacroAction::Press("Space".into())],
+    ));
+    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x71,
+        "F2 Macro",
+        vec![MacroAction::Press("Enter".into())],
+    ));
+    // Root mutes 0x70
+    manager.global_profile.muted_key_macros.push(0x70);
+
+    // Child profile inherits everything without overriding
+    let child = AppProfile::new_child("app1", "App 1", "app1.exe", "⭐");
+    manager.add_profile(child);
+
+    // Verify Effective Rules: Child inherits the turned off state!
+    let eff_remap = manager.resolve_effective_remaps("app1");
+    assert_eq!(eff_remap.len(), 1);
+    assert_eq!(eff_remap[0].from_vk, 0x91);
+
+    let eff_disable = manager.resolve_effective_disabled("app1");
+    assert_eq!(eff_disable.len(), 1);
+    assert_eq!(eff_disable[0], 0x13);
+
+    let eff_macro = manager.resolve_effective_macros("app1", &global_macros);
+    assert_eq!(eff_macro.len(), 1);
+    assert_eq!(eff_macro[0].key, "omw");
+
+    let eff_km = manager.resolve_effective_key_macros("app1");
+    assert_eq!(eff_km.len(), 1);
+    assert_eq!(eff_km[0].trigger_vk, 0x71);
+
+    // Verify UI Items: Root muted items appear as MutedGlobal and inactive
+    let ui_remap = manager.resolve_remap_items_for_ui("app1");
+    let remap_14 = ui_remap.iter().find(|r| r.from_vk == 0x14).unwrap();
+    assert_eq!(remap_14.origin, RuleOrigin::MutedGlobal);
+    assert!(!remap_14.is_active);
+
+    let ui_disable = manager.resolve_disable_items_for_ui("app1");
+    let disable_2d = ui_disable.iter().find(|d| d.vk == 0x2D).unwrap();
+    assert_eq!(disable_2d.origin, RuleOrigin::MutedGlobal);
+    assert!(!disable_2d.is_active);
+
+    let ui_macro = manager.resolve_macro_items_for_ui("app1", &global_macros);
+    let macro_btw = ui_macro.iter().find(|m| m.key == "btw").unwrap();
+    assert_eq!(macro_btw.origin, RuleOrigin::MutedGlobal);
+    assert!(!macro_btw.is_active);
+
+    let ui_km = manager.resolve_key_macro_items_for_ui("app1");
+    let km_70 = ui_km.iter().find(|k| k.trigger_vk == 0x70).unwrap();
+    assert_eq!(km_70.origin, RuleOrigin::MutedGlobal);
+    assert!(!km_70.is_active);
+
+    // Now, child app1 enables 0x14 (CapsLock -> Ctrl) specifically
+    let child_mut = manager.get_profile_mut("app1").unwrap();
+    child_mut.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
+    child_mut.app_disabled.push(0x2D); // Enables 0x2D block specifically
+
+    // Effective remap for app1 now has both rules!
+    let eff_remap2 = manager.resolve_effective_remaps("app1");
+    assert_eq!(eff_remap2.len(), 2);
+    assert!(eff_remap2.iter().any(|r| r.from_vk == 0x14));
+
+    // Effective disabled for app1 now has 0x2D blocked!
+    let eff_disable2 = manager.resolve_effective_disabled("app1");
+    assert_eq!(eff_disable2.len(), 2);
+    assert!(eff_disable2.contains(&0x2D));
+
+    // Global profile is STILL muted!
+    assert!(manager.resolve_effective_remaps("global").iter().all(|r| r.from_vk != 0x14));
+    assert!(!manager.resolve_effective_disabled("global").contains(&0x2D));
+
+    // UI in app1 displays 0x14 as AppSpecific and active!
+    let ui_remap2 = manager.resolve_remap_items_for_ui("app1");
+    let remap_14_ui = ui_remap2.iter().find(|r| r.from_vk == 0x14).unwrap();
+    assert_eq!(remap_14_ui.origin, RuleOrigin::AppSpecific);
+    assert!(remap_14_ui.is_active);
+}
+
+
