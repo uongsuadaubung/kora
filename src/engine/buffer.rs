@@ -174,7 +174,15 @@ impl TypingBuffer {
 
     /// Checks whether `key` marks a word boundary (e.g. CamelCase / PascalCase boundary).
     pub fn is_boundary(&self, key: &RawKey) -> bool {
-        if self.raw_keys.is_empty() {
+        if !key.is_upper || self.raw_keys.is_empty() {
+            return false;
+        }
+        let is_letter = if key.ch.is_ascii() {
+            key.ch.is_ascii_alphabetic()
+        } else {
+            key.ch.is_alphabetic()
+        };
+        if !is_letter {
             return false;
         }
 
@@ -184,11 +192,9 @@ impl TypingBuffer {
             return false;
         }
 
-        key.is_upper
-            && self
-                .raw_keys
-                .iter()
-                .any(|k| !k.is_upper && k.ch.is_alphabetic())
+        self.raw_keys
+            .iter()
+            .any(|k| !k.is_upper && k.ch.is_alphabetic())
     }
 
     /// Feeds a new key into the state machine and returns the resulting EngineAction.
@@ -211,11 +217,11 @@ impl TypingBuffer {
 
         self.raw_keys.push(key);
 
-        let was_nucleus_or_coda = matches!(
-            self.state,
-            SyllableState::Nucleus(_) | SyllableState::Coda(_)
-        );
-        let was_unambiguous_vi = self.state.is_unambiguous_completed_vietnamese();
+        let was_nucleus_or_coda = match self.state {
+            SyllableState::Nucleus(n) => Some(SyllableState::Nucleus(n)),
+            SyllableState::Coda(c) => Some(SyllableState::Coda(c)),
+            _ => None,
+        };
 
         let current_state = std::mem::take(&mut self.state);
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
@@ -227,10 +233,9 @@ impl TypingBuffer {
         // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
         // preserve the word as passthrough for immediate backspace recovery!
         if config.restore_on_wrong_spelling
-            && was_nucleus_or_coda
-            && !was_unambiguous_vi
             && matches!(next_state, SyllableState::Passthrough(_))
             && matches!(action, EngineAction::Passthrough)
+            && was_nucleus_or_coda.as_ref().is_some_and(|s| !s.is_unambiguous_completed_vietnamese())
         {
             let is_same_as_raw = self.last_rendered
                 .chars()

@@ -288,6 +288,20 @@ fn test_macro_with_underscore_expansion() {
 
     // 4. Underscore identifier typing without macro:
     assert_eq!(simulate_typing(&mut engine, "user_name "), "user_name ");
+
+    // 5. Hardware Shift test: Shift held down when typing '-' to produce '_'
+    engine.config_mut().enabled = true;
+    let _ = engine.on_key('v', false, false);
+    let _ = engine.on_key('_', true, false); // Physical Shift + '-' key
+    let _ = engine.on_key('n', false, false);
+    let act = engine.on_key(' ', false, false);
+    assert_eq!(
+        act,
+        kora::EngineAction::Replace {
+            backspaces: 3,
+            output: "Việt Nam ".to_string()
+        }
+    );
 }
 
 #[test]
@@ -320,4 +334,95 @@ fn test_macro_type_serialization_and_roundtrip() {
     assert_eq!(entry_ko.value, "không");
     assert_eq!(entry_ko.macro_type, MacroType::Normal);
 }
+
+#[test]
+fn test_muted_macro_in_global_profile_does_not_expand() {
+    let mut engine = VietnameseEngine::new(EngineConfig {
+        use_macro: true,
+        ..Default::default()
+    });
+
+    engine.macro_table.insert("vn", "Việt Nam");
+    engine.macro_table.insert("ko", "không");
+
+    // Before muting: both expand
+    assert_eq!(simulate_typing(&mut engine, "vn "), "Việt Nam ");
+    assert_eq!(simulate_typing(&mut engine, "ko "), "không ");
+
+    // Mute "vn" in global profile (simulates user toggling off "vn" row in UI)
+    engine
+        .profile_manager
+        .global_profile
+        .muted_macros
+        .push("vn".to_string());
+
+    // "vn " must NOT expand (remains "vn ")
+    assert_eq!(simulate_typing(&mut engine, "vn "), "vn ");
+    // "ko " was NOT muted, must still expand
+    assert_eq!(simulate_typing(&mut engine, "ko "), "không ");
+
+    // Unmute "vn" (simulates user toggling row back on)
+    engine
+        .profile_manager
+        .global_profile
+        .muted_macros
+        .retain(|k| !k.eq_ignore_ascii_case("vn"));
+    assert_eq!(simulate_typing(&mut engine, "vn "), "Việt Nam ");
+}
+
+#[test]
+fn test_muted_macro_in_child_profile_does_not_expand() {
+    let mut engine = VietnameseEngine::new(EngineConfig {
+        use_macro: true,
+        ..Default::default()
+    });
+
+    engine.macro_table.insert("vn", "Việt Nam");
+    engine.macro_table.insert("ko", "không");
+
+    let mut child = kora::engine::profile::AppProfile::new_child("app1", "App 1", "app1.exe", "⭐");
+    child.muted_macros.push("vn".to_string());
+    engine.profile_manager.add_profile(child);
+
+    // Global profile: "vn " still expands
+    assert_eq!(simulate_typing(&mut engine, "vn "), "Việt Nam ");
+
+    // Switch to child profile
+    let (changed, id) = engine.switch_profile_by_process("app1.exe");
+    assert!(changed);
+    assert_eq!(id, "app1");
+
+    // In child profile, "vn" is muted, so "vn " must NOT expand
+    assert_eq!(simulate_typing(&mut engine, "vn "), "vn ");
+    // "ko" is not muted, must still expand
+    assert_eq!(simulate_typing(&mut engine, "ko "), "không ");
+}
+
+#[test]
+fn test_child_profile_inherits_global_muted_macro() {
+    let mut engine = VietnameseEngine::new(EngineConfig {
+        use_macro: true,
+        ..Default::default()
+    });
+
+    engine.macro_table.insert("vn", "Việt Nam");
+    // Global mutes "vn"
+    engine
+        .profile_manager
+        .global_profile
+        .muted_macros
+        .push("vn".to_string());
+
+    // Child profile has no deltas
+    let child = kora::engine::profile::AppProfile::new_child("app2", "App 2", "app2.exe", "⭐");
+    engine.profile_manager.add_profile(child);
+
+    let (changed, id) = engine.switch_profile_by_process("app2.exe");
+    assert!(changed);
+    assert_eq!(id, "app2");
+
+    // Child must inherit global mute: "vn " must NOT expand
+    assert_eq!(simulate_typing(&mut engine, "vn "), "vn ");
+}
+
 

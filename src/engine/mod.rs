@@ -26,6 +26,8 @@ pub struct VietnameseEngine {
     auto_uppercase_next: bool,
     pub debug_log: Vec<String>,
     log_writer: AsyncLogWriter,
+    cached_active_macro_table: Option<MacroTable>,
+    cached_macro_sig: Option<(String, Vec<String>, usize, usize)>,
 }
 
 impl Default for VietnameseEngine {
@@ -52,6 +54,8 @@ impl VietnameseEngine {
             auto_uppercase_next: false,
             debug_log: Vec::new(),
             log_writer,
+            cached_active_macro_table: None,
+            cached_macro_sig: None,
         }
     }
 
@@ -141,23 +145,61 @@ impl VietnameseEngine {
         new_state
     }
 
-    /// Macro table of the active profile: the global table unless the child has macro deltas
-    fn active_macro_table(&self) -> std::borrow::Cow<'_, MacroTable> {
-        match self.profile_manager.get_profile(&self.profile_manager.active_id) {
-            Some(p)
-                if !p.is_root
-                    && (!p.muted_macros.is_empty()
-                        || !p.overridden_macros.is_empty()
-                        || !p.app_macros.is_empty()) =>
-            {
-                let mut table = MacroTable::new();
-                for e in self.effective_macros() {
-                    table.insert_typed_no_cache(e.key, e.value, e.macro_type);
-                }
-                table.rebuild_cache();
-                std::borrow::Cow::Owned(table)
+    fn ensure_active_macro_table(&mut self) {
+        let has_global_mutes = !self.profile_manager.global_profile.muted_macros.is_empty();
+        let child_deltas = match self.profile_manager.get_profile(&self.profile_manager.active_id) {
+            Some(p) if !p.is_root => {
+                !p.muted_macros.is_empty()
+                    || !p.overridden_macros.is_empty()
+                    || !p.app_macros.is_empty()
             }
-            _ => std::borrow::Cow::Borrowed(&self.macro_table),
+            _ => false,
+        };
+
+        if !has_global_mutes && !child_deltas {
+            self.cached_active_macro_table = None;
+            self.cached_macro_sig = None;
+            return;
+        }
+
+        let current_child_sum = match self.profile_manager.get_profile(&self.profile_manager.active_id) {
+            Some(p) if !p.is_root => {
+                p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len()
+            }
+            _ => 0,
+        };
+
+        let is_valid = if let Some((ref cached_id, ref cached_global_mutes, cached_global_len, child_sum)) = self.cached_macro_sig {
+            *cached_id == self.profile_manager.active_id
+                && cached_global_mutes.as_slice() == self.profile_manager.global_profile.muted_macros.as_slice()
+                && cached_global_len == self.macro_table.len()
+                && child_sum == current_child_sum
+        } else {
+            false
+        };
+
+        if !is_valid {
+            let mut table = MacroTable::new();
+            for e in self.effective_macros() {
+                table.insert_typed_no_cache(e.key, e.value, e.macro_type);
+            }
+            table.rebuild_cache();
+            self.cached_macro_sig = Some((
+                self.profile_manager.active_id.clone(),
+                self.profile_manager.global_profile.muted_macros.clone(),
+                self.macro_table.len(),
+                current_child_sum,
+            ));
+            self.cached_active_macro_table = Some(table);
+        }
+    }
+
+    /// Macro table of the active profile: borrowed reference without heap allocations
+    fn active_macro_table(&self) -> &MacroTable {
+        if let Some(ref cached) = self.cached_active_macro_table {
+            cached
+        } else {
+            &self.macro_table
         }
     }
 
@@ -211,23 +253,26 @@ impl VietnameseEngine {
 
     /// Feed a character into the engine with hardware Shift & CapsLock state.
     pub fn on_key(&mut self, ch: char, is_shift: bool, is_caps: bool) -> EngineAction {
-        // Settings of the active (foreground app) profile, resolved over the global config
-        let cfg = if self.profile_manager.active_id == "global" {
-            self.config.clone()
+        let (bracket_w, auto_uppercase_first_char) = if self.profile_manager.active_id == "global" {
+            (self.config.bracket_w, self.config.auto_uppercase_first_char)
         } else {
-            self.cached_effective_config.clone()
+            (
+                self.cached_effective_config.bracket_w,
+                self.cached_effective_config.auto_uppercase_first_char,
+            )
         };
-        let prev_state_summary = if self.config.debug {
-            self.buffer.state.summary()
+
+        let is_letter = if ch.is_ascii() {
+            ch.is_ascii_alphabetic()
         } else {
-            String::new()
+            ch.is_alphabetic()
         };
-        let mut is_upper = is_shift ^ is_caps;
+        let mut is_upper = (is_shift ^ is_caps) && is_letter;
 
         // Auto-uppercase first letter after period or newline
-        if cfg.auto_uppercase_first_char
+        if auto_uppercase_first_char
             && self.auto_uppercase_next
-            && ch.is_alphabetic()
+            && is_letter
             && self.buffer.is_empty()
         {
             is_upper = true;
@@ -235,9 +280,22 @@ impl VietnameseEngine {
         }
 
         // Word break characters: space, enter, punctuation
-        if ch.is_whitespace() || is_word_break(ch, cfg.bracket_w) {
-            return self.handle_word_break(ch, &cfg);
+        if ch.is_whitespace() || is_word_break(ch, bracket_w) {
+            return self.handle_word_break(ch);
         }
+
+        // Settings of the active (foreground app) profile, resolved over the global config
+        let cfg = if self.profile_manager.active_id == "global" {
+            &self.config
+        } else {
+            &self.cached_effective_config
+        };
+
+        let prev_state_summary = if self.config.debug {
+            self.buffer.state.summary()
+        } else {
+            String::new()
+        };
 
         if !cfg.enabled {
             if cfg.use_macro && cfg.use_macro_in_english_mode {
@@ -326,14 +384,30 @@ impl VietnameseEngine {
         action
     }
 
-    fn handle_word_break(&mut self, ch: char, cfg: &EngineConfig) -> EngineAction {
+    fn handle_word_break(&mut self, ch: char) -> EngineAction {
+        let (auto_uppercase, use_macro, restore_on_wrong_spelling) =
+            if self.profile_manager.active_id == "global" {
+                (
+                    self.config.auto_uppercase_first_char,
+                    self.config.use_macro,
+                    self.config.restore_on_wrong_spelling,
+                )
+            } else {
+                (
+                    self.cached_effective_config.auto_uppercase_first_char,
+                    self.cached_effective_config.use_macro,
+                    self.cached_effective_config.restore_on_wrong_spelling,
+                )
+            };
+
         // Update auto-uppercase trigger
-        if cfg.auto_uppercase_first_char && (ch == '.' || ch == '\n' || ch == '\r') {
+        if auto_uppercase && (ch == '.' || ch == '\n' || ch == '\r') {
             self.auto_uppercase_next = true;
         }
 
         // Check Macro expansion before clearing buffer
-        if cfg.use_macro && !self.buffer.is_empty() {
+        if use_macro && !self.buffer.is_empty() {
+            self.ensure_active_macro_table();
             let rendered = self.buffer.rendered();
             let is_space = ch == ' ';
             let allow_start = is_space;
@@ -354,7 +428,6 @@ impl VietnameseEngine {
                         None
                     }
                 });
-            drop(macro_table);
 
             if let Some(mut output) = expanded {
                 let backspaces = self.buffer.emitted_len;
@@ -381,7 +454,7 @@ impl VietnameseEngine {
         }
 
         // Restore raw keys if the word is an invalid Vietnamese syllable
-        if cfg.restore_on_wrong_spelling && !self.buffer.is_empty() {
+        if restore_on_wrong_spelling && !self.buffer.is_empty() {
             let is_same = self.buffer.rendered().chars().eq(self
                 .buffer
                 .raw_keys
@@ -455,9 +528,9 @@ impl VietnameseEngine {
     /// Feed a backspace event
     pub fn on_backspace(&mut self) -> EngineAction {
         let cfg = if self.profile_manager.active_id == "global" {
-            self.config.clone()
+            &self.config
         } else {
-            self.cached_effective_config.clone()
+            &self.cached_effective_config
         };
         if !cfg.enabled {
             if cfg.use_macro
@@ -499,7 +572,7 @@ impl VietnameseEngine {
                 } else {
                     // Replay previous word into buffer
                     for &k in &raw_keys {
-                        self.buffer.feed_key(k, &cfg);
+                        self.buffer.feed_key(k, cfg);
                     }
                     self.buffer.is_restored_across_space = true;
                 }

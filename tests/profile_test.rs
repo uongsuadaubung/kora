@@ -568,4 +568,108 @@ fn test_child_inherits_root_muted_state() {
     assert!(remap_14_ui.is_active);
 }
 
+#[test]
+fn test_key_management_row_toggle_remap_disable_key_macro() {
+    use kora::engine::profile::{KeyMacroRule, MacroAction};
+    use kora::VietnameseEngine;
+
+    let mut engine = VietnameseEngine::new(EngineConfig {
+        remap_enabled: true,
+        disable_enabled: true,
+        key_macro_enabled: true,
+        ..Default::default()
+    });
+
+    let pm = &mut engine.profile_manager;
+    pm.global_profile.remap_enabled = Some(true);
+    pm.global_profile.disable_enabled = Some(true);
+    pm.global_profile.key_macro_enabled = Some(true);
+
+    // 1. Remap: CapsLock (0x14) -> Ctrl (0x11), ScrollLock (0x91) -> Mute (0xAD)
+    pm.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
+    pm.global_profile.app_remaps.push(KeyRemapRule::new(0x91, 0xAD));
+
+    // 2. Disable: Insert (0x2D), Pause (0x13)
+    pm.global_profile.app_disabled.push(0x2D);
+    pm.global_profile.app_disabled.push(0x13);
+
+    // 3. Key Macro: F1 (0x70), F2 (0x71)
+    pm.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x70,
+        "F1 Macro",
+        vec![MacroAction::Press("Space".into())],
+    ));
+    pm.global_profile.app_key_macros.push(KeyMacroRule::new(
+        0x71,
+        "F2 Macro",
+        vec![MacroAction::Press("Enter".into())],
+    ));
+
+    // Verify initial active state: All rules are effective
+    assert_eq!(engine.effective_remaps().len(), 2);
+    assert!(engine.effective_remaps().iter().any(|r| r.from_vk == 0x14));
+    assert!(engine.effective_remaps().iter().any(|r| r.from_vk == 0x91));
+
+    assert_eq!(engine.effective_disabled().len(), 2);
+    assert!(engine.effective_disabled().contains(&0x2D));
+    assert!(engine.effective_disabled().contains(&0x13));
+
+    assert_eq!(engine.effective_key_macros().len(), 2);
+    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x70));
+    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x71));
+
+    // --- TOGGLE OFF (Mute each row in Global Profile) ---
+    // Remap: Mute CapsLock (0x14)
+    engine.profile_manager.global_profile.muted_remaps.push(0x14);
+    // Disable: Mute disable (unblock) Insert (0x2D)
+    engine.profile_manager.global_profile.unmuted_disabled.push(0x2D);
+    // Key Macro: Mute F1 (0x70)
+    engine.profile_manager.global_profile.muted_key_macros.push(0x70);
+
+    // Verify Effective: Muted rules must NOT be in effective lists!
+    let eff_remap = engine.effective_remaps();
+    assert_eq!(eff_remap.len(), 1);
+    assert_eq!(eff_remap[0].from_vk, 0x91); // Only 0x91 remains
+    assert!(eff_remap.iter().all(|r| r.from_vk != 0x14)); // 0x14 is gone!
+
+    let eff_disable = engine.effective_disabled();
+    assert_eq!(eff_disable.len(), 1);
+    assert_eq!(eff_disable[0], 0x13); // Only 0x13 remains
+    assert!(!eff_disable.contains(&0x2D)); // 0x2D is unblocked!
+
+    let eff_km = engine.effective_key_macros();
+    assert_eq!(eff_km.len(), 1);
+    assert_eq!(eff_km[0].trigger_vk, 0x71); // Only 0x71 remains
+    assert!(eff_km.iter().all(|m| m.trigger_vk != 0x70)); // 0x70 is gone!
+
+    // Verify UI reflects inactive status
+    let ui_remaps = engine.profile_manager.resolve_remap_items_for_ui("global");
+    let ui_14 = ui_remaps.iter().find(|r| r.from_vk == 0x14).unwrap();
+    assert!(!ui_14.is_active);
+
+    let ui_disabled = engine.profile_manager.resolve_disable_items_for_ui("global");
+    let ui_2d = ui_disabled.iter().find(|d| d.vk == 0x2D).unwrap();
+    assert!(!ui_2d.is_active);
+
+    let ui_km = engine.profile_manager.resolve_key_macro_items_for_ui("global");
+    let ui_70 = ui_km.iter().find(|k| k.trigger_vk == 0x70).unwrap();
+    assert!(!ui_70.is_active);
+
+    // --- TOGGLE ON (Unmute each row in Global Profile) ---
+    engine.profile_manager.global_profile.muted_remaps.retain(|&v| v != 0x14);
+    engine.profile_manager.global_profile.unmuted_disabled.retain(|&v| v != 0x2D);
+    engine.profile_manager.global_profile.muted_key_macros.retain(|&v| v != 0x70);
+
+    // Verify Effective: All rules are restored and effective again!
+    assert_eq!(engine.effective_remaps().len(), 2);
+    assert!(engine.effective_remaps().iter().any(|r| r.from_vk == 0x14));
+
+    assert_eq!(engine.effective_disabled().len(), 2);
+    assert!(engine.effective_disabled().contains(&0x2D));
+
+    assert_eq!(engine.effective_key_macros().len(), 2);
+    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x70));
+}
+
+
 
