@@ -178,6 +178,12 @@ impl TypingBuffer {
             return false;
         }
 
+        // If the buffer already contains an underscore, it is an identifier or macro (e.g. v_n, v_N, tp_hcm),
+        // not a camelCase word boundary.
+        if self.raw_keys.iter().any(|k| k.ch == '_') {
+            return false;
+        }
+
         key.is_upper
             && self
                 .raw_keys

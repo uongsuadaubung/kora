@@ -241,7 +241,7 @@ impl VietnameseEngine {
 
         if !cfg.enabled {
             if cfg.use_macro && cfg.use_macro_in_english_mode {
-                if ch.is_alphanumeric() {
+                if ch.is_alphanumeric() || ch == '_' {
                     self.buffer.raw_keys.push(RawKey { ch, is_upper });
                     self.buffer.emitted_len += 1;
                 } else {
@@ -561,7 +561,6 @@ fn is_word_break(c: char, bracket_w: bool) -> bool {
             | '%'
             | '^'
             | '&'
-            | '_'
             | '`'
             | '~'
             | '|'

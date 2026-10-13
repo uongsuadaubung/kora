@@ -260,6 +260,37 @@ fn test_macro_type_customization_and_single_character_guard() {
 }
 
 #[test]
+fn test_macro_with_underscore_expansion() {
+    let mut engine = VietnameseEngine::new(EngineConfig {
+        use_macro: true,
+        use_macro_in_english_mode: true,
+        enabled: true,
+        ..Default::default()
+    });
+
+    engine.macro_table.insert("v_n", "Việt Nam");
+    engine.macro_table.insert("tp_hcm", "thành phố Hồ Chí Minh");
+
+    // 1. Vietnamese mode: "v_n " -> "Việt Nam "
+    assert_eq!(simulate_typing(&mut engine, "v_n "), "Việt Nam ");
+    assert_eq!(simulate_typing(&mut engine, "tp_hcm "), "thành phố Hồ Chí Minh ");
+
+    // 2. Case preservation:
+    // "V_n " -> "Việt Nam "
+    assert_eq!(simulate_typing(&mut engine, "V_n "), "Việt Nam ");
+    // "V_N " -> "VIỆT NAM "
+    assert_eq!(simulate_typing(&mut engine, "V_N "), "VIỆT NAM ");
+
+    // 3. English mode:
+    engine.config_mut().enabled = false;
+    assert_eq!(simulate_typing(&mut engine, "v_n "), "Việt Nam ");
+    assert_eq!(simulate_typing(&mut engine, "tp_hcm "), "thành phố Hồ Chí Minh ");
+
+    // 4. Underscore identifier typing without macro:
+    assert_eq!(simulate_typing(&mut engine, "user_name "), "user_name ");
+}
+
+#[test]
 fn test_macro_type_serialization_and_roundtrip() {
     use kora::engine::macro_table::{MacroTable, MacroType};
 
