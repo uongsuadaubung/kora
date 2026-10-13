@@ -195,9 +195,9 @@ impl TabTyping {
                 right: BADGE_X + BADGE_MAX_W + 4,
                 bottom: BADGE_Y + BADGE_H + 8,
             };
-            InvalidateRect(self.parent, &rc, 1);
-            InvalidateRect(self.lbl_switch_prompt.hwnd(), std::ptr::null(), 1);
-            InvalidateRect(self.lbl_switch_badge.hwnd(), std::ptr::null(), 1);
+            InvalidateRect(self.parent, &rc, 0);
+            InvalidateRect(self.lbl_switch_prompt.hwnd(), std::ptr::null(), 0);
+            InvalidateRect(self.lbl_switch_badge.hwnd(), std::ptr::null(), 0);
         }
     }
 
@@ -218,8 +218,8 @@ impl TabTyping {
             SetWindowPos(hwnd, 0, 0, 0, w, BADGE_H, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
             // Repaint the pill border drawn by the parent around the label
             let rc = RECT { left: BADGE_X - 4, top: BADGE_Y - 8, right: BADGE_X + BADGE_MAX_W + 4, bottom: BADGE_Y + BADGE_H + 8 };
-            InvalidateRect(self.parent, &rc, 1);
-            InvalidateRect(hwnd, std::ptr::null(), 1);
+            InvalidateRect(self.parent, &rc, 0);
+            InvalidateRect(hwnd, std::ptr::null(), 0);
         }
     }
 

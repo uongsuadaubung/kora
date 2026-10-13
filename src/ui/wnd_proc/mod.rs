@@ -54,8 +54,21 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
                 if hdc != 0 {
+                    let mut rc = RECT::default();
+                    GetClientRect(hwnd, &mut rc);
+                    let width = rc.right - rc.left;
+                    let height = rc.bottom - rc.top;
                     let is_dark = is_current_dark();
-                    paint_control_panel(hwnd, hdc, is_dark);
+
+                    if width > 0 && height > 0 {
+                        if let Some(bb) = BackBuffer::new(hdc, width, height) {
+                            paint_control_panel(hwnd, bb.hdc(), is_dark);
+                        } else {
+                            paint_control_panel(hwnd, hdc, is_dark);
+                        }
+                    } else {
+                        paint_control_panel(hwnd, hdc, is_dark);
+                    }
                     EndPaint(hwnd, &ps);
                 }
             }

@@ -180,136 +180,14 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                 if hdc != 0 {
                     let mut rc = RECT::default();
                     GetClientRect(hwnd, &mut rc);
+                    let w = rc.right - rc.left;
+                    let h = rc.bottom - rc.top;
 
-                    let is_dark = crate::ui::is_current_dark();
-                    let palette = ThemePalette::get(is_dark);
-
-                    let (tabs, cur_sel, hover_idx, font_normal, font_bold) = if let Ok(g) = state_mutex.lock() {
-                        (g.tabs.clone(), g.cur_sel, g.hover_idx, g.font_normal, g.font_bold)
-                    } else {
-                        (Vec::new(), 0, -1, 0, 0)
-                    };
-
-                    // 0. Fill the entire control rect with the window background
-                    let brush_bg = CreateSolidBrush(palette.bg_window);
-                    FillRect(hdc, &rc, brush_bg);
-                    DeleteObject(brush_bg);
-
-                    // 1. Paint Outer Segmented Track Pill
-                    let brush_track = CreateSolidBrush(palette.tab_track_bg);
-                    let pen_track = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_track_border);
-                    let old_brush = SelectObject(hdc, brush_track);
-                    let old_pen = SelectObject(hdc, pen_track);
-
-                    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radii::RADIUS_PILL, radii::RADIUS_PILL);
-
-                    SelectObject(hdc, old_brush);
-                    SelectObject(hdc, old_pen);
-                    DeleteObject(brush_track);
-                    DeleteObject(pen_track);
-
-                    // 2. Draw Tabs
-                    let num_tabs = tabs.len() as i32;
-                    if num_tabs > 0 {
-                        let track_padding = 3;
-                        let available_w = (rc.right - rc.left) - (track_padding * 2);
-                        let tab_w = available_w / num_tabs;
-
-                        SetBkMode(hdc, TRANSPARENT);
-
-                        for (i, title) in tabs.iter().enumerate() {
-                            let i_i32 = i as i32;
-                            let item_left = track_padding + i_i32 * tab_w;
-                            let item_right = if i == tabs.len() - 1 {
-                                rc.right - track_padding
-                            } else {
-                                item_left + tab_w
-                            };
-                            let item_top = track_padding;
-                            let item_bottom = rc.bottom - track_padding;
-
-                            let mut item_rc = RECT {
-                                left: item_left,
-                                top: item_top,
-                                right: item_right,
-                                bottom: item_bottom,
-                            };
-
-                            if i == cur_sel {
-                                // Active Tab Pill
-                                let h_active_br = CreateSolidBrush(palette.tab_active_bg);
-                                let h_active_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_active_border);
-                                let ob = SelectObject(hdc, h_active_br);
-                                let op = SelectObject(hdc, h_active_pen);
-
-                                RoundRect(
-                                    hdc,
-                                    item_rc.left,
-                                    item_rc.top,
-                                    item_rc.right,
-                                    item_rc.bottom,
-                                    radii::RADIUS_CARD,
-                                    radii::RADIUS_CARD,
-                                );
-
-                                SelectObject(hdc, ob);
-                                SelectObject(hdc, op);
-                                DeleteObject(h_active_br);
-                                DeleteObject(h_active_pen);
-
-                                // Text & Underline indicator
-                                if font_bold != 0 {
-                                    SelectObject(hdc, font_bold);
-                                }
-                                SetTextColor(hdc, palette.accent);
-
-                                let line_rc = RECT {
-                                    left: item_rc.left + 4,
-                                    top: item_rc.bottom - 2,
-                                    right: item_rc.right - 4,
-                                    bottom: item_rc.bottom,
-                                };
-                                let line_br = CreateSolidBrush(palette.accent);
-                                FillRect(hdc, &line_rc, line_br);
-                                DeleteObject(line_br);
-                            } else {
-                                // Inactive Tab (with subtle hover)
-                                if hover_idx == i as isize {
-                                    let h_hvr_br = CreateSolidBrush(palette.tab_hover_bg);
-                                    let h_null_pen = CreatePen(PS_NULL, 0, 0);
-                                    let ob = SelectObject(hdc, h_hvr_br);
-                                    let op = SelectObject(hdc, h_null_pen);
-
-                                    RoundRect(
-                                        hdc,
-                                        item_rc.left,
-                                        item_rc.top,
-                                        item_rc.right,
-                                        item_rc.bottom,
-                                        radii::RADIUS_CARD,
-                                        radii::RADIUS_CARD,
-                                    );
-
-                                    SelectObject(hdc, ob);
-                                    SelectObject(hdc, op);
-                                    DeleteObject(h_hvr_br);
-                                    DeleteObject(h_null_pen);
-                                }
-
-                                if font_normal != 0 {
-                                    SelectObject(hdc, font_normal);
-                                }
-                                SetTextColor(hdc, palette.text_secondary);
-                            }
-
-                            let title_w = to_wide(title);
-                            DrawTextW(
-                                hdc,
-                                title_w.as_ptr(),
-                                title.encode_utf16().count() as i32,
-                                &mut item_rc,
-                                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
-                            );
+                    if w > 0 && h > 0 {
+                        if let Some(bb) = BackBuffer::new(hdc, w, h) {
+                            render_tab_bar_to_dc(bb.hdc(), &rc, state_mutex);
+                        } else {
+                            render_tab_bar_to_dc(hdc, &rc, state_mutex);
                         }
                     }
 
@@ -319,6 +197,142 @@ unsafe extern "system" fn tab_bar_wnd_proc(
             0
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
+
+fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>) {
+    unsafe {
+        let is_dark = crate::ui::is_current_dark();
+        let palette = ThemePalette::get(is_dark);
+
+        let (tabs, cur_sel, hover_idx, font_normal, font_bold) = if let Ok(g) = state_mutex.lock() {
+            (g.tabs.clone(), g.cur_sel, g.hover_idx, g.font_normal, g.font_bold)
+        } else {
+            (Vec::new(), 0, -1, 0, 0)
+        };
+
+        // 0. Fill the entire control rect with the window background
+        let brush_bg = CreateSolidBrush(palette.bg_window);
+        FillRect(hdc, rc, brush_bg);
+        DeleteObject(brush_bg);
+
+        // 1. Paint Outer Segmented Track Pill
+        let brush_track = CreateSolidBrush(palette.tab_track_bg);
+        let pen_track = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_track_border);
+        let old_brush = SelectObject(hdc, brush_track);
+        let old_pen = SelectObject(hdc, pen_track);
+
+        RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radii::RADIUS_PILL, radii::RADIUS_PILL);
+
+        SelectObject(hdc, old_brush);
+        SelectObject(hdc, old_pen);
+        DeleteObject(brush_track);
+        DeleteObject(pen_track);
+
+        // 2. Draw Tabs
+        let num_tabs = tabs.len() as i32;
+        if num_tabs > 0 {
+            let track_padding = 3;
+            let available_w = (rc.right - rc.left) - (track_padding * 2);
+            let tab_w = available_w / num_tabs;
+
+            SetBkMode(hdc, TRANSPARENT);
+
+            for (i, title) in tabs.iter().enumerate() {
+                let i_i32 = i as i32;
+                let item_left = track_padding + i_i32 * tab_w;
+                let item_right = if i == tabs.len() - 1 {
+                    rc.right - track_padding
+                } else {
+                    item_left + tab_w
+                };
+                let item_top = track_padding;
+                let item_bottom = rc.bottom - track_padding;
+
+                let mut item_rc = RECT {
+                    left: item_left,
+                    top: item_top,
+                    right: item_right,
+                    bottom: item_bottom,
+                };
+
+                if i == cur_sel {
+                    // Active Tab Pill
+                    let h_active_br = CreateSolidBrush(palette.tab_active_bg);
+                    let h_active_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_active_border);
+                    let ob = SelectObject(hdc, h_active_br);
+                    let op = SelectObject(hdc, h_active_pen);
+
+                    RoundRect(
+                        hdc,
+                        item_rc.left,
+                        item_rc.top,
+                        item_rc.right,
+                        item_rc.bottom,
+                        radii::RADIUS_CARD,
+                        radii::RADIUS_CARD,
+                    );
+
+                    SelectObject(hdc, ob);
+                    SelectObject(hdc, op);
+                    DeleteObject(h_active_br);
+                    DeleteObject(h_active_pen);
+
+                    // Text & Underline indicator
+                    if font_bold != 0 {
+                        SelectObject(hdc, font_bold);
+                    }
+                    SetTextColor(hdc, palette.accent);
+
+                    let line_rc = RECT {
+                        left: item_rc.left + 4,
+                        top: item_rc.bottom - 2,
+                        right: item_rc.right - 4,
+                        bottom: item_rc.bottom,
+                    };
+                    let line_br = CreateSolidBrush(palette.accent);
+                    FillRect(hdc, &line_rc, line_br);
+                    DeleteObject(line_br);
+                } else {
+                    // Inactive Tab (with subtle hover)
+                    if hover_idx == i as isize {
+                        let h_hvr_br = CreateSolidBrush(palette.tab_hover_bg);
+                        let h_null_pen = CreatePen(PS_NULL, 0, 0);
+                        let ob = SelectObject(hdc, h_hvr_br);
+                        let op = SelectObject(hdc, h_null_pen);
+
+                        RoundRect(
+                            hdc,
+                            item_rc.left,
+                            item_rc.top,
+                            item_rc.right,
+                            item_rc.bottom,
+                            radii::RADIUS_CARD,
+                            radii::RADIUS_CARD,
+                        );
+
+                        SelectObject(hdc, ob);
+                        SelectObject(hdc, op);
+                        DeleteObject(h_hvr_br);
+                        DeleteObject(h_null_pen);
+                    }
+
+                    if font_normal != 0 {
+                        SelectObject(hdc, font_normal);
+                    }
+                    SetTextColor(hdc, palette.text_secondary);
+                }
+
+                let title_w = to_wide(title);
+                DrawTextW(
+                    hdc,
+                    title_w.as_ptr(),
+                    title.encode_utf16().count() as i32,
+                    &mut item_rc,
+                    DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
+                );
+            }
+        }
     }
 }
 

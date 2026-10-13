@@ -239,7 +239,7 @@ impl TabMacro {
                     0,
                     SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW,
                 );
-                InvalidateRect(self.list_macro.hwnd(), std::ptr::null(), 1);
+                InvalidateRect(self.list_macro.hwnd(), std::ptr::null(), 0);
             }
         }
     }

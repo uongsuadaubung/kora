@@ -262,7 +262,7 @@ impl TabKeys {
                     0,
                     SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW,
                 );
-                InvalidateRect(*h, std::ptr::null(), 1);
+                InvalidateRect(*h, std::ptr::null(), 0);
             }
         }
     }
