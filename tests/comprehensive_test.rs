@@ -216,6 +216,7 @@ fn test_benchmark_throughput() {
         (elapsed.as_micros() as f64) / (total_keystrokes as f64)
     );
 
+    engine.reset();
     let chars: Vec<char> = paragraph.chars().collect();
     let start_raw = std::time::Instant::now();
     for _ in 0..iterations {

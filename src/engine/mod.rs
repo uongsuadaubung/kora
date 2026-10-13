@@ -6,7 +6,7 @@ pub mod history;
 pub mod macro_table;
 pub mod profile;
 
-use action::EngineAction;
+pub use action::{CompactString, EngineAction};
 use buffer::{RawKey, TypingBuffer};
 pub use config::EngineConfig;
 use history::WordHistory;
@@ -19,6 +19,7 @@ pub use profile::ProfileManager;
 pub struct VietnameseEngine {
     config: EngineConfig,
     cached_effective_config: EngineConfig,
+    is_active_global: bool,
     pub buffer: TypingBuffer,
     pub macro_table: MacroTable,
     pub profile_manager: ProfileManager,
@@ -47,6 +48,7 @@ impl VietnameseEngine {
         Self {
             config,
             cached_effective_config,
+            is_active_global: true,
             buffer: TypingBuffer::new(),
             macro_table: MacroTable::with_defaults(),
             profile_manager: ProfileManager::new(),
@@ -72,7 +74,8 @@ impl VietnameseEngine {
     }
 
     pub fn refresh_effective_config(&mut self) {
-        if self.profile_manager.active_id == "global" {
+        self.is_active_global = self.profile_manager.active_id == "global";
+        if self.is_active_global {
             self.cached_effective_config = self.config.clone();
         } else {
             self.cached_effective_config = self.profile_manager.resolve_effective_config(
@@ -84,7 +87,7 @@ impl VietnameseEngine {
 
     #[inline(always)]
     pub fn effective_config(&self) -> &EngineConfig {
-        if self.profile_manager.active_id == "global" {
+        if self.is_active_global {
             &self.config
         } else {
             &self.cached_effective_config
@@ -253,7 +256,7 @@ impl VietnameseEngine {
 
     /// Feed a character into the engine with hardware Shift & CapsLock state.
     pub fn on_key(&mut self, ch: char, is_shift: bool, is_caps: bool) -> EngineAction {
-        let (bracket_w, auto_uppercase_first_char) = if self.profile_manager.active_id == "global" {
+        let (bracket_w, auto_uppercase_first_char) = if self.is_active_global {
             (self.config.bracket_w, self.config.auto_uppercase_first_char)
         } else {
             (
@@ -279,13 +282,15 @@ impl VietnameseEngine {
             self.auto_uppercase_next = false;
         }
 
-        // Word break characters: space, enter, punctuation
-        if ch.is_whitespace() || is_word_break(ch, bracket_w) {
+        // Letter Fast-Path: Hơn 95% thao tác gõ phím là chữ cái thông thường ('a'..'z', 'A'..'Z').
+        // Nhờ điều kiện `!is_letter`, toàn bộ các chữ cái bỏ qua kiểm tra whitespace và bitmask ngắt từ
+        // ngay trong đúng 1 chu kỳ CPU mà không tốn lệnh rẽ nhánh phụ.
+        if !is_letter && (ch.is_whitespace() || is_word_break(ch, bracket_w)) {
             return self.handle_word_break(ch);
         }
 
         // Settings of the active (foreground app) profile, resolved over the global config
-        let cfg = if self.profile_manager.active_id == "global" {
+        let cfg = if self.is_active_global {
             &self.config
         } else {
             &self.cached_effective_config
@@ -316,9 +321,13 @@ impl VietnameseEngine {
         // If the incoming key begins a new CamelCase boundary, save preceding word into history
         if self.buffer.is_boundary(&raw_key) {
             let rendered = self.buffer.rendered();
-            let is_same_as_raw = rendered
-                .chars()
-                .eq(self.buffer.raw_keys.iter().map(|k| k.ch));
+            let is_same_as_raw = if self.buffer.raw_keys.len() != self.buffer.emitted_len {
+                false
+            } else {
+                rendered
+                    .chars()
+                    .eq(self.buffer.raw_keys.iter().map(|k| k.ch))
+            };
             let should_restore = cfg.restore_on_wrong_spelling
                 && !is_same_as_raw
                 && !self.buffer.state.is_valid_spelling();
@@ -336,7 +345,7 @@ impl VietnameseEngine {
                 self.buffer.state = next_state;
                 self.buffer.last_rendered.push(ch);
                 self.buffer.emitted_len = ch.len_utf16();
-                return EngineAction::Replace { backspaces, output };
+                return EngineAction::Replace { backspaces, output: output.into() };
             }
 
             let current_raw = self.buffer.raw_keys;
@@ -386,7 +395,7 @@ impl VietnameseEngine {
 
     fn handle_word_break(&mut self, ch: char) -> EngineAction {
         let (auto_uppercase, use_macro, restore_on_wrong_spelling) =
-            if self.profile_manager.active_id == "global" {
+            if self.is_active_global {
                 (
                     self.config.auto_uppercase_first_char,
                     self.config.use_macro,
@@ -405,61 +414,74 @@ impl VietnameseEngine {
             self.auto_uppercase_next = true;
         }
 
+        // Fast path: if buffer is empty, no macro expansion or spelling restoration needed
+        if self.buffer.is_empty() {
+            if ch == ' ' {
+                self.history.add_space();
+            } else {
+                self.history.clear();
+            }
+            return EngineAction::Passthrough;
+        }
+
+        // O(1) Length Fast-Path: Với mọi từ tiếng Việt có dấu phụ hoặc dấu thanh (tiếng, việt, được, rất),
+        // số phím thô (raw_keys: "t-i-e-e-n-g-s") luôn khác số ký tự phát ra màn hình (emitted_len: 5 ký tự "tiếng").
+        // Ta kết luận ngay `is_same = false` chỉ trong 1 lệnh so sánh số nguyên O(1), tránh việc duyệt UTF-8 lặp.
+        let is_same = if self.buffer.raw_keys.len() != self.buffer.emitted_len {
+            false
+        } else {
+            self.buffer.rendered().chars().eq(self.buffer.raw_keys.iter().map(|k| k.ch))
+        };
+
         // Check Macro expansion before clearing buffer
-        if use_macro && !self.buffer.is_empty() {
+        if use_macro {
             self.ensure_active_macro_table();
-            let rendered = self.buffer.rendered();
-            let is_space = ch == ' ';
-            let allow_start = is_space;
-            let allow_end = is_space;
-
-            let is_same = rendered
-                .chars()
-                .eq(self.buffer.raw_keys.iter().map(|k| k.ch));
             let macro_table = self.active_macro_table();
-            let expanded = macro_table
-                .expand_word(rendered, allow_start, allow_end)
-                .or_else(|| {
-                    if !is_same {
-                        let current_word: String =
-                            self.buffer.raw_keys.iter().map(|k| k.ch).collect();
-                        macro_table.expand_word(&current_word, allow_start, allow_end)
-                    } else {
-                        None
+            if !macro_table.is_empty() {
+                let rendered = self.buffer.rendered();
+                let is_space = ch == ' ';
+                let allow_start = is_space;
+                let allow_end = is_space;
+
+                let expanded = macro_table
+                    .expand_word(rendered, allow_start, allow_end)
+                    .or_else(|| {
+                        if !is_same {
+                            let current_word: String =
+                                self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                            macro_table.expand_word(&current_word, allow_start, allow_end)
+                        } else {
+                            None
+                        }
+                    });
+
+                if let Some(mut output) = expanded {
+                    let backspaces = self.buffer.emitted_len;
+                    output.push(ch);
+
+                    if self.config.debug {
+                        let current_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                        self.log_debug(format!(
+                            "[DBG][MACRO] Key: {:?} | Expanded {:?} -> {:?} | Replace(bs={}, output={:?})",
+                            ch, current_word, output, backspaces, output
+                        ));
                     }
-                });
 
-            if let Some(mut output) = expanded {
-                let backspaces = self.buffer.emitted_len;
-                output.push(ch);
+                    self.buffer.clear();
+                    if ch == ' ' {
+                        self.history.commit_word(crate::vietnamese::InlineList::new(), false);
+                        self.history.add_space();
+                    } else {
+                        self.history.clear();
+                    }
 
-                if self.config.debug {
-                    let current_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
-                    self.log_debug(format!(
-                        "[DBG][MACRO] Key: {:?} | Expanded {:?} -> {:?} | Replace(bs={}, output={:?})",
-                        ch, current_word, output, backspaces, output
-                    ));
+                    return EngineAction::Replace { backspaces, output: output.into() };
                 }
-
-                self.buffer.clear();
-                if ch == ' ' {
-                    self.history.commit_word(crate::vietnamese::InlineList::new(), false);
-                    self.history.add_space();
-                } else {
-                    self.history.clear();
-                }
-
-                return EngineAction::Replace { backspaces, output };
             }
         }
 
         // Restore raw keys if the word is an invalid Vietnamese syllable
-        if restore_on_wrong_spelling && !self.buffer.is_empty() {
-            let is_same = self.buffer.rendered().chars().eq(self
-                .buffer
-                .raw_keys
-                .iter()
-                .map(|k| k.ch));
+        if restore_on_wrong_spelling {
             let is_invalid = if !is_same {
                 !self.buffer.state.is_valid_spelling()
             } else {
@@ -493,7 +515,7 @@ impl VietnameseEngine {
                 }
                 self.buffer.clear();
 
-                return EngineAction::Replace { backspaces, output };
+                return EngineAction::Replace { backspaces, output: output.into() };
             }
         }
 
@@ -527,7 +549,7 @@ impl VietnameseEngine {
 
     /// Feed a backspace event
     pub fn on_backspace(&mut self) -> EngineAction {
-        let cfg = if self.profile_manager.active_id == "global" {
+        let cfg = if self.is_active_global {
             &self.config
         } else {
             &self.cached_effective_config
@@ -602,41 +624,38 @@ impl VietnameseEngine {
     }
 }
 
-fn is_word_break(c: char, bracket_w: bool) -> bool {
-    if bracket_w && (c == '[' || c == ']') {
-        return false;
+/// Tạo mặt nạ bit 128-bit (u128) tại compile-time chứa toàn bộ các ký tự ngắt câu trong bảng mã ASCII (0..127).
+/// Triệt tiêu hoàn toàn 31 nhánh so khớp pattern (`matches!`), cho phép kiểm tra ngắt từ trong đúng 1 phép dịch bit và 1 phép AND.
+const fn make_word_break_mask(include_brackets: bool) -> u128 {
+    let chars: &[u8] = if include_brackets {
+        b".,;:!?\"'()[]{}/\\+=*<>@#$%^&`~|-"
+    } else {
+        b".,;:!?\"'(){}/\\+=*<>@#$%^&`~|-"
+    };
+    let mut mask = 0u128;
+    let mut i = 0;
+    while i < chars.len() {
+        mask |= 1u128 << chars[i];
+        i += 1;
     }
-    matches!(
-        c,
-        '.' | ','
-            | ';'
-            | ':'
-            | '!'
-            | '?'
-            | '"'
-            | '\''
-            | '('
-            | ')'
-            | '['
-            | ']'
-            | '{'
-            | '}'
-            | '/'
-            | '\\'
-            | '+'
-            | '='
-            | '*'
-            | '<'
-            | '>'
-            | '@'
-            | '#'
-            | '$'
-            | '%'
-            | '^'
-            | '&'
-            | '`'
-            | '~'
-            | '|'
-            | '-'
-    )
+    mask
+}
+
+const WORD_BREAK_MASK: u128 = make_word_break_mask(true);
+const WORD_BREAK_NO_BRACKETS_MASK: u128 = make_word_break_mask(false);
+
+/// Kiểm tra ký tự ngắt từ O(1) qua bitmask 128-bit không rẽ nhánh (zero-branching).
+#[inline(always)]
+fn is_word_break(c: char, bracket_w: bool) -> bool {
+    let cp = c as u32;
+    if cp < 128 {
+        let mask = if bracket_w {
+            WORD_BREAK_NO_BRACKETS_MASK
+        } else {
+            WORD_BREAK_MASK
+        };
+        (mask & (1u128 << cp)) != 0
+    } else {
+        false
+    }
 }

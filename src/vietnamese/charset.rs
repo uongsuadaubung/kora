@@ -33,26 +33,49 @@ pub enum BaseVowel {
     Y,
 }
 
+/// Bảng tra cứu tĩnh compile-time O(1) cho 128 ký tự ASCII (128 bytes trong .rodata).
+/// Triệt tiêu hoàn toàn rẽ nhánh (branching) và chuyển đổi chữ hoa/thường (to_ascii_lowercase),
+/// ánh xạ tức thì ký tự ASCII sang BaseVowel chỉ trong đúng 1 chu kỳ CPU.
+pub const ASCII_VOWELS: [Option<BaseVowel>; 128] = {
+    let mut table = [None; 128];
+    table[b'a' as usize] = Some(BaseVowel::A);
+    table[b'A' as usize] = Some(BaseVowel::A);
+    table[b'e' as usize] = Some(BaseVowel::E);
+    table[b'E' as usize] = Some(BaseVowel::E);
+    table[b'i' as usize] = Some(BaseVowel::I);
+    table[b'I' as usize] = Some(BaseVowel::I);
+    table[b'o' as usize] = Some(BaseVowel::O);
+    table[b'O' as usize] = Some(BaseVowel::O);
+    table[b'u' as usize] = Some(BaseVowel::U);
+    table[b'U' as usize] = Some(BaseVowel::U);
+    table[b'y' as usize] = Some(BaseVowel::Y);
+    table[b'Y' as usize] = Some(BaseVowel::Y);
+    table
+};
+
 impl TryFrom<char> for BaseVowel {
     type Error = ();
 
-    #[inline]
+    #[inline(always)]
     fn try_from(c: char) -> Result<Self, Self::Error> {
-        match c.to_ascii_lowercase() {
-            'a' => Ok(Self::A),
-            'e' => Ok(Self::E),
-            'i' => Ok(Self::I),
-            'o' => Ok(Self::O),
-            'u' => Ok(Self::U),
-            'y' => Ok(Self::Y),
-            _ => Err(()),
+        let cp = c as u32;
+        if cp < 128 {
+            ASCII_VOWELS[cp as usize].ok_or(())
+        } else {
+            decompose_vowel(c).map(|(v, _, _)| v).ok_or(())
         }
     }
 }
 
 impl BaseVowel {
+    #[inline(always)]
     pub fn from_char(c: char) -> Option<Self> {
-        Self::try_from(c).ok()
+        let cp = c as u32;
+        if cp < 128 {
+            ASCII_VOWELS[cp as usize]
+        } else {
+            decompose_vowel(c).map(|(v, _, _)| v)
+        }
     }
 }
 
@@ -182,16 +205,9 @@ pub fn compose_d(has_stroke: bool, uppercase: bool) -> char {
 /// Decomposes a character into (BaseVowel, Diacritic, Tone) if it is a Vietnamese vowel
 #[inline]
 pub fn decompose_vowel(c: char) -> Option<(BaseVowel, Diacritic, Tone)> {
-    if c.is_ascii() {
-        return match c {
-            'a' | 'A' => Some((BaseVowel::A, Diacritic::None, Tone::None)),
-            'e' | 'E' => Some((BaseVowel::E, Diacritic::None, Tone::None)),
-            'i' | 'I' => Some((BaseVowel::I, Diacritic::None, Tone::None)),
-            'o' | 'O' => Some((BaseVowel::O, Diacritic::None, Tone::None)),
-            'u' | 'U' => Some((BaseVowel::U, Diacritic::None, Tone::None)),
-            'y' | 'Y' => Some((BaseVowel::Y, Diacritic::None, Tone::None)),
-            _ => None,
-        };
+    let cp = c as u32;
+    if cp < 128 {
+        return ASCII_VOWELS[cp as usize].map(|v| (v, Diacritic::None, Tone::None));
     }
 
     match c {

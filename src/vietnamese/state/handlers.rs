@@ -1,5 +1,9 @@
 use super::types::SyllableState;
-use crate::engine::{action::EngineAction, buffer::RawKey, config::EngineConfig};
+use crate::engine::{
+    action::{CompactString, EngineAction},
+    buffer::RawKey,
+    config::EngineConfig,
+};
 use crate::vietnamese::{
     charset::{BaseVowel, Diacritic, Tone, decompose_vowel, is_d_stroke},
     coda::CodaState,
@@ -169,7 +173,8 @@ impl SyllableState {
                 },
                 Tone::None,
             );
-            let output = nucleus.render();
+            // Zero-heap Replace: render directly into stack-allocated CompactString
+            let output = nucleus.render_compact();
             return Some((
                 SyllableState::Nucleus(nucleus),
                 EngineAction::Replace {
@@ -200,7 +205,8 @@ impl SyllableState {
                 },
                 Tone::None,
             );
-            let output = nucleus.render();
+            // Zero-heap Replace: render directly into stack-allocated CompactString
+            let output = nucleus.render_compact();
             return (
                 SyllableState::Nucleus(nucleus),
                 EngineAction::Replace {
@@ -227,7 +233,7 @@ impl SyllableState {
                     SyllableState::Nucleus(nucleus),
                     EngineAction::Replace {
                         backspaces: 0,
-                        output: String::from(upper_char),
+                        output: upper_char.into(),
                     },
                 );
             } else {
@@ -236,7 +242,7 @@ impl SyllableState {
                     SyllableState::Onset(onset),
                     EngineAction::Replace {
                         backspaces: 0,
-                        output: String::from(upper_char),
+                        output: upper_char.into(),
                     },
                 );
             }
@@ -304,7 +310,7 @@ impl SyllableState {
             if config.method.is_telex_family() && onset.is_d_stroke {
                 // 3rd 'd' cancels 'đ' and restores double 'dd' into Passthrough!
                 let first_d = if onset.chars[0].1 { 'D' } else { 'd' };
-                let mut output = String::with_capacity(2);
+                let mut output = CompactString::new();
                 output.push(first_d);
                 output.push(key.ch);
                 let mut raw = InlineList::new();
@@ -319,7 +325,8 @@ impl SyllableState {
                 );
             } else {
                 onset.is_d_stroke = !onset.is_d_stroke;
-                let output = onset.render();
+                // Zero-heap Replace: render directly into stack-allocated CompactString
+                let output = onset.render_compact();
                 return (
                     SyllableState::Onset(onset),
                     EngineAction::Replace {
@@ -333,7 +340,8 @@ impl SyllableState {
         // 2. Incoming vowel -> Transition from Onset to Nucleus!
         if config.method.has_standalone_w() && ch_lower == 'w' {
             if !is_valid_onset_vowel_orthography(&onset.chars, onset.is_d_stroke, BaseVowel::U) {
-                let mut raw = InlineList::from(onset.render().as_str());
+                let mut raw = InlineList::new();
+                onset.render_chars_to(&mut raw);
                 raw.push(key.ch);
                 return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
             }
@@ -347,7 +355,8 @@ impl SyllableState {
                 },
                 Tone::None,
             );
-            let output = nucleus.render();
+            // Zero-heap Replace: render directly into stack-allocated CompactString
+            let output = nucleus.render_compact();
             return (
                 SyllableState::Nucleus(nucleus),
                 EngineAction::Replace {
@@ -359,7 +368,8 @@ impl SyllableState {
 
         if let Some((base_vowel, diacritic, tone)) = decompose_vowel(key.ch) {
             if !is_valid_onset_vowel_orthography(&onset.chars, onset.is_d_stroke, base_vowel) {
-                let mut raw = InlineList::from(onset.render().as_str());
+                let mut raw = InlineList::new();
+                onset.render_chars_to(&mut raw);
                 raw.push(key.ch);
                 return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
             }
@@ -391,7 +401,8 @@ impl SyllableState {
                 return (SyllableState::Nucleus(nucleus), EngineAction::Passthrough);
             }
 
-            let output = nucleus.render();
+            // Zero-heap Replace: render directly into stack-allocated CompactString
+            let output = nucleus.render_compact();
             return (
                 SyllableState::Nucleus(nucleus),
                 EngineAction::Replace {
@@ -408,7 +419,8 @@ impl SyllableState {
         }
 
         // Invalid onset combo -> Passthrough
-        let mut raw = InlineList::from(onset.render().as_str());
+        let mut raw = InlineList::new();
+        onset.render_chars_to(&mut raw);
         raw.push(key.ch);
         (SyllableState::Passthrough(raw), EngineAction::Passthrough)
     }
@@ -435,7 +447,7 @@ impl SyllableState {
                     SyllableState::Passthrough(InlineList::from_single('[')),
                     EngineAction::Replace {
                         backspaces: current_len,
-                        output: "[".to_string(),
+                        output: "[".into(),
                     },
                 );
             }
@@ -447,7 +459,7 @@ impl SyllableState {
                     SyllableState::Passthrough(InlineList::from_single(']')),
                     EngineAction::Replace {
                         backspaces: current_len,
-                        output: "]".to_string(),
+                        output: "]".into(),
                     },
                 );
             }
@@ -466,7 +478,8 @@ impl SyllableState {
         ) {
             match nucleus.apply_modifier(effect, key, None, None, config) {
                 ModifierOutcome::Applied => {
-                    let output = nucleus.render();
+                    // Zero-heap Replace: render directly into stack-allocated CompactString
+                    let output = nucleus.render_compact();
                     return (
                         SyllableState::Nucleus(nucleus),
                         EngineAction::Replace {
@@ -480,7 +493,7 @@ impl SyllableState {
                         SyllableState::Passthrough(InlineList::from(raw.as_str())),
                         EngineAction::Replace {
                             backspaces: current_len,
-                            output: raw,
+                            output: raw.into(),
                         },
                     );
                 }
@@ -544,7 +557,8 @@ impl SyllableState {
                 };
 
                 if !is_valid {
-                    let mut raw = InlineList::from(nucleus.render().as_str());
+                    let mut raw = InlineList::new();
+                    nucleus.render_chars_to(&mut raw);
                     raw.push(key.ch);
                     return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
                 }
@@ -565,7 +579,8 @@ impl SyllableState {
                     return (SyllableState::Nucleus(nucleus), EngineAction::Passthrough);
                 }
 
-                let output = nucleus.render();
+                // Zero-heap Replace: render directly into stack-allocated CompactString
+                let output = nucleus.render_compact();
                 return (
                     SyllableState::Nucleus(nucleus),
                     EngineAction::Replace {
@@ -577,6 +592,19 @@ impl SyllableState {
         }
 
         // 6. Consonant -> Transition from Nucleus to Coda!
+        // Early-Exit Coda Guard: Kiểm tra nhanh O(1) qua bitmask CODA_START_CHARS_MASK.
+        // Nếu phụ âm không thể bắt đầu một coda tiếng Việt (và không phải trường hợp ngoại lệ 'k' Đắk Lắk),
+        // thoát sớm ngay lập tức mà không cần kiểm tra nâng cấp sừng hay tương thích thanh điệu.
+        let is_valid_start = is_valid_coda_start(key.ch);
+        let is_k = key.ch.eq_ignore_ascii_case(&'k');
+        if !is_valid_start && !is_k {
+            // Zero-allocation stack projection: dựng mảng ký tự thẳng trên stack mà không cấp phát String trên heap
+            let mut raw = InlineList::new();
+            nucleus.render_chars_to(&mut raw);
+            raw.push(key.ch);
+            return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
+        }
+
         // If vowels are "uơ" (e.g. from typing 'thuow' or 'huow') and a coda arrives (e.g. 'c' in "thước" or 'n' in "thương"),
         // upgrade "uơ" to "ươ" because "uơ" cannot accept codas while "ươ" does!
         let mut upgraded_u_horn = false;
@@ -585,13 +613,13 @@ impl SyllableState {
             && nucleus.vowels[0].diacritic == Diacritic::None
             && nucleus.vowels[1].base == BaseVowel::O
             && nucleus.vowels[1].diacritic == Diacritic::Horn
-            && is_valid_coda_start(key.ch)
+            && is_valid_start
         {
             nucleus.vowels[0].diacritic = Diacritic::Horn;
             upgraded_u_horn = true;
         }
 
-        let is_special_k = key.ch.eq_ignore_ascii_case(&'k')
+        let is_special_k = is_k
             && nucleus.onset.as_ref().is_some_and(|o| {
                 is_special_k_coda_allowed_during_typing(&o.chars, o.is_d_stroke, &nucleus.vowels)
             });
@@ -606,7 +634,7 @@ impl SyllableState {
         let tone_incompatible = config.restore_on_wrong_spelling
             && is_stop
             && matches!(nucleus.tone, Tone::Grave | Tone::HookAbove | Tone::Tilde);
-        if can_accept_coda && (is_valid_coda_start(key.ch) || is_special_k) && !tone_incompatible {
+        if can_accept_coda && (is_valid_start || is_special_k) && !tone_incompatible {
             let coda = CodaState::from_single(nucleus, key.ch, key.is_upper);
 
             // Fast path: if horn was not upgraded and there is no tone mark to shift,
@@ -615,7 +643,8 @@ impl SyllableState {
                 return (SyllableState::Coda(coda), EngineAction::Passthrough);
             }
 
-            let output = coda.render();
+            // Zero-heap Replace: render directly into stack-allocated CompactString
+            let output = coda.render_compact();
             return (
                 SyllableState::Coda(coda),
                 EngineAction::Replace {
@@ -626,7 +655,8 @@ impl SyllableState {
         }
 
         // Non-coda consonant or non-alphabetic -> Passthrough
-        let mut raw = InlineList::from(nucleus.render().as_str());
+        let mut raw = InlineList::new();
+        nucleus.render_chars_to(&mut raw);
         raw.push(key.ch);
         (SyllableState::Passthrough(raw), EngineAction::Passthrough)
     }
@@ -659,7 +689,8 @@ impl SyllableState {
                     } else {
                         coda.circumflex_across_coda = None;
                     }
-                    let output = coda.render();
+                    // Zero-heap Replace: render directly into stack-allocated CompactString
+                    let output = coda.render_compact();
                     return (
                         SyllableState::Coda(coda),
                         EngineAction::Replace {
@@ -673,7 +704,7 @@ impl SyllableState {
                         SyllableState::Passthrough(InlineList::from(raw.as_str())),
                         EngineAction::Replace {
                             backspaces: current_len,
-                            output: raw,
+                            output: raw.into(),
                         },
                     );
                 }
@@ -688,7 +719,8 @@ impl SyllableState {
         }
 
         // Otherwise -> Passthrough
-        let mut raw = InlineList::from(coda.render().as_str());
+        let mut raw = InlineList::new();
+        coda.render_chars_to(&mut raw);
         raw.push(key.ch);
         (SyllableState::Passthrough(raw), EngineAction::Passthrough)
     }

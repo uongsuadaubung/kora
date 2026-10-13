@@ -15,7 +15,7 @@ pub mod vietnamese;
 
 pub use engine::{
     VietnameseEngine,
-    action::EngineAction,
+    action::{CompactString, EngineAction},
     config::{EngineConfig, Hotkey, InputMethod, UiTheme},
     config_store::{
         flush_config_debounced, get_config_path, load_config_all, load_config_and_macros,

@@ -49,6 +49,34 @@ impl OnsetState {
     }
 
     #[inline]
+    pub fn render_chars_to(&self, out: &mut InlineList<char, 16>) {
+        for &(c, is_upper) in &self.chars {
+            if c.eq_ignore_ascii_case(&'d') {
+                out.push(compose_d(self.is_d_stroke, is_upper));
+            } else if is_upper {
+                out.push(c.to_ascii_uppercase());
+            } else {
+                out.push(c.to_ascii_lowercase());
+            }
+        }
+    }
+
+    #[inline]
+    pub fn render_compact(&self) -> crate::engine::action::CompactString {
+        let mut s = crate::engine::action::CompactString::new();
+        for &(c, is_upper) in &self.chars {
+            if c.eq_ignore_ascii_case(&'d') {
+                s.push(compose_d(self.is_d_stroke, is_upper));
+            } else if is_upper {
+                s.push(c.to_ascii_uppercase());
+            } else {
+                s.push(c.to_ascii_lowercase());
+            }
+        }
+        s
+    }
+
+    #[inline]
     pub fn render(&self) -> String {
         let mut s = String::with_capacity(8);
         self.render_to(&mut s);

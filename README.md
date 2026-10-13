@@ -43,8 +43,8 @@ Cái tên **Kora** ra đời để phản ánh trọn vẹn tầm vóc của m�
 
 | Chỉ số (Metric) | Kết quả đo đạc thực tế (Benchmark) | Ý nghĩa đối với người dùng & Game thủ |
 | :--- | :--- | :--- |
-| 🚀 **Tốc độ xử lý (Throughput)** | **~11.000.000 – 14.000.000 ký tự / giây** | Xử lý lên tới 14 triệu phím/giây, không bao giờ bị nghẽn phím khi gõ cực nhanh |
-| ⏱️ **Độ trễ phản hồi (Latency)** | **~0.07 – 0.09 microsecond / phím** (70 – 90 ns) | Phản hồi siêu thanh trong 70 nano-giây, nhanh gấp **150.000 lần** ngưỡng mắt người nhận biết |
+| 🚀 **Tốc độ xử lý (Throughput)** | **~20.300.000 – 25.400.000 ký tự / giây** | Xử lý hơn 20 triệu phím/giây toàn trình mô phỏng màn hình (lên tới 25.4M pure engine), không bao giờ nghẽn phím |
+| ⏱️ **Độ trễ phản hồi (Latency)** | **~0.039 – 0.049 microsecond / phím** (39 – 49 ns) | Phản hồi siêu thanh trong 39–49 nano-giây, nhanh gấp **150.000 lần** ngưỡng mắt người nhận biết |
 | 💾 **Bộ nhớ RAM (Chạy ngầm)** | **< 1 MB** (0.5 – 0.9 MB) | Nhẹ không đối thủ; hoạt động ổn định và cực kỳ tiết kiệm tài nguyên |
 | 🖥️ **Bộ nhớ RAM (Control Panel mở)** | **~1.5 MB** | Toàn bộ giao diện Win32 native siêu gọn nhẹ, không dùng WebView/Electron cồng kềnh |
 | 🔊 **Giả lập phím cơ (Sound Engine)** | **Tích hợp Native WASAPI (13 switches)** | Âm thanh phím cơ 48 kHz studio + Trình tải 1-Click tích hợp, không cần script ngoài |

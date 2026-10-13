@@ -79,11 +79,15 @@ impl TypingBuffer {
 
     pub fn restore_as_passthrough(&mut self, keys: InlineList<RawKey, 32>) {
         self.last_rendered.clear();
+        let mut raw_chars = InlineList::new();
+        let mut emitted_len = 0;
         for k in &keys {
             self.last_rendered.push(k.ch);
+            raw_chars.push(k.ch);
+            emitted_len += k.ch.len_utf16();
         }
-        self.emitted_len = self.last_rendered.encode_utf16().count();
-        self.state = SyllableState::Passthrough(InlineList::from(self.last_rendered.as_str()));
+        self.emitted_len = emitted_len;
+        self.state = SyllableState::Passthrough(raw_chars);
         self.raw_keys = keys;
         self.is_passthrough = true;
         self.is_restored_across_space = true;
@@ -127,11 +131,15 @@ impl TypingBuffer {
                     .chars()
                     .eq(keys[..idx].iter().map(|k| k.ch));
                 if !is_same_as_raw {
+                    let mut raw_list = InlineList::new();
+                    for k in &keys[..=idx] {
+                        raw_list.push(k.ch);
+                    }
+                    next_state = SyllableState::Passthrough(raw_list);
                     let raw_str: String = keys[..=idx].iter().map(|k| k.ch).collect();
-                    next_state = SyllableState::Passthrough(InlineList::from(raw_str.as_str()));
                     action = EngineAction::Replace {
                         backspaces: last_rendered.chars().count(),
-                        output: raw_str,
+                        output: raw_str.into(),
                     };
                 }
             }
@@ -140,7 +148,8 @@ impl TypingBuffer {
             match &action {
                 EngineAction::Replace { output, .. } => {
                     current_len = output.encode_utf16().count();
-                    last_rendered = output.clone();
+                    last_rendered.clear();
+                    last_rendered.push_str(output);
                     // If an undo toggle transitioned into Passthrough (e.g. toanss -> toans, chuww -> chuw),
                     // synchronize effective keys to match the explicit cancelled output.
                     if let SyllableState::Passthrough(raw) = state {
@@ -173,28 +182,24 @@ impl TypingBuffer {
     }
 
     /// Checks whether `key` marks a word boundary (e.g. CamelCase / PascalCase boundary).
+    #[inline]
     pub fn is_boundary(&self, key: &RawKey) -> bool {
         if !key.is_upper || self.raw_keys.is_empty() {
-            return false;
-        }
-        let is_letter = if key.ch.is_ascii() {
-            key.ch.is_ascii_alphabetic()
-        } else {
-            key.ch.is_alphabetic()
-        };
-        if !is_letter {
             return false;
         }
 
         // If the buffer already contains an underscore, it is an identifier or macro (e.g. v_n, v_N, tp_hcm),
         // not a camelCase word boundary.
-        if self.raw_keys.iter().any(|k| k.ch == '_') {
-            return false;
+        let mut has_lower = false;
+        for k in &self.raw_keys {
+            if k.ch == '_' {
+                return false;
+            }
+            if !k.is_upper && k.ch.is_alphabetic() {
+                has_lower = true;
+            }
         }
-
-        self.raw_keys
-            .iter()
-            .any(|k| !k.is_upper && k.ch.is_alphabetic())
+        has_lower
     }
 
     /// Feeds a new key into the state machine and returns the resulting EngineAction.
@@ -217,13 +222,12 @@ impl TypingBuffer {
 
         self.raw_keys.push(key);
 
-        let was_nucleus_or_coda = match self.state {
-            SyllableState::Nucleus(n) => Some(SyllableState::Nucleus(n)),
-            SyllableState::Coda(c) => Some(SyllableState::Coda(c)),
-            _ => None,
-        };
+        let current_state = self.state;
+        let was_nucleus_or_coda = matches!(
+            current_state,
+            SyllableState::Nucleus(_) | SyllableState::Coda(_)
+        );
 
-        let current_state = std::mem::take(&mut self.state);
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
 
         // Smart English Word Bypass / Instant Restore on Wrong Spelling:
@@ -233,19 +237,24 @@ impl TypingBuffer {
         // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
         // preserve the word as passthrough for immediate backspace recovery!
         if config.restore_on_wrong_spelling
+            && was_nucleus_or_coda
             && matches!(next_state, SyllableState::Passthrough(_))
             && matches!(action, EngineAction::Passthrough)
-            && was_nucleus_or_coda.as_ref().is_some_and(|s| !s.is_unambiguous_completed_vietnamese())
+            && !current_state.is_unambiguous_completed_vietnamese()
         {
             let is_same_as_raw = self.last_rendered
                 .chars()
                 .eq(self.raw_keys[..self.raw_keys.len() - 1].iter().map(|k| k.ch));
             if !is_same_as_raw {
+                let mut raw_list = InlineList::new();
+                for k in &self.raw_keys {
+                    raw_list.push(k.ch);
+                }
+                next_state = SyllableState::Passthrough(raw_list);
                 let raw_str: String = self.raw_keys.iter().map(|k| k.ch).collect();
-                next_state = SyllableState::Passthrough(InlineList::from(raw_str.as_str()));
                 action = EngineAction::Replace {
                     backspaces: self.last_rendered.chars().count(),
-                    output: raw_str,
+                    output: raw_str.into(),
                 };
             }
         }
@@ -258,30 +267,34 @@ impl TypingBuffer {
         // This eliminates duplicate characters ("ggõ") on browser address bars (Firefox, Chrome).
         let (action, new_emitted_len) = match action {
             EngineAction::Replace { backspaces, mut output } => {
-                let full_output_utf16 = output.encode_utf16().count();
+                // Thuật toán so khớp tiền tố chung một lượt (Single-Pass Common Prefix Optimization):
+                // 1. Duyệt đồng thời chuỗi đã render cũ và chuỗi mới để đếm số ký tự trùng khớp và số byte UTF-8 tương ứng.
+                // 2. Tích lũy trực tiếp common_bytes để cắt ngắn buffer mà không cần duyệt lại char_indices().
+                // 3. Số phím Backspace tối ưu: nếu có ký tự không khớp, chỉ cần xóa lùi (1 + phần còn lại của prev_iter).
+                // 4. Tái sử dụng vùng đệm cũ bằng truncate(common_bytes) thay vì clear() rồi sao chép lại toàn bộ.
+                let full_output_utf16: usize = output.chars().map(|c| c.len_utf16()).sum();
                 let mut prev_iter = self.last_rendered.chars();
                 let mut new_iter = output.chars();
                 let mut common = 0;
+                let mut common_bytes = 0;
+                let mut had_mismatch = false;
                 while let (Some(c1), Some(c2)) = (prev_iter.next(), new_iter.next()) {
                     if c1 == c2 {
                         common += 1;
+                        common_bytes += c1.len_utf8();
                     } else {
+                        had_mismatch = true;
                         break;
                     }
                 }
 
-                let prev_chars_count = self.last_rendered.chars().count();
-                self.last_rendered.clear();
-                self.last_rendered.push_str(&output);
-
                 let final_action = if common > 0 {
-                    let opt_backspaces = prev_chars_count - common;
-                    let byte_offset = output
-                        .char_indices()
-                        .nth(common)
-                        .map(|(i, _)| i)
-                        .unwrap_or(output.len());
-                    output.drain(..byte_offset);
+                    let opt_backspaces = if had_mismatch {
+                        1 + prev_iter.count()
+                    } else {
+                        0
+                    };
+                    output.drain(..common_bytes);
                     EngineAction::Replace {
                         backspaces: opt_backspaces,
                         output,
@@ -289,6 +302,11 @@ impl TypingBuffer {
                 } else {
                     EngineAction::Replace { backspaces, output }
                 };
+
+                self.last_rendered.truncate(common_bytes);
+                if let EngineAction::Replace { ref output, .. } = final_action {
+                    self.last_rendered.push_str(output);
+                }
 
                 (final_action, full_output_utf16)
             }

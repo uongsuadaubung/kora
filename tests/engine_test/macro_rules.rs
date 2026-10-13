@@ -299,7 +299,7 @@ fn test_macro_with_underscore_expansion() {
         act,
         kora::EngineAction::Replace {
             backspaces: 3,
-            output: "Việt Nam ".to_string()
+            output: "Việt Nam ".into()
         }
     );
 }
