@@ -703,6 +703,7 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                                     }
                                 }
                             }
+                            crate::ui::controller::refresh_keys_overview();
                         }
 
                         PostMessageW(hwnd, WM_CLOSE, 0, 0);

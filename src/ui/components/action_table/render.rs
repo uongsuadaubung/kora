@@ -192,6 +192,19 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
             FillRect(mem_dc, &row_rc, r_br);
             DeleteObject(r_br);
 
+            // Left-edge Fluent accent indicator for active selection
+            if is_selected {
+                let ind_rc = RECT {
+                    left: 0,
+                    top: row_y + 4,
+                    right: 3,
+                    bottom: row_y + ROW_HEIGHT - borders::WIDTH_THIN - 4,
+                };
+                let ind_br = CreateSolidBrush(palette.accent);
+                FillRect(mem_dc, &ind_rc, ind_br);
+                DeleteObject(ind_br);
+            }
+
             // Horizontal row bottom divider
             let div_rc = RECT {
                 left: 0,
@@ -304,7 +317,7 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
                                 let wide_text = to_wide(text);
                                 SetBkMode(mem_dc, TRANSPARENT);
                                 let text_clr = if is_selected {
-                                    palette.text_white
+                                    palette.row_selected_text
                                 } else {
                                     palette.text_primary
                                 };
@@ -328,7 +341,12 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
                             TableCell::SecondaryText(text) => {
                                 let wide_text = to_wide(text);
                                 SetBkMode(mem_dc, TRANSPARENT);
-                                SetTextColor(mem_dc, palette.text_secondary);
+                                let sec_clr = if is_selected {
+                                    palette.row_selected_text
+                                } else {
+                                    palette.text_secondary
+                                };
+                                SetTextColor(mem_dc, sec_clr);
                                 let old_f = SelectObject(mem_dc, app_font);
                                 let mut text_rc = RECT {
                                     left: cell_rc.left + 4,

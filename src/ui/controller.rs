@@ -65,6 +65,7 @@ pub fn edit_selected_then<R>(
                 .map(|p| f(EditTarget::Child(p)))
         }?;
         after(engine);
+        engine.refresh_effective_config();
         save(engine);
         Some(r)
     })
@@ -111,6 +112,7 @@ pub fn refresh_macro_list() {
 pub fn refresh_remap_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_remap_items(e)), super::controls()) {
         c.tab_keys.populate_remaps(&items);
+        refresh_keys_overview();
     }
 }
 
@@ -118,6 +120,7 @@ pub fn refresh_remap_list() {
 pub fn refresh_disable_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_disable_items(e)), super::controls()) {
         c.tab_keys.populate_disabled(&items);
+        refresh_keys_overview();
     }
 }
 
@@ -125,5 +128,22 @@ pub fn refresh_disable_list() {
 pub fn refresh_key_macro_list() {
     if let (Some(items), Some(c)) = (with_engine(|e| selected_key_macro_items(e)), super::controls()) {
         c.tab_keys.populate_key_macros(&items);
+        refresh_keys_overview();
+    }
+}
+
+/// Re-populates the consolidated key overview table and diagnostics from the engine.
+pub fn refresh_keys_overview() {
+    if let (Some(items), Some(c)) = (
+        with_engine(|e| {
+            (
+                selected_remap_items(e),
+                selected_disable_items(e),
+                selected_key_macro_items(e),
+            )
+        }),
+        super::controls(),
+    ) {
+        c.tab_keys.refresh_overview(&items.0, &items.1, &items.2);
     }
 }

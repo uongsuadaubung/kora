@@ -430,6 +430,14 @@ impl TabTyping {
                     }
                 },
             );
+            if ctrl_id == IDC_COMBO_TYPING_MODE
+                && let Some(is_viet) = crate::ui::controller::with_engine(|e| e.effective_config().enabled)
+            {
+                crate::ui::update_tray_icon(is_viet);
+            }
+            if ctrl_id == IDC_CHECK_SWITCH_KEY {
+                crate::ui::controller::refresh_keys_overview();
+            }
             return true;
         }
 

@@ -178,6 +178,9 @@ pub mod id {
     pub const IDC_BTN_ADD_KEY_MACRO: u32 = 520;
     pub const IDC_LIST_KEY_MACRO: u32 = 521;
     pub const IDC_CHECK_KEY_MACRO_ENABLED: u32 = 522;
+    pub const IDC_LABEL_OVERVIEW_TITLE: u32 = 523;
+    pub const IDC_LABEL_OVERVIEW_STATUS: u32 = 524;
+    pub const IDC_LIST_OVERVIEW: u32 = 525;
 
     // 600..609: Footer Actions & Hotkey Dialog
     pub const IDC_BTN_EXIT: u32 = 600;

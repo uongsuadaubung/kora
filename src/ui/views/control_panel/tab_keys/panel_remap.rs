@@ -195,10 +195,11 @@ impl RemapPanel {
                     }
                 } else {
                     child.muted_remaps.retain(|&v| v != from_vk);
-                    if is_root_muted && !child.app_remaps.iter().any(|r| r.from_vk == from_vk) {
-                        if let Some(rule) = global_rule {
-                            child.app_remaps.push(rule);
-                        }
+                    if is_root_muted
+                        && !child.app_remaps.iter().any(|r| r.from_vk == from_vk)
+                        && let Some(rule) = global_rule
+                    {
+                        child.app_remaps.push(rule);
                     }
                 }
             }

@@ -172,6 +172,7 @@ impl ControlPanelControls {
         self.tab_keys.populate_remaps(&snap.remaps);
         self.tab_keys.populate_disabled(&snap.disabled);
         self.tab_keys.populate_key_macros(&snap.key_macros);
+        self.tab_keys.refresh_overview(&snap.remaps, &snap.disabled, &snap.key_macros);
         self.populate_macro_items(&snap.macros);
         Some(snap.config)
     }

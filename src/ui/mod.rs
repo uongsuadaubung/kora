@@ -115,6 +115,11 @@ pub fn show_control_panel() {
         apply_ui_theme(ui.h_panel, c, is_dark);
     }
 
+    // Reconcile tray icon with effective typing mode in case it drifted while hidden
+    if let Some(is_viet) = crate::ui::controller::with_engine(|e| e.effective_config().enabled) {
+        ui.tray.borrow_mut().set_vietnamese_mode(is_viet);
+    }
+
     c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
     unsafe {
         InvalidateRect(ui.h_panel, null_mut(), 0);
@@ -152,13 +157,22 @@ pub fn init_ui() -> bool {
     let class_helper_name = to_wide("KoraHelperClass");
     let class_panel_name = to_wide("KoraControlPanelClass");
 
-    let (cfg_theme, cfg_lang) = crate::platform::win32::ENGINE_INSTANCE
+    let (cfg_theme, cfg_lang, cfg_enabled) = crate::platform::win32::ENGINE_INSTANCE
         .lock()
         .ok()
-        .and_then(|g| g.as_ref().map(|e| (e.config().theme, e.config().language)))
+        .and_then(|g| {
+            g.as_ref().map(|e| {
+                (
+                    e.config().theme,
+                    e.config().language,
+                    e.effective_config().enabled,
+                )
+            })
+        })
         .unwrap_or((
             crate::engine::config::UiTheme::Auto,
             crate::language::Language::Vietnamese,
+            true,
         ));
     crate::language::set_current_language(cfg_lang);
     let is_dark = resolve_is_dark(cfg_theme);
@@ -216,7 +230,7 @@ pub fn init_ui() -> bool {
         WTSRegisterSessionNotification(h_helper, NOTIFY_FOR_THIS_SESSION);
 
         // 4. Create Tray Handler
-        let tray = TrayHandler::new(h_helper);
+        let tray = TrayHandler::new(h_helper, cfg_enabled);
 
         // 5. Fonts (Segoe UI 9pt normal, 9pt semibold) from the shared font cache
         let hfont_normal = crate::ui::theme::get_app_font_normal();

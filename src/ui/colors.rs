@@ -53,6 +53,8 @@ pub struct ThemePalette {
     pub row_hover_bg: u32,
     /// Row selected background for tables / list views
     pub row_selected_bg: u32,
+    /// Row selected text color for tables / list views
+    pub row_selected_text: u32,
     /// Danger button background
     pub danger_bg: u32,
     /// Danger button hover background
@@ -121,6 +123,7 @@ pub const DARK_PALETTE: ThemePalette = ThemePalette {
     border_hover: rgb(101, 101, 101),   // Hover border
     row_hover_bg: rgb(56, 56, 60),       // #38383C - Subtle row hover highlight
     row_selected_bg: rgb(64, 68, 76),    // #40444C - Refined row selection highlight
+    row_selected_text: rgb(255, 255, 255), // #FFFFFF - Crisp white text for selected row in dark mode
     danger_bg: rgb(43, 27, 27),         // Danger red tinted background
     danger_bg_hover: rgb(50, 31, 31),   // Danger hover background
     danger_border: rgb(216, 68, 58),    // Danger red border
@@ -166,6 +169,7 @@ pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
     border_hover: rgb(176, 176, 176),   // Hover border
     row_hover_bg: rgb(245, 247, 250),   // #F5F7FA - Subtle row hover highlight
     row_selected_bg: rgb(228, 240, 255), // #E4F0FF - Fluent light selection highlight
+    row_selected_text: rgb(25, 25, 25),  // #191919 - High-contrast crisp text for selected row in light mode
     danger_bg: rgb(253, 232, 232),      // Soft red tinted background
     danger_bg_hover: rgb(254, 226, 226), // Soft red hover background
     danger_border: rgb(216, 68, 58),    // Red border

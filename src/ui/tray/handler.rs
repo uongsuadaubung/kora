@@ -27,7 +27,7 @@ pub struct TrayHandler {
 }
 
 impl TrayHandler {
-    pub fn new(hwnd: isize) -> Self {
+    pub fn new(hwnd: isize, is_vietnamese: bool) -> Self {
         let (w, h) = get_small_icon_size();
         let hicon_viet = load_icon_from_memory(VIET_BYTES, w, h).unwrap_or(0);
         let hicon_eng = load_icon_from_memory(ENG_BYTES, w, h).unwrap_or(0);
@@ -36,7 +36,7 @@ impl TrayHandler {
             tray: TrayIcon::new(hwnd, TRAY_ICON_ID, WM_TRAY_MESSAGE),
             hicon_viet,
             hicon_eng,
-            is_vietnamese: true,
+            is_vietnamese,
         };
 
         handler.refresh_icon();

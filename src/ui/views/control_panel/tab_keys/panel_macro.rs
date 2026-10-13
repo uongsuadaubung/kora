@@ -192,10 +192,11 @@ impl MacroPanel {
                     }
                 } else {
                     child.muted_key_macros.retain(|&v| v != trigger_vk);
-                    if is_root_muted && !child.app_key_macros.iter().any(|m| m.trigger_vk == trigger_vk) {
-                        if let Some(m) = global_macro {
-                            child.app_key_macros.push(m);
-                        }
+                    if is_root_muted
+                        && !child.app_key_macros.iter().any(|m| m.trigger_vk == trigger_vk)
+                        && let Some(m) = global_macro
+                    {
+                        child.app_key_macros.push(m);
                     }
                 }
             }

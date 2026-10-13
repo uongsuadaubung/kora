@@ -165,6 +165,9 @@ pub unsafe extern "system" fn tray_helper_wnd_proc(
                     KillTimer(hwnd, TIMER_ID_RESUME_SYNC);
                 }
                 crate::platform::reinstall_hooks();
+                if let Some(is_viet) = controller::with_engine(|e| e.effective_config().enabled) {
+                    update_tray_icon(is_viet);
+                }
             }
             0
         }
@@ -180,6 +183,9 @@ pub unsafe extern "system" fn tray_helper_wnd_proc(
         }
         _ if msg == taskbar_created_msg() => {
             if let Some(ui) = crate::ui::ui() {
+                if let Some(is_viet) = controller::with_engine(|e| e.effective_config().enabled) {
+                    ui.tray.borrow_mut().set_vietnamese_mode(is_viet);
+                }
                 ui.tray.borrow_mut().readd();
             }
             0

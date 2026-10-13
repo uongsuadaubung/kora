@@ -215,6 +215,19 @@ impl ActionTable {
         String::new()
     }
 
+    pub fn set_columns(&self, columns: &[(&str, i32, ColumnStyle)]) {
+        if let Ok(mut g) = self.state.lock() {
+            let mut defs = Vec::with_capacity(columns.len());
+            for &(title, w, style) in columns {
+                defs.push(ColumnDef::fixed(title, w, style));
+            }
+            g.columns = defs;
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
     pub fn set_column_title(&self, idx: i32, title: &str) {
         if let Ok(mut g) = self.state.lock()
             && let Some(col) = g.columns.get_mut(idx as usize)

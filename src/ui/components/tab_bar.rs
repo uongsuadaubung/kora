@@ -413,6 +413,17 @@ impl TabBar {
         }
     }
 
+    pub fn set_cur_sel(&self, idx: usize) {
+        if let Ok(mut g) = self.state.lock()
+            && idx < g.tabs.len()
+        {
+            g.cur_sel = idx;
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
     pub fn set_tabs(&self, tabs: &[impl AsRef<str>]) {
         if let Ok(mut g) = self.state.lock() {
             g.tabs = tabs.iter().map(|s| s.as_ref().to_string()).collect();

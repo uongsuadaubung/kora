@@ -88,7 +88,14 @@ pub fn init_app_tracker() {
         }
     }
     // The hook only fires on future switches: resolve the app already in front now
-    check_and_switch_profile();
+    let (changed, _) = check_and_switch_profile();
+    if !changed
+        && let Ok(guard) = super::ENGINE_INSTANCE.lock()
+        && let Some(ref engine) = *guard
+    {
+        let eff = engine.effective_config();
+        super::notify_mode_change(eff.enabled);
+    }
 }
 
 /// Unhooks the foreground window event hook

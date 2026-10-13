@@ -118,6 +118,25 @@ impl ProfileManager {
     /// Computes effective EngineConfig for a profile based on Live Inheritance
     pub fn resolve_effective_config(&self, profile_id: &str, base: &EngineConfig) -> EngineConfig {
         let mut cfg = base.clone();
+
+        // Overlay Global profile options on top of base
+        if let Some(r) = self.global_profile.remap_enabled {
+            cfg.remap_enabled = r;
+        }
+        if let Some(d) = self.global_profile.disable_enabled {
+            cfg.disable_enabled = d;
+        }
+        if let Some(km) = self.global_profile.key_macro_enabled {
+            cfg.key_macro_enabled = km;
+        }
+        if let Some(sw) = self.global_profile.switch_key {
+            cfg.switch_key = sw;
+            cfg.switch_with_ctrl_shift = sw.is_ctrl_shift();
+        }
+        if let Some(en) = self.global_profile.switch_key_enabled {
+            cfg.switch_key_enabled = en;
+        }
+
         if profile_id == "global" {
             return cfg;
         }
