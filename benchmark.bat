@@ -11,6 +11,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/2] Running target\release\examples\benchmark.exe...
+timeout /t 1 /nobreak >nul
 echo.
 "target\release\examples\benchmark.exe"
 

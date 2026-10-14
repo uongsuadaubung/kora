@@ -407,7 +407,7 @@ impl VietnameseEngine {
                     .state
                     .feed_key(raw_key, self.buffer.emitted_len, &cfg);
             if matches!(test_state, crate::vietnamese::SyllableState::Passthrough(_))
-                || self.buffer.is_passthrough
+                || self.buffer.is_passthrough()
             {
                 let current_raw = self.buffer.raw_keys;
                 self.history.commit_word(current_raw, false);

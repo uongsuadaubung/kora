@@ -45,6 +45,40 @@ impl CompactString {
     }
 
     #[inline]
+    pub fn clear(&mut self) {
+        match self {
+            Self::Inline { len, .. } => *len = 0,
+            Self::Heap(s) => s.clear(),
+        }
+    }
+
+    #[inline]
+    pub fn truncate(&mut self, new_len: usize) {
+        match self {
+            Self::Inline { buf, len } => {
+                let cur = *len as usize;
+                if new_len < cur && (new_len == 0 || (buf[new_len] as i8) >= -0x40) {
+                    *len = new_len as u8;
+                }
+            }
+            Self::Heap(s) => s.truncate(new_len),
+        }
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> Option<char> {
+        match self {
+            Self::Inline { buf, len } => {
+                let s = unsafe { std::str::from_utf8_unchecked(&buf[..*len as usize]) };
+                let ch = s.chars().next_back()?;
+                *len -= ch.len_utf8() as u8;
+                Some(ch)
+            }
+            Self::Heap(s) => s.pop(),
+        }
+    }
+
+    #[inline]
     pub fn push(&mut self, ch: char) {
         let ch_len = ch.len_utf8();
         match self {

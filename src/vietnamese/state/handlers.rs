@@ -246,17 +246,6 @@ impl State<Onset> {
         }
     }
 
-    /// Consumes `State<Onset>` on Backspace, returning `Empty` or updated `State<Onset>`
-    #[inline(always)]
-    pub fn pop_char(mut self) -> SyllableState {
-        self.data.chars.pop();
-        if self.data.chars.is_empty() {
-            SyllableState::Empty
-        } else {
-            self.into()
-        }
-    }
-
     #[inline(always)]
     fn try_bracket_w_shortcut(
         self,
@@ -457,54 +446,6 @@ impl State<Nucleus> {
         State {
             data: InlineList::from(raw),
             _state: PhantomData,
-        }
-    }
-
-    /// Consumes `State<Nucleus>` on Backspace, returning `Empty`, `State<Onset>`, or `State<Nucleus>`
-    #[inline(always)]
-    pub fn pop_vowel(mut self) -> SyllableState {
-        let tone_pos_before = if self.tone == Tone::None {
-            None
-        } else {
-            Some(self.find_tone_position())
-        };
-
-        self.vowels.pop();
-
-        if self.vowels.is_empty() {
-            if let Some(mut onset) = self.onset {
-                // If onset absorbed glide "gi" or "qu", break it back down into onset + single vowel
-                if onset.chars.len() == 2 {
-                    let c0 = onset.chars[0].0.to_ascii_lowercase();
-                    let c1 = onset.chars[1].0.to_ascii_lowercase();
-                    if (c0 == 'g' && c1 == 'i') || (c0 == 'q' && c1 == 'u') {
-                        let glide = onset.chars.pop().unwrap();
-                        let base = if glide.0.eq_ignore_ascii_case(&'i') {
-                            BaseVowel::I
-                        } else {
-                            BaseVowel::U
-                        };
-                        self.onset = Some(onset);
-                        self.vowels = InlineList::from_single(VowelLetter {
-                            base,
-                            diacritic: Diacritic::None,
-                            is_upper: glide.1,
-                        });
-                        return self.into();
-                    }
-                }
-                State::<Onset>::from_data(onset).into()
-            } else {
-                SyllableState::Empty
-            }
-        } else {
-            // If the popped vowel carried the tone mark, clear tone
-            if let Some(pos) = tone_pos_before
-                && pos >= self.vowels.len()
-            {
-                self.tone = Tone::None;
-            }
-            self.into()
         }
     }
 
@@ -758,17 +699,6 @@ impl State<Coda> {
         }
     }
 
-    /// Consumes `State<Coda>` on Backspace, transitioning back to `State<Nucleus>` when coda is emptied
-    #[inline(always)]
-    pub fn pop_coda(mut self) -> SyllableState {
-        self.data.coda.pop();
-        if self.data.coda.is_empty() {
-            State::<Nucleus>::from_data(self.data.nucleus).into()
-        } else {
-            self.into()
-        }
-    }
-
     /// Feeds a key into `State<Coda>`, consuming `self` and transitioning to the next state.
     #[inline(always)]
     pub fn feed_key(
@@ -848,16 +778,6 @@ impl State<Passthrough> {
         self.data.push(key.ch);
         (self.into(), EngineAction::Passthrough)
     }
-
-    #[inline(always)]
-    pub fn pop_char(mut self, config: &EngineConfig) -> SyllableState {
-        self.data.pop();
-        if self.data.is_empty() {
-            SyllableState::Empty
-        } else {
-            SyllableState::parse_prefix_chars(self.data.iter().copied(), config)
-        }
-    }
 }
 
 // ============================================================================
@@ -865,50 +785,6 @@ impl State<Passthrough> {
 // ============================================================================
 
 impl SyllableState {
-    /// Parses an iterator of characters into the appropriate SyllableState
-    pub fn parse_prefix_chars(
-        raw: impl IntoIterator<Item = char>,
-        config: &EngineConfig,
-    ) -> SyllableState {
-        let mut state = SyllableState::Empty;
-        let mut current_len = 0;
-        for ch in raw {
-            let key = RawKey {
-                ch,
-                is_upper: ch.is_uppercase(),
-            };
-            let (next_state, action) = state.feed_key(key, current_len, config);
-            state = next_state;
-            match action {
-                EngineAction::Replace { output, .. } => {
-                    current_len = output.chars().count();
-                }
-                EngineAction::Passthrough => {
-                    current_len += 1;
-                }
-                EngineAction::Consume => {}
-            }
-        }
-        state
-    }
-
-    /// Parses a string into the appropriate SyllableState (Onset, Nucleus, Coda, or Passthrough)
-    pub fn parse_prefix(raw: &str, config: &EngineConfig) -> SyllableState {
-        Self::parse_prefix_chars(raw.chars(), config)
-    }
-
-    /// Transitions backward when Backspace is pressed by delegating to each Typestate
-    #[inline(always)]
-    pub fn handle_backspace(self, config: &EngineConfig) -> SyllableState {
-        match self {
-            SyllableState::Empty => SyllableState::Empty,
-            SyllableState::Onset(onset) => onset.pop_char(),
-            SyllableState::Nucleus(nucleus) => nucleus.pop_vowel(),
-            SyllableState::Coda(coda) => coda.pop_coda(),
-            SyllableState::Passthrough(raw) => raw.pop_char(config),
-        }
-    }
-
     /// Process a new key and transit to the next state by delegating to each Typestate
     #[inline(always)]
     pub fn feed_key(
