@@ -100,7 +100,11 @@ impl CompactString {
                     Bound::Excluded(&n) => n,
                     Bound::Unbounded => cur,
                 };
-                if start <= end && end <= cur {
+                if start <= end
+                    && end <= cur
+                    && (start == 0 || start == cur || (buf[start] as i8) >= -0x40)
+                    && (end == 0 || end == cur || (buf[end] as i8) >= -0x40)
+                {
                     let count = end - start;
                     buf.copy_within(end..cur, start);
                     *len -= count as u8;
@@ -109,6 +113,26 @@ impl CompactString {
             Self::Heap(s) => {
                 s.drain(range);
             }
+        }
+    }
+}
+
+impl FromIterator<char> for CompactString {
+    #[inline]
+    fn from_iter<T: IntoIterator<Item = char>>(iter: T) -> Self {
+        let mut s = Self::new();
+        for ch in iter {
+            s.push(ch);
+        }
+        s
+    }
+}
+
+impl Extend<char> for CompactString {
+    #[inline]
+    fn extend<T: IntoIterator<Item = char>>(&mut self, iter: T) {
+        for ch in iter {
+            self.push(ch);
         }
     }
 }

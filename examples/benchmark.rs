@@ -204,8 +204,8 @@ fn main() {
         let start = Instant::now();
         for _ in 0..hook_iterations {
             for &vk in &test_vks {
-                let _is_disabled = black_box(engine.effective_disabled().contains(&vk));
-                let _remap = black_box(engine.effective_remaps().into_iter().find(|r| r.from_vk == vk));
+                let _is_disabled = black_box(engine.is_key_disabled(vk));
+                let _remap = black_box(engine.lookup_key_remap(vk));
             }
         }
         print_result("Hook Rule Resolution (4 keys)", total_hook_checks, start.elapsed());

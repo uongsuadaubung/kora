@@ -1,12 +1,13 @@
 //! Vietnamese Nucleus (Nguyên âm & Dấu thanh) State Representation
 
 use super::VowelLetter;
-use super::charset::{BaseVowel, Diacritic, Tone, compose_d, compose_vowel};
+use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel};
 use super::inline_list::InlineList;
 use super::modifier::KeyEffect;
 use super::onset::OnsetState;
 use super::spelling::is_stop_coda;
 use super::syllable::Syllable;
+use crate::engine::action::CompactString;
 use crate::engine::buffer::RawKey;
 use crate::engine::config::EngineConfig;
 use std::fmt;
@@ -14,7 +15,7 @@ use std::fmt;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModifierOutcome {
     Applied,
-    Undone(String),
+    Undone(CompactString),
     NotApplied,
 }
 
@@ -42,28 +43,6 @@ impl NucleusState {
     }
 
     #[inline]
-    pub fn render_to(&self, out: &mut String) {
-        if let Some(ref onset) = self.onset {
-            onset.render_to(out);
-        }
-
-        let tone_pos = if self.tone != Tone::None {
-            self.find_tone_position()
-        } else {
-            0
-        };
-        for (i, v) in self.vowels.iter().enumerate() {
-            let tone_for_vowel = if i == tone_pos { self.tone } else { Tone::None };
-            out.push(compose_vowel(
-                v.base,
-                v.diacritic,
-                tone_for_vowel,
-                v.is_upper,
-            ));
-        }
-    }
-
-    #[inline]
     pub fn render_chars_to(&self, out: &mut InlineList<char, 16>) {
         if let Some(ref onset) = self.onset {
             onset.render_chars_to(out);
@@ -86,18 +65,10 @@ impl NucleusState {
     }
 
     #[inline]
-    pub fn render_compact(&self) -> crate::engine::action::CompactString {
-        let mut s = crate::engine::action::CompactString::new();
+    pub fn render_compact(&self) -> CompactString {
+        let mut s = CompactString::new();
         if let Some(ref onset) = self.onset {
-            for &(c, is_upper) in &onset.chars {
-                if c.eq_ignore_ascii_case(&'d') {
-                    s.push(compose_d(onset.is_d_stroke, is_upper));
-                } else if is_upper {
-                    s.push(c.to_ascii_uppercase());
-                } else {
-                    s.push(c.to_ascii_lowercase());
-                }
-            }
+            onset.render_compact_to(&mut s);
         }
 
         let tone_pos = if self.tone != Tone::None {
@@ -118,10 +89,13 @@ impl NucleusState {
     }
 
     #[inline]
+    pub fn render_to(&self, out: &mut String) {
+        out.push_str(&self.render_compact());
+    }
+
+    #[inline]
     pub fn render(&self) -> String {
-        let mut s = String::with_capacity(16);
-        self.render_to(&mut s);
-        s
+        self.render_compact().to_string()
     }
 
     pub fn find_tone_position(&self) -> usize {
@@ -342,9 +316,8 @@ impl NucleusState {
         can_undo_circumflex: Option<BaseVowel>,
         config: &EngineConfig,
     ) -> ModifierOutcome {
-        let make_raw = |n: &NucleusState| -> String {
-            let mut s = String::with_capacity(16);
-            n.render_to(&mut s);
+        let make_raw = |n: &NucleusState| -> CompactString {
+            let mut s = n.render_compact();
             if let Some(coda_chars) = coda {
                 for &(c, is_upper) in coda_chars {
                     if is_upper {
@@ -476,7 +449,7 @@ impl NucleusState {
                     && self.vowels[0].base == BaseVowel::U
                     && self.vowels[0].diacritic == Diacritic::Horn
                 {
-                    let raw_w = if key.is_upper { "W" } else { "w" }.to_string();
+                    let raw_w = CompactString::from(if key.is_upper { 'W' } else { 'w' });
                     return ModifierOutcome::Undone(raw_w);
                 }
 
@@ -575,9 +548,7 @@ impl NucleusState {
 
 impl fmt::Display for NucleusState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::with_capacity(16);
-        self.render_to(&mut s);
-        f.write_str(&s)
+        f.write_str(&self.render_compact())
     }
 }
 

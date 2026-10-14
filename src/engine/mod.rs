@@ -94,6 +94,33 @@ impl VietnameseEngine {
         }
     }
 
+    #[inline]
+    pub fn is_key_disabled(&self, vk: u32) -> bool {
+        self.profile_manager.is_vk_disabled(
+            &self.profile_manager.active_id,
+            self.is_active_global,
+            vk,
+        )
+    }
+
+    #[inline]
+    pub fn lookup_key_remap(&self, vk: u32) -> Option<u32> {
+        self.profile_manager.lookup_remap_vk(
+            &self.profile_manager.active_id,
+            self.is_active_global,
+            vk,
+        )
+    }
+
+    #[inline]
+    pub fn lookup_key_macro(&self, vk: u32) -> Option<&[profile::MacroAction]> {
+        self.profile_manager.lookup_key_macro_actions(
+            &self.profile_manager.active_id,
+            self.is_active_global,
+            vk,
+        )
+    }
+
     pub fn effective_remaps(&self) -> Vec<profile::KeyRemapRule> {
         self.profile_manager.resolve_effective_remaps(&self.profile_manager.active_id)
     }
@@ -148,35 +175,44 @@ impl VietnameseEngine {
         new_state
     }
 
+    #[inline]
     fn ensure_active_macro_table(&mut self) {
-        let has_global_mutes = !self.profile_manager.global_profile.muted_macros.is_empty();
-        let child_deltas = match self.profile_manager.get_profile(&self.profile_manager.active_id) {
-            Some(p) if !p.is_root => {
-                !p.muted_macros.is_empty()
-                    || !p.overridden_macros.is_empty()
-                    || !p.app_macros.is_empty()
+        let global_mutes_len = self.profile_manager.global_profile.muted_macros.len();
+        let current_child_sum = if self.is_active_global {
+            0
+        } else {
+            match self
+                .profile_manager
+                .profiles
+                .iter()
+                .find(|p| p.id == self.profile_manager.active_id)
+            {
+                Some(p) => p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len(),
+                None => 0,
             }
-            _ => false,
         };
 
-        if !has_global_mutes && !child_deltas {
-            self.cached_active_macro_table = None;
-            self.cached_macro_sig = None;
+        if global_mutes_len == 0 && current_child_sum == 0 {
+            if self.cached_active_macro_table.is_some() {
+                self.cached_active_macro_table = None;
+                self.cached_macro_sig = None;
+            }
             return;
         }
 
-        let current_child_sum = match self.profile_manager.get_profile(&self.profile_manager.active_id) {
-            Some(p) if !p.is_root => {
-                p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len()
-            }
-            _ => 0,
-        };
-
-        let is_valid = if let Some((ref cached_id, ref cached_global_mutes, cached_global_len, child_sum)) = self.cached_macro_sig {
-            *cached_id == self.profile_manager.active_id
-                && cached_global_mutes.as_slice() == self.profile_manager.global_profile.muted_macros.as_slice()
-                && cached_global_len == self.macro_table.len()
+        let is_valid = if let Some((
+            ref cached_id,
+            ref cached_global_mutes,
+            cached_global_len,
+            child_sum,
+        )) = self.cached_macro_sig
+        {
+            cached_global_len == self.macro_table.len()
                 && child_sum == current_child_sum
+                && cached_global_mutes.len() == global_mutes_len
+                && (self.is_active_global || *cached_id == self.profile_manager.active_id)
+                && cached_global_mutes.as_slice()
+                    == self.profile_manager.global_profile.muted_macros.as_slice()
         } else {
             false
         };
@@ -334,7 +370,7 @@ impl VietnameseEngine {
 
             if should_restore {
                 let backspaces = self.buffer.emitted_len;
-                let mut output: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                let mut output: CompactString = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
                 output.push(ch);
                 let current_raw = self.buffer.raw_keys;
                 self.history.commit_word(current_raw, false);
@@ -345,7 +381,7 @@ impl VietnameseEngine {
                 self.buffer.state = next_state;
                 self.buffer.last_rendered.push(ch);
                 self.buffer.emitted_len = ch.len_utf16();
-                return EngineAction::Replace { backspaces, output: output.into() };
+                return EngineAction::Replace { backspaces, output };
             }
 
             let current_raw = self.buffer.raw_keys;
@@ -447,7 +483,7 @@ impl VietnameseEngine {
                     .expand_word(rendered, allow_start, allow_end)
                     .or_else(|| {
                         if !is_same {
-                            let current_word: String =
+                            let current_word: CompactString =
                                 self.buffer.raw_keys.iter().map(|k| k.ch).collect();
                             macro_table.expand_word(&current_word, allow_start, allow_end)
                         } else {
@@ -490,7 +526,7 @@ impl VietnameseEngine {
 
             if is_invalid {
                 let backspaces = self.buffer.emitted_len;
-                let mut output: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                let mut output: CompactString = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
                 output.push(ch);
 
                 if self.config.debug {
@@ -515,7 +551,7 @@ impl VietnameseEngine {
                 }
                 self.buffer.clear();
 
-                return EngineAction::Replace { backspaces, output: output.into() };
+                return EngineAction::Replace { backspaces, output };
             }
         }
 

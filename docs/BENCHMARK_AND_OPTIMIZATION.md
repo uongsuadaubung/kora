@@ -75,7 +75,9 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 | **Giai đoạn 4** | Bảng tra cứu tĩnh `ASCII_VOWELS` ($O(1)$), Bitmask 128-bit cho `is_word_break`, Letter Fast-Path, `is_active_global` cờ nhị phân, Single-Pass Common Prefix Optimization. | **25.43M keys/s** (**39 ns**) | **18.39M keys/s** (**54 ns**) | **+21.0%** |
 | **Giai đoạn 5** | Stack projection `render_chars_to` (0 heap allocation khi fallback Passthrough), Guard `find_tone_position()` khi không có thanh điệu, Early-exit Coda Guard trong `handle_nucleus`, Jump-Table `is_valid_onset_vowel_orthography`, Single-Pass length tracking. | ~20.66M – 25.43M keys/s (39–48 ns) | ~20.30M keys/s (49 ns) | **+10.4% Full Simulation** |
 | **Giai đoạn 6** | **Bitmask Phonotactic Table cho `can_vowels_accept_coda`** (biến 16 nhánh match thành 1 lệnh bitwise AND duy nhất) + **Zero-Heap `CompactString` cho `EngineAction::Replace`** (stack buffer 24 bytes, 100% stack-allocated không tốn `malloc` khi thay thế ký tự/bỏ dấu thanh). | **22.7M – 24.1M keys/s** (**41 ns**) | **20.6M – 22.7M keys/s** (**44 ns**) | **+11.6% Full Simulation** 🚀 |
-| **Giai đoạn 7** (Hoàn tất) | **100% Bitmask Toàn Bộ Quy Tắc Ghép Vần Tiếng Việt**: `is_valid_onset`, `is_valid_onset_extension`, `is_valid_coda_start`, `is_valid_coda_pair`, `is_stop_coda`, `is_valid_onset_vowel_orthography`, `is_valid_coda_start_for_vowels`. Triệt tiêu hoàn toàn mọi chuỗi `match/if-else` trong toàn bộ module chính tả `spelling.rs`. | **20.9M – 24.1M keys/s** (**41–48 ns**) | **18.9M – 22.7M keys/s** (**44–50 ns**) | **100% O(1) Bitwise Zero-Branching** ⚡ |
+| **Giai đoạn 7** (`db34a8c`) | **100% Bitmask Toàn Bộ Quy Tắc Ghép Vần Tiếng Việt**: `is_valid_onset`, `is_valid_onset_extension`, `is_valid_coda_start`, `is_valid_coda_pair`, `is_stop_coda`, `is_valid_onset_vowel_orthography`, `is_valid_coda_start_for_vowels`. Triệt tiêu hoàn toàn mọi chuỗi `match/if-else` trong toàn bộ module chính tả `spelling.rs`. | **20.9M – 24.6M keys/s** (**41–48 ns**) | **18.9M – 22.7M keys/s** (**44–50 ns**) | **100% O(1) Bitwise Zero-Branching** ⚡ |
+| **Giai đoạn 8** (Hoàn tất) | **True 100% Zero-Heap trên cả nhánh Hoàn Tác & Khôi Phục Chính Tả + Thu Gọn L1 Cache**: Đổi `ModifierOutcome::Undone` và Smart English Bypass sang `CompactString` (đẩy English Bypass lên **92.8M keys/s = 10.8 ns**), kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`, gộp các hàm `render_*` xóa 84 dòng code thừa, thu gọn LUT phụ âm đầu từ 1.050B xuống **64B (1 L1 cache line)** không kiểm tra biên (`& 31`). | **21.6M – 24.5M keys/s** (**40.8–46.3 ns**) | **20.35M keys/s** (**49.1 ns**) | **English Bypass: 92.8M keys/s (10.8 ns)** 🔥 |
+| **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **24.97M keys/s** (**40.1 ns**) | **20.35M keys/s** (**49.1 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
 
 ### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record)
 
@@ -184,10 +186,25 @@ flowchart LR
   2. `is_valid_onset_extension`: Kiểm tra khả năng mở rộng phụ âm đầu bằng bitmask 2-ký tự.
   3. `STOP_CODA_CHARS_MASK: u32`: Kiểm tra phụ âm tắc (`c, p, t, k`) bằng phép thử bit đơn.
   4. `CODA_START_CHARS_MASK: u32` & `CODA_2LETTERS_MASK: [u64; 16]`: Kiểm tra phụ âm cuối đơn (`c, m, n, p, t`) và phụ âm cuối đôi (`ng, nh, ch`) bằng bảng tra cứu 128 bytes.
-  5. `SINGLE_ONSET_ALLOWED_VOWELS: [u8; 26]` & `DOUBLE_ONSET_ALLOWED_VOWELS: [u8; 1024]`: Ma trận nhị phân 6-bit ánh xạ nguyên âm cơ bản (A, E, I, O, U, Y) hợp lệ cho từng phụ âm đầu (`q` chỉ đi với `u`, `k` chỉ đi với `i, e, y`, `c` không đi với `i, e, y`, `gh/ngh` chỉ đi với `i, e`,...).
+  5. `SINGLE_ONSET_ALLOWED_VOWELS: [u8; 32]` & `ONSET_H_ALLOWED_VOWELS: [u8; 32]`: Ma trận nhị phân 6-bit ánh xạ nguyên âm cơ bản (A, E, I, O, U, Y) hợp lệ cho từng phụ âm đầu (`q` chỉ đi với `u`, `k` chỉ đi với `i, e, y`, `c` không đi với `i, e, y`, `gh/ngh` chỉ đi với `i, e`,...) nằm gọn trong đúng 1 L1 cache line (64 bytes) với chỉ mục `& 31` triệt tiêu hoàn toàn bounds check.
   6. `CODA_START_2VOWELS_MASK: [u32; 36]`: Ma trận bitmask 144 bytes ánh xạ 36 cặp nguyên âm cơ bản với phụ âm cuối cho phép (`oo` chỉ nhận `n`, `oe` nhận `t, n`, `uy` nhận `n, t, p, c`, `uê` nhận `n, c`).
 
-### 5.5. [Kế hoạch] WASAPI Audio Worker: Zero-Heap Allocation & SIMD Polyphonic Mixer
+### 5.5. [ĐÃ HOÀN THÀNH - Giai đoạn 8] True 100% Zero-Heap Hoàn Tác/Khôi Phục, UTF-8 Soundness & L1 Cache Diet
+- **Mục tiêu:** Xóa bỏ nốt các điểm cấp phát `String` cuối cùng trên đường hoàn tác dấu và khôi phục từ tiếng Anh, đảm bảo an toàn bộ nhớ UTF-8 tuyệt đối và tối giản hóa kích thước bảng tra cứu trong L1 Data Cache.
+- **Giải pháp đã triển khai:**
+  1. **Zero-Heap `ModifierOutcome::Undone(CompactString)` & Smart English Bypass:** Thay thế toàn bộ `.collect::<String>()` khi hoàn tác dấu (`aa -> a`, `ss -> s`, `ww -> w`) và khi tự động khôi phục từ tiếng Anh sai chính tả bằng `CompactString` (`FromIterator<char>`). Đẩy tốc độ `English Bypass` lên **94.22 triệu phím/giây (10.6 ns/phím)**.
+  2. **Kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`:** Kiểm tra bit tiếp nối UTF-8 bằng phép so sánh số nguyên có dấu 8-bit `(buf[idx] as i8) >= -0x40` trước khi `copy_within`, đảm bảo an toàn `from_utf8_unchecked` mà không sinh panic landing pad.
+  3. **Thu gọn LUT phụ âm đầu từ 1.050B xuống 64B (1 L1 Cache Line):** Thay bảng `DOUBLE_ONSET_ALLOWED_VOWELS: [u8; 1024]` bằng `ONSET_H_ALLOWED_VOWELS: [u8; 32]` kết hợp `SINGLE_ONSET_ALLOWED_VOWELS: [u8; 32]` đánh chỉ mục `& 31` không bounds-check.
+  4. **Hợp nhất hệ thống hàm `render_*`:** Tách `render_compact_to` và `tone_position` (`#[inline(always)]`), loại bỏ 84 dòng code trùng lặp giữa `render_to`, `render_chars_to` và `render_compact`.
+
+### 5.6. [ĐÃ HOÀN THÀNH - Giai đoạn 9] Zero-Allocation Hook Rule Resolution (39.2x Speedup), `VOWEL_COMPOSE_LUT` & Bitmask Macro Pre-filter
+- **Mục tiêu:** Triệt tiêu hoàn toàn việc cấp phát `Vec` và clone `String` trên mỗi sự kiện phím ở tầng Win32 Keyboard Hook (`low_level_keyboard_proc`), đồng thời loại bỏ 72 nhánh `match` trong `compose_vowel`.
+- **Giải pháp đã triển khai:**
+  1. **Zero-Allocation Single-Key Hook Lookups (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`):** Truy vấn trực tiếp trên slice của `ProfileManager` kết hợp cờ `is_active_global` mà không cấp phát `Vec<u32>` hay clone `KeyRemapRule` (`from_name`/`to_name`). Tăng tốc `Hook Rule Resolution` từ **6.66M keys/s (150.1 ns)** lên **261.59M keys/s (3.8 ns/phím — nhanh gấp 39.2 lần)**.
+  2. **Bảng hằng số Compile-Time `VOWEL_COMPOSE_LUT: [u16; 360]` (720 bytes):** Ánh xạ trực tiếp bộ 4 tham số `(BaseVowel, Diacritic, Tone, uppercase)` sang mã UTF-16 chỉ trong đúng **1 lệnh đọc mảng $O(1)$** không nhánh nhảy, thay thế toàn bộ 72 nhánh `match` lúc chạy của `compose_vowel`.
+  3. **Bitmask Pre-filter cho Gõ Tắt Phụ Âm Đầu/Cuối (`start_first_mask` & `end_last_mask`):** Lưu mặt nạ bit 32-bit cho ký tự đầu/cuối của các quy tắc `StartConsonant`/`EndConsonant` và kiểm tra độ dài 1 ký tự trong $O(1)$ (`word.chars().nth(1).is_none()`), giúp >95% từ thông thường bỏ qua vòng lặp quét `Vec` trong 1 chu kỳ CPU.
+
+### 5.7. [Kế hoạch] WASAPI Audio Worker: Zero-Heap Allocation & SIMD Polyphonic Mixer
 - **Bối cảnh:** Khi bật tính năng âm thanh bàn phím cơ (Mechanical Soundpack), mỗi nhát phím kích hoạt luồng phát âm thanh nền Windows Audio Session API (WASAPI) với tần suất cập nhật buffer ~10ms (100 lần/giây).
 - **Vấn đề hiện tại trong `src/platform/win32/sound/wasapi.rs`:**
   - Vẫn tồn tại lệnh cấp phát bộ nhớ heap `let mut mix_buf = vec![0.0f32; frames];` trong mỗi chu kỳ render audio.
@@ -201,7 +218,7 @@ flowchart LR
 
 ---
 
-### 5.6. [Kế hoạch] Win32 App Tracker: Event-Driven Foreground Window Caching
+### 5.8. [Kế hoạch] Win32 App Tracker: Event-Driven Foreground Window Caching
 - **Bối cảnh:** Kora hỗ trợ profile cấu hình độc lập cho từng ứng dụng (tự động tắt tiếng Việt khi chơi Game, bật macro riêng khi mở VS Code, Photoshop).
 - **Vấn đề hiện tại:** Mỗi chu kỳ quét ứng dụng hiện hành đòi hỏi gọi các hàm Windows API: `GetForegroundWindow()`, `GetWindowThreadProcessId()`, `QueryFullProcessImageNameW()`. Các lời gọi này yêu cầu chuyển đổi ngữ cảnh Kernel (Context-Switch), gây tốn kém chu kỳ máy nếu thăm dò liên tục.
 - **Giải pháp tối ưu hóa:**
@@ -211,7 +228,7 @@ flowchart LR
 
 ---
 
-### 5.7. [Kế hoạch] Tối Ưu Hóa Khởi Động (Ultra-Fast Startup & Lazy Resource Loading)
+### 5.9. [Kế hoạch] Tối Ưu Hóa Khởi Động (Ultra-Fast Startup & Lazy Resource Loading)
 - **Bối cảnh:** Kora là phần mềm chạy nền cùng hệ điều hành (Run on Windows Startup), yêu cầu thời gian khởi động tức thì để không làm chậm trễ quá trình mở máy của người dùng.
 - **Giải pháp tối ưu hóa:**
   1. **Lazy SoundBank Loading:** Không nạp toàn bộ các file âm thanh WAV vào RAM ngay khi mở ứng dụng. Chỉ nạp âm thanh khi người dùng kích hoạt tính năng Soundpack lần đầu tiên.
@@ -220,7 +237,7 @@ flowchart LR
 
 ---
 
-### 5.8. [Kế hoạch] Tiết Kiệm Năng Lượng Giao Diện (Reactive UI Throttling cho Egui Panel)
+### 5.10. [Kế hoạch] Tiết Kiệm Năng Lượng Giao Diện (Reactive UI Throttling cho Egui Panel)
 - **Bối cảnh:** Bảng điều khiển Control Panel sử dụng thư viện đồ họa Egui rendering qua DirectX / OpenGL.
 - **Giải pháp tối ưu hóa:**
   1. **Chế độ Reactive Rendering:** Khi cửa sổ Settings mở nhưng người dùng không di chuyển chuột hoặc không tương tác, chuyển tần số vẽ khung hình về 0 FPS (ngủ chờ sự kiện `winit::event::Event::RedrawRequested`).

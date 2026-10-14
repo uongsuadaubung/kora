@@ -185,11 +185,66 @@ const fn compute_vowel_pair(base: BaseVowel, diacritic: Diacritic, tone: Tone) -
     }
 }
 
+/// Compile-time lookup table mapping (BaseVowel, Diacritic, Tone, uppercase) -> UTF-16 codepoint.
+/// Dimensions: 6 BaseVowels * 5 Diacritics * 6 Tones * 2 Cases = 360 entries (720 bytes).
+/// Eliminates the 72-branch match in `compose_vowel` down to a single O(1) array load.
+const VOWEL_COMPOSE_LUT: [u16; 360] = {
+    let bases = [
+        BaseVowel::A,
+        BaseVowel::E,
+        BaseVowel::I,
+        BaseVowel::O,
+        BaseVowel::U,
+        BaseVowel::Y,
+    ];
+    let diacritics = [
+        Diacritic::None,
+        Diacritic::Circumflex,
+        Diacritic::Breve,
+        Diacritic::Horn,
+        Diacritic::DStroke,
+    ];
+    let tones = [
+        Tone::None,
+        Tone::Acute,
+        Tone::Grave,
+        Tone::HookAbove,
+        Tone::Tilde,
+        Tone::DotBelow,
+    ];
+
+    let mut lut = [0u16; 360];
+    let mut b = 0;
+    while b < 6 {
+        let mut d = 0;
+        while d < 5 {
+            let mut t = 0;
+            while t < 6 {
+                let (lower, upper) = compute_vowel_pair(bases[b], diacritics[d], tones[t]);
+                let base_idx = ((b * 5 + d) * 6 + t) << 1;
+                lut[base_idx] = lower as u16;
+                lut[base_idx | 1] = upper as u16;
+                t += 1;
+            }
+            d += 1;
+        }
+        b += 1;
+    }
+    lut
+};
+
 /// Builds a precomposed UTF-8 Unicode character from base vowel, diacritic, tone, and uppercase flag.
-#[inline]
-pub fn compose_vowel(base: BaseVowel, diacritic: Diacritic, tone: Tone, uppercase: bool) -> char {
-    let (lower, upper) = compute_vowel_pair(base, diacritic, tone);
-    if uppercase { upper } else { lower }
+/// Evaluated via O(1) compile-time LUT `VOWEL_COMPOSE_LUT` with zero branches.
+#[inline(always)]
+pub const fn compose_vowel(
+    base: BaseVowel,
+    diacritic: Diacritic,
+    tone: Tone,
+    uppercase: bool,
+) -> char {
+    let idx = (((base as usize * 5 + diacritic as usize) * 6 + tone as usize) << 1)
+        | (uppercase as usize);
+    unsafe { char::from_u32_unchecked(VOWEL_COMPOSE_LUT[idx] as u32) }
 }
 
 /// Compose the letter 'd' / 'đ'

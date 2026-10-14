@@ -67,6 +67,8 @@ pub struct MacroTable {
     entries: HashMap<String, MacroEntry>,
     start_consonants: Vec<MacroEntry>,
     end_consonants: Vec<MacroEntry>,
+    start_first_mask: u32,
+    end_last_mask: u32,
 }
 
 #[inline]
@@ -105,8 +107,28 @@ impl MacroTable {
             .collect();
         ends.sort_by_key(|a| std::cmp::Reverse(a.key.len()));
 
+        let mut start_mask = 0u32;
+        for s in &starts {
+            if let Some(&b) = s.key.as_bytes().first()
+                && b.is_ascii_lowercase()
+            {
+                start_mask |= 1u32 << (b - b'a');
+            }
+        }
+
+        let mut end_mask = 0u32;
+        for e in &ends {
+            if let Some(&b) = e.key.as_bytes().last()
+                && b.is_ascii_lowercase()
+            {
+                end_mask |= 1u32 << (b - b'a');
+            }
+        }
+
         self.start_consonants = starts;
         self.end_consonants = ends;
+        self.start_first_mask = start_mask;
+        self.end_last_mask = end_mask;
     }
 
     /// Create a macro table pre-populated with standard default rules
@@ -180,6 +202,8 @@ impl MacroTable {
         self.entries.clear();
         self.start_consonants.clear();
         self.end_consonants.clear();
+        self.start_first_mask = 0;
+        self.end_last_mask = 0;
     }
 
     /// Number of macro entries
@@ -330,39 +354,46 @@ impl MacroTable {
         }
 
         // 2. Single-character guard: single letters like 'f', 'j', 'w' MUST NOT be modified
-        if word.chars().count() <= 1 {
+        if word.len() <= 1 || word.chars().nth(1).is_none() {
             return None;
         }
 
         let mut matched_start: Option<(&str, &str)> = None;
         let mut matched_end: Option<(&str, &str)> = None;
+        let lower_bytes = lower.as_bytes();
 
-        // 3. Quick start consonant match (onset)
-        if allow_start_consonant {
-            for entry in &self.start_consonants {
-                if lower.starts_with(&entry.key) {
-                    let rem = &lower[entry.key.len()..];
-                    if let Some(next_char) = rem.chars().next()
-                        && is_vowel(next_char)
-                    {
-                        matched_start = Some((entry.key.as_str(), entry.value.as_str()));
-                        break;
+        // 3. Quick start consonant match (onset) — O(1) bitmask pre-filter skips loop when first char cannot match
+        if allow_start_consonant && !self.start_consonants.is_empty() {
+            let b0 = lower_bytes[0];
+            if !b0.is_ascii_lowercase() || (self.start_first_mask & (1u32 << (b0 - b'a'))) != 0 {
+                for entry in &self.start_consonants {
+                    if lower.starts_with(&entry.key) {
+                        let rem = &lower[entry.key.len()..];
+                        if let Some(next_char) = rem.chars().next()
+                            && is_vowel(next_char)
+                        {
+                            matched_start = Some((entry.key.as_str(), entry.value.as_str()));
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        // 4. Quick end consonant match (coda)
-        if allow_end_consonant {
-            for entry in &self.end_consonants {
-                if lower.ends_with(&entry.key) {
-                    let prefix_len = lower.len() - entry.key.len();
-                    let prefix = &lower[..prefix_len];
-                    if let Some(prev_char) = prefix.chars().last()
-                        && is_vowel(prev_char)
-                    {
-                        matched_end = Some((entry.key.as_str(), entry.value.as_str()));
-                        break;
+        // 4. Quick end consonant match (coda) — O(1) bitmask pre-filter skips loop when last char cannot match
+        if allow_end_consonant && !self.end_consonants.is_empty() {
+            let bl = lower_bytes[lower_bytes.len() - 1];
+            if !bl.is_ascii_lowercase() || (self.end_last_mask & (1u32 << (bl - b'a'))) != 0 {
+                for entry in &self.end_consonants {
+                    if lower.ends_with(&entry.key) {
+                        let prefix_len = lower.len() - entry.key.len();
+                        let prefix = &lower[..prefix_len];
+                        if let Some(prev_char) = prefix.chars().last()
+                            && is_vowel(prev_char)
+                        {
+                            matched_end = Some((entry.key.as_str(), entry.value.as_str()));
+                            break;
+                        }
                     }
                 }
             }

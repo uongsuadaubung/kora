@@ -36,7 +36,7 @@ impl OnsetState {
     }
 
     #[inline]
-    pub fn render_to(&self, out: &mut String) {
+    pub fn render_chars_to(&self, out: &mut InlineList<char, 16>) {
         for &(c, is_upper) in &self.chars {
             if c.eq_ignore_ascii_case(&'d') {
                 out.push(compose_d(self.is_d_stroke, is_upper));
@@ -48,8 +48,8 @@ impl OnsetState {
         }
     }
 
-    #[inline]
-    pub fn render_chars_to(&self, out: &mut InlineList<char, 16>) {
+    #[inline(always)]
+    pub fn render_compact_to(&self, out: &mut crate::engine::action::CompactString) {
         for &(c, is_upper) in &self.chars {
             if c.eq_ignore_ascii_case(&'d') {
                 out.push(compose_d(self.is_d_stroke, is_upper));
@@ -64,30 +64,23 @@ impl OnsetState {
     #[inline]
     pub fn render_compact(&self) -> crate::engine::action::CompactString {
         let mut s = crate::engine::action::CompactString::new();
-        for &(c, is_upper) in &self.chars {
-            if c.eq_ignore_ascii_case(&'d') {
-                s.push(compose_d(self.is_d_stroke, is_upper));
-            } else if is_upper {
-                s.push(c.to_ascii_uppercase());
-            } else {
-                s.push(c.to_ascii_lowercase());
-            }
-        }
+        self.render_compact_to(&mut s);
         s
     }
 
     #[inline]
+    pub fn render_to(&self, out: &mut String) {
+        out.push_str(&self.render_compact());
+    }
+
+    #[inline]
     pub fn render(&self) -> String {
-        let mut s = String::with_capacity(8);
-        self.render_to(&mut s);
-        s
+        self.render_compact().to_string()
     }
 }
 
 impl fmt::Display for OnsetState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::with_capacity(8);
-        self.render_to(&mut s);
-        f.write_str(&s)
+        f.write_str(&self.render_compact())
     }
 }

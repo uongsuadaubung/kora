@@ -210,18 +210,10 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 if let Ok(guard) = ENGINE_INSTANCE.lock() {
                     if let Some(ref engine) = *guard {
                         let eff_cfg = engine.effective_config();
-                        let disabled = engine.effective_disabled().contains(&vk);
-                        let remap = engine
-                            .effective_remaps()
-                            .into_iter()
-                            .find(|r| r.from_vk == vk)
-                            .map(|r| r.to_vk);
+                        let disabled = engine.is_key_disabled(vk);
+                        let remap = engine.lookup_key_remap(vk);
                         let key_macro = if eff_cfg.key_macro_enabled {
-                            engine
-                                .effective_key_macros()
-                                .into_iter()
-                                .find(|m| m.trigger_vk == vk)
-                                .map(|m| m.actions)
+                            engine.lookup_key_macro(vk).map(|s| s.to_vec())
                         } else {
                             None
                         };

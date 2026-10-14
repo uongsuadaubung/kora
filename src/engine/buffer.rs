@@ -132,14 +132,15 @@ impl TypingBuffer {
                     .eq(keys[..idx].iter().map(|k| k.ch));
                 if !is_same_as_raw {
                     let mut raw_list = InlineList::new();
+                    let mut output = super::action::CompactString::new();
                     for k in &keys[..=idx] {
                         raw_list.push(k.ch);
+                        output.push(k.ch);
                     }
                     next_state = SyllableState::Passthrough(raw_list);
-                    let raw_str: String = keys[..=idx].iter().map(|k| k.ch).collect();
                     action = EngineAction::Replace {
                         backspaces: last_rendered.chars().count(),
-                        output: raw_str.into(),
+                        output,
                     };
                 }
             }
@@ -247,14 +248,15 @@ impl TypingBuffer {
                 .eq(self.raw_keys[..self.raw_keys.len() - 1].iter().map(|k| k.ch));
             if !is_same_as_raw {
                 let mut raw_list = InlineList::new();
+                let mut output = super::action::CompactString::new();
                 for k in &self.raw_keys {
                     raw_list.push(k.ch);
+                    output.push(k.ch);
                 }
                 next_state = SyllableState::Passthrough(raw_list);
-                let raw_str: String = self.raw_keys.iter().map(|k| k.ch).collect();
                 action = EngineAction::Replace {
                     backspaces: self.last_rendered.chars().count(),
-                    output: raw_str.into(),
+                    output,
                 };
             }
         }
@@ -357,8 +359,9 @@ impl TypingBuffer {
                     self.last_rendered = eval.rendered;
                     self.is_passthrough = matches!(self.state, SyllableState::Passthrough(_));
                 } else {
-                    let raw_str: String = self.raw_keys.iter().map(|k| k.ch).collect();
-                    self.state = SyllableState::Passthrough(InlineList::from(raw_str.as_str()));
+                    let raw_chars: InlineList<char, 16> =
+                        self.raw_keys.iter().map(|k| k.ch).collect();
+                    self.state = SyllableState::Passthrough(raw_chars);
                 }
             }
             return true;

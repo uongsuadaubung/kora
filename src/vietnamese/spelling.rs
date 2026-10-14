@@ -627,9 +627,9 @@ const VOWEL_Q: u8 = VOWEL_MASK_U;                                   // q always 
 const VOWEL_GH_NGH: u8 = VOWEL_MASK_I | VOWEL_MASK_E;               // gh, ngh only go with i, e/ê
 const VOWEL_NG: u8 = VOWEL_ALL & !(VOWEL_MASK_I | VOWEL_MASK_E | VOWEL_MASK_Y); // ng never with i, e, y
 
-/// Lookup table of allowed vowels for 1-letter onsets: [u8; 26] (26 bytes).
-const SINGLE_ONSET_ALLOWED_VOWELS: [u8; 26] = {
-    let mut table = [VOWEL_ALL; 26];
+/// Lookup table of allowed vowels for 1-letter onsets: [u8; 32] (32 bytes, zero bounds checks).
+const SINGLE_ONSET_ALLOWED_VOWELS: [u8; 32] = {
+    let mut table = [VOWEL_ALL; 32];
     table[(b'q' - b'a') as usize] = VOWEL_Q;
     table[(b'k' - b'a') as usize] = VOWEL_FRONT;
     table[(b'c' - b'a') as usize] = VOWEL_NON_FRONT;
@@ -640,14 +640,13 @@ const SINGLE_ONSET_ALLOWED_VOWELS: [u8; 26] = {
     table
 };
 
-/// Lookup table of allowed vowels for 2-letter onsets: [u8; 1024] (1 KB).
-/// Indexed by ((c0 - 'a') << 5) | (c1 - 'a').
-const DOUBLE_ONSET_ALLOWED_VOWELS: [u8; 1024] = {
-    let mut table = [VOWEL_ALL; 1024];
-    table[(((b'g' - b'a') as usize) << 5) | ((b'h' - b'a') as usize)] = VOWEL_GH_NGH;
-    table[(((b'n' - b'a') as usize) << 5) | ((b'g' - b'a') as usize)] = VOWEL_NG;
-    table[(((b'p' - b'a') as usize) << 5) | ((b'h' - b'a') as usize)] = VOWEL_NO_Y;
-    table[(((b'k' - b'a') as usize) << 5) | ((b'h' - b'a') as usize)] = VOWEL_NO_Y;
+/// 32-byte lookup table (half a single L1 cache line) of allowed vowels for '*h' 2-letter onsets (ch, gh, kh, nh, ph, th).
+/// Indexed by (c0 - 'a') & 31 with zero bounds checks.
+const ONSET_H_ALLOWED_VOWELS: [u8; 32] = {
+    let mut table = [VOWEL_ALL; 32];
+    table[(b'g' - b'a') as usize] = VOWEL_GH_NGH;
+    table[(b'p' - b'a') as usize] = VOWEL_NO_Y;
+    table[(b'k' - b'a') as usize] = VOWEL_NO_Y;
     table
 };
 
@@ -667,7 +666,7 @@ pub fn is_valid_onset_vowel_orthography(
         1 => {
             let c = onset[0].0.to_ascii_lowercase();
             if c.is_ascii_lowercase() {
-                SINGLE_ONSET_ALLOWED_VOWELS[(c as usize) - ('a' as usize)]
+                SINGLE_ONSET_ALLOWED_VOWELS[(c as usize - 'a' as usize) & 31]
             } else {
                 VOWEL_ALL
             }
@@ -675,9 +674,10 @@ pub fn is_valid_onset_vowel_orthography(
         2 => {
             let c0 = onset[0].0.to_ascii_lowercase();
             let c1 = onset[1].0.to_ascii_lowercase();
-            if c0.is_ascii_lowercase() && c1.is_ascii_lowercase() {
-                let idx = ((c0 as usize - 'a' as usize) << 5) | (c1 as usize - 'a' as usize);
-                DOUBLE_ONSET_ALLOWED_VOWELS[idx]
+            if c1 == 'h' && c0.is_ascii_lowercase() {
+                ONSET_H_ALLOWED_VOWELS[(c0 as usize - 'a' as usize) & 31]
+            } else if c0 == 'n' && c1 == 'g' {
+                VOWEL_NG
             } else {
                 VOWEL_ALL
             }

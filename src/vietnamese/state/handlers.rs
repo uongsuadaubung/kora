@@ -493,7 +493,7 @@ impl SyllableState {
                         SyllableState::Passthrough(InlineList::from(raw.as_str())),
                         EngineAction::Replace {
                             backspaces: current_len,
-                            output: raw.into(),
+                            output: raw,
                         },
                     );
                 }
@@ -704,7 +704,7 @@ impl SyllableState {
                         SyllableState::Passthrough(InlineList::from(raw.as_str())),
                         EngineAction::Replace {
                             backspaces: current_len,
-                            output: raw.into(),
+                            output: raw,
                         },
                     );
                 }
