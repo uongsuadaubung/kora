@@ -59,12 +59,15 @@ fn test_group_2_undo_toggle_and_cancel_key() {
     assert_eq!(simulate(&mut engine, "dd "), "đ ");
     assert_eq!(simulate(&mut engine, "ddd "), "dd ");
 
-    // 5. Phím 'z' xóa dấu thanh hoặc xóa dấu phụ (móc, mũ, đ-stroke)
+    // 5. Phím 'z' xóa dấu thanh hoặc xóa dấu phụ (móc, mũ, đ-stroke) và gõ tiếp chữ cái
     assert_eq!(simulate(&mut engine, "toansz "), "toan ");
     assert_eq!(simulate(&mut engine, "hoafz "), "hoa ");
     assert_eq!(simulate(&mut engine, "cowz "), "co "); // Gõ 'cow' ra 'cơ', gõ 'z' xóa móc sừng thành 'co'
     assert_eq!(simulate(&mut engine, "tooz "), "to "); // Gõ 'too' ra 'tô', gõ 'z' xóa mũ thành 'to'
     assert_eq!(simulate(&mut engine, "ddaz "), "da "); // Gõ 'dda' ra 'đa', gõ 'z' xóa nét đ thành 'da'
+    assert_eq!(simulate(&mut engine, "lafzg "), "lag "); // Gõ 'laf' -> 'là', 'z' -> 'la', 'g' -> 'lag'
+    assert_eq!(simulate(&mut engine, "cowzde "), "code ");
+    assert_eq!(simulate(&mut engine, "ddazta "), "data ");
 
     // 6. Gõ lặp phím 'w' khôi phục chữ 'w' (e.g. coww -> cow)
     assert_eq!(simulate(&mut engine, "coww "), "cow ");
@@ -191,45 +194,4 @@ fn test_group_7_macro_expansion_with_casing() {
     // Viết hoa toàn bộ (ALL CAPS)
     assert_eq!(simulate(&mut engine, "KO "), "KHÔNG ");
     assert_eq!(simulate(&mut engine, "DC "), "ĐƯỢC ");
-}
-
-#[test]
-fn test_benchmark_throughput() {
-    let mut engine = VietnameseEngine::new(EngineConfig::default());
-    let paragraph =
-        "tooi gox tieengs vieetj raats nhanh vaf muwowjt maf treen heej thoongs Kora moqis ";
-    let total_chars = paragraph.chars().count();
-    let iterations = 10_000;
-
-    let start = std::time::Instant::now();
-    for _ in 0..iterations {
-        simulate(&mut engine, paragraph);
-    }
-    let elapsed = start.elapsed();
-    let total_keystrokes = total_chars * iterations;
-    let keys_per_sec = (total_keystrokes as f64) / elapsed.as_secs_f64();
-    println!(
-        "\n===> BENCHMARK (Full Screen Simulation): {} keys typed in {:?}. Speed: {:.0} keys/sec ({:.2} microseconds/key)",
-        total_keystrokes,
-        elapsed,
-        keys_per_sec,
-        (elapsed.as_micros() as f64) / (total_keystrokes as f64)
-    );
-
-    engine.reset();
-    let chars: Vec<char> = paragraph.chars().collect();
-    let start_raw = std::time::Instant::now();
-    for _ in 0..iterations {
-        for &ch in &chars {
-            std::hint::black_box(engine.on_key(ch, ch.is_uppercase(), false));
-        }
-    }
-    let elapsed_raw = start_raw.elapsed();
-    let speed_raw = (total_keystrokes as f64) / elapsed_raw.as_secs_f64();
-    println!(
-        "===> BENCHMARK (Pure Engine on_key): Speed: {:.0} keys/sec ({:.3} microseconds/key = {:.0} ns)",
-        speed_raw,
-        (elapsed_raw.as_nanos() as f64) / 1000.0 / (total_keystrokes as f64),
-        (elapsed_raw.as_nanos() as f64) / (total_keystrokes as f64)
-    );
 }

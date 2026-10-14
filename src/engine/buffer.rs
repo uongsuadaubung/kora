@@ -151,10 +151,13 @@ impl TypingBuffer {
                     current_len = output.encode_utf16().count();
                     last_rendered.clear();
                     last_rendered.push_str(output);
-                    // If an undo toggle transitioned into Passthrough (e.g. toanss -> toans, chuww -> chuw),
-                    // synchronize effective keys to match the explicit cancelled output.
+                    // If an undo toggle transitioned into Passthrough (e.g. toanss -> toans, chuww -> chuw)
+                    // or mark removal ('z' / VNI '0') stripped all marks back to plain ASCII (e.g. lafz -> la),
+                    // synchronize effective keys to match the cancelled output on screen.
                     if let SyllableState::Passthrough(raw) = state {
                         effective = raw.iter().map(|&c| RawKey::from(c)).collect();
+                    } else if last_rendered.is_ascii() {
+                        effective = last_rendered.chars().map(RawKey::from).collect();
                     }
                 }
                 EngineAction::Passthrough => {
@@ -329,6 +332,8 @@ impl TypingBuffer {
                 self.raw_keys = raw.iter().map(|&c| RawKey::from(c)).collect();
             }
             self.is_passthrough = true;
+        } else if matches!(&action, EngineAction::Replace { .. }) && self.last_rendered.is_ascii() {
+            self.raw_keys = self.last_rendered.chars().map(RawKey::from).collect();
         }
 
         action

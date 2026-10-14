@@ -6,18 +6,12 @@ Tài liệu này ghi chép chi tiết phương pháp chạy kiểm chuẩn hiệ
 
 ## 1. Hướng Dẫn Chạy Benchmark
 
-### 1.1. Lệnh Benchmark Chuẩn Xác & Không Xung Đột
+### 1.1. Lệnh Benchmark Chuẩn Xác & Đa Kịch Bản
 
-Khi Kora đang được kích hoạt và chạy nền trên thanh Taskbar/System Tray của Windows, tệp thực thi `target\release\Kora.exe` bị khóa bởi hệ điều hành. Lệnh biên dịch Release thông thường (`cargo test --release`) sẽ gặp lỗi:
-```text
-error: failed to remove file `...\target\release\Kora.exe`
-Caused by: Access is denied. (os error 5)
-```
-
-Để benchmark độc lập mà **không cần tắt Kora đang sử dụng**, sử dụng cờ `--target-dir` để điều hướng tiến trình build sang một thư mục đích cách ly:
+Khi Kora đang được kích hoạt và chạy nền trên thanh Taskbar/System Tray của Windows, tệp thực thi `target\release\Kora.exe` bị khóa bởi hệ điều hành. Để benchmark độc lập mà **không cần tắt Kora đang sử dụng**, sử dụng công cụ phân tích đa kịch bản trong `examples/benchmark.rs` cùng cờ `--target-dir` để điều hướng tiến trình build sang một thư mục đích cách ly:
 
 ```bash
-cargo test --release --target-dir target/bench_run --test comprehensive_test test_benchmark_throughput -- --nocapture
+cargo run --release --target-dir target/bench_run --example benchmark
 ```
 
 ### 1.2. Phân Tích Chi Tiết Từng Tham Số
@@ -26,40 +20,23 @@ cargo test --release --target-dir target/bench_run --test comprehensive_test tes
 | :--- | :--- |
 | `--release` | Kích hoạt profile biên dịch tối ưu hóa cao nhất (`opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`). |
 | `--target-dir target/bench_run` | Cách ly hoàn toàn thư mục build kiểm chuẩn, tránh xung đột quyền truy cập tệp (*Access is denied*) với tiến trình `Kora.exe` đang chạy nền. |
-| `--test comprehensive_test` | Chỉ định chính xác tệp kiểm thử tích hợp chuyên sâu `tests/comprehensive_test.rs`. |
-| `test_benchmark_throughput` | Tên hàm kiểm thử đo lường thông lượng phím. |
-| `-- --nocapture` | Chuyển tiếp trực tiếp output ra màn hình console (không bị Cargo nuốt log). |
-
----
-
-### 1.3. Lệnh Benchmark Mở Rộng Đa Kịch Bản
-
-Ngoài bài kiểm thử đơn lẻ trong `comprehensive_test`, Kora có sẵn công cụ phân tích đa kịch bản trong `examples/benchmark.rs` đo đạc riêng biệt từng bộ gõ (Telex, Simple Telex, English Bypass, Macro Mute, Hook Rule Resolution):
-
-```bash
-cargo run --release --target-dir target/bench_run --example benchmark
-```
+| `--example benchmark` | Chạy bộ đo lường đa kịch bản `examples/benchmark.rs` (Telex, Simple Telex, English Bypass, Full Screen Simulation, Macro Mute, Hook Rule Resolution). |
 
 ---
 
 ## 2. Giải Thích 2 Chỉ Số Đo Lường Cốt Lõi
 
-Khi chạy benchmark, console sẽ in ra 2 kết quả phản ánh 2 tầng kiến trúc khác nhau:
-
-```text
-===> BENCHMARK (Full Screen Simulation): 820000 keys typed in 44.59ms. Speed: 18,388,206 keys/sec (0.05 µs/key)
-===> BENCHMARK (Pure Engine on_key):     Speed: 25,425,624 keys/sec (0.039 µs/key = 39 ns)
-```
+Khi chạy benchmark, console sẽ in ra các chỉ số phản ánh các tầng kiến trúc khác nhau:
 
 ### 2.1. `Pure Engine on_key` (Tốc độ xử lý lõi phím thô)
 - **Bản chất:** Đo đạc thời gian máy trạng thái ngữ âm (`SyllableState`) phân loại phím, chuyển dịch trạng thái, tra cứu ngữ âm học và xác định hành vi (`EngineAction`).
 - **Ý nghĩa:** Phản ánh độ trễ trực tiếp trên luồng chặn bàn phím (`Low-Level Keyboard Hook`).
-- **Thực tế:** Đạt **~25.4 triệu phím/giây** (**39 nano-giây / phím**). Nhanh gấp **150.000 lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
+- **Thực tế:** Đạt **~25.45 triệu phím/giây** (**39.3 nano-giây / phím**). Nhanh gấp **150.000 lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
 
 ### 2.2. `Full Screen Simulation` (Mô phỏng gõ trên màn hình thực tế)
 - **Bản chất:** Đo đạc toàn bộ chu trình hoàn chỉnh từ lúc nhấn phím, máy trạng thái tính toán, chạy thuật toán tiền tố chung (*Common Prefix Optimization*), phát sinh số lượng phím `Backspace` cần xóa lùi, cập nhật bộ đệm và nối chuỗi thay thế vào màn hình ảo.
 - **Ý nghĩa:** Phản ánh trải nghiệm gõ thực tế của người dùng khi gõ các đoạn văn bản tiếng Việt phức tạp với đầy đủ dấu thanh, dấu mũ, dấu móc và từ tiếng Anh.
-- **Thực tế:** Đạt **~18.4 triệu phím/giây** (**54 nano-giây / phím**). 820.000 ký tự tiếng Việt phức hợp được xử lý trọn vẹn trong chưa đầy **0.05 giây**.
+- **Thực tế:** Đạt **~22.50 triệu phím/giây** (**44.5 nano-giây / phím**).
 
 ---
 
@@ -77,27 +54,37 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 | **Giai đoạn 6** | **Bitmask Phonotactic Table cho `can_vowels_accept_coda`** (biến 16 nhánh match thành 1 lệnh bitwise AND duy nhất) + **Zero-Heap `CompactString` cho `EngineAction::Replace`** (stack buffer 24 bytes, 100% stack-allocated không tốn `malloc` khi thay thế ký tự/bỏ dấu thanh). | **22.7M – 24.1M keys/s** (**41 ns**) | **20.6M – 22.7M keys/s** (**44 ns**) | **+11.6% Full Simulation** 🚀 |
 | **Giai đoạn 7** (`db34a8c`) | **100% Bitmask Toàn Bộ Quy Tắc Ghép Vần Tiếng Việt**: `is_valid_onset`, `is_valid_onset_extension`, `is_valid_coda_start`, `is_valid_coda_pair`, `is_stop_coda`, `is_valid_onset_vowel_orthography`, `is_valid_coda_start_for_vowels`. Triệt tiêu hoàn toàn mọi chuỗi `match/if-else` trong toàn bộ module chính tả `spelling.rs`. | **20.9M – 24.6M keys/s** (**41–48 ns**) | **18.9M – 22.7M keys/s** (**44–50 ns**) | **100% O(1) Bitwise Zero-Branching** ⚡ |
 | **Giai đoạn 8** (Hoàn tất) | **True 100% Zero-Heap trên cả nhánh Hoàn Tác & Khôi Phục Chính Tả + Thu Gọn L1 Cache**: Đổi `ModifierOutcome::Undone` và Smart English Bypass sang `CompactString` (đẩy English Bypass lên **92.8M keys/s = 10.8 ns**), kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`, gộp các hàm `render_*` xóa 84 dòng code thừa, thu gọn LUT phụ âm đầu từ 1.050B xuống **64B (1 L1 cache line)** không kiểm tra biên (`& 31`). | **21.6M – 24.5M keys/s** (**40.8–46.3 ns**) | **20.35M keys/s** (**49.1 ns**) | **English Bypass: 92.8M keys/s (10.8 ns)** 🔥 |
-| **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **24.97M keys/s** (**40.1 ns**) | **20.35M keys/s** (**49.1 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
+| **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **25.45M keys/s** (**39.3 ns**) | **22.50M keys/s** (**44.5 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
 
 ### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record)
 
-- **Thời gian đo:** Ngày 13 tháng 10 năm 2026.
+- **Thời gian đo:** Ngày 14 tháng 10 năm 2026.
 - **Môi trường:** Windows 11 x64, Rust toolchain 2024 edition.
 - **Cấu hình Profile Release:** `opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`.
-- **Dữ liệu kiểm chuẩn:** Chuỗi tiếng Việt phức hợp 82 ký tự (`"tooi gox tieengs vieetj raats nhanh vaf muwowjt maf treen heej thoongs Kora moqis "`), lặp lại 10.000 vòng (tổng cộng **820.000 ký tự**).
 
 ```text
-running 1 test
+[1] PURE ENGINE ON_KEY LATENCY & THROUGHPUT (No screen allocation):
+  Benchmark Case                             |       Throughput |    Latency per Key
+  -------------------------------------------+------------------+-------------------
+  Telex (on_key raw)                         |  25451390 keys/s |    39.3 ns/key (0.039 µs)
+  Simple Telex (on_key raw)                  |  24428842 keys/s |    40.9 ns/key (0.041 µs)
+  English Bypass (on_key raw)                |  90025602 keys/s |    11.1 ns/key (0.011 µs)
 
-===> BENCHMARK (Full Screen Simulation): 820000 keys typed in 39.1212ms. 
-     Speed: 20,960,502 keys/sec (0.047 microseconds/key = 47 ns)
+[2] FULL SCREEN SIMULATION (Handling Backspace & Replacement):
+  Benchmark Case                             |       Throughput |    Latency per Key
+  -------------------------------------------+------------------+-------------------
+  End-to-End Vietnamese Typing               |  22495089 keys/s |    44.5 ns/key (0.044 µs)
 
-===> BENCHMARK (Pure Engine on_key): 
-     Speed: 24,579,378 keys/sec (0.041 microseconds/key = 41 ns)
+[3] MACRO EXPANSION & ZERO-ALLOCATION ROW MUTE BENCHMARK:
+  Benchmark Case                             |       Throughput |    Latency per Key
+  -------------------------------------------+------------------+-------------------
+  Macro (All Unmuted)                        |  15988552 keys/s |    62.5 ns/key (0.063 µs)
+  Macro with Muted Rows (Cached Zero-Alloc)  |  20795641 keys/s |    48.1 ns/key (0.048 µs)
 
-test test_benchmark_throughput ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.07s
+[4] KEYBOARD HOOK RULE RESOLUTION (Remap, Disable, Key Macro):
+  Benchmark Case                             |       Throughput |    Latency per Key
+  -------------------------------------------+------------------+-------------------
+  Hook Rule Resolution (4 keys)              | 247524752 keys/s |     4.0 ns/key (0.004 µs)
 ```
 
 ---
