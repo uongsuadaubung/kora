@@ -16,10 +16,6 @@ name = "Kora"
 path = "src/main.rs"
 
 [[example]]
-name = "combinatorial_tester"
-path = "examples/combinatorial_tester.rs"
-
-[[example]]
 name = "benchmark"
 path = "examples/benchmark.rs"
 
