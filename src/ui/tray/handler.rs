@@ -66,6 +66,10 @@ impl TrayHandler {
     pub fn readd(&mut self) {
         self.tray.readd();
     }
+
+    pub fn hide(&mut self) {
+        self.tray.hide();
+    }
 }
 
 /// Builds and tracks the tray context menu. Takes plain values so callers don't hold any

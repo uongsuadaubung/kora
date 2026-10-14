@@ -81,6 +81,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     btn_open_log: "Mở file log",
     btn_check_update: "Kiểm tra bản mới",
     btn_checking_update: "Đang kiểm tra...",
+    btn_updating: "Đang cập nhật...",
     label_theme_title: "Giao diện & ngôn ngữ",
     label_theme: "Chủ đề màu sắc:",
     theme_auto: "Theo hệ thống",
@@ -288,7 +289,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     // Updater
     update_title: "Cập nhật Kora",
     update_error_title: "Lỗi cập nhật Kora",
-    update_available_msg: "Đã có phiên bản mới: {latest}\n(Phiên bản hiện tại của bạn: v{current})\n\nBạn có muốn mở trang GitHub để tải về không?",
+    update_available_msg: "Đã có phiên bản mới: {latest}\n(Phiên bản hiện tại của bạn: v{current})\n\nBạn có muốn tự động tải về và cập nhật trực tiếp ngay không?",
     update_latest_msg: "Bạn đang sử dụng phiên bản mới nhất (v{current}).",
-    update_error_msg: "Không thể kiểm tra phiên bản mới:\n{error}",
+    update_error_msg: "Không thể cập nhật phiên bản mới:\n{error}",
 };

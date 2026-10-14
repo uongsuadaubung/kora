@@ -15,6 +15,17 @@ fn main() {
         return;
     }
 
+    // Clean up previous executable left over from in-place self-update
+    if let Ok(exe) = std::env::current_exe() {
+        let old = exe.with_extension("exe.old");
+        if old.exists() && std::fs::remove_file(&old).is_err() {
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                let _ = std::fs::remove_file(old);
+            });
+        }
+    }
+
     // Attach to existing parent console if launched from terminal (cmd/PowerShell)
     attach_parent_console();
 

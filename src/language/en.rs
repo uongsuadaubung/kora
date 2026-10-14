@@ -81,6 +81,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     btn_open_log: "Open log file",
     btn_check_update: "Check for Updates",
     btn_checking_update: "Checking...",
+    btn_updating: "Updating...",
     label_theme_title: "Appearance (Theme) & Language",
     label_theme: "Color theme:",
     theme_auto: "System (Auto)",
@@ -288,7 +289,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     // Updater
     update_title: "Kora Update",
     update_error_title: "Kora Update Error",
-    update_available_msg: "A new version is available: {latest}\n(Your current version: v{current})\n\nWould you like to open the GitHub release page to download it?",
+    update_available_msg: "A new version is available: {latest}\n(Your current version: v{current})\n\nWould you like to automatically download and update now?",
     update_latest_msg: "You are using the latest version (v{current}).",
-    update_error_msg: "Failed to check for updates:\n{error}",
+    update_error_msg: "Failed to update Kora:\n{error}",
 };

@@ -6,6 +6,9 @@ use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 
 #[cfg(target_os = "windows")]
+use std::sync::atomic::{AtomicIsize, Ordering};
+
+#[cfg(target_os = "windows")]
 #[link(name = "kernel32")]
 unsafe extern "system" {
     fn CreateMutexW(
@@ -13,10 +16,14 @@ unsafe extern "system" {
         bInitialOwner: i32,
         lpName: *const u16,
     ) -> isize;
+    fn CloseHandle(hObject: isize) -> i32;
     fn GetLastError() -> u32;
     fn AttachConsole(dwProcessId: u32) -> i32;
     fn AllocConsole() -> i32;
 }
+
+#[cfg(target_os = "windows")]
+static SINGLE_INSTANCE_MUTEX: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(target_os = "windows")]
 #[link(name = "user32")]
@@ -40,9 +47,12 @@ pub fn ensure_single_instance(is_cli: bool) -> bool {
             .encode_wide()
             .chain(Some(0))
             .collect();
-        let _h_mutex = CreateMutexW(std::ptr::null_mut(), 1, mutex_name.as_ptr());
+        let h_mutex = CreateMutexW(std::ptr::null_mut(), 1, mutex_name.as_ptr());
 
         if GetLastError() == ERROR_ALREADY_EXISTS && !is_cli {
+            if h_mutex != 0 {
+                CloseHandle(h_mutex);
+            }
             let class_name: Vec<u16> = OsStr::new("KoraControlPanelClass")
                 .encode_wide()
                 .chain(Some(0))
@@ -54,8 +64,20 @@ pub fn ensure_single_instance(is_cli: bool) -> bool {
             }
             return false;
         }
+        SINGLE_INSTANCE_MUTEX.store(h_mutex, Ordering::SeqCst);
     }
     true
+}
+
+/// Releases the single-instance mutex early so a newly spawned updated binary can start immediately.
+pub fn release_single_instance() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let h = SINGLE_INSTANCE_MUTEX.swap(0, Ordering::SeqCst);
+        if h != 0 {
+            CloseHandle(h);
+        }
+    }
 }
 
 /// Attaches to existing parent console if launched from terminal (cmd/PowerShell)
