@@ -25,7 +25,7 @@ pub struct NucleusState {
     pub onset: Option<OnsetState>,
     pub vowels: InlineList<VowelLetter, 4>,
     pub tone: Tone,
-    pub shorthand_key: Option<char>,
+    pub is_shorthand: bool,
 }
 
 impl NucleusState {
@@ -40,7 +40,7 @@ impl NucleusState {
             onset,
             vowels: InlineList::from_single(vowel),
             tone,
-            shorthand_key: None,
+            is_shorthand: false,
         }
     }
 
@@ -446,9 +446,7 @@ impl NucleusState {
             KeyEffect::HornShortcut => {
                 // Shorthand 'w' undo: ww -> w, tww -> tw
                 if coda.is_none()
-                    && self
-                        .shorthand_key
-                        .is_some_and(|k| k.eq_ignore_ascii_case(&'w'))
+                    && self.is_shorthand
                     && self.tone == Tone::None
                     && self.vowels.len() == 1
                     && self.vowels[0].base == BaseVowel::U
@@ -465,7 +463,7 @@ impl NucleusState {
                 if self.apply_horn(coda.is_some()) {
                     ModifierOutcome::Applied
                 } else if coda.is_none() && self.revert_horn() {
-                    self.shorthand_key = None;
+                    self.is_shorthand = false;
                     ModifierOutcome::Undone(make_raw(self))
                 } else {
                     ModifierOutcome::NotApplied
@@ -544,7 +542,7 @@ impl NucleusState {
                         changed = true;
                     }
                     if changed {
-                        self.shorthand_key = None;
+                        self.is_shorthand = false;
                         ModifierOutcome::Applied
                     } else {
                         ModifierOutcome::NotApplied

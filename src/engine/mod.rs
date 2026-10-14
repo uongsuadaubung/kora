@@ -9,7 +9,7 @@ pub mod profile;
 pub use action::{CompactString, EngineAction};
 use buffer::{RawKey, TypingBuffer};
 pub use config::EngineConfig;
-use history::WordHistory;
+use history::{HistoryBackspace, WordHistory};
 use crate::logger::{AsyncLogWriter, current_timestamp_str};
 use macro_table::MacroTable;
 pub use profile::ProfileManager;
@@ -20,6 +20,7 @@ pub struct VietnameseEngine {
     config: EngineConfig,
     cached_effective_config: EngineConfig,
     is_active_global: bool,
+    active_child_idx: Option<usize>,
     pub buffer: TypingBuffer,
     pub macro_table: MacroTable,
     pub profile_manager: ProfileManager,
@@ -49,6 +50,7 @@ impl VietnameseEngine {
             config,
             cached_effective_config,
             is_active_global: true,
+            active_child_idx: None,
             buffer: TypingBuffer::new(),
             macro_table: MacroTable::with_defaults(),
             profile_manager: ProfileManager::new(),
@@ -76,8 +78,14 @@ impl VietnameseEngine {
     pub fn refresh_effective_config(&mut self) {
         self.is_active_global = self.profile_manager.active_id == "global";
         if self.is_active_global {
+            self.active_child_idx = None;
             self.cached_effective_config = self.config.clone();
         } else {
+            self.active_child_idx = self
+                .profile_manager
+                .profiles
+                .iter()
+                .position(|p| p.id == self.profile_manager.active_id);
             self.cached_effective_config = self.profile_manager.resolve_effective_config(
                 &self.profile_manager.active_id,
                 &self.config,
@@ -99,6 +107,7 @@ impl VietnameseEngine {
         self.profile_manager.is_vk_disabled(
             &self.profile_manager.active_id,
             self.is_active_global,
+            self.active_child_idx,
             vk,
         )
     }
@@ -108,6 +117,7 @@ impl VietnameseEngine {
         self.profile_manager.lookup_remap_vk(
             &self.profile_manager.active_id,
             self.is_active_global,
+            self.active_child_idx,
             vk,
         )
     }
@@ -117,6 +127,7 @@ impl VietnameseEngine {
         self.profile_manager.lookup_key_macro_actions(
             &self.profile_manager.active_id,
             self.is_active_global,
+            self.active_child_idx,
             vk,
         )
     }
@@ -183,9 +194,7 @@ impl VietnameseEngine {
         } else {
             match self
                 .profile_manager
-                .profiles
-                .iter()
-                .find(|p| p.id == self.profile_manager.active_id)
+                .resolve_child(&self.profile_manager.active_id, self.active_child_idx)
             {
                 Some(p) => p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len(),
                 None => 0,
@@ -619,8 +628,10 @@ impl VietnameseEngine {
         if self.buffer.is_empty() {
             let mut restored_word = None;
             if cfg.remember_history_across_space
-                && let Some(restored) = self.history.pop_backspace()
-                && let Some((raw_keys, is_raw_restored)) = restored
+                && let HistoryBackspace::RestoredWord {
+                    raw_keys,
+                    is_raw_restored,
+                } = self.history.pop_backspace()
             {
                 if self.config.debug {
                     restored_word = Some(raw_keys.iter().map(|k| k.ch).collect::<String>());

@@ -87,7 +87,7 @@ impl TypingBuffer {
             emitted_len += k.ch.len_utf16();
         }
         self.emitted_len = emitted_len;
-        self.state = SyllableState::Passthrough(raw_chars);
+        self.state = SyllableState::passthrough(raw_chars);
         self.raw_keys = keys;
         self.is_passthrough = true;
         self.is_restored_across_space = true;
@@ -137,7 +137,7 @@ impl TypingBuffer {
                         raw_list.push(k.ch);
                         output.push(k.ch);
                     }
-                    next_state = SyllableState::Passthrough(raw_list);
+                    next_state = SyllableState::passthrough(raw_list);
                     action = EngineAction::Replace {
                         backspaces: last_rendered.chars().count(),
                         output,
@@ -156,7 +156,7 @@ impl TypingBuffer {
                     // synchronize effective keys to match the cancelled output on screen.
                     if let SyllableState::Passthrough(raw) = state {
                         effective = raw.iter().map(|&c| RawKey::from(c)).collect();
-                    } else if last_rendered.is_ascii() {
+                    } else if matches!(key.ch, 'z' | 'Z' | '0') && last_rendered.is_ascii() {
                         effective = last_rendered.chars().map(RawKey::from).collect();
                     }
                 }
@@ -256,7 +256,7 @@ impl TypingBuffer {
                     raw_list.push(k.ch);
                     output.push(k.ch);
                 }
-                next_state = SyllableState::Passthrough(raw_list);
+                next_state = SyllableState::passthrough(raw_list);
                 action = EngineAction::Replace {
                     backspaces: self.last_rendered.chars().count(),
                     output,
@@ -332,7 +332,10 @@ impl TypingBuffer {
                 self.raw_keys = raw.iter().map(|&c| RawKey::from(c)).collect();
             }
             self.is_passthrough = true;
-        } else if matches!(&action, EngineAction::Replace { .. }) && self.last_rendered.is_ascii() {
+        } else if matches!(key.ch, 'z' | 'Z' | '0')
+            && matches!(&action, EngineAction::Replace { .. })
+            && self.last_rendered.is_ascii()
+        {
             self.raw_keys = self.last_rendered.chars().map(RawKey::from).collect();
         }
 
@@ -366,7 +369,7 @@ impl TypingBuffer {
                 } else {
                     let raw_chars: InlineList<char, 16> =
                         self.raw_keys.iter().map(|k| k.ch).collect();
-                    self.state = SyllableState::Passthrough(raw_chars);
+                    self.state = SyllableState::passthrough(raw_chars);
                 }
             }
             return true;

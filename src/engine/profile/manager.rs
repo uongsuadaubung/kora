@@ -445,9 +445,27 @@ impl ProfileManager {
         result
     }
 
+    #[inline(always)]
+    pub(crate) fn resolve_child(
+        &self,
+        profile_id: &str,
+        child_idx: Option<usize>,
+    ) -> Option<&AppProfile> {
+        child_idx
+            .and_then(|idx| self.profiles.get(idx))
+            .filter(|p| p.id == profile_id)
+            .or_else(|| self.profiles.iter().find(|p| p.id == profile_id))
+    }
+
     /// Zero-allocation check whether `vk` is disabled for the given profile.
     #[inline]
-    pub fn is_vk_disabled(&self, profile_id: &str, is_global: bool, vk: u32) -> bool {
+    pub fn is_vk_disabled(
+        &self,
+        profile_id: &str,
+        is_global: bool,
+        child_idx: Option<usize>,
+        vk: u32,
+    ) -> bool {
         let global_enabled = self.global_profile.disable_enabled.unwrap_or(false);
         if is_global {
             return global_enabled
@@ -455,7 +473,7 @@ impl ProfileManager {
                 && !self.global_profile.unmuted_disabled.contains(&vk);
         }
 
-        let Some(child) = self.profiles.iter().find(|p| p.id == profile_id) else {
+        let Some(child) = self.resolve_child(profile_id, child_idx) else {
             return global_enabled
                 && self.global_profile.app_disabled.contains(&vk)
                 && !self.global_profile.unmuted_disabled.contains(&vk);
@@ -477,7 +495,13 @@ impl ProfileManager {
     /// Zero-allocation lookup of remapped target VK for `vk` in the given profile.
     /// Avoids allocating `Vec<KeyRemapRule>` and avoids cloning `from_name`/`to_name` Strings.
     #[inline]
-    pub fn lookup_remap_vk(&self, profile_id: &str, is_global: bool, vk: u32) -> Option<u32> {
+    pub fn lookup_remap_vk(
+        &self,
+        profile_id: &str,
+        is_global: bool,
+        child_idx: Option<usize>,
+        vk: u32,
+    ) -> Option<u32> {
         let global_enabled = self.global_profile.remap_enabled.unwrap_or(false);
         if is_global {
             if !global_enabled || self.global_profile.muted_remaps.contains(&vk) {
@@ -491,7 +515,7 @@ impl ProfileManager {
                 .map(|r| r.to_vk);
         }
 
-        let Some(child) = self.profiles.iter().find(|p| p.id == profile_id) else {
+        let Some(child) = self.resolve_child(profile_id, child_idx) else {
             if !global_enabled || self.global_profile.muted_remaps.contains(&vk) {
                 return None;
             }
@@ -530,6 +554,7 @@ impl ProfileManager {
         &self,
         profile_id: &str,
         is_global: bool,
+        child_idx: Option<usize>,
         vk: u32,
     ) -> Option<&[MacroAction]> {
         let global_enabled = self.global_profile.key_macro_enabled.unwrap_or(false);
@@ -545,7 +570,7 @@ impl ProfileManager {
                 .map(|m| m.actions.as_slice());
         }
 
-        let Some(child) = self.profiles.iter().find(|p| p.id == profile_id) else {
+        let Some(child) = self.resolve_child(profile_id, child_idx) else {
             if !global_enabled || self.global_profile.muted_key_macros.contains(&vk) {
                 return None;
             }

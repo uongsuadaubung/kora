@@ -1,3 +1,7 @@
+use std::fmt;
+use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
+
 use crate::vietnamese::{
     charset::{BaseVowel, Diacritic, Tone},
     coda::CodaState,
@@ -8,18 +12,149 @@ use crate::vietnamese::{
     syllable::Syllable,
 };
 
-/// State pattern: Representation of Vietnamese Syllable Parser State
+// ============================================================================
+// Compile-Time Typestate Markers (Zero-Sized Types — 0 bytes at runtime)
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Empty;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Onset;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Nucleus;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Coda;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Passthrough;
+
+/// Sealed-style trait associating each compile-time Typestate marker `S`
+/// with its exact state payload `S::Data`.
+pub trait Phase: Copy + Clone + PartialEq + Eq + Default {
+    type Data: Copy + Clone + PartialEq + Eq + Default + fmt::Debug;
+}
+
+impl Phase for Empty {
+    type Data = ();
+}
+
+impl Phase for Onset {
+    type Data = OnsetState;
+}
+
+impl Phase for Nucleus {
+    type Data = NucleusState;
+}
+
+impl Phase for Coda {
+    type Data = CodaState;
+}
+
+impl Phase for Passthrough {
+    type Data = InlineList<char, 16>;
+}
+
+/// Zero-cost Typestate container parameterized over phase marker `S`.
+/// `#[repr(transparent)]` guarantees identical memory layout and register usage
+/// to `S::Data` alone, while `_state: PhantomData<S>` enforces compile-time phase transitions.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct State<S: Phase> {
+    pub data: S::Data,
+    pub(crate) _state: PhantomData<S>,
+}
+
+impl<S: Phase> State<S> {
+    #[inline(always)]
+    pub const fn from_data(data: S::Data) -> Self {
+        Self {
+            data,
+            _state: PhantomData,
+        }
+    }
+}
+
+impl<S: Phase> Deref for State<S> {
+    type Target = S::Data;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<S: Phase> DerefMut for State<S> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl<S: Phase> fmt::Display for State<S>
+where
+    S::Data: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.data.fmt(f)
+    }
+}
+
+impl From<State<Empty>> for SyllableState {
+    #[inline(always)]
+    fn from(_: State<Empty>) -> Self {
+        SyllableState::Empty
+    }
+}
+
+impl From<State<Onset>> for SyllableState {
+    #[inline(always)]
+    fn from(s: State<Onset>) -> Self {
+        SyllableState::Onset(s)
+    }
+}
+
+impl From<State<Nucleus>> for SyllableState {
+    #[inline(always)]
+    fn from(s: State<Nucleus>) -> Self {
+        SyllableState::Nucleus(s)
+    }
+}
+
+impl From<State<Coda>> for SyllableState {
+    #[inline(always)]
+    fn from(s: State<Coda>) -> Self {
+        SyllableState::Coda(s)
+    }
+}
+
+impl From<State<Passthrough>> for SyllableState {
+    #[inline(always)]
+    fn from(s: State<Passthrough>) -> Self {
+        SyllableState::Passthrough(s)
+    }
+}
+
+/// Runtime dispatch sum-type wrapping the compile-time `State<S>` typestates
+/// for storage across OS keystroke callbacks in `TypingBuffer`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SyllableState {
     #[default]
     Empty,
-    Onset(OnsetState),
-    Nucleus(NucleusState),
-    Coda(CodaState),
-    Passthrough(InlineList<char, 16>),
+    Onset(State<Onset>),
+    Nucleus(State<Nucleus>),
+    Coda(State<Coda>),
+    Passthrough(State<Passthrough>),
 }
 
 impl SyllableState {
+    #[inline(always)]
+    pub const fn passthrough(raw: InlineList<char, 16>) -> Self {
+        SyllableState::Passthrough(State::from_data(raw))
+    }
+
     /// Returns a compact summary string of the state for debugging
     pub fn summary(&self) -> String {
         match self {
@@ -76,18 +211,13 @@ impl SyllableState {
 
     /// Checks whether this state represents an unambiguous, completed Vietnamese syllable
     /// that must NEVER be destructively rolled back into raw keys when an invalid key arrives.
-    ///
-    /// When an extra character arrives after an unambiguous Vietnamese syllable (e.g. "nấu" + 'c' -> "nấuc",
-    /// "hiện" + 'e' -> "hiệne", "bạn" + 'k' -> "bạnk", "được" + 'w' -> "đượcw"),
-    /// the syllable is preserved as passthrough so that hitting Backspace immediately restores
-    /// the original Vietnamese word without screen flicker or raw key destruction.
     pub fn is_unambiguous_completed_vietnamese(&self) -> bool {
         if !self.is_valid_spelling() {
             return false;
         }
 
         let (nucleus, coda) = match self {
-            SyllableState::Nucleus(n) => (n, &[][..]),
+            SyllableState::Nucleus(n) => (&n.data, &[][..]),
             SyllableState::Coda(c) => (&c.nucleus, c.coda.as_slice()),
             _ => return false,
         };
@@ -102,10 +232,6 @@ impl SyllableState {
         }
 
         // 2. Horn ('ơ', 'ư') or Breve ('ă'): purely Vietnamese diacritics.
-        // Exception for English words starting with 'w' (which Telex interprets as standalone 'ư'):
-        // When onset is None, words starting with 'w' are English unless they form a valid Vietnamese
-        // word (with coda like "ước", "ương", or "ưa", or with tone like "ừ", "ứ").
-        // Bare 'w' in "what", "write", "win", "word", "work" must rollback cleanly.
         if vowels.iter().any(|v| {
             matches!(
                 v.diacritic,
@@ -147,10 +273,7 @@ impl SyllableState {
             return true;
         }
 
-        // 5. Circumflex on 'E' or 'O' ('ê', 'ô'):
-        // In English, 'ee' and 'oo' are common (e.g. "meet", "good", "cool").
-        // But once 'ê' or 'ô' has a tone (e.g. "bố", "đến", "mến") or a coda (e.g. "công", "tiếng", "bông"),
-        // it cannot be an English 'good' or 'meet'!
+        // 5. Circumflex on 'E' or 'O' ('ê', 'ô') with tone or coda:
         if vowels.iter().any(|v| {
             matches!(v.base, BaseVowel::E | BaseVowel::O) && v.diacritic == Diacritic::Circumflex
         }) && (tone != Tone::None || !coda.is_empty())
@@ -158,9 +281,7 @@ impl SyllableState {
             return true;
         }
 
-        // 6. Vietnamese Diphthong / Triphthong with Tone (e.g. "nấu", "mái", "chào", "nghỉ", "ngày"):
-        // English words with two plain vowels like "mail", "boat", "coin" have Tone::None.
-        // A multi-vowel syllable with a tone is unambiguous Vietnamese.
+        // 6. Vietnamese Diphthong / Triphthong with Tone:
         if vowels.len() >= 2 && tone != Tone::None {
             if onset.is_none()
                 && vowels[0].base == BaseVowel::U
@@ -178,9 +299,7 @@ impl SyllableState {
             }
         }
 
-        // 7. Completed Coda with Tone (e.g. "bóng", "sách", "toán", "chính", "mát"):
-        // Exception: English '-st' words (e.g. "test", "list", "post") where a single plain vowel
-        // was marked with acute tone 's' followed by coda 't' (e.g. "tét" in "testing", "lít" in "listing").
+        // 7. Completed Coda with Tone (excluding English '-st' pattern):
         if !coda.is_empty() && tone != Tone::None {
             let is_english_st_pattern = vowels.len() == 1
                 && vowels[0].diacritic == Diacritic::None
@@ -207,10 +326,9 @@ impl SyllableState {
                 tone: Tone::None,
                 coda: Vec::new(),
             }),
-            SyllableState::Nucleus(nucleus) => Some(nucleus.into()),
-            SyllableState::Coda(coda) => Some(coda.into()),
+            SyllableState::Nucleus(nucleus) => Some((&nucleus.data).into()),
+            SyllableState::Coda(coda) => Some((&coda.data).into()),
             SyllableState::Passthrough(_) => None,
         }
     }
 }
-

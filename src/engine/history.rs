@@ -17,6 +17,20 @@ pub struct WordHistory {
     committed_words: VecDeque<CommittedWord>,
 }
 
+/// Result of handling a Backspace when the active word buffer is empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HistoryBackspace {
+    /// History is completely empty or no trailing space to backspace across
+    Empty,
+    /// A trailing space was consumed (nothing to restore yet)
+    ConsumedSpace,
+    /// The last trailing space was consumed and the previous word was restored
+    RestoredWord {
+        raw_keys: InlineList<RawKey, 32>,
+        is_raw_restored: bool,
+    },
+}
+
 impl WordHistory {
     pub fn new() -> Self {
         Self::default()
@@ -58,21 +72,20 @@ impl WordHistory {
     }
 
     /// Handles a backspace when the active word buffer is empty.
-    /// Returns:
-    /// - `Some(None)` if a trailing space was consumed (nothing to restore yet)
-    /// - `Some(Some((raw_keys, is_raw_restored)))` if the trailing space was the last one and the previous word was restored
-    /// - `None` if history is completely empty or no space to backspace across
-    pub fn pop_backspace(&mut self) -> Option<Option<(InlineList<RawKey, 32>, bool)>> {
+    pub fn pop_backspace(&mut self) -> HistoryBackspace {
         if let Some(last) = self.committed_words.back_mut() {
             if last.spaces_after > 1 {
                 last.spaces_after -= 1;
-                return Some(None);
+                return HistoryBackspace::ConsumedSpace;
             }
             if last.spaces_after == 1 {
                 let word = self.committed_words.pop_back().unwrap();
-                return Some(Some((word.raw_keys, word.is_raw_restored)));
+                return HistoryBackspace::RestoredWord {
+                    raw_keys: word.raw_keys,
+                    is_raw_restored: word.is_raw_restored,
+                };
             }
         }
-        None
+        HistoryBackspace::Empty
     }
 }
