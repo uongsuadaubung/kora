@@ -25,6 +25,7 @@ pub struct NucleusState {
     pub onset: Option<OnsetState>,
     pub vowels: InlineList<VowelLetter, 4>,
     pub tone: Tone,
+    pub shorthand_key: Option<char>,
 }
 
 impl NucleusState {
@@ -39,6 +40,7 @@ impl NucleusState {
             onset,
             vowels: InlineList::from_single(vowel),
             tone,
+            shorthand_key: None,
         }
     }
 
@@ -442,20 +444,28 @@ impl NucleusState {
             }
 
             KeyEffect::HornShortcut => {
-                // Standalone 'w' undo: ww -> w
+                // Shorthand 'w' undo: ww -> w, tww -> tw
                 if coda.is_none()
-                    && self.onset.is_none()
+                    && self
+                        .shorthand_key
+                        .is_some_and(|k| k.eq_ignore_ascii_case(&'w'))
+                    && self.tone == Tone::None
                     && self.vowels.len() == 1
                     && self.vowels[0].base == BaseVowel::U
                     && self.vowels[0].diacritic == Diacritic::Horn
                 {
-                    let raw_w = CompactString::from(if key.is_upper { 'W' } else { 'w' });
-                    return ModifierOutcome::Undone(raw_w);
+                    let mut raw = CompactString::new();
+                    if let Some(ref onset) = self.onset {
+                        onset.render_compact_to(&mut raw);
+                    }
+                    raw.push(if key.is_upper { 'W' } else { 'w' });
+                    return ModifierOutcome::Undone(raw);
                 }
 
                 if self.apply_horn(coda.is_some()) {
                     ModifierOutcome::Applied
                 } else if coda.is_none() && self.revert_horn() {
+                    self.shorthand_key = None;
                     ModifierOutcome::Undone(make_raw(self))
                 } else {
                     ModifierOutcome::NotApplied
@@ -534,6 +544,7 @@ impl NucleusState {
                         changed = true;
                     }
                     if changed {
+                        self.shorthand_key = None;
                         ModifierOutcome::Applied
                     } else {
                         ModifierOutcome::NotApplied

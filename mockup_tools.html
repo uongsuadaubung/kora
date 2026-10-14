@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kora - Tab Công Cụ Tiện Ích (Mockup)</title>
+  <style>
+    :root {
+      --bg-window: #1E1E1E;
+      --bg-sidebar: #252526;
+      --bg-card: #2D2D30;
+      --bg-card-header: #28282B;
+      --bg-input: #333337;
+      --text-primary: #F1F1F1;
+      --text-secondary: #9E9E9E;
+      --border: #3E3E42;
+      --border-subtle: #333336;
+      --tab-active-bg: #3E3E42;
+      --accent: #0078D4;
+      --accent-hover: #1684D8;
+      --success: #10B981;
+      --danger: #F44747;
+      --font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body.light-theme {
+      --bg-window: #F8F8F8;
+      --bg-sidebar: #F0F0F0;
+      --bg-card: #FFFFFF;
+      --bg-card-header: #FAFAFA;
+      --bg-input: #FFFFFF;
+      --text-primary: #1E1E1E;
+      --text-secondary: #6E6E6E;
+      --border: #E0E0E0;
+      --border-subtle: #EAEAEA;
+      --tab-active-bg: #E4E4E4;
+      --accent: #0066CC;
+      --accent-hover: #0078D4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: #111;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 12.5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      gap: 14px;
+    }
+
+    /* Top Simulation Toolbar */
+    .top-toolbar {
+      width: 1120px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .top-toolbar-left, .top-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-toolbar button {
+      background: #2D2D30;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .top-toolbar button:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .top-toolbar button.btn-sim-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .top-toolbar button.btn-sim-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Workspace Container: App Window + Right Tray/Clipboard Sandbox */
+    .workspace {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    /* Main Kora Window (820x600 matching Kora Control Panel) */
+    .app-window {
+      width: 820px;
+      height: 600px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Title Bar */
+    .titlebar {
+      height: 38px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .titlebar-logo {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 11px;
+    }
+
+    /* Layout: 2 Columns */
+    .window-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 230px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-title {
+      padding: 12px 14px 6px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-add-profile {
+      background: var(--accent);
+      border: none;
+      color: white;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .profile-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .profile-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s;
+    }
+
+    .profile-item:hover {
+      background: var(--tab-active-bg);
+    }
+
+    .profile-item.active {
+      background: var(--tab-active-bg);
+      border-color: var(--border);
+    }
+
+    .profile-item-icon {
+      font-size: 16px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .profile-item-name {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .profile-item-desc {
+      font-size: 10.5px;
+      color: var(--text-secondary);
+    }
+
+    .badge-root {
+      font-size: 9px;
+      background: #0078D422;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 1px 5px;
+      border-radius: 10px;
+      font-weight: 700;
+      margin-left: auto;
+    }
+
+    /* Sidebar Footer Navigation (Tools right above System Settings) */
+    .sidebar-footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .sidebar-footer-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.12s;
+    }
+
+    .sidebar-footer-btn-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-footer-btn:hover {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+    }
+
+    .sidebar-footer-btn.active {
+      color: var(--text-primary);
+      background: var(--tab-active-bg);
+      border-color: var(--border);
+      font-weight: 600;
+    }
+
+    .tools-count-badge {
+      font-size: 10px;
+      background: rgba(0, 120, 212, 0.2);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 0 6px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* Right Main Area */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-window);
+      overflow: hidden;
+    }
+
+    .profile-banner {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card-header);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Content Area */
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Tool Cards */
+    .tool-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      transition: border-color 0.15s, opacity 0.15s;
+    }
+
+    .tool-card.disabled-card .tool-card-body {
+      opacity: 0.42;
+      pointer-events: none;
+    }
+
+    .tool-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tool-card-title-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .tool-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tool-desc {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .tool-card-body {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+      padding-left: 26px;
+      transition: opacity 0.15s;
+    }
+
+    /* Hotkey Button */
+    .hotkey-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .hotkey-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .btn-hotkey {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      font-family: Consolas, monospace;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      min-width: 118px;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .btn-hotkey:hover:not(:disabled) {
+      border-color: var(--accent);
+      background: rgba(0, 120, 212, 0.12);
+    }
+
+    .btn-hotkey:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      color: var(--text-secondary);
+    }
+
+    /* Form Controls */
+    select, input[type="text"], textarea {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    select:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    label.check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-primary);
+    }
+
+    input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Case Conversion Cycle List */
+    .case-cycle-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .case-step-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card-header);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 10px;
+      border-radius: 5px;
+      transition: all 0.12s;
+    }
+
+    .case-step-row.active-step {
+      border-color: var(--accent);
+      background: rgba(0, 120, 212, 0.12);
+    }
+
+    .step-order-pill {
+      font-size: 10.5px;
+      font-family: Consolas, monospace;
+      color: var(--text-secondary);
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      padding: 1px 7px;
+      border-radius: 10px;
+    }
+
+    .panel-footer {
+      height: 40px;
+      background: var(--bg-card-header);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    /* ========================================== */
+    /* RIGHT COLUMN: TRAY MENU + CLIPBOARD SANDBOX */
+    /* ========================================== */
+    .sandbox-column {
+      width: 282px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sandbox-box {
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .sandbox-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Simulated Toast Notification */
+    .toast-notification {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      border-top: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 9px 10px;
+      transition: transform 0.15s;
+    }
+
+    .toast-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 3px;
+    }
+
+    .toast-msg {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* Simulated Win32 Tray Context Menu */
+    .win32-tray-menu {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    }
+
+    .tray-item {
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--text-primary);
+    }
+
+    .tray-item:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .tray-item:hover .tray-shortcut {
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    .tray-shortcut {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: Consolas, monospace;
+    }
+
+    .tray-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 6px;
+    }
+
+    /* Hotkey Modal Dialog */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-window {
+      width: 380px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+    }
+
+    .btn {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Toolbar for Interactive Demo -->
+  <div class="top-toolbar">
+    <div class="top-toolbar-left">
+      <button onclick="toggleTheme()">🌓 Đổi Giao diện Sáng/Tối</button>
+      <span style="color:#999; font-size:12px;">Bấm thử phím tắt để kiểm tra luồng xử lý Clipboard & Thông báo:</span>
+    </div>
+    <div class="top-toolbar-right">
+      <button class="btn-sim-primary" onclick="triggerCaseCycle()">
+        ▶ Ấn phím Đổi Hoa/Thường (Xoay vòng)
+      </button>
+      <button onclick="triggerTranslate()">
+        ▶ Ấn phím Dịch văn bản đang bôi đen
+      </button>
+      <button onclick="triggerStripAccents()">
+        ▶ Ấn phím Xóa dấu Clipboard
+      </button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <!-- KORA CONTROL PANEL WINDOW -->
+    <div class="app-window">
+      <!-- Titlebar -->
+      <div class="titlebar">
+        <div class="titlebar-brand">
+          <div class="titlebar-logo">K</div>
+          <span>Kora - Bộ gõ Tiếng Việt (v0.8.0)</span>
+        </div>
+        <div style="font-size: 11.5px; color: var(--text-secondary);">
+          Trạng thái: <b style="color:var(--success)">● Đang bật Tiếng Việt</b>
+        </div>
+      </div>
+
+      <!-- Window Body -->
+      <div class="window-body">
+        <!-- Sidebar -->
+        <div class="sidebar">
+          <div class="sidebar-title">
+            <span>HỒ SƠ (PROFILES)</span>
+            <button class="btn-add-profile" title="Thêm Profile Mới">➕</button>
+          </div>
+
+          <div class="profile-tree">
+            <div class="profile-item" onclick="switchView('profile')">
+              <div class="profile-item-icon">🌐</div>
+              <div style="overflow:hidden;">
+                <div class="profile-item-name">Toàn hệ thống</div>
+                <div class="profile-item-desc">Telex • Unicode</div>
+              </div>
+              <span class="badge-root">GỐC</span>
+            </div>
+
+            <div class="profile-item" onclick="switchView('profile')">
+              <div class="profile-item-icon">💻</div>
+              <div style="overflow:hidden;">
+                <div class="profile-item-name">Visual Studio Code</div>
+                <div class="profile-item-desc">Code.exe • Tiếng Anh</div>
+              </div>
+            </div>
+
+            <div class="profile-item" onclick="switchView('profile')">
+              <div class="profile-item-icon">🎮</div>
+              <div style="overflow:hidden;">
+                <div class="profile-item-name">Valorant</div>
+                <div class="profile-item-desc">VALORANT.exe • Tắt</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sidebar Footer: NEW "Công cụ" button placed right above "Cài đặt hệ thống" -->
+          <div class="sidebar-footer">
+            <div class="sidebar-footer-btn active" id="navTools" onclick="switchView('tools')">
+              <div class="sidebar-footer-btn-left">
+                <span>🛠️</span>
+                <span>Công cụ tiện ích</span>
+              </div>
+              <span class="tools-count-badge" id="badgeToolsCount">3 bật</span>
+            </div>
+
+            <div class="sidebar-footer-btn" id="navSystem" onclick="switchView('system')">
+              <div class="sidebar-footer-btn-left">
+                <span>⚙️</span>
+                <span>Cài đặt hệ thống</span>
+              </div>
+            </div>
+
+            <div class="sidebar-footer-btn" id="navAbout" onclick="switchView('about')">
+              <div class="sidebar-footer-btn-left">
+                <span>ℹ️</span>
+                <span>Thông tin</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Main Area -->
+        <div class="main-area">
+          <!-- Banner -->
+          <div class="profile-banner">
+            <div>
+              <h2 id="bannerTitle" style="font-size: 14.5px; font-weight: 700;">🛠️ Công cụ tiện ích</h2>
+              <p id="bannerSub" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
+                Các công cụ được bật sẽ hiển thị trong menu khay hệ thống (Tray Menu) và kích hoạt phím tắt tương ứng
+              </p>
+            </div>
+          </div>
+
+          <!-- TOOLS TAB CONTENT -->
+          <div class="tab-content" id="viewTools">
+            <!-- CARD 1: DỊCH VĂN BẢN ĐANG BÔI ĐEN -->
+            <div class="tool-card" id="cardTranslate">
+              <div class="tool-card-header">
+                <div class="tool-card-title-group">
+                  <input type="checkbox" id="chkTranslate" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <div>
+                    <label for="chkTranslate" class="tool-title" style="cursor:pointer;">
+                      🌐 Dịch văn bản đang bôi đen
+                    </label>
+                    <div class="tool-desc">
+                      Dịch nhanh đoạn văn bản bạn đang bôi đen sang ngôn ngữ đích đã chọn
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hotkey-group">
+                  <span class="hotkey-label">Phím tắt:</span>
+                  <button class="btn-hotkey" id="btnHkTranslate" onclick="openHotkeyModal('translate')">
+                    Ctrl + Shift + D
+                  </button>
+                </div>
+              </div>
+
+              <div class="tool-card-body">
+                <div style="display:grid; grid-template-columns: 230px 1fr; gap: 16px; align-items: center;">
+                  <div>
+                    <label style="display:block; font-size:11px; color:var(--text-secondary); margin-bottom:4px;">
+                      Ngôn ngữ đích cần dịch sang:
+                    </label>
+                    <select id="selTargetLang" onchange="syncToolsState()" style="width:100%;">
+                      <option value="Tiếng Việt">Tiếng Việt (Vietnamese)</option>
+                      <option value="Tiếng Anh">Tiếng Anh (English)</option>
+                      <option value="Tự động (Việt ↔ Anh)">Tự động phát hiện (Việt ↔ Anh)</option>
+                      <option value="Tiếng Nhật">Tiếng Nhật (日本語)</option>
+                      <option value="Tiếng Hàn">Tiếng Hàn (한국어)</option>
+                      <option value="Tiếng Trung">Tiếng Trung (中文)</option>
+                    </select>
+                  </div>
+
+                  <div style="padding-top: 14px;">
+                    <label class="check-row">
+                      <input type="checkbox" id="chkTranslateAutoCopy" checked onchange="syncToolsState()">
+                      <span>Tự động sao chép kết quả dịch vào Clipboard</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD 2: CHUYỂN ĐỔI CHỮ HOA / CHỮ THƯỜNG TRONG CLIPBOARD -->
+            <div class="tool-card" id="cardCase">
+              <div class="tool-card-header">
+                <div class="tool-card-title-group">
+                  <input type="checkbox" id="chkCase" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <div>
+                    <label for="chkCase" class="tool-title" style="cursor:pointer;">
+                      🔠 Chuyển đổi chữ Hoa / chữ thường (Clipboard)
+                    </label>
+                    <div class="tool-desc">
+                      Xử lý văn bản trong bộ nhớ Clipboard. Mỗi lần ấn phím tắt sẽ chuyển lần lượt từ trên xuống dưới kèm thông báo
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hotkey-group">
+                  <span class="hotkey-label">Phím tắt:</span>
+                  <button class="btn-hotkey" id="btnHkCase" onclick="openHotkeyModal('case')">
+                    Ctrl + Shift + C
+                  </button>
+                </div>
+              </div>
+
+              <div class="tool-card-body">
+                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:6px;">
+                  Chọn các kiểu chữ muốn bật (mỗi lần ấn phím tắt sẽ xoay vòng tuần tự từ trên xuống dưới):
+                </div>
+
+                <div class="case-cycle-grid" id="caseCycleList">
+                  <div class="case-step-row" id="stepRow0">
+                    <label class="check-row">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="upper" data-name="IN HOA TẤT CẢ" onchange="syncToolsState()">
+                      <span><b>IN HOA TẤT CẢ</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: XIN CHÀO VIỆT NAM)</span></span>
+                    </label>
+                    <span class="step-order-pill" id="pillOrder0">Thứ tự #1</span>
+                  </div>
+
+                  <div class="case-step-row" id="stepRow1">
+                    <label class="check-row">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="lower" data-name="chữ thường tất cả" onchange="syncToolsState()">
+                      <span><b>chữ thường tất cả</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: xin chào việt nam)</span></span>
+                    </label>
+                    <span class="step-order-pill" id="pillOrder1">Thứ tự #2</span>
+                  </div>
+
+                  <div class="case-step-row" id="stepRow2">
+                    <label class="check-row">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="title" data-name="Viết Hoa Chữ Cái Đầu Từ" onchange="syncToolsState()">
+                      <span><b>Viết Hoa Chữ Cái Đầu Từ</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: Xin Chào Việt Nam)</span></span>
+                    </label>
+                    <span class="step-order-pill" id="pillOrder2">Thứ tự #3</span>
+                  </div>
+
+                  <div class="case-step-row" id="stepRow3">
+                    <label class="check-row">
+                      <input type="checkbox" class="case-sub-opt" data-mode="sentence" data-name="Viết hoa chữ đầu câu" onchange="syncToolsState()">
+                      <span><b>Viết hoa chữ đầu câu</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: Xin chào việt nam)</span></span>
+                    </label>
+                    <span class="step-order-pill" id="pillOrder3">Đang tắt</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CARD 3: XÓA DẤU TIẾNG VIỆT TRONG CLIPBOARD -->
+            <div class="tool-card" id="cardStrip">
+              <div class="tool-card-header">
+                <div class="tool-card-title-group">
+                  <input type="checkbox" id="chkStrip" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <div>
+                    <label for="chkStrip" class="tool-title" style="cursor:pointer;">
+                      ✂️ Xóa dấu Tiếng Việt trong Clipboard
+                    </label>
+                    <div class="tool-desc">
+                      Loại bỏ toàn bộ dấu thanh và dấu mũ Tiếng Việt của văn bản đang lưu trong bộ nhớ Clipboard
+                    </div>
+                  </div>
+                </div>
+
+                <div class="hotkey-group">
+                  <span class="hotkey-label">Phím tắt:</span>
+                  <button class="btn-hotkey" id="btnHkStrip" onclick="openHotkeyModal('strip')">
+                    Ctrl + Shift + U
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="panel-footer">
+            <span>💡 Tắt các công cụ không dùng để ẩn khỏi Tray Menu và giải phóng phím tắt</span>
+            <span style="color:var(--accent); font-weight:600;">Tự động lưu cấu hình</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- HOTKEY CAPTURE DIALOG MODAL -->
+      <div class="modal-backdrop" id="hotkeyModal">
+        <div class="modal-window">
+          <div style="font-size:13.5px; font-weight:700; margin-bottom:6px;">⌨️ Chọn tổ hợp phím tắt mới</div>
+          <div style="font-size:11.5px; color:var(--text-secondary); margin-bottom:12px;">
+            Nhấn tổ hợp phím trên bàn phím của bạn (ví dụ: Ctrl + Shift + C, Alt + Q...)
+          </div>
+          <div id="hotkeyPreviewBox" tabindex="0" style="height:44px; background:var(--bg-input); border:2px dashed var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:Consolas, monospace; font-size:14px; font-weight:bold; color:var(--accent); margin-bottom:14px;">
+            Ctrl + Shift + C
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
+            <button class="btn" onclick="closeHotkeyModal()">Hủy</button>
+            <button class="btn btn-primary" onclick="saveHotkeyModal()">Lưu phím tắt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT SANDBOX: LIVE SYSTEM NOTIFICATION, CLIPBOARD & TRAY MENU -->
+    <div class="sandbox-column">
+      <!-- 1. Simulated System Notification -->
+      <div class="sandbox-box">
+        <div class="sandbox-header">
+          <span>🔔 Thông báo khi ấn phím tắt</span>
+          <span id="badgeToastStep" style="color:var(--accent);">Sẵn sàng</span>
+        </div>
+        <div class="toast-notification" id="toastBox">
+          <div class="toast-title" id="toastTitle">Kora — Công cụ tiện ích</div>
+          <div class="toast-msg" id="toastMsg">
+            Bấm nút giả lập phím tắt ở thanh trên cùng hoặc click vào mục trong Tray Menu bên dưới.
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Simulated Clipboard Memory -->
+      <div class="sandbox-box">
+        <div class="sandbox-header">
+          <span>📋 Bộ nhớ Clipboard (RAM)</span>
+          <span style="color:var(--accent); cursor:pointer; text-transform:none;" onclick="resetClipboardSample()">Khôi phục mẫu</span>
+        </div>
+        <textarea id="txtClipboard" rows="3" style="width:100%; resize:none; line-height:1.45;">Trăm năm trong cõi người ta, chữ tài chữ mệnh khéo là ghét nhau.</textarea>
+        <div style="font-size:11px; color:var(--text-secondary); margin-top:6px;">
+          Người dùng chủ động <b>Ctrl+C</b> văn bản trước, công cụ 2 &amp; 3 chỉ biến đổi trực tiếp trong vùng nhớ này.
+        </div>
+      </div>
+
+      <!-- 3. Simulated Tray Context Menu -->
+      <div class="sandbox-box">
+        <div class="sandbox-header">
+          <span>📥 Khay hệ thống (Tray Menu)</span>
+          <span style="text-transform:none; font-weight:normal;">Đồng bộ tức thì</span>
+        </div>
+
+        <div class="win32-tray-menu">
+          <div class="tray-item">
+            <span>✓ Bật Tiếng Việt</span>
+            <span class="tray-shortcut">Ctrl+Shift</span>
+          </div>
+          <div class="tray-sep"></div>
+          <div class="tray-item">
+            <span>Kiểu gõ: Telex</span>
+            <span>▸</span>
+          </div>
+          <div class="tray-item">
+            <span>Bảng mã: Unicode</span>
+            <span>▸</span>
+          </div>
+
+          <!-- Dynamic Tools Section in Tray Menu -->
+          <div id="trayToolsContainer">
+            <div class="tray-sep"></div>
+            <div class="tray-item" id="trayItemTranslate" onclick="triggerTranslate()">
+              <span>🌐 Dịch văn bản (<span id="trayTargetLang">Tiếng Việt</span>)</span>
+              <span class="tray-shortcut" id="trayHkTranslate">Ctrl+Shift+D</span>
+            </div>
+            <div class="tray-item" id="trayItemCase" onclick="triggerCaseCycle()">
+              <span>🔠 Đổi chữ Hoa / thường</span>
+              <span class="tray-shortcut" id="trayHkCase">Ctrl+Shift+C</span>
+            </div>
+            <div class="tray-item" id="trayItemStrip" onclick="triggerStripAccents()">
+              <span>✂️ Xóa dấu Tiếng Việt</span>
+              <span class="tray-shortcut" id="trayHkStrip">Ctrl+Shift+U</span>
+            </div>
+          </div>
+
+          <div class="tray-sep"></div>
+          <div class="tray-item">
+            <span>Bảng điều khiển...</span>
+          </div>
+          <div class="tray-item" style="color:var(--danger);">
+            <span>Thoát Kora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentCaseStepIdx = 0;
+    let editingHotkeyTarget = null;
+    let capturedHotkeyText = '';
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
+    }
+
+    function syncToolsState() {
+      const trOn = document.getElementById('chkTranslate').checked;
+      const caseOn = document.getElementById('chkCase').checked;
+      const stripOn = document.getElementById('chkStrip').checked;
+      const targetLang = document.getElementById('selTargetLang').value;
+
+      // Toggle card states & hotkey buttons
+      document.getElementById('cardTranslate').classList.toggle('disabled-card', !trOn);
+      document.getElementById('btnHkTranslate').disabled = !trOn;
+
+      document.getElementById('cardCase').classList.toggle('disabled-card', !caseOn);
+      document.getElementById('btnHkCase').disabled = !caseOn;
+
+      document.getElementById('cardStrip').classList.toggle('disabled-card', !stripOn);
+      document.getElementById('btnHkStrip').disabled = !stripOn;
+
+      // Update Sidebar active tools count badge
+      const activeCount = (trOn ? 1 : 0) + (caseOn ? 1 : 0) + (stripOn ? 1 : 0);
+      document.getElementById('badgeToolsCount').innerText = activeCount + ' bật';
+
+      // Update step order pills for Case Conversion (top-to-bottom sequence)
+      const subOpts = Array.from(document.querySelectorAll('.case-sub-opt'));
+      let orderCounter = 1;
+      subOpts.forEach((chk, idx) => {
+        const pill = document.getElementById('pillOrder' + idx);
+        if (chk.checked) {
+          pill.innerText = 'Thứ tự #' + orderCounter++;
+          pill.style.color = 'var(--accent)';
+          pill.style.borderColor = 'var(--accent)';
+        } else {
+          pill.innerText = 'Đang tắt';
+          pill.style.color = 'var(--text-secondary)';
+          pill.style.borderColor = 'var(--border)';
+          document.getElementById('stepRow' + idx).classList.remove('active-step');
+        }
+      });
+      currentCaseStepIdx = 0;
+
+      // Sync Tray Menu items visibility
+      document.getElementById('trayItemTranslate').style.display = trOn ? 'flex' : 'none';
+      document.getElementById('trayItemCase').style.display = caseOn ? 'flex' : 'none';
+      document.getElementById('trayItemStrip').style.display = stripOn ? 'flex' : 'none';
+      document.getElementById('trayTargetLang').innerText = targetLang;
+      document.getElementById('trayToolsContainer').style.display = activeCount > 0 ? 'block' : 'none';
+    }
+
+    function showToast(title, msg, badge) {
+      document.getElementById('toastTitle').innerText = title;
+      document.getElementById('toastMsg').innerText = msg;
+      document.getElementById('badgeToastStep').innerText = badge;
+      const box = document.getElementById('toastBox');
+      box.style.transform = 'scale(1.02)';
+      setTimeout(() => { box.style.transform = 'scale(1)'; }, 140);
+    }
+
+    function toTitleCase(str) {
+      return str.toLowerCase().replace(/(?:^|\s)\S/g, a => a.toUpperCase());
+    }
+
+    function toSentenceCase(str) {
+      const lower = str.toLowerCase();
+      return lower.replace(/(^\s*\S|[.!?]\s+\S)/g, a => a.toUpperCase());
+    }
+
+    function triggerCaseCycle() {
+      if (!document.getElementById('chkCase').checked) {
+        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Chuyển đổi chữ Hoa / chữ thường" trước.', 'Đã tắt');
+        return;
+      }
+
+      const allSubOpts = Array.from(document.querySelectorAll('.case-sub-opt'));
+      const enabledList = allSubOpts
+        .map((el, domIndex) => ({ el, domIndex, mode: el.dataset.mode, name: el.dataset.name }))
+        .filter(item => item.el.checked);
+
+      if (enabledList.length === 0) {
+        showToast('⚠️ Chưa chọn kiểu chữ nào', 'Hãy tích chọn ít nhất 1 kiểu chữ trong danh sách để xoay vòng.', 'Chú ý');
+        return;
+      }
+
+      const stepNumber = (currentCaseStepIdx % enabledList.length) + 1;
+      const item = enabledList[currentCaseStepIdx % enabledList.length];
+      currentCaseStepIdx = (currentCaseStepIdx + 1) % enabledList.length;
+
+      // Highlight current row in UI
+      allSubOpts.forEach((_, idx) => {
+        document.getElementById('stepRow' + idx).classList.toggle('active-step', idx === item.domIndex);
+      });
+
+      // Transform Clipboard text in memory
+      const clip = document.getElementById('txtClipboard');
+      const src = clip.value;
+      if (item.mode === 'upper') clip.value = src.toUpperCase();
+      else if (item.mode === 'lower') clip.value = src.toLowerCase();
+      else if (item.mode === 'title') clip.value = toTitleCase(src);
+      else if (item.mode === 'sentence') clip.value = toSentenceCase(src);
+
+      showToast(
+        '🔠 Đã đổi sang: ' + item.name,
+        `Clipboard đã chuyển sang kiểu "${item.name}" (Bước ${stepNumber}/${enabledList.length}). Bạn có thể Ctrl+V để dán ngay.`,
+        `Bước ${stepNumber}/${enabledList.length}`
+      );
+    }
+
+    function removeVietnameseTones(str) {
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D');
+    }
+
+    function triggerStripAccents() {
+      if (!document.getElementById('chkStrip').checked) {
+        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Xóa dấu Tiếng Việt trong Clipboard" trước.', 'Đã tắt');
+        return;
+      }
+      const clip = document.getElementById('txtClipboard');
+      clip.value = removeVietnameseTones(clip.value);
+      showToast(
+        '✂️ Đã xóa dấu Tiếng Việt trong Clipboard',
+        'Văn bản trong bộ nhớ Clipboard đã được loại bỏ dấu. Bạn có thể Ctrl+V để dán.',
+        'Không dấu'
+      );
+    }
+
+    function triggerTranslate() {
+      if (!document.getElementById('chkTranslate').checked) {
+        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Dịch văn bản đang bôi đen" trước.', 'Đã tắt');
+        return;
+      }
+      const targetLang = document.getElementById('selTargetLang').value;
+      const autoCopy = document.getElementById('chkTranslateAutoCopy').checked;
+
+      const translatedSample = targetLang === 'Tiếng Anh'
+        ? 'A hundred years in this human realm, talent and destiny are ironically poised against each other.'
+        : `[Bản dịch sang ${targetLang}]: Trăm năm trong cõi người ta, chữ tài chữ mệnh khéo là ghét nhau.`;
+
+      if (autoCopy) {
+        document.getElementById('txtClipboard').value = translatedSample;
+      }
+
+      showToast(
+        `🌐 Dịch sang ${targetLang}` + (autoCopy ? ' (Đã copy vào Clipboard)' : ''),
+        translatedSample,
+        'Đã dịch'
+      );
+    }
+
+    function resetClipboardSample() {
+      document.getElementById('txtClipboard').value = 'Trăm năm trong cõi người ta, chữ tài chữ mệnh khéo là ghét nhau.';
+      currentCaseStepIdx = 0;
+      document.querySelectorAll('.case-step-row').forEach(r => r.classList.remove('active-step'));
+    }
+
+    function openHotkeyModal(target) {
+      editingHotkeyTarget = target;
+      const btnId = target === 'translate' ? 'btnHkTranslate' : (target === 'case' ? 'btnHkCase' : 'btnHkStrip');
+      capturedHotkeyText = document.getElementById(btnId).innerText.trim();
+      document.getElementById('hotkeyPreviewBox').innerText = capturedHotkeyText;
+      document.getElementById('hotkeyModal').style.display = 'flex';
+    }
+
+    function closeHotkeyModal() {
+      document.getElementById('hotkeyModal').style.display = 'none';
+      editingHotkeyTarget = null;
+    }
+
+    function saveHotkeyModal() {
+      if (!editingHotkeyTarget) return;
+      const btnId = editingHotkeyTarget === 'translate' ? 'btnHkTranslate' : (editingHotkeyTarget === 'case' ? 'btnHkCase' : 'btnHkStrip');
+      const trayId = editingHotkeyTarget === 'translate' ? 'trayHkTranslate' : (editingHotkeyTarget === 'case' ? 'trayHkCase' : 'trayHkStrip');
+      document.getElementById(btnId).innerText = capturedHotkeyText;
+      document.getElementById(trayId).innerText = capturedHotkeyText.replace(/\s+/g, '');
+      closeHotkeyModal();
+    }
+
+    window.addEventListener('keydown', e => {
+      if (!editingHotkeyTarget) return;
+      e.preventDefault();
+      const parts = [];
+      if (e.ctrlKey) parts.push('Ctrl');
+      if (e.altKey) parts.push('Alt');
+      if (e.shiftKey) parts.push('Shift');
+      const key = e.key.toUpperCase();
+      if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) {
+        parts.push(key === ' ' ? 'Space' : key);
+      }
+      if (parts.length > 0) {
+        capturedHotkeyText = parts.join(' + ');
+        document.getElementById('hotkeyPreviewBox').innerText = capturedHotkeyText;
+      }
+    });
+
+    function switchView(view) {
+      document.querySelectorAll('.sidebar-footer-btn').forEach(b => b.classList.remove('active'));
+      if (view === 'tools') {
+        document.getElementById('navTools').classList.add('active');
+      } else {
+        document.getElementById('navTools').classList.add('active');
+        showToast('💡 Đang ở bản Mockup Tab Công Cụ', 'Bản thiết kế này tập trung mô phỏng chi tiết Tab "Công cụ tiện ích" mới.', 'Mockup');
+      }
+    }
+
+    syncToolsState();
+  </script>
+</body>
+</html>
+

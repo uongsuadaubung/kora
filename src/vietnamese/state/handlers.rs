@@ -164,7 +164,7 @@ impl SyllableState {
                 ']' => BaseVowel::O,
                 _ => return None,
             };
-            let nucleus = NucleusState::from_single(
+            let mut nucleus = NucleusState::from_single(
                 onset,
                 VowelLetter {
                     base,
@@ -173,6 +173,7 @@ impl SyllableState {
                 },
                 Tone::None,
             );
+            nucleus.shorthand_key = Some(key.ch);
             // Zero-heap Replace: render directly into stack-allocated CompactString
             let output = nucleus.render_compact();
             return Some((
@@ -196,7 +197,7 @@ impl SyllableState {
 
         // Standalone 'w' -> 'ư'
         if config.method.has_standalone_w() && ch_lower == 'w' {
-            let nucleus = NucleusState::from_single(
+            let mut nucleus = NucleusState::from_single(
                 None,
                 VowelLetter {
                     base: BaseVowel::U,
@@ -205,6 +206,7 @@ impl SyllableState {
                 },
                 Tone::None,
             );
+            nucleus.shorthand_key = Some(key.ch);
             // Zero-heap Replace: render directly into stack-allocated CompactString
             let output = nucleus.render_compact();
             return (
@@ -346,7 +348,7 @@ impl SyllableState {
                 return (SyllableState::Passthrough(raw), EngineAction::Passthrough);
             }
             // e.g. "tw" -> "tư" in Standard Telex
-            let nucleus = NucleusState::from_single(
+            let mut nucleus = NucleusState::from_single(
                 Some(onset),
                 VowelLetter {
                     base: BaseVowel::U,
@@ -355,6 +357,7 @@ impl SyllableState {
                 },
                 Tone::None,
             );
+            nucleus.shorthand_key = Some(key.ch);
             // Zero-heap Replace: render directly into stack-allocated CompactString
             let output = nucleus.render_compact();
             return (
@@ -438,6 +441,7 @@ impl SyllableState {
             && config.method.has_bracket_shortcuts()
             && nucleus.onset.is_none()
             && nucleus.vowels.len() == 1
+            && nucleus.shorthand_key == Some(key.ch)
         {
             if key.ch == '['
                 && nucleus.vowels[0].base == BaseVowel::U

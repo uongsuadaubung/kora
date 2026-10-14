@@ -157,6 +157,7 @@ pub struct WasapiSession {
     channels: usize,
     is_float: bool,
     block_align: usize,
+    mix_buf: Vec<f32>,
 }
 
 impl WasapiSession {
@@ -266,6 +267,7 @@ impl WasapiSession {
                 channels,
                 is_float,
                 block_align,
+                mix_buf: vec![0.0f32; buffer_frame_count as usize],
             })
         }
     }
@@ -295,9 +297,10 @@ impl WasapiSession {
                 // No active sounds playing -> fill silence
                 std::ptr::write_bytes(p_data, 0, frames_available as usize * self.block_align);
             } else {
-                // Mix active voices with SIMD-vectorized float accumulator
-                let frames = frames_available as usize;
-                let mut mix_buf = vec![0.0f32; frames];
+                // Zero-heap polyphonic mixing using preallocated scratch buffer
+                let frames = (frames_available as usize).min(self.mix_buf.len());
+                let mix_slice = &mut self.mix_buf[..frames];
+                mix_slice.fill(0.0);
 
                 for v in voices.iter_mut() {
                     let samples = bank.get_samples(v.vk, v.variation);
@@ -305,9 +308,9 @@ impl WasapiSession {
                     let count = remaining.min(frames);
                     let vol = v.volume;
                     let src = &samples[v.pos..v.pos + count];
-                    let dst = &mut mix_buf[0..count];
-                    for (d, s) in dst.iter_mut().zip(src.iter()) {
-                        *d += *s * vol;
+                    let dst = &mut mix_slice[..count];
+                    for (d, &s) in dst.iter_mut().zip(src.iter()) {
+                        *d = s.mul_add(vol, *d);
                     }
                     v.pos += count;
                 }
@@ -315,19 +318,40 @@ impl WasapiSession {
                 if self.is_float {
                     let float_buf =
                         std::slice::from_raw_parts_mut(p_data as *mut f32, frames * self.channels);
-                    for i in 0..frames {
-                        let clamped = mix_buf[i].clamp(-1.0, 1.0);
-                        for ch in 0..self.channels {
-                            float_buf[i * self.channels + ch] = clamped;
+                    if self.channels == 2 {
+                        for (pair, &sample) in
+                            float_buf.chunks_exact_mut(2).zip(mix_slice.iter())
+                        {
+                            let clamped = sample.clamp(-1.0, 1.0);
+                            pair[0] = clamped;
+                            pair[1] = clamped;
+                        }
+                    } else {
+                        for (chunk, &sample) in float_buf
+                            .chunks_exact_mut(self.channels)
+                            .zip(mix_slice.iter())
+                        {
+                            let clamped = sample.clamp(-1.0, 1.0);
+                            chunk.fill(clamped);
                         }
                     }
                 } else {
                     let i16_buf =
                         std::slice::from_raw_parts_mut(p_data as *mut i16, frames * self.channels);
-                    for i in 0..frames {
-                        let clamped = (mix_buf[i] * 32767.0).clamp(-32767.0, 32767.0) as i16;
-                        for ch in 0..self.channels {
-                            i16_buf[i * self.channels + ch] = clamped;
+                    if self.channels == 2 {
+                        for (pair, &sample) in i16_buf.chunks_exact_mut(2).zip(mix_slice.iter())
+                        {
+                            let clamped = (sample * 32767.0).clamp(-32767.0, 32767.0) as i16;
+                            pair[0] = clamped;
+                            pair[1] = clamped;
+                        }
+                    } else {
+                        for (chunk, &sample) in i16_buf
+                            .chunks_exact_mut(self.channels)
+                            .zip(mix_slice.iter())
+                        {
+                            let clamped = (sample * 32767.0).clamp(-32767.0, 32767.0) as i16;
+                            chunk.fill(clamped);
                         }
                     }
                 }
@@ -345,6 +369,7 @@ impl WasapiSession {
     }
 
     pub fn close(&mut self) {
+        self.mix_buf = Vec::new();
         unsafe {
             if !self.p_client.is_null() {
                 let client_vtbl = *(self.p_client as *mut *mut IAudioClientVtbl);

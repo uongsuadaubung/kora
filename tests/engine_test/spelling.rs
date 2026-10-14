@@ -98,6 +98,17 @@ fn test_w_horn_undo_and_coda_guard() {
     // chuwz -> gõ 'z' xóa dấu sừng -> chu
     assert_eq!(simulate_typing(&mut engine, "chuwz "), "chu ");
 
+    // Phân biệt gõ tắt 'w' (ww -> w, tww -> tw) với gõ nguyên âm 'u' + 'w' (uww -> uw, tuww -> tuw):
+    assert_eq!(simulate_typing(&mut engine, "ww "), "w ");
+    assert_eq!(simulate_typing(&mut engine, "WW "), "W ");
+    assert_eq!(simulate_typing(&mut engine, "uww "), "uw ");
+    assert_eq!(simulate_typing(&mut engine, "Uww "), "Uw ");
+    assert_eq!(simulate_typing(&mut engine, "UWW "), "UW ");
+    assert_eq!(simulate_typing(&mut engine, "tww "), "tw ");
+    assert_eq!(simulate_typing(&mut engine, "tuww "), "tuw ");
+    assert_eq!(simulate_typing(&mut engine, "oww "), "ow ");
+    assert_eq!(simulate_typing(&mut engine, "aww "), "aw ");
+
     // 'w' không bao giờ trở thành phụ âm cuối Coda (không tạo ra chuwwx hay chưw)
     // Nếu gõ 'w' không hợp lệ sau phụ âm đầu đã có sừng, nó chuyển thành passthrough an toàn
     let mut eng2 = VietnameseEngine::new(EngineConfig::default());
