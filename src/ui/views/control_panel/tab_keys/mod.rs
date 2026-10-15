@@ -16,12 +16,12 @@ pub use panel_overview::OverviewPanel;
 pub use panel_remap::RemapPanel;
 
 use crate::engine::profile::{ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem};
-use crate::ui::components::TabBar;
-use crate::ui::tokens::{id::*, layout, spacing};
+use crate::language::LanguageStrings;
 use crate::ui::win32::{
-    HWND_TOP, InvalidateRect, SendMessageW, SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_SHOWWINDOW, SW_HIDE, SW_SHOW, WM_COMMAND,
+    HWND_TOP, InvalidateRect, SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SW_HIDE, SW_SHOW,
 };
+use crate::ui::prelude::*;
 
 /// Sub-tab bar geometry
 const SUB_TAB_Y: i32 = layout::CARD_START_Y; // 112
@@ -47,6 +47,80 @@ pub const TABLE_WIDTH: i32 = layout::CARD_CONTENT_WIDTH; // 530
 pub const TABLE_Y: i32 = SUB_CARD_Y + 44; // 196
 pub const TABLE_HEIGHT: i32 = layout::CARD_BOTTOM_Y - spacing::SPACE_12 - TABLE_Y; // 324
 
+/// Shared scaffold for a rule table sub-panel (`CheckBox<Inheritable>` + `+ Add` `PushButton` + `ActionTable`).
+pub struct RuleSubPanel {
+    layout: CardLayout,
+    pub check_enabled: CheckBox<Inheritable>,
+    pub btn_add: PushButton,
+    pub list: ActionTable,
+}
+
+impl RuleSubPanel {
+    pub fn create(
+        parent: isize,
+        hfont_normal: isize,
+        hfont_bold: isize,
+        title_fn: TextFn,
+        add_btn_fn: TextFn,
+        cols: &[(&str, i32, ColumnStyle)],
+        cols_i18n_fn: TextListFn,
+    ) -> Option<Self> {
+        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
+        let check_enabled = ly.inheritable_checkbox_at(
+            title_fn,
+            TITLE_X,
+            TITLE_Y,
+            TITLE_WIDTH,
+            TITLE_HEIGHT,
+            true,
+        )?;
+        let btn_add = ly.button_at(
+            add_btn_fn,
+            BTN_X,
+            BTN_Y,
+            BTN_WIDTH,
+            BTN_HEIGHT,
+            true,
+            ButtonVariant::Primary,
+        )?;
+        let list = ly.track_table_i18n(
+            ActionTable::create_styled(
+                parent,
+                0,
+                TABLE_X,
+                TABLE_Y,
+                TABLE_WIDTH,
+                TABLE_HEIGHT,
+                hfont_normal,
+                cols,
+            )?,
+            cols_i18n_fn,
+        );
+        let panel = Self {
+            layout: ly,
+            check_enabled,
+            btn_add,
+            list,
+        };
+        panel.update_controls_state();
+        Some(panel)
+    }
+
+    pub fn update_controls_state(&self) {
+        let is_enabled = self.check_enabled.is_checked();
+        self.btn_add.set_enabled(is_enabled);
+        self.list.set_enabled(is_enabled);
+    }
+
+    pub fn hwnds(&self) -> &[isize] {
+        self.layout.hwnds()
+    }
+
+    pub fn update_language(&self, strings: &LanguageStrings) {
+        self.layout.update_language(strings);
+    }
+}
+
 /// TabKeys: Master coordinator for the Keyboard Management tab
 pub struct TabKeys {
     pub parent_hwnd: isize,
@@ -69,7 +143,7 @@ impl TabKeys {
         ];
         let sub_tabs = TabBar::create(
             parent,
-            IDC_TAB_KEYS_SUB,
+            0,
             layout::CARD_X,
             SUB_TAB_Y,
             SUB_TAB_W_PER_ITEM * sub_titles.len() as i32,
@@ -95,112 +169,104 @@ impl TabKeys {
         Some(tab)
     }
 
-    pub fn load_config(&self, config: &crate::engine::EngineConfig) {
-        self.remap.check_enabled.set_checked(config.remap_enabled);
-        self.remap.update_controls_state();
-
-        self.disable
-            .check_enabled
-            .set_checked(config.disable_enabled);
-        self.disable.update_controls_state();
-
-        self.key_macro
-            .check_enabled
-            .set_checked(config.key_macro_enabled);
-        self.key_macro.update_controls_state();
+    pub fn paint(&self, hdc: isize, right_bound: i32) {
+        CardLayout::draw_cards(
+            hdc,
+            layout::CARD_X,
+            right_bound,
+            &[(SUB_CARD_Y, layout::CARD_BOTTOM_Y)],
+        );
     }
 
     pub fn load_profile(
         &self,
-        profile: &crate::engine::profile::AppProfile,
+        child: Option<&crate::engine::profile::AppProfile<crate::engine::profile::Child>>,
         global_config: &crate::engine::EngineConfig,
     ) {
-        if profile.is_root {
-            self.load_config(global_config);
-            return;
-        }
-        self.remap
-            .check_enabled
-            .set_tri_state(profile.remap_enabled, global_config.remap_enabled);
+        let is_root = child.is_none();
+        self.remap.check_enabled.set_inherited(
+            is_root,
+            child.and_then(|c| c.remap_enabled),
+            global_config.remap_enabled,
+        );
         self.remap.update_controls_state();
 
-        self.disable
-            .check_enabled
-            .set_tri_state(profile.disable_enabled, global_config.disable_enabled);
+        self.disable.check_enabled.set_inherited(
+            is_root,
+            child.and_then(|c| c.disable_enabled),
+            global_config.disable_enabled,
+        );
         self.disable.update_controls_state();
 
-        self.key_macro
-            .check_enabled
-            .set_tri_state(profile.key_macro_enabled, global_config.key_macro_enabled);
+        self.key_macro.check_enabled.set_inherited(
+            is_root,
+            child.and_then(|c| c.key_macro_enabled),
+            global_config.key_macro_enabled,
+        );
         self.key_macro.update_controls_state();
     }
 
-    pub fn read_config(&self, config: &mut crate::engine::EngineConfig) {
-        config.remap_enabled = self.remap.check_enabled.is_checked();
-        config.disable_enabled = self.disable.check_enabled.is_checked();
-        config.key_macro_enabled = self.key_macro.check_enabled.is_checked();
-    }
-
-    pub fn read_profile(&self, profile: &mut crate::engine::profile::AppProfile) {
-        profile.remap_enabled = self.remap.check_enabled.tri_state();
-        profile.disable_enabled = self.disable.check_enabled.tri_state();
-        profile.key_macro_enabled = self.key_macro.check_enabled.tri_state();
-    }
-
     pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
-        use crate::ui::controller::EditTarget;
-        match ctl_id {
-            IDC_TAB_KEYS_SUB => {
-                self.update_visibility(true);
-                true
-            }
-            IDC_CHECK_REMAP_ENABLED | IDC_CHECK_DISABLE_ENABLED | IDC_CHECK_KEY_MACRO_ENABLED => {
-                if notify_code != 0 {
-                    return false;
-                }
-                match ctl_id {
-                    IDC_CHECK_REMAP_ENABLED => self.remap.update_controls_state(),
-                    IDC_CHECK_DISABLE_ENABLED => self.disable.update_controls_state(),
-                    IDC_CHECK_KEY_MACRO_ENABLED => self.key_macro.update_controls_state(),
-                    _ => {}
-                }
-                let remap_on = self.remap.check_enabled.is_checked();
-                let disable_on = self.disable.check_enabled.is_checked();
-                let macro_on = self.key_macro.check_enabled.is_checked();
-                crate::ui::controller::edit_selected_then(
-                    |target| match target {
-                        EditTarget::Global(cfg) => self.read_config(cfg),
-                        EditTarget::Child(child) => self.read_profile(child),
-                    },
-                    |engine| {
-                        // Root profile mirrors the global toggle in its profile record too.
-                        let pm = &mut engine.profile_manager;
-                        if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
-                            match ctl_id {
-                                IDC_CHECK_REMAP_ENABLED => pm.global_profile.remap_enabled = Some(remap_on),
-                                IDC_CHECK_DISABLE_ENABLED => pm.global_profile.disable_enabled = Some(disable_on),
-                                IDC_CHECK_KEY_MACRO_ENABLED => pm.global_profile.key_macro_enabled = Some(macro_on),
-                                _ => {}
-                            }
-                        }
-                    },
-                );
-                true
-            }
-            IDC_BTN_ADD_REMAP => {
-                crate::ui::views::dialogs::show_remap_dialog(hwnd);
-                true
-            }
-            IDC_BTN_ADD_DISABLE => {
-                crate::ui::views::dialogs::show_disable_dialog(hwnd);
-                true
-            }
-            IDC_BTN_ADD_KEY_MACRO => {
-                crate::ui::views::dialogs::show_key_macro_dialog(hwnd);
-                true
-            }
-            _ => false,
+        if self.sub_tabs.is_changed(ctl_id, notify_code) {
+            self.update_visibility(true);
+            return true;
         }
+
+        let is_remap_toggle = self.remap.check_enabled.is_toggled(ctl_id, notify_code);
+        let is_disable_toggle = self.disable.check_enabled.is_toggled(ctl_id, notify_code);
+        let is_macro_toggle = self.key_macro.check_enabled.is_toggled(ctl_id, notify_code);
+
+        if is_remap_toggle || is_disable_toggle || is_macro_toggle {
+            self.remap.update_controls_state();
+            self.disable.update_controls_state();
+            self.key_macro.update_controls_state();
+
+            let remap_on = self.remap.check_enabled.is_checked();
+            let disable_on = self.disable.check_enabled.is_checked();
+            let macro_on = self.key_macro.check_enabled.is_checked();
+            crate::ui::controller::edit_selected_then(
+                |mut target| {
+                    target.sync_checkbox(
+                        &self.remap.check_enabled,
+                        |c| &mut c.remap_enabled,
+                        |p| &mut p.remap_enabled,
+                    );
+                    target.sync_checkbox(
+                        &self.disable.check_enabled,
+                        |c| &mut c.disable_enabled,
+                        |p| &mut p.disable_enabled,
+                    );
+                    target.sync_checkbox(
+                        &self.key_macro.check_enabled,
+                        |c| &mut c.key_macro_enabled,
+                        |p| &mut p.key_macro_enabled,
+                    );
+                },
+                |engine| {
+                    let pm = &mut engine.profile_manager;
+                    if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
+                        pm.global_profile.remap_enabled = remap_on;
+                        pm.global_profile.disable_enabled = disable_on;
+                        pm.global_profile.key_macro_enabled = macro_on;
+                    }
+                },
+            );
+            return true;
+        }
+
+        if self.remap.btn_add.is_clicked(ctl_id, notify_code) {
+            crate::ui::views::dialogs::show_remap_dialog(hwnd);
+            return true;
+        }
+        if self.disable.btn_add.is_clicked(ctl_id, notify_code) {
+            crate::ui::views::dialogs::show_disable_dialog(hwnd);
+            return true;
+        }
+        if self.key_macro.btn_add.is_clicked(ctl_id, notify_code) {
+            crate::ui::views::dialogs::show_key_macro_dialog(hwnd);
+            return true;
+        }
+        false
     }
 
     /// Populates Remap ActionTable with resolved Live Inheritance items
@@ -254,24 +320,6 @@ impl TabKeys {
                 crate::engine::profile::RuleOrigin::Root,
             ));
 
-        let sub_tabs = self.sub_tabs.clone();
-        let parent_hwnd = self.parent_hwnd;
-        let on_nav = move |target_sub: usize| {
-            if target_sub == 0 {
-                crate::ui::views::dialogs::show_hotkey_dialog(parent_hwnd);
-            } else {
-                sub_tabs.set_cur_sel(target_sub);
-                unsafe {
-                    SendMessageW(
-                        parent_hwnd,
-                        WM_COMMAND,
-                        (IDC_TAB_KEYS_SUB & 0xFFFF) as usize,
-                        sub_tabs.hwnd(),
-                    );
-                }
-            }
-        };
-
         let diag = self.overview.populate(
             remaps,
             remap_on,
@@ -282,7 +330,6 @@ impl TabKeys {
             switch_key,
             switch_key_enabled,
             switch_key_origin,
-            on_nav,
         );
 
         let strings = crate::language::current();
@@ -312,15 +359,19 @@ impl TabKeys {
         self.disable.update_language(strings);
         self.key_macro.update_language(strings);
 
-        // Rows contain localized labels: rebuild them (engine lock released first).
+        // Rows and tri-state notes contain localized labels: rebuild them (engine lock released first).
         let items = crate::ui::controller::with_engine(|e| {
+            let pm = &e.profile_manager;
             (
+                pm.get_profile(&pm.selected_id).cloned(),
+                e.config().clone(),
                 crate::ui::controller::selected_remap_items(e),
                 crate::ui::controller::selected_disable_items(e),
                 crate::ui::controller::selected_key_macro_items(e),
             )
         });
-        if let Some((remaps, disabled, macros)) = items {
+        if let Some((child, cfg, remaps, disabled, macros)) = items {
+            self.load_profile(child.as_ref(), &cfg);
             self.populate_remaps(&remaps);
             self.populate_disabled(&disabled);
             self.populate_key_macros(&macros);
@@ -331,10 +382,10 @@ impl TabKeys {
     pub fn update_visibility(&self, visible: bool) {
         let sub = self.sub_tabs.get_cur_sel();
         let panels = [
-            (self.overview.hwnds().to_vec(), visible && sub == 0),
-            (self.remap.hwnds().to_vec(), visible && sub == 1),
-            (self.disable.hwnds().to_vec(), visible && sub == 2),
-            (self.key_macro.hwnds().to_vec(), visible && sub == 3),
+            (self.overview.hwnds(), visible && sub == 0),
+            (self.remap.hwnds(), visible && sub == 1),
+            (self.disable.hwnds(), visible && sub == 2),
+            (self.key_macro.hwnds(), visible && sub == 3),
         ];
         unsafe {
             ShowWindow(
@@ -342,10 +393,10 @@ impl TabKeys {
                 if visible { SW_SHOW } else { SW_HIDE },
             );
             // Hide outgoing panels first so they never overlap the incoming one
-            for h in panels.iter().filter(|(_, on)| !on).flat_map(|(hs, _)| hs) {
+            for h in panels.iter().filter(|(_, on)| !on).flat_map(|(hs, _)| *hs) {
                 ShowWindow(*h, SW_HIDE);
             }
-            for h in panels.iter().filter(|(_, on)| *on).flat_map(|(hs, _)| hs) {
+            for h in panels.iter().filter(|(_, on)| *on).flat_map(|(hs, _)| *hs) {
                 SetWindowPos(
                     *h,
                     HWND_TOP,

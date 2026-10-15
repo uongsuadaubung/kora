@@ -1,6 +1,6 @@
 //! Application Typography & Font Management
 //!
-//! Khởi tạo font chữ hệ thống Segoe UI chuẩn DPI cao cho toàn bộ giao diện Kora.
+//! Khởi tạo font chữ hệ thống Segoe UI chuẩn DPI cao cho toàn bộ giao diện.
 
 use super::ffi::*;
 use super::styling::to_wide;

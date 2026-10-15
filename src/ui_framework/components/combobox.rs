@@ -1,8 +1,9 @@
 //! Native Win32 ComboBox Component (Owner-Drawn with Smooth Padding & Modern Theming)
 
-use crate::ui::win32::*;
-use crate::ui::colors::ThemePalette;
-use crate::ui::tokens::spacing;
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::theme::{get_app_font_normal, is_current_dark};
+use crate::ui_framework::tokens::spacing;
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 
 const CBS_DROPDOWNLIST: u32 = 0x0003;
@@ -34,10 +35,9 @@ unsafe extern "system" fn combobox_self_subclass(
         return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
     }
 
-    // Message Reflection: Self-contained item rendering
     if msg == OCM_DRAWITEM {
         let dis = unsafe { &*(lparam as *const DRAWITEMSTRUCT) };
-        let is_dark = crate::ui::is_current_dark();
+        let is_dark = is_current_dark();
         if ComboBox::render_item(dis, is_dark) {
             return 1;
         }
@@ -61,6 +61,7 @@ impl ComboBox {
         height: i32,
         hfont: isize,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("COMBOBOX");
 
         let hwnd = unsafe {
@@ -104,7 +105,6 @@ impl ComboBox {
         }
     }
 
-    /// Unified owner-drawn renderer for Win32 ComboBox with smooth padding and modern theme colors
     pub fn render_item(dis: &DRAWITEMSTRUCT, is_dark: bool) -> bool {
         if dis.ctl_type != 3 /* ODT_COMBOBOX */ {
             return false;
@@ -116,9 +116,6 @@ impl ComboBox {
             let is_disabled = (dis.item_state & 0x0004 /* ODS_DISABLED */) != 0;
             let is_edit = (dis.item_state & 0x1000 /* ODS_COMBOBOXEDIT */) != 0;
 
-            // Background color:
-            // - Closed selection box: always use clean input background (bg_input)
-            // - Dropdown list item: highlight with accent if selected/hovered, otherwise bg_input
             let bg_color = if is_edit {
                 palette.bg_input
             } else if is_selected {
@@ -127,7 +124,6 @@ impl ComboBox {
                 palette.bg_input
             };
 
-            // Text color:
             let text_color = if is_disabled {
                 palette.text_secondary
             } else if !is_edit && is_selected {
@@ -136,12 +132,10 @@ impl ComboBox {
                 palette.text_primary
             };
 
-            // 1. Fill Item Background
             let brush = CreateSolidBrush(bg_color);
             FillRect(dis.hdc, &dis.rc_item, brush);
             DeleteObject(brush);
 
-            // 2. Draw Item Text with comfortable padding
             if (dis.item_id as i32) >= 0 {
                 let mut text_buf = [0u16; 256];
                 let len = SendMessageW(
@@ -155,7 +149,7 @@ impl ComboBox {
                     SetBkMode(dis.hdc, TRANSPARENT);
                     SetTextColor(dis.hdc, text_color);
 
-                    let font = crate::ui::theme::get_app_font_normal();
+                    let font = get_app_font_normal();
                     let old_font = if font != 0 {
                         SelectObject(dis.hdc, font)
                     } else {
@@ -184,7 +178,6 @@ impl ComboBox {
         }
     }
 
-    /// Creates a ComboBox with items and an initial selected index in a single declarative call
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_items(
         parent: isize,
@@ -213,6 +206,12 @@ impl ComboBox {
 
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    /// Returns `true` when this ComboBox's selection changed in `WM_COMMAND` (`CBN_SELCHANGE = 1`).
+    #[inline]
+    pub fn is_changed(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == CBN_SELCHANGE
     }
 
     pub fn set_enabled(&self, enabled: bool) {
@@ -272,4 +271,30 @@ impl ComboBox {
             self.set_selected(sel);
         }
     }
+
+    /// Replaces all items while preserving the currently selected index.
+    pub fn set_items_preserve_selection(&self, items: &[&str]) {
+        Self::set_items_by_hwnd(self.hwnd, items);
+    }
+
+    /// Replaces all items on a ComboBox `hwnd` while preserving its currently selected index.
+    pub fn set_items_by_hwnd(hwnd: isize, items: &[&str]) {
+        if hwnd == 0 {
+            return;
+        }
+        unsafe {
+            let sel = SendMessageW(hwnd, CB_GETCURSEL, 0, 0);
+            SendMessageW(hwnd, CB_RESETCONTENT, 0, 0);
+            for item in items {
+                let wide = to_wide(item);
+                SendMessageW(hwnd, CB_ADDSTRING, 0, wide.as_ptr() as isize);
+            }
+            if !items.is_empty() && sel != CB_ERR && sel >= 0 {
+                let clamped = (sel as usize).min(items.len() - 1);
+                SendMessageW(hwnd, CB_SETCURSEL, clamped, 0);
+            }
+            InvalidateRect(hwnd, null_mut(), 1);
+        }
+    }
 }
+

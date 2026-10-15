@@ -191,9 +191,9 @@ fn main() {
             ..Default::default()
         });
         let pm = &mut engine.profile_manager;
-        pm.global_profile.remap_enabled = Some(true);
-        pm.global_profile.disable_enabled = Some(true);
-        pm.global_profile.key_macro_enabled = Some(true);
+        pm.global_profile.remap_enabled = true;
+        pm.global_profile.disable_enabled = true;
+        pm.global_profile.key_macro_enabled = true;
         pm.global_profile.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x14, 0x11));
         pm.global_profile.app_disabled.push(0x2D);
 

@@ -45,6 +45,10 @@ pub fn serialize_config_all(
 
     out.push_str("[features]\n");
     out.push_str(&format!("use_macro = {}\n", config.use_macro));
+    out.push_str(&format!(
+        "use_macro_in_english = {}\n",
+        config.use_macro_in_english_mode
+    ));
     out.push_str(&format!("bracket_w = {}\n", config.bracket_w));
     out.push_str(&format!(
         "remember_history = {}\n\n",
@@ -92,17 +96,9 @@ pub fn serialize_config_all(
     if !profiles.global_profile.app_remaps.is_empty() {
         out.push_str("# Đổi phím toàn hệ thống: <Phím gốc> = <Phím đích>\n");
         for r in &profiles.global_profile.app_remaps {
-            let from_str = if !r.from_name.is_empty() {
-                &r.from_name
-            } else {
-                "Key"
-            };
-            let to_str = if !r.to_name.is_empty() {
-                &r.to_name
-            } else {
-                "Key"
-            };
-            out.push_str(&format!("{} = {}\n", from_str, to_str));
+            if !r.from_name.is_empty() && !r.to_name.is_empty() {
+                out.push_str(&format!("{} = {}\n", r.from_name, r.to_name));
+            }
         }
     }
     if !profiles.global_profile.muted_remaps.is_empty() {
@@ -149,13 +145,10 @@ pub fn serialize_config_all(
     if !profiles.global_profile.app_key_macros.is_empty() {
         out.push_str("# Phím macro toàn hệ thống: <Phím kích hoạt> = <Tên> | <DSL>\n");
         for m in &profiles.global_profile.app_key_macros {
-            let trig_str = if !m.trigger_name.is_empty() {
-                &m.trigger_name
-            } else {
-                "Key"
-            };
-            let dsl = MacroAction::actions_to_dsl(&m.actions);
-            out.push_str(&format!("{} = {} | {}\n", trig_str, m.name, dsl));
+            if !m.trigger_name.is_empty() {
+                let dsl = MacroAction::actions_to_dsl(&m.actions);
+                out.push_str(&format!("{} = {} | {}\n", m.trigger_name, m.name, dsl));
+            }
         }
     }
     if !profiles.global_profile.muted_key_macros.is_empty() {
@@ -239,17 +232,9 @@ pub fn serialize_config_all(
             out.push_str(&format!("override_remap = {} = {}\n", fnm, tnm));
         }
         for r in &child.app_remaps {
-            let fnm = if !r.from_name.is_empty() {
-                &r.from_name
-            } else {
-                "Key"
-            };
-            let tnm = if !r.to_name.is_empty() {
-                &r.to_name
-            } else {
-                "Key"
-            };
-            out.push_str(&format!("app_remap = {} = {}\n", fnm, tnm));
+            if !r.from_name.is_empty() && !r.to_name.is_empty() {
+                out.push_str(&format!("app_remap = {} = {}\n", r.from_name, r.to_name));
+            }
         }
 
         if !child.unmuted_disabled.is_empty() {
@@ -317,13 +302,10 @@ pub fn serialize_config_all(
             out.push_str(&format!("override_key_macro = {} = {} | {}\n", trig_nm, nm, dsl));
         }
         for m in &child.app_key_macros {
-            let trig_nm = if !m.trigger_name.is_empty() {
-                &m.trigger_name
-            } else {
-                "Key"
-            };
-            let dsl = MacroAction::actions_to_dsl(&m.actions);
-            out.push_str(&format!("app_key_macro = {} = {} | {}\n", trig_nm, m.name, dsl));
+            if !m.trigger_name.is_empty() {
+                let dsl = MacroAction::actions_to_dsl(&m.actions);
+                out.push_str(&format!("app_key_macro = {} = {} | {}\n", m.trigger_name, m.name, dsl));
+            }
         }
         out.push('\n');
     }

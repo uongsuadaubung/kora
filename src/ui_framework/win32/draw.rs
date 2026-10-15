@@ -37,9 +37,16 @@ pub fn round_rect(hdc: isize, rc: &RECT, radius: i32, fill: u32, border: Option<
         };
         let old_brush = SelectObject(hdc, GetStockObject(DC_BRUSH));
         let old_pen = SelectObject(hdc, pen);
-        // NULL_PEN draws one pixel short on the right/bottom; compensate.
         let extra = if border.is_none() { 1 } else { 0 };
-        RoundRect(hdc, rc.left, rc.top, rc.right + extra, rc.bottom + extra, radius, radius);
+        RoundRect(
+            hdc,
+            rc.left,
+            rc.top,
+            rc.right + extra,
+            rc.bottom + extra,
+            radius,
+            radius,
+        );
         SelectObject(hdc, old_pen);
         SelectObject(hdc, old_brush);
     }
@@ -93,8 +100,6 @@ pub struct BackBuffer {
 }
 
 impl BackBuffer {
-    /// Returns `None` if the memory DC/bitmap could not be created (caller should
-    /// then paint directly into `target`).
     pub fn new(target: isize, width: i32, height: i32) -> Option<Self> {
         unsafe {
             let mem = CreateCompatibleDC(target);
@@ -107,7 +112,14 @@ impl BackBuffer {
                 return None;
             }
             let old_bmp = SelectObject(mem, bmp);
-            Some(Self { target, mem, bmp, old_bmp, width, height })
+            Some(Self {
+                target,
+                mem,
+                bmp,
+                old_bmp,
+                width,
+                height,
+            })
         }
     }
 
@@ -120,7 +132,17 @@ impl BackBuffer {
 impl Drop for BackBuffer {
     fn drop(&mut self) {
         unsafe {
-            BitBlt(self.target, 0, 0, self.width, self.height, self.mem, 0, 0, SRCCOPY);
+            BitBlt(
+                self.target,
+                0,
+                0,
+                self.width,
+                self.height,
+                self.mem,
+                0,
+                0,
+                SRCCOPY,
+            );
             SelectObject(self.mem, self.old_bmp);
             DeleteObject(self.bmp);
             DeleteDC(self.mem);

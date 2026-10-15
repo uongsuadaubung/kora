@@ -161,6 +161,7 @@ unsafe extern "system" {
     pub fn IsDialogMessageW(h_dlg: isize, lp_msg: *const std::ffi::c_void) -> i32;
     pub fn GetActiveWindow() -> isize;
     pub fn GetParent(h_wnd: isize) -> isize;
+    pub fn SetThreadDpiAwarenessContext(dpi_context: isize) -> isize;
 }
 
 #[link(name = "comctl32")]

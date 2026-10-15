@@ -1,11 +1,4 @@
 //! Universal ActionTable Component (Web-style Canvas / Owner-Draw Architecture)
-//!
-//! Module được tách thành các thành phần chuyên biệt:
-//! - [`types`]: Struct/Enum mô hình dữ liệu (Cell, Row, Column, Badge, Action)
-//! - [`render`]: Đồ họa GDI Double-buffering, layout tính toán cột và scrollbar
-//! - [`wnd_proc`]: Win32 Window Procedure bắt sự kiện chuột và cuộn
-//!
-//! Struct chính: [`ActionTable`]
 
 pub mod render;
 pub mod types;
@@ -15,7 +8,8 @@ pub use render::*;
 pub use types::*;
 pub use wnd_proc::*;
 
-use crate::ui::win32::*;
+use crate::ui_framework::theme::get_app_font_bold;
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex, Once};
 
@@ -78,9 +72,10 @@ impl ActionTable {
         font: isize,
         columns: Vec<ColumnDef>,
     ) -> Option<Self> {
+        let id = crate::ui_framework::components::resolve_id(id);
         ensure_class_registered();
 
-        let font_bold = crate::ui::theme::get_app_font_bold();
+        let font_bold = get_app_font_bold();
 
         let state = Arc::new(Mutex::new(ActionTableState {
             columns,
@@ -133,26 +128,34 @@ impl ActionTable {
         Some(Self { hwnd, state })
     }
 
-    /// Data-driven setter for rows using TableRow builder
     pub fn set_rows(&self, rows: impl IntoIterator<Item = TableRow>) {
         let cells: Vec<Vec<TableCell>> = rows.into_iter().map(|r| r.cells).collect();
         self.set_raw_cells(cells);
     }
 
-    /// Low-level raw cells setter
     pub fn set_raw_cells(&self, rows: Vec<Vec<TableCell>>) {
         if let Ok(mut g) = self.state.lock() {
             g.rows = rows;
             let total_rows = g.rows.len();
             if let Some(r) = g.selected_row {
-                g.selected_row = if total_rows == 0 { None } else { Some(r.min(total_rows - 1)) };
+                g.selected_row = if total_rows == 0 {
+                    None
+                } else {
+                    Some(r.min(total_rows - 1))
+                };
             }
             if let Some(r) = g.hover_row {
-                g.hover_row = if total_rows == 0 { None } else { Some(r.min(total_rows - 1)) };
+                g.hover_row = if total_rows == 0 {
+                    None
+                } else {
+                    Some(r.min(total_rows - 1))
+                };
             }
             g.hover_action = ActionHover::None;
             let mut rc = RECT::default();
-            unsafe { GetClientRect(self.hwnd, &mut rc); }
+            unsafe {
+                GetClientRect(self.hwnd, &mut rc);
+            }
             let body_h = (rc.bottom - g.header_h).max(0);
             let total_h = total_rows as i32 * ROW_HEIGHT;
             let max_scroll = (total_h - body_h).max(0);
@@ -165,7 +168,6 @@ impl ActionTable {
         }
     }
 
-    /// Hides the column header row (body rows start at y = 0)
     pub fn hide_header(&self) {
         if let Ok(mut g) = self.state.lock() {
             g.header_h = 0;
@@ -204,7 +206,8 @@ impl ActionTable {
                         TableCell::SecondaryText(s) => s.clone(),
                         TableCell::Badge(b) => b.text.clone(),
                         TableCell::Actions(actions) => {
-                            let labels: Vec<&str> = actions.iter().map(|a| a.label.as_str()).collect();
+                            let labels: Vec<&str> =
+                                actions.iter().map(|a| a.label.as_str()).collect();
                             labels.join("   ")
                         }
                         _ => String::new(),
@@ -236,6 +239,29 @@ impl ActionTable {
         }
         unsafe {
             InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
+    /// Updates all column header titles at once and refreshes the table header.
+    pub fn set_column_titles(&self, titles: &[&str]) {
+        Self::set_column_titles_by_hwnd(self.hwnd, titles);
+    }
+
+    /// Updates all column header titles on an `ActionTable` `hwnd` and invalidates the window.
+    pub fn set_column_titles_by_hwnd(hwnd: isize, titles: &[&str]) {
+        if hwnd == 0 {
+            return;
+        }
+        unsafe {
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ActionTableState>;
+            if !ptr.is_null()
+                && let Ok(mut g) = (*ptr).lock()
+            {
+                for (col, &title) in g.columns.iter_mut().zip(titles.iter()) {
+                    col.title = title.to_string();
+                }
+            }
+            InvalidateRect(hwnd, null_mut(), 0);
         }
     }
 

@@ -1,20 +1,53 @@
 //! Kora Pure Win32 UI System
 //! Fully componentized, lightweight, zero-dependency native Windows UI.
 
-pub mod colors;
-pub mod components;
 pub mod controller;
 pub mod theme;
-pub mod tokens;
 pub mod tray;
 pub mod views;
-pub mod win32;
 pub mod wnd_proc;
 
+pub use crate::ui_framework::{colors, components, dialog, tokens, win32};
 pub use win32::*;
 
 pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
 pub use tokens::*;
+
+impl crate::ui_framework::I18nSource for crate::language::LanguageStrings {
+    fn current() -> &'static Self {
+        crate::language::current()
+    }
+
+    fn inherit_note(&self, inherited_on: bool) -> &'static str {
+        if inherited_on {
+            self.check_inherit_on
+        } else {
+            self.check_inherit_off
+        }
+    }
+}
+
+/// Application-level UI prelude specializing `CardLayout`, `Inheritable`, `TextFn`, and `TextListFn` to [`crate::language::LanguageStrings`].
+pub mod prelude {
+    pub use crate::ui_framework::dialog::*;
+    pub use crate::ui_framework::prelude::{
+        borders, cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,
+        next_control_id, radii, resolve_id, set_hwnds_visible, spacing, to_wide, typography,
+        ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
+        CellAlign, CheckBox, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
+        InCard, I18nSource, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
+        PillBadge, PopupMenu, PushButton, Slider, StaticText, SurfaceRole, TabBar, TableAction,
+        TableCell, TableRow, TextBox, ThemePalette, TwoState, RECT,
+    };
+
+    pub type CardLayout<S = OutsideCard> =
+        crate::ui_framework::components::CardLayout<S, crate::language::LanguageStrings>;
+    pub type Inheritable =
+        crate::ui_framework::components::Inheritable<crate::language::LanguageStrings>;
+    pub type TextFn = crate::ui_framework::components::TextFn<crate::language::LanguageStrings>;
+    pub type TextListFn =
+        crate::ui_framework::components::TextListFn<crate::language::LanguageStrings>;
+}
 
 use crate::ui::theme::recreate_theme_brushes;
 use crate::ui::tray::{get_small_icon_size, load_icon_from_memory, TrayHandler};
@@ -83,24 +116,19 @@ fn selected_mode_combo_index() -> Option<usize> {
     let engine = guard.as_ref()?;
     let pm = &engine.profile_manager;
     Some(match pm.get_profile(&pm.selected_id) {
-        Some(p) if !p.is_root => match p.mode {
+        Some(p) => match p.mode {
             LanguageMode::Inherit => 0,
             LanguageMode::Vietnamese => 1,
             LanguageMode::English => 2,
         },
-        _ => {
-            if engine.config().enabled {
-                0
-            } else {
-                1
-            }
-        }
+        None => usize::from(!engine.config().enabled),
     })
 }
 
 pub fn show_control_panel() {
     let Some(ui) = ui() else { return };
     let c = &ui.controls;
+    c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
     let Some(cfg) = c.refresh_from_engine() else { return };
 
     // Language / theme are kept in sync by their own handlers (system tab, defaults,
@@ -120,7 +148,6 @@ pub fn show_control_panel() {
         ui.tray.borrow_mut().set_vietnamese_mode(is_viet);
     }
 
-    c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
     unsafe {
         InvalidateRect(ui.h_panel, null_mut(), 0);
         ShowWindow(ui.h_panel, SW_SHOW);
@@ -205,7 +232,10 @@ pub fn init_ui() -> bool {
         wc_panel.h_cursor = LoadCursorW(0, IDC_ARROW);
         RegisterClassExW(&wc_panel);
 
-        // 3. Create Hidden Helper Window
+        // 3. Create Hidden Helper Window under Per-Monitor V2 DPI awareness so tray menus
+        // position and scale accurately on mixed-DPI multi-monitor setups regardless of
+        // which monitor the GDI-scaled Control Panel resides on.
+        let prev_dpi_ctx = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let h_helper = CreateWindowExW(
             0,
             class_helper_name.as_ptr(),
@@ -220,6 +250,7 @@ pub fn init_ui() -> bool {
             0,
             null_mut(),
         );
+        SetThreadDpiAwarenessContext(prev_dpi_ctx);
 
         if h_helper == 0 {
             eprintln!("[UI Error] Không thể tạo cửa sổ Helper!");

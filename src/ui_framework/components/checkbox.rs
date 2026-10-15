@@ -2,8 +2,10 @@
 //! Custom-subclassed for perfect Dark and Light theme integration,
 //! crisp primary text color, custom Fluent 18x18 checkbox, and exact vertical centering.
 
-use crate::ui::win32::*;
-use crate::ui::tokens::{borders, radii};
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::theme::is_current_dark;
+use crate::ui_framework::tokens::{borders, radii};
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 
 const CHECKBOX_SUBCLASS_ID: usize = 0x408;
@@ -20,19 +22,16 @@ const BST_CHECKED: usize = 0x0001;
 const BST_UNCHECKED: usize = 0x0000;
 const BST_INDETERMINATE: usize = 0x0002;
 const WM_SETFONT: u32 = 0x0030;
-/// Private: wparam 0 = normal 2-state, 1 = tri-state inheriting `false`, 2 = tri-state inheriting `true`
 const CBM_SET_TRI: u32 = 0x0400 + 0x60;
-/// Private: returns 1 if tri-state and the inherited value is `true`
 const CBM_GET_INHERITED: u32 = 0x0400 + 0x61;
-/// Private: wparam 1 = draw box + label flush to the right edge of the control
 const CBM_SET_ALIGN_RIGHT: u32 = 0x0400 + 0x62;
+
 struct CheckBoxData {
     is_hover: bool,
     bg_color: Option<u32>,
-    /// Tri-state mode: indeterminate (None) means "inherit"
     tri: bool,
-    /// Inherited value shown while indeterminate
     inherited: bool,
+    inherit_note: &'static str,
     align_right: bool,
 }
 
@@ -77,6 +76,11 @@ unsafe extern "system" fn checkbox_subclass_proc(
         let data = unsafe { &mut *data_ptr };
         data.tri = wparam != 0;
         data.inherited = wparam == 2;
+        data.inherit_note = if lparam != 0 {
+            unsafe { *(lparam as *const &'static str) }
+        } else {
+            ""
+        };
         let style = if data.tri { BS_3STATE } else { BS_AUTOCHECKBOX };
         unsafe {
             DefSubclassProc(hwnd, BM_SETSTYLE, style as usize, 0);
@@ -94,9 +98,11 @@ unsafe extern "system" fn checkbox_subclass_proc(
         }
         return 1;
     }
-    // Reflected BN_CLICKED (sent by the parent before it dispatches on_command):
-    // cycle Inherit -> !inherited -> inherited -> Inherit. Return 0 so the parent still handles it.
-    if msg == OCM_COMMAND && (wparam >> 16) & 0xFFFF == 0 && !data_ptr.is_null() && unsafe { (*data_ptr).tri } {
+    if msg == OCM_COMMAND
+        && (wparam >> 16) & 0xFFFF == 0
+        && !data_ptr.is_null()
+        && unsafe { (*data_ptr).tri }
+    {
         let inherited = unsafe { (*data_ptr).inherited };
         let cur = unsafe { SendMessageW(hwnd, BM_GETCHECK, 0, 0) } as usize;
         let as_state = |v: bool| if v { BST_CHECKED } else { BST_UNCHECKED };
@@ -150,15 +156,14 @@ unsafe extern "system" fn checkbox_subclass_proc(
                 let mut rc = RECT::default();
                 GetClientRect(hwnd, &mut rc);
 
-                let is_dark = crate::ui::is_current_dark();
-                let palette = crate::ui::colors::ThemePalette::get(is_dark);
+                let is_dark = is_current_dark();
+                let palette = ThemePalette::get(is_dark);
                 let is_hover = if !data_ptr.is_null() {
                     (*data_ptr).is_hover
                 } else {
                     false
                 };
 
-                // 1. Fill entire background seamlessly with the Card background or custom bg
                 let bg_color = if !data_ptr.is_null() {
                     (*data_ptr).bg_color.unwrap_or(palette.bg_card)
                 } else {
@@ -168,17 +173,14 @@ unsafe extern "system" fn checkbox_subclass_proc(
                 FillRect(hdc, &rc, bg_brush);
                 DeleteObject(bg_brush);
 
-                // 2. Check current checked / disabled state
                 let check_state = SendMessageW(hwnd, BM_GETCHECK, 0, 0) as usize;
                 let is_checked = check_state == BST_CHECKED;
                 let is_disabled = IsWindowEnabled(hwnd) == 0;
                 let inherited_on = !data_ptr.is_null() && (*data_ptr).inherited;
-                let inherit_note = (check_state == BST_INDETERMINATE).then(|| {
-                    let s = crate::language::current();
-                    if inherited_on { s.check_inherit_on } else { s.check_inherit_off }
-                });
+                let inherit_note = (check_state == BST_INDETERMINATE && !data_ptr.is_null())
+                    .then(|| (*data_ptr).inherit_note)
+                    .filter(|s| !s.is_empty());
 
-                // Measure label (+ inherit note) with the control font, used for right alignment
                 let hfont = SendMessageW(hwnd, WM_GETFONT, 0, 0);
                 let old_font = if hfont != 0 { SelectObject(hdc, hfont) } else { 0 };
                 let mut text_buf = [0u16; 256];
@@ -190,9 +192,15 @@ unsafe extern "system" fn checkbox_subclass_proc(
                 };
                 let label_w = measure(&text_buf[..text_len.max(0) as usize]);
                 let space_w = measure(&[b' ' as u16]);
-                let note_w: Vec<u16> = inherit_note.map(|n| n.encode_utf16().collect()).unwrap_or_default();
-                let note_px = if note_w.is_empty() { 0 } else { space_w + measure(&note_w) };
-                let gap = 5; // Compact, clean spacing to label
+                let note_w: Vec<u16> = inherit_note
+                    .map(|n| n.encode_utf16().collect())
+                    .unwrap_or_default();
+                let note_px = if note_w.is_empty() {
+                    0
+                } else {
+                    space_w + measure(&note_w)
+                };
+                let gap = 5;
                 let box_size = 13;
                 let content_w = 2 + box_size + gap + label_w + note_px;
                 let offset = if !data_ptr.is_null() && (*data_ptr).align_right {
@@ -201,7 +209,6 @@ unsafe extern "system" fn checkbox_subclass_proc(
                     0
                 };
 
-                // 3. Draw Checkbox Glyph - compact Fluent 13x13, precisely centered vertically
                 let h = rc.bottom - rc.top;
                 let box_top = (h - box_size) / 2;
                 let box_rc = RECT {
@@ -211,7 +218,6 @@ unsafe extern "system" fn checkbox_subclass_proc(
                     bottom: box_top + box_size,
                 };
 
-                // Determine box fill & border colors based on state & theme
                 let (glyph_bg, glyph_border) = if is_checked {
                     if is_hover && !is_disabled {
                         (palette.accent_hover, palette.accent_hover)
@@ -233,7 +239,6 @@ unsafe extern "system" fn checkbox_subclass_proc(
                 let ob = SelectObject(hdc, br);
                 let op = SelectObject(hdc, pen);
 
-                // Rounded checkbox rectangle (2px smooth radius for 13x13 box)
                 RoundRect(
                     hdc,
                     box_rc.left,
@@ -250,7 +255,6 @@ unsafe extern "system" fn checkbox_subclass_proc(
                 DeleteObject(pen);
 
                 if is_checked {
-                    // Draw crisp white checkmark inside 13x13 box
                     let pen_check = CreatePen(PS_SOLID, borders::WIDTH_FOCUS, palette.text_white);
                     let op_c = SelectObject(hdc, pen_check);
                     MoveToEx(hdc, box_rc.left + 2, box_rc.top + 6, null_mut());
@@ -258,8 +262,7 @@ unsafe extern "system" fn checkbox_subclass_proc(
                     LineTo(hdc, box_rc.left + 10, box_rc.top + 3);
                     SelectObject(hdc, op_c);
                     DeleteObject(pen_check);
-                } else if inherit_note.is_some() {
-                    // Inherit state: horizontal dash (accent when the inherited value is ON)
+                } else if check_state == BST_INDETERMINATE {
                     let dash_color = if inherited_on && !is_disabled {
                         palette.accent
                     } else {
@@ -273,7 +276,6 @@ unsafe extern "system" fn checkbox_subclass_proc(
                     DeleteObject(pen_dash);
                 }
 
-                // 4. Draw Label Text in theme's primary text color (aligned right next to check box)
                 if text_len > 0 {
                     let mut text_rc = RECT {
                         left: box_rc.right + gap,
@@ -325,28 +327,26 @@ unsafe extern "system" fn checkbox_subclass_proc(
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }
 
-pub struct CheckBox {
+use crate::ui_framework::I18nSource;
+use std::marker::PhantomData;
+
+/// Marker type for a standard 2-state (`bool`) checkbox.
+#[derive(Debug, Clone, Copy)]
+pub struct TwoState;
+
+/// Marker type for a 3-state (`Option<bool>`) inheritable checkbox used in profile tabs.
+#[derive(Debug, Clone, Copy)]
+pub struct Inheritable<L: I18nSource = ()>(PhantomData<L>);
+
+pub struct CheckBox<M = TwoState> {
     hwnd: isize,
     id: u32,
+    _mode: PhantomData<M>,
 }
 
-impl CheckBox {
+impl<M> CheckBox<M> {
     #[allow(clippy::too_many_arguments)]
-    pub fn create(
-        parent: isize,
-        id: u32,
-        text: &str,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        hfont: isize,
-    ) -> Option<Self> {
-        Self::create_ext(parent, id, text, x, y, width, height, hfont, None)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_ext(
+    fn create_raw(
         parent: isize,
         id: u32,
         text: &str,
@@ -357,6 +357,7 @@ impl CheckBox {
         hfont: isize,
         bg_color: Option<u32>,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("BUTTON");
         let window_name = to_wide(text);
 
@@ -388,6 +389,7 @@ impl CheckBox {
                 bg_color,
                 tri: false,
                 inherited: false,
+                inherit_note: "",
                 align_right: false,
             }));
             unsafe {
@@ -398,30 +400,14 @@ impl CheckBox {
                     data as usize,
                 );
             }
-            Some(Self { hwnd, id })
+            Some(Self {
+                hwnd,
+                id,
+                _mode: PhantomData,
+            })
         } else {
             None
         }
-    }
-
-    /// Declarative helper: create a CheckBox with initial checked state in 1 line
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_with_state(
-        parent: isize,
-        id: u32,
-        text: &str,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        hfont: isize,
-        checked: bool,
-    ) -> Option<Self> {
-        let cb = Self::create(parent, id, text, x, y, width, height, hfont)?;
-        if checked {
-            cb.set_checked(true);
-        }
-        Some(cb)
     }
 
     pub fn hwnd(&self) -> isize {
@@ -432,7 +418,12 @@ impl CheckBox {
         self.id
     }
 
-    /// Effective checked value (the inherited value while in tri-state "inherit")
+    /// Returns `true` when this checkbox was toggled in `WM_COMMAND` (`BN_CLICKED = 0`).
+    #[inline]
+    pub fn is_toggled(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == 0
+    }
+
     pub fn is_checked(&self) -> bool {
         let res = unsafe { SendMessageW(self.hwnd, BM_GETCHECK, 0, 0) } as usize;
         res == BST_CHECKED
@@ -440,38 +431,6 @@ impl CheckBox {
                 && unsafe { SendMessageW(self.hwnd, CBM_GET_INHERITED, 0, 0) } != 0)
     }
 
-    pub fn set_checked(&self, checked: bool) {
-        let state = if checked { BST_CHECKED } else { BST_UNCHECKED };
-        unsafe {
-            SendMessageW(self.hwnd, CBM_SET_TRI, 0, 0);
-            SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
-            InvalidateRect(self.hwnd, null_mut(), 0);
-        }
-    }
-
-    /// Switches to tri-state mode: `None` = inherit (shows "(Kế thừa: bật/tắt)" from `inherited`).
-    /// Clicking cycles Inherit -> !inherited -> inherited -> Inherit.
-    pub fn set_tri_state(&self, value: Option<bool>, inherited: bool) {
-        let state = match value {
-            None => BST_INDETERMINATE,
-            Some(true) => BST_CHECKED,
-            Some(false) => BST_UNCHECKED,
-        };
-        unsafe {
-            SendMessageW(self.hwnd, CBM_SET_TRI, 1 + inherited as usize, 0);
-            SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
-        }
-    }
-
-    /// Explicit value, or `None` when in the inherit state
-    pub fn tri_state(&self) -> Option<bool> {
-        match unsafe { SendMessageW(self.hwnd, BM_GETCHECK, 0, 0) } as usize {
-            BST_INDETERMINATE => None,
-            s => Some(s == BST_CHECKED),
-        }
-    }
-
-    /// Draws box + label (+ inherit note) flush against the right edge of the control
     pub fn set_align_right(&self, right: bool) {
         unsafe { SendMessageW(self.hwnd, CBM_SET_ALIGN_RIGHT, right as usize, 0) };
     }
@@ -497,3 +456,137 @@ impl CheckBox {
         }
     }
 }
+
+impl CheckBox<TwoState> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn create(
+        parent: isize,
+        id: u32,
+        text: &str,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        hfont: isize,
+    ) -> Option<Self> {
+        Self::create_raw(parent, id, text, x, y, width, height, hfont, None)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_ext(
+        parent: isize,
+        id: u32,
+        text: &str,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        hfont: isize,
+        bg_color: Option<u32>,
+    ) -> Option<Self> {
+        Self::create_raw(parent, id, text, x, y, width, height, hfont, bg_color)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_with_state(
+        parent: isize,
+        id: u32,
+        text: &str,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        hfont: isize,
+        checked: bool,
+    ) -> Option<Self> {
+        let cb = Self::create(parent, id, text, x, y, width, height, hfont)?;
+        if checked {
+            cb.set_checked(true);
+        }
+        Some(cb)
+    }
+
+    pub fn set_checked(&self, checked: bool) {
+        let state = if checked { BST_CHECKED } else { BST_UNCHECKED };
+        unsafe {
+            SendMessageW(self.hwnd, CBM_SET_TRI, 0, 0);
+            SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
+    /// Transitions a 2-state checkbox into a 3-state inheritable checkbox.
+    #[inline]
+    pub fn into_inheritable<L: I18nSource>(self) -> CheckBox<Inheritable<L>> {
+        CheckBox {
+            hwnd: self.hwnd,
+            id: self.id,
+            _mode: PhantomData,
+        }
+    }
+}
+
+impl<L: I18nSource> CheckBox<Inheritable<L>> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_inheritable(
+        parent: isize,
+        id: u32,
+        text: &str,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        hfont: isize,
+    ) -> Option<Self> {
+        Self::create_raw(parent, id, text, x, y, width, height, hfont, None)
+    }
+
+    pub fn set_tri_state_with_note(&self, value: Option<bool>, inherited: bool, note: &'static str) {
+        let state = match value {
+            None => BST_INDETERMINATE,
+            Some(true) => BST_CHECKED,
+            Some(false) => BST_UNCHECKED,
+        };
+        unsafe {
+            SendMessageW(
+                self.hwnd,
+                CBM_SET_TRI,
+                1 + inherited as usize,
+                &note as *const &'static str as isize,
+            );
+            SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
+        }
+    }
+
+    pub fn set_tri_state(&self, value: Option<bool>, inherited: bool) {
+        let note = L::current().inherit_note(inherited);
+        self.set_tri_state_with_note(value, inherited, note);
+    }
+
+    /// Sets 2-state when `is_root` is true, or 3-state (`set_tri_state`) for child profiles.
+    pub fn set_inherited(&self, is_root: bool, child_value: Option<bool>, global_value: bool) {
+        if is_root {
+            let state = if global_value {
+                BST_CHECKED
+            } else {
+                BST_UNCHECKED
+            };
+            unsafe {
+                SendMessageW(self.hwnd, CBM_SET_TRI, 0, 0);
+                SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
+                InvalidateRect(self.hwnd, null_mut(), 0);
+            }
+        } else {
+            self.set_tri_state(child_value, global_value);
+        }
+    }
+
+    pub fn tri_state(&self) -> Option<bool> {
+        match unsafe { SendMessageW(self.hwnd, BM_GETCHECK, 0, 0) } as usize {
+            BST_INDETERMINATE => None,
+            s => Some(s == BST_CHECKED),
+        }
+    }
+}
+
+

@@ -1,11 +1,10 @@
 //! Modal Confirmation Dialog for Kora UI
 //! Generic, reusable Yes/No dialog with customizable title, message, button labels, and danger styling.
 
-use super::{attach_state, close_modal, detach_state, forward_draw_item, open_modal, state, ModalSpec};
+use super::{attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state, ModalSpec};
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
 use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
-use crate::ui::tokens::id::{IDC_CONFIRM_BTN_NO, IDC_CONFIRM_BTN_YES};
 use crate::ui::win32::*;
 use std::sync::Once;
 
@@ -69,6 +68,8 @@ struct ConfirmState {
     /// UTF-16 message, converted once instead of on every paint.
     message_w: Vec<u16>,
     callback: Option<ConfirmCallback>,
+    btn_no: Option<PushButton>,
+    btn_yes: Option<PushButton>,
 }
 
 const CLASS_NAME: &str = "KoraConfirmDialogClass";
@@ -91,6 +92,8 @@ where
         message_w: to_wide(&options.message),
         options,
         callback: Some(Box::new(on_confirm)),
+        btn_no: None,
+        btn_yes: None,
     });
     open_modal(
         parent,
@@ -105,6 +108,31 @@ where
         },
         st,
     );
+}
+
+/// Displays a danger-styled confirmation dialog (`btn_yes` and `btn_no` automatically localized).
+pub fn show_danger_confirm<F>(
+    parent: isize,
+    title: impl Into<String>,
+    message: impl Into<String>,
+    on_confirm: F,
+) where
+    F: FnOnce() + Send + 'static,
+{
+    show_confirm_dialog(
+        parent,
+        ConfirmDialogOptions::new(title, message).danger(true),
+        on_confirm,
+    );
+}
+
+/// Displays a standard delete confirmation dialog (`strings.confirm_delete_title`, danger styling).
+pub fn show_delete_confirm<F>(parent: isize, message: impl Into<String>, on_confirm: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    let strings = crate::language::current();
+    show_danger_confirm(parent, strings.confirm_delete_title, message, on_confirm);
 }
 
 /// Runs the confirm callback (taken out of the state first, so a callback that
@@ -182,11 +210,13 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
     const WM_COMMAND: u32 = 0x0111;
     const WM_ERASEBKGND: u32 = 0x0014;
     const WM_CLOSE: u32 = 0x0010;
-    const WM_DRAWITEM: u32 = 0x002B;
     const WM_KEYDOWN: u32 = 0x0100;
     const WM_NCDESTROY: u32 = 0x0082;
 
     unsafe {
+        if let Some(res) = reflect_dialog_messages(hwnd, msg, wparam, lparam) {
+            return res;
+        }
         match msg {
             WM_CREATE => {
                 attach_state::<ConfirmState>(hwnd, lparam);
@@ -200,10 +230,10 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                     ButtonVariant::Primary
                 };
 
-                // Cancel / No Button
+                // Cancel / No Button (Auto-ID = 0)
                 let btn_no = PushButton::create_with_variant(
                     hwnd,
-                    IDC_CONFIRM_BTN_NO,
+                    0,
                     &st.options.no_text,
                     210,
                     110,
@@ -214,10 +244,10 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                     Some(palette.bg_sidebar),
                 );
 
-                // Confirm / Yes Button
+                // Confirm / Yes Button (Auto-ID = 0)
                 let btn_yes = PushButton::create_with_variant(
                     hwnd,
-                    IDC_CONFIRM_BTN_YES,
+                    0,
                     &st.options.yes_text,
                     310,
                     110,
@@ -229,9 +259,16 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                 );
 
                 // Default focus: focus No on danger actions to prevent accidental deletion
-                let focus = if is_danger { btn_no } else { btn_yes };
-                if let Some(ref b) = focus {
-                    SetFocus(b.hwnd());
+                let focus_hwnd = if is_danger {
+                    btn_no.as_ref().map_or(0, |b| b.hwnd())
+                } else {
+                    btn_yes.as_ref().map_or(0, |b| b.hwnd())
+                };
+                st.btn_no = btn_no;
+                st.btn_yes = btn_yes;
+
+                if focus_hwnd != 0 {
+                    SetFocus(focus_hwnd);
                 }
                 0
             }
@@ -251,14 +288,23 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
             }
             WM_ERASEBKGND => 1,
             WM_COMMAND => {
+                let (yes_id, no_id) = state::<ConfirmState>(hwnd)
+                    .map(|s| {
+                        (
+                            s.btn_yes.as_ref().map_or(0, |b| b.id()),
+                            s.btn_no.as_ref().map_or(0, |b| b.id()),
+                        )
+                    })
+                    .unwrap_or((0, 0));
+
                 let mut id = (wparam & 0xFFFF) as u32;
                 if id == IDOK {
                     // Enter: activates the focused button (No stays No on danger dialogs)
-                    id = super::resolve_enter_command(hwnd, IDC_CONFIRM_BTN_YES);
+                    id = super::resolve_enter_command(hwnd, yes_id);
                 }
-                if id == IDC_CONFIRM_BTN_YES {
+                if yes_id != 0 && id == yes_id {
                     confirm_and_close(hwnd);
-                } else if id == IDC_CONFIRM_BTN_NO || id == IDCANCEL {
+                } else if (no_id != 0 && id == no_id) || id == IDCANCEL {
                     cancel_and_close(hwnd);
                 }
                 0
@@ -272,7 +318,6 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                 }
                 0
             }
-            WM_DRAWITEM => forward_draw_item(wparam, lparam),
             WM_CLOSE => {
                 let parent = state::<ConfirmState>(hwnd).map_or(0, |s| s.parent);
                 close_modal(hwnd, parent);

@@ -1,261 +1,135 @@
 //! Tab 2: System controls (Khởi động cùng Windows, Giao diện, Ngôn ngữ, Nhật ký lỗi, Cập nhật)
-//! Redesigned with modern Fluent cards, matching mockup_profiles layout.
+//! Uses CardLayout (page_header, section_title, checkbox_row, auto-HWND, auto-i18n).
 
 use crate::language::LanguageStrings;
-use crate::ui::colors::ThemePalette;
-use crate::ui::views::dialogs::{show_confirm_dialog, ConfirmDialogOptions};
-use crate::ui::win32::{
-    create_app_font, to_wide, DeleteObject, RedrawWindow, SetBkColor, SetTextColor,
-    SetWindowTextW, ShowWindow, CBN_SELCHANGE, FW_BOLD, RDW_ALLCHILDREN, RDW_INVALIDATE,
-    SW_HIDE, SW_SHOW,
-};
-use crate::ui::components::*;
-use crate::ui::tokens::id::*;
-use crate::ui::tokens::layout::*;
-use crate::ui::tokens::typography::*;
+use crate::ui::prelude::*;
+use crate::ui::views::dialogs::show_danger_confirm;
+use crate::ui_framework::win32::{RedrawWindow, SetWindowTextW, RDW_ALLCHILDREN, RDW_INVALIDATE};
+
+const SYS_CARD_X: i32 = 246;
+const SYS_CONTENT_X: i32 = 266;
+const SYS_CONTENT_W: i32 = 520;
 
 pub struct TabSystem {
-    pub lbl_header_title: Label,
-    pub lbl_header_sub: Label,
-    pub label_sys_title: Label,
+    layout: CardLayout,
     pub check_autostart: CheckBox,
     pub check_show_dialog: CheckBox,
     pub check_debug_log: CheckBox,
     pub btn_open_log: PushButton,
-    pub label_theme_title: Label,
-    pub label_theme: Label,
     pub combo_theme: ComboBox,
-    pub label_lang: Label,
     pub combo_lang: ComboBox,
-    pub label_defaults_title: Label,
-    pub label_defaults_desc: Label,
     pub btn_restore_defaults: PushButton,
-    pub hfont_title: isize,
 }
 
 impl TabSystem {
     pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
-        let strings = crate::language::current();
-        let hfont_title = create_app_font(FONT_SIZE_TITLE, FW_BOLD);
+        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold)
+            .at(86)
+            .with_bounds(SYS_CONTENT_X, SYS_CONTENT_W);
 
         // --- Header Section ---
-        let lbl_header_title = Label::create_with_id(
-            parent,
-            IDC_SYS_HEADER_TITLE,
-            strings.sys_header_title,
-            HEADER_X,
-            HEADER_TITLE_Y,
-            HEADER_TITLE_WIDTH,
-            HEADER_TITLE_HEIGHT,
-            hfont_title,
-        )?;
-
-        let lbl_header_sub = Label::create_with_id(
-            parent,
-            IDC_SYS_HEADER_SUB,
-            strings.sys_header_sub,
-            HEADER_X,
-            HEADER_SUB_Y,
-            HEADER_SUB_WIDTH,
-            HEADER_SUB_HEIGHT,
-            hfont_normal,
-        )?;
+        ly.page_header(|s| s.sys_header_title, |s| s.sys_header_sub)?;
 
         // --- Card 1: Windows System ---
-        let label_sys_title = Label::create_with_id(
-            parent,
-            IDC_LABEL_SYS_TITLE,
-            strings.sys_title,
-            266,
-            102,
-            400,
-            20,
-            hfont_bold,
-        )?;
+        let (check_autostart, check_show_dialog, check_debug_log, btn_open_log) =
+            ly.card_with_pad(16, 18, |card| {
+                card.section_title(|s| s.sys_title, 8)?;
+                let check_autostart =
+                    card.checkbox_row(|s| s.check_autostart, 24, 6, false, false)?;
+                let check_show_dialog =
+                    card.checkbox_row(|s| s.check_show_dialog, 24, 6, false, false)?;
 
-        let check_autostart = CheckBox::create(
-            parent,
-            IDC_CHECK_AUTOSTART,
-            strings.check_autostart,
-            266,
-            130,
-            520,
-            24,
-            hfont_normal,
-        )?;
+                let ((x_dbg, w_dbg), (x_btn_log, w_btn_log)) = card.split_right(144, 16);
+                let y_chk3 = card.row(24, 0);
+                let check_debug_log =
+                    card.checkbox_at(|s| s.check_debug_log, x_dbg, y_chk3, w_dbg, 24, false)?;
 
-        let check_show_dialog = CheckBox::create(
-            parent,
-            IDC_CHECK_SHOW_DIALOG,
-            strings.check_show_dialog,
-            266,
-            160,
-            520,
-            24,
-            hfont_normal,
-        )?;
-
-        let check_debug_log = CheckBox::create(
-            parent,
-            IDC_CHECK_DEBUG_LOG,
-            strings.check_debug_log,
-            266,
-            190,
-            360,
-            24,
-            hfont_normal,
-        )?;
-
-        let btn_open_log = PushButton::create_with_variant(
-            parent,
-            IDC_BTN_OPEN_LOG,
-            strings.btn_open_log,
-            642,
-            189,
-            144,
-            26,
-            hfont_normal,
-            ButtonVariant::Secondary,
-            None,
-        )?;
+                let btn_open_log = card.button_at(
+                    |s| s.btn_open_log,
+                    x_btn_log,
+                    y_chk3 - 1,
+                    w_btn_log,
+                    26,
+                    false,
+                    ButtonVariant::Secondary,
+                )?;
+                Some((check_autostart, check_show_dialog, check_debug_log, btn_open_log))
+            })?;
 
         // --- Card 2: Theme & Language ---
-        let label_theme_title = Label::create_with_id(
-            parent,
-            IDC_LABEL_THEME_TITLE,
-            strings.label_theme_title,
-            266,
-            264,
-            400,
-            20,
-            hfont_bold,
-        )?;
-
-        let label_theme = Label::create_with_id(
-            parent,
-            IDC_LABEL_THEME,
-            strings.label_theme,
-            266,
-            292,
-            245,
-            18,
-            hfont_normal,
-        )?;
-
-        let combo_theme = ComboBox::create_with_items(
-            parent,
-            IDC_COMBO_THEME,
-            266,
-            314,
-            250,
-            160,
-            hfont_normal,
-            &[strings.theme_auto, strings.theme_light, strings.theme_dark],
-            0,
-        )?;
-
-        let label_lang = Label::create_with_id(
-            parent,
-            IDC_LABEL_LANG,
-            strings.label_language,
-            536,
-            292,
-            250,
-            18,
-            hfont_normal,
-        )?;
-
-        let combo_lang = ComboBox::create_with_items(
-            parent,
-            IDC_COMBO_LANG,
-            536,
-            314,
-            250,
-            160,
-            hfont_normal,
-            &["Tiếng Việt", "English"],
-            0,
-        )?;
+        ly.skip(4);
+        let (combo_theme, combo_lang) = ly.card_with_pad(16, 26, |card| {
+            card.section_title(|s| s.label_theme_title, 8)?;
+            let ((_, combo_theme), (_, combo_lang)) = card.two_col_combos(
+                20,
+                0,
+                false,
+                (
+                    |s| s.label_theme,
+                    |s| vec![s.theme_auto, s.theme_light, s.theme_dark],
+                ),
+                (|s| s.label_language, |_s| vec!["Tiếng Việt", "English"]),
+            )?;
+            Some((combo_theme, combo_lang))
+        })?;
 
         // --- Card 3: Restore Defaults ---
-        let label_defaults_title = Label::create_with_id(
-            parent,
-            IDC_LABEL_DEFAULTS_TITLE,
-            strings.sys_defaults_title,
-            266,
-            400,
-            360,
-            20,
-            hfont_bold,
-        )?;
+        ly.skip(4);
+        let btn_restore_defaults = ly.card_with_pad(16, 12, |card| {
+            let ((x_def, w_def), (x_btn_def, w_btn_def)) = card.split_right(144, 16);
+            let y_def_title = card.row(20, 4);
+            card.label_at(
+                |s| s.sys_defaults_title,
+                x_def,
+                y_def_title,
+                w_def,
+                20,
+                true,
+            )?;
 
-        let label_defaults_desc = Label::create_with_id(
-            parent,
-            IDC_LABEL_DEFAULTS_DESC,
-            strings.sys_defaults_desc,
-            266,
-            424,
-            360,
-            36,
-            hfont_normal,
-        )?;
+            let y_def_desc = card.row(36, 0);
+            card.label_at(
+                |s| s.sys_defaults_desc,
+                x_def,
+                y_def_desc,
+                w_def,
+                36,
+                false,
+            )?
+            .with_tone(LabelTone::Secondary);
 
-        let btn_restore_defaults = PushButton::create_with_variant(
-            parent,
-            IDC_BTN_RESTORE_DEFAULTS,
-            strings.btn_restore_defaults,
-            642,
-            412,
-            144,
-            32,
-            hfont_normal,
-            ButtonVariant::Secondary,
-            None,
-        )?;
+            card.button_at(
+                |s| s.btn_restore_defaults,
+                x_btn_def,
+                y_def_title + 12,
+                w_btn_def,
+                32,
+                false,
+                ButtonVariant::Secondary,
+            )
+        })?;
 
         Some(Self {
-            lbl_header_title,
-            lbl_header_sub,
-            label_sys_title,
+            layout: ly,
             check_autostart,
             check_show_dialog,
             check_debug_log,
             btn_open_log,
-            label_theme_title,
-            label_theme,
             combo_theme,
-            label_lang,
             combo_lang,
-            label_defaults_title,
-            label_defaults_desc,
             btn_restore_defaults,
-            hfont_title,
         })
     }
 
+    pub fn paint(&self, hdc: isize, right_bound: i32) {
+        self.layout.paint_cards(hdc, SYS_CARD_X, right_bound);
+    }
+
     pub fn update_visibility(&self, visible: bool) {
-        unsafe {
-            let show_cmd = if visible { SW_SHOW } else { SW_HIDE };
-            ShowWindow(self.lbl_header_title.hwnd(), show_cmd);
-            ShowWindow(self.lbl_header_sub.hwnd(), show_cmd);
-            ShowWindow(self.label_sys_title.hwnd(), show_cmd);
-            ShowWindow(self.check_autostart.hwnd(), show_cmd);
-            ShowWindow(self.check_show_dialog.hwnd(), show_cmd);
-            ShowWindow(self.check_debug_log.hwnd(), show_cmd);
-            ShowWindow(self.btn_open_log.hwnd(), show_cmd);
-            ShowWindow(self.label_theme_title.hwnd(), show_cmd);
-            ShowWindow(self.label_theme.hwnd(), show_cmd);
-            ShowWindow(self.combo_theme.hwnd(), show_cmd);
-            ShowWindow(self.label_lang.hwnd(), show_cmd);
-            ShowWindow(self.combo_lang.hwnd(), show_cmd);
-            ShowWindow(self.label_defaults_title.hwnd(), show_cmd);
-            ShowWindow(self.label_defaults_desc.hwnd(), show_cmd);
-            ShowWindow(self.btn_restore_defaults.hwnd(), show_cmd);
-        }
+        self.layout.set_visible(visible);
     }
 
     pub fn load_config(&self, config: &crate::engine::EngineConfig) {
-        // Luôn đọc trực tiếp từ Registry làm nguồn chuẩn xác nhất
         self.check_autostart
             .set_checked(crate::platform::is_windows_autostart_enabled());
         self.check_show_dialog
@@ -296,77 +170,8 @@ impl TabSystem {
     }
 
     pub fn update_language(&self, lang: crate::language::Language, strings: &LanguageStrings) {
-        self.lbl_header_title.set_text(strings.sys_header_title);
-        self.lbl_header_sub.set_text(strings.sys_header_sub);
-        self.label_sys_title.set_text(strings.sys_title);
-        self.check_autostart.set_text(strings.check_autostart);
-        self.check_show_dialog.set_text(strings.check_show_dialog);
-        self.check_debug_log.set_text(strings.check_debug_log);
-        self.btn_open_log.set_text(strings.btn_open_log);
-        self.label_theme_title.set_text(strings.label_theme_title);
-        self.label_theme.set_text(strings.label_theme);
-
-        let cur_theme = self.combo_theme.get_selected().unwrap_or(0);
-        self.combo_theme.reset_items(
-            &[strings.theme_auto, strings.theme_light, strings.theme_dark],
-            Some(cur_theme),
-        );
-
-        self.label_lang.set_text(strings.label_language);
+        self.layout.update_language(strings);
         self.combo_lang.set_selected(lang.into());
-
-        self.label_defaults_title.set_text(strings.sys_defaults_title);
-        self.label_defaults_desc.set_text(strings.sys_defaults_desc);
-        self.btn_restore_defaults.set_text(strings.btn_restore_defaults);
-    }
-
-
-    pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
-        let palette = ThemePalette::get(is_dark);
-        match ctrl_id {
-            IDC_SYS_HEADER_TITLE => {
-                unsafe {
-                    SetBkColor(hdc, palette.bg_window);
-                    SetTextColor(hdc, palette.text_primary);
-                }
-                let br = crate::ui::theme::get_panel_bg_brush();
-                if br != 0 {
-                    return Some(br);
-                }
-            }
-            IDC_SYS_HEADER_SUB => {
-                unsafe {
-                    SetBkColor(hdc, palette.bg_window);
-                    SetTextColor(hdc, palette.text_secondary);
-                }
-                let br = crate::ui::theme::get_panel_bg_brush();
-                if br != 0 {
-                    return Some(br);
-                }
-            }
-            IDC_LABEL_SYS_TITLE | IDC_LABEL_THEME_TITLE | IDC_LABEL_DEFAULTS_TITLE => {
-                unsafe {
-                    SetBkColor(hdc, palette.bg_card);
-                    SetTextColor(hdc, palette.text_primary);
-                }
-                let br = crate::ui::theme::get_tab_card_brush();
-                if br != 0 {
-                    return Some(br);
-                }
-            }
-            IDC_LABEL_THEME | IDC_LABEL_LANG | IDC_LABEL_DEFAULTS_DESC => {
-                unsafe {
-                    SetBkColor(hdc, palette.bg_card);
-                    SetTextColor(hdc, palette.text_secondary);
-                }
-                let br = crate::ui::theme::get_tab_card_brush();
-                if br != 0 {
-                    return Some(br);
-                }
-            }
-            _ => {}
-        }
-        None
     }
 
     pub fn on_command(
@@ -376,87 +181,87 @@ impl TabSystem {
         notify_code: u32,
         controls: &super::ControlPanelControls,
     ) -> bool {
-        match ctl_id {
-            IDC_BTN_RESTORE_DEFAULTS => {
-                let strings = crate::language::current();
-                let options = ConfirmDialogOptions::new(
-                    strings.confirm_defaults_title,
-                    strings.confirm_defaults_msg,
-                )
-                .danger(true)
-                .yes_text(strings.btn_yes)
-                .no_text(strings.btn_no);
-
-                let hwnd_panel = hwnd;
-                show_confirm_dialog(hwnd_panel, options, move || {
-                    let def_config = crate::engine::EngineConfig::default();
-                    crate::ui::controller::with_engine(|engine| {
-                        *engine.config_mut() = def_config.clone();
-                        engine.profile_manager = crate::engine::profile::ProfileManager::new();
-                        engine.macro_table = crate::engine::macro_table::MacroTable::new();
-                        let _ = crate::engine::config_store::save_config_all(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                        crate::ui::controller::reconfigure_sound(engine);
-                    });
-
-                    if let Some(controls) = crate::ui::controls() {
-                        controls.refresh_from_engine();
-                        controls.update_language(def_config.language);
-                        let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
-                        crate::ui::theme::apply_ui_theme(hwnd_panel, controls, is_dark);
-                    }
-                    unsafe {
-                        let strings = crate::language::get_strings(def_config.language);
-                        SetWindowTextW(
-                            hwnd_panel,
-                            to_wide(strings.window_title).as_ptr(),
-                        );
-                        RedrawWindow(
-                            hwnd_panel,
-                            std::ptr::null(),
-                            0,
-                            RDW_INVALIDATE | RDW_ALLCHILDREN,
-                        );
-                    }
+        if self.btn_restore_defaults.is_clicked(ctl_id, notify_code) {
+            let strings = crate::language::current();
+            let hwnd_panel = hwnd;
+            show_danger_confirm(
+                hwnd_panel,
+                strings.confirm_defaults_title,
+                strings.confirm_defaults_msg,
+                move || {
+                let def_config = crate::engine::EngineConfig::default();
+                crate::ui::controller::with_engine(|engine| {
+                    *engine.config_mut() = def_config.clone();
+                    engine.profile_manager = crate::engine::profile::ProfileManager::new();
+                    engine.macro_table = crate::engine::macro_table::MacroTable::new();
+                    let _ = crate::engine::config_store::save_config_all(
+                        engine.config(),
+                        &engine.macro_table,
+                        &engine.profile_manager,
+                    );
+                    crate::ui::controller::reconfigure_sound(engine);
                 });
-                true
+
+                if let Some(controls) = crate::ui::controls() {
+                    controls.refresh_from_engine();
+                    controls.update_language(def_config.language);
+                    let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
+                    crate::ui::theme::apply_ui_theme(hwnd_panel, controls, is_dark);
+                }
+                unsafe {
+                    let strings = crate::language::get_strings(def_config.language);
+                    SetWindowTextW(hwnd_panel, to_wide(strings.window_title).as_ptr());
+                    RedrawWindow(
+                        hwnd_panel,
+                        std::ptr::null(),
+                        0,
+                        RDW_INVALIDATE | RDW_ALLCHILDREN,
+                    );
+                }
+            });
+            return true;
+        }
+
+        if self.btn_open_log.is_clicked(ctl_id, notify_code) {
+            let log_file = {
+                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
+                    guard
+                        .as_ref()
+                        .and_then(|e| {
+                            e.config()
+                                .debug_file_path
+                                .as_deref()
+                                .map(|s| s.to_string())
+                        })
+                        .unwrap_or_else(|| "kora_debug.log".to_string())
+                } else {
+                    "kora_debug.log".to_string()
+                }
+            };
+            if !std::path::Path::new(&log_file).exists() {
+                let _ = std::fs::File::create(&log_file);
             }
-            IDC_BTN_OPEN_LOG => {
-                let log_file = {
-                    if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
-                        guard
-                            .as_ref()
-                            .and_then(|e| e.config().debug_file_path.as_deref().map(|s| s.to_string()))
-                            .unwrap_or_else(|| "kora_debug.log".to_string())
-                    } else {
-                        "kora_debug.log".to_string()
-                    }
-                };
-                if !std::path::Path::new(&log_file).exists() {
-                    let _ = std::fs::File::create(&log_file);
-                }
-                let _ = std::process::Command::new("notepad.exe")
-                    .arg(&log_file)
-                    .spawn();
-                true
-            }
-            IDC_COMBO_THEME | IDC_COMBO_LANG | IDC_CHECK_AUTOSTART | IDC_CHECK_SHOW_DIALOG | IDC_CHECK_DEBUG_LOG => {
-                let is_combo = (ctl_id == IDC_COMBO_THEME || ctl_id == IDC_COMBO_LANG) && notify_code == CBN_SELCHANGE;
-                let is_check = (ctl_id == IDC_CHECK_AUTOSTART || ctl_id == IDC_CHECK_SHOW_DIALOG || ctl_id == IDC_CHECK_DEBUG_LOG) && notify_code == 0;
+            let _ = std::process::Command::new("notepad.exe")
+                .arg(&log_file)
+                .spawn();
+            return true;
+        }
 
-                if !(is_combo || is_check) {
-                    return false;
-                }
+        if self.check_autostart.is_toggled(ctl_id, notify_code) {
+            crate::platform::set_windows_autostart(self.check_autostart.is_checked());
+            return true;
+        }
 
-                if ctl_id == IDC_CHECK_AUTOSTART {
-                    crate::platform::set_windows_autostart(self.check_autostart.is_checked());
-                    return true;
-                }
+        let is_theme_changed = self.combo_theme.is_changed(ctl_id, notify_code);
+        let is_lang_changed = self.combo_lang.is_changed(ctl_id, notify_code);
+        let is_chk_changed = self.check_show_dialog.is_toggled(ctl_id, notify_code)
+            || self.check_debug_log.is_toggled(ctl_id, notify_code);
 
-                let snapshot = crate::platform::win32::ENGINE_INSTANCE.lock().ok().and_then(|mut guard| {
+        if is_theme_changed || is_lang_changed || is_chk_changed {
+            let snapshot = crate::platform::win32::ENGINE_INSTANCE
+                .lock()
+                .ok()
+                .and_then(|mut guard| {
                     guard.as_mut().map(|engine| {
                         self.read_config(engine.config_mut());
                         crate::engine::config_store::save_config_all_debounced(
@@ -468,33 +273,33 @@ impl TabSystem {
                     })
                 });
 
-                if let Some((theme, lang)) = snapshot {
-                    if ctl_id == IDC_COMBO_THEME {
-                        let is_dark = crate::ui::theme::resolve_is_dark(theme);
-                        crate::ui::theme::apply_ui_theme(hwnd, controls, is_dark);
-                    } else if ctl_id == IDC_COMBO_LANG {
-                        controls.update_language(lang);
-                        unsafe {
-                            let strings = crate::language::get_strings(lang);
-                            SetWindowTextW(hwnd, to_wide(strings.window_title).as_ptr());
-                            // Only text changed: repaint, no need to re-run the theme pass
-                            RedrawWindow(hwnd, std::ptr::null(), 0, RDW_INVALIDATE | RDW_ALLCHILDREN);
-                        }
+            if let Some((theme, lang)) = snapshot {
+                if is_theme_changed {
+                    let is_dark = crate::ui::theme::resolve_is_dark(theme);
+                    crate::ui::theme::apply_ui_theme(hwnd, controls, is_dark);
+                    if let Some(ui) = crate::ui::ui() {
+                        ui.tray.borrow_mut().refresh_icon();
+                    }
+                } else if is_lang_changed {
+                    controls.update_language(lang);
+                    if let Some(ui) = crate::ui::ui() {
+                        ui.tray.borrow_mut().refresh_icon();
+                    }
+                    unsafe {
+                        let strings = crate::language::get_strings(lang);
+                        SetWindowTextW(hwnd, to_wide(strings.window_title).as_ptr());
+                        RedrawWindow(
+                            hwnd,
+                            std::ptr::null(),
+                            0,
+                            RDW_INVALIDATE | RDW_ALLCHILDREN,
+                        );
                     }
                 }
-                true
             }
-            _ => false,
+            return true;
         }
-    }
-}
 
-impl Drop for TabSystem {
-    fn drop(&mut self) {
-        unsafe {
-            if self.hfont_title != 0 {
-                DeleteObject(self.hfont_title);
-            }
-        }
+        false
     }
 }

@@ -138,7 +138,6 @@ pub struct LanguageStrings {
     pub action_mute: &'static str,
     pub action_unmute: &'static str,
     pub action_combo: &'static str,
-    pub action_jump_to_feature: &'static str,
     pub macro_type_normal: &'static str,
     pub macro_type_start: &'static str,
     pub macro_type_end: &'static str,
@@ -205,10 +204,6 @@ pub struct LanguageStrings {
     // System Tray Menu & Tooltips
     pub tray_tooltip_vi: &'static str,
     pub tray_tooltip_en: &'static str,
-    pub tray_toggle_vi: &'static str,
-    pub tray_method_telex: &'static str,
-    pub tray_method_vni: &'static str,
-    pub tray_method_simple_telex: &'static str,
     pub tray_control_panel: &'static str,
     pub tray_exit: &'static str,
 

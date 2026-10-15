@@ -258,7 +258,7 @@
       margin-left: auto;
     }
 
-    /* Sidebar Footer Navigation (Tools right above System Settings) */
+    /* Sidebar Footer Navigation */
     .sidebar-footer {
       border-top: 1px solid var(--border);
       padding: 8px 10px;
@@ -298,16 +298,6 @@
       font-weight: 600;
     }
 
-    .tools-count-badge {
-      font-size: 10px;
-      background: rgba(0, 120, 212, 0.2);
-      color: var(--accent);
-      border: 1px solid var(--accent);
-      padding: 0 6px;
-      border-radius: 10px;
-      font-weight: 700;
-    }
-
     /* Right Main Area */
     .main-area {
       flex: 1;
@@ -318,7 +308,7 @@
     }
 
     .profile-banner {
-      padding: 12px 20px;
+      padding: 10px 20px;
       border-bottom: 1px solid var(--border);
       background: var(--bg-card-header);
       display: flex;
@@ -326,14 +316,78 @@
       align-items: center;
     }
 
+    /* Shared Profile TabBar */
+    .profile-tabbar-wrap {
+      padding: 10px 20px 0 20px;
+    }
+
+    .profile-tabbar {
+      display: flex;
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .profile-tab {
+      flex: 1;
+      text-align: center;
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.12s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .profile-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .profile-tab.active {
+      background: var(--tab-active-bg);
+      color: var(--text-primary);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+
+    .origin-pill {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      background: var(--bg-input);
+      cursor: pointer;
+    }
+
+    .origin-pill.inherited {
+      color: var(--accent);
+      border-color: rgba(0, 120, 212, 0.45);
+      background: rgba(0, 120, 212, 0.1);
+    }
+
+    .origin-pill.overridden {
+      color: #F59E0B;
+      border-color: rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.12);
+    }
+
     /* Content Area */
     .tab-content {
       flex: 1;
       overflow-y: auto;
-      padding: 14px 20px;
+      padding: 12px 20px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
     }
 
     /* Tool Cards */
@@ -341,7 +395,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 12px 14px;
+      padding: 11px 14px;
       transition: border-color 0.15s, opacity 0.15s;
     }
 
@@ -379,8 +433,8 @@
     }
 
     .tool-card-body {
-      margin-top: 10px;
-      padding-top: 10px;
+      margin-top: 9px;
+      padding-top: 9px;
       border-top: 1px solid var(--border-subtle);
       padding-left: 26px;
       transition: opacity 0.15s;
@@ -461,7 +515,7 @@
     .case-cycle-grid {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
       margin-top: 6px;
     }
 
@@ -471,7 +525,7 @@
       justify-content: space-between;
       background: var(--bg-card-header);
       border: 1px solid var(--border-subtle);
-      padding: 6px 10px;
+      padding: 5px 10px;
       border-radius: 5px;
       transition: all 0.12s;
     }
@@ -644,7 +698,7 @@
   <div class="top-toolbar">
     <div class="top-toolbar-left">
       <button onclick="toggleTheme()">🌓 Đổi Giao diện Sáng/Tối</button>
-      <span style="color:#999; font-size:12px;">Bấm thử phím tắt để kiểm tra luồng xử lý Clipboard & Thông báo:</span>
+      <span style="color:#999; font-size:12px;">Chọn Hồ sơ ở cột trái hoặc bấm thử phím tắt để kiểm tra:</span>
     </div>
     <div class="top-toolbar-right">
       <button class="btn-sim-primary" onclick="triggerCaseCycle()">
@@ -666,10 +720,10 @@
       <div class="titlebar">
         <div class="titlebar-brand">
           <div class="titlebar-logo">K</div>
-          <span>Kora - Bộ gõ Tiếng Việt (v0.8.0)</span>
+          <span>Kora - Bảng điều khiển</span>
         </div>
         <div style="font-size: 11.5px; color: var(--text-secondary);">
-          Trạng thái: <b style="color:var(--success)">● Đang bật Tiếng Việt</b>
+          Hồ sơ đang chọn: <b id="titleActiveProfile" style="color:var(--accent)">🌐 Toàn hệ thống</b>
         </div>
       </div>
 
@@ -678,58 +732,50 @@
         <!-- Sidebar -->
         <div class="sidebar">
           <div class="sidebar-title">
-            <span>HỒ SƠ (PROFILES)</span>
-            <button class="btn-add-profile" title="Thêm Profile Mới">➕</button>
+            <span>📁 HỒ SƠ</span>
+            <button class="btn-add-profile" title="Thêm hồ sơ ứng dụng mới">➕</button>
           </div>
 
           <div class="profile-tree">
-            <div class="profile-item" onclick="switchView('profile')">
+            <div class="profile-item active" id="profItem_global" onclick="selectProfile('global')">
               <div class="profile-item-icon">🌐</div>
               <div style="overflow:hidden;">
                 <div class="profile-item-name">Toàn hệ thống</div>
-                <div class="profile-item-desc">Telex • Unicode</div>
+                <div class="profile-item-desc" id="profDesc_global">Toàn hệ thống • Mặc định</div>
               </div>
               <span class="badge-root">GỐC</span>
             </div>
 
-            <div class="profile-item" onclick="switchView('profile')">
+            <div class="profile-item" id="profItem_vscode" onclick="selectProfile('vscode')">
               <div class="profile-item-icon">💻</div>
               <div style="overflow:hidden;">
                 <div class="profile-item-name">Visual Studio Code</div>
-                <div class="profile-item-desc">Code.exe • Tiếng Anh</div>
+                <div class="profile-item-desc" id="profDesc_vscode">Code.exe • Tiếng Anh</div>
               </div>
             </div>
 
-            <div class="profile-item" onclick="switchView('profile')">
+            <div class="profile-item" id="profItem_valorant" onclick="selectProfile('valorant')">
               <div class="profile-item-icon">🎮</div>
               <div style="overflow:hidden;">
                 <div class="profile-item-name">Valorant</div>
-                <div class="profile-item-desc">VALORANT.exe • Tắt</div>
+                <div class="profile-item-desc" id="profDesc_valorant">VALORANT.exe • Tắt công cụ</div>
               </div>
             </div>
           </div>
 
-          <!-- Sidebar Footer: NEW "Công cụ" button placed right above "Cài đặt hệ thống" -->
+          <!-- Sidebar Footer: Only System Settings & About -->
           <div class="sidebar-footer">
-            <div class="sidebar-footer-btn active" id="navTools" onclick="switchView('tools')">
-              <div class="sidebar-footer-btn-left">
-                <span>🛠️</span>
-                <span>Công cụ tiện ích</span>
-              </div>
-              <span class="tools-count-badge" id="badgeToolsCount">3 bật</span>
-            </div>
-
-            <div class="sidebar-footer-btn" id="navSystem" onclick="switchView('system')">
+            <div class="sidebar-footer-btn" id="navSystem" onclick="switchSystemView('system')">
               <div class="sidebar-footer-btn-left">
                 <span>⚙️</span>
-                <span>Cài đặt hệ thống</span>
+                <span>Cài đặt chung hệ thống</span>
               </div>
             </div>
 
-            <div class="sidebar-footer-btn" id="navAbout" onclick="switchView('about')">
+            <div class="sidebar-footer-btn" id="navAbout" onclick="switchSystemView('about')">
               <div class="sidebar-footer-btn-left">
                 <span>ℹ️</span>
-                <span>Thông tin</span>
+                <span>Thông tin &amp; tác giả</span>
               </div>
             </div>
           </div>
@@ -737,29 +783,51 @@
 
         <!-- Right Main Area -->
         <div class="main-area">
-          <!-- Banner -->
+          <!-- Profile Banner -->
           <div class="profile-banner">
             <div>
-              <h2 id="bannerTitle" style="font-size: 14.5px; font-weight: 700;">🛠️ Công cụ tiện ích</h2>
+              <h2 id="bannerTitle" style="font-size: 14.5px; font-weight: 700;">🌐 Toàn hệ thống</h2>
               <p id="bannerSub" style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">
-                Các công cụ được bật sẽ hiển thị trong menu khay hệ thống (Tray Menu) và kích hoạt phím tắt tương ứng
+                Cấu hình nền mặc định cho mọi ứng dụng trên máy tính
               </p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button class="btn" id="btnResetProfileTools" style="display:none; font-size:11px; padding:4px 9px;" onclick="resetCurrentProfileToInherit()">
+                🌐 Kế thừa toàn bộ từ gốc
+              </button>
+              <button class="btn" id="btnDeleteProfile" style="display:none; font-size:11px; padding:4px 9px; color:var(--danger); border-color:rgba(244,71,71,0.4);">
+                🗑️ Xóa profile
+              </button>
             </div>
           </div>
 
-          <!-- TOOLS TAB CONTENT -->
+          <!-- Shared Profile TabBar (5 Tabs: Bộ gõ, Quản lý phím, Âm thanh gõ, Gõ tắt, Công cụ) -->
+          <div class="profile-tabbar-wrap">
+            <div class="profile-tabbar">
+              <div class="profile-tab" onclick="switchProfileTab(0)">⌨️ Bộ gõ</div>
+              <div class="profile-tab" onclick="switchProfileTab(1)">🔄 Quản lý phím</div>
+              <div class="profile-tab" onclick="switchProfileTab(2)">🔊 Âm thanh gõ</div>
+              <div class="profile-tab" onclick="switchProfileTab(3)">⚡ Gõ tắt</div>
+              <div class="profile-tab active" onclick="switchProfileTab(4)">
+                <span>🛠️ Công cụ</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- TOOLS TAB CONTENT (PER-PROFILE) -->
           <div class="tab-content" id="viewTools">
             <!-- CARD 1: DỊCH VĂN BẢN ĐANG BÔI ĐEN -->
             <div class="tool-card" id="cardTranslate">
               <div class="tool-card-header">
                 <div class="tool-card-title-group">
-                  <input type="checkbox" id="chkTranslate" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <input type="checkbox" id="chkTranslate" checked onchange="onToggleTool('translate', this.checked)" style="margin-top:2px;">
                   <div>
-                    <label for="chkTranslate" class="tool-title" style="cursor:pointer;">
-                      🌐 Dịch văn bản đang bôi đen
-                    </label>
+                    <div class="tool-title">
+                      <label for="chkTranslate" style="cursor:pointer;">🌐 Dịch văn bản</label>
+                      <span class="origin-pill" id="originPillTranslate" style="display:none;" onclick="resetToolToInherit('translate')" title="Click để khôi phục kế thừa từ Toàn hệ thống"></span>
+                    </div>
                     <div class="tool-desc">
-                      Dịch nhanh đoạn văn bản bạn đang bôi đen sang ngôn ngữ đích đã chọn
+                      Dịch nhanh đoạn văn bản đang bôi đen sang ngôn ngữ đích của hồ sơ này
                     </div>
                   </div>
                 </div>
@@ -778,7 +846,7 @@
                     <label style="display:block; font-size:11px; color:var(--text-secondary); margin-bottom:4px;">
                       Ngôn ngữ đích cần dịch sang:
                     </label>
-                    <select id="selTargetLang" onchange="syncToolsState()" style="width:100%;">
+                    <select id="selTargetLang" onchange="onChangeTargetLang(this.value)" style="width:100%;">
                       <option value="Tiếng Việt">Tiếng Việt (Vietnamese)</option>
                       <option value="Tiếng Anh">Tiếng Anh (English)</option>
                       <option value="Tự động (Việt ↔ Anh)">Tự động phát hiện (Việt ↔ Anh)</option>
@@ -790,7 +858,7 @@
 
                   <div style="padding-top: 14px;">
                     <label class="check-row">
-                      <input type="checkbox" id="chkTranslateAutoCopy" checked onchange="syncToolsState()">
+                      <input type="checkbox" id="chkTranslateAutoCopy" checked onchange="onChangeAutoCopy(this.checked)">
                       <span>Tự động sao chép kết quả dịch vào Clipboard</span>
                     </label>
                   </div>
@@ -802,11 +870,12 @@
             <div class="tool-card" id="cardCase">
               <div class="tool-card-header">
                 <div class="tool-card-title-group">
-                  <input type="checkbox" id="chkCase" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <input type="checkbox" id="chkCase" checked onchange="onToggleTool('case', this.checked)" style="margin-top:2px;">
                   <div>
-                    <label for="chkCase" class="tool-title" style="cursor:pointer;">
-                      🔠 Chuyển đổi chữ Hoa / chữ thường (Clipboard)
-                    </label>
+                    <div class="tool-title">
+                      <label for="chkCase" style="cursor:pointer;">🔠 Chuyển đổi chữ Hoa / chữ thường (Clipboard)</label>
+                      <span class="origin-pill" id="originPillCase" style="display:none;" onclick="resetToolToInherit('case')" title="Click để khôi phục kế thừa từ Toàn hệ thống"></span>
+                    </div>
                     <div class="tool-desc">
                       Xử lý văn bản trong bộ nhớ Clipboard. Mỗi lần ấn phím tắt sẽ chuyển lần lượt từ trên xuống dưới kèm thông báo
                     </div>
@@ -829,7 +898,7 @@
                 <div class="case-cycle-grid" id="caseCycleList">
                   <div class="case-step-row" id="stepRow0">
                     <label class="check-row">
-                      <input type="checkbox" class="case-sub-opt" checked data-mode="upper" data-name="IN HOA TẤT CẢ" onchange="syncToolsState()">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="upper" data-name="IN HOA TẤT CẢ" onchange="onChangeCaseSubOpts()">
                       <span><b>IN HOA TẤT CẢ</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: XIN CHÀO VIỆT NAM)</span></span>
                     </label>
                     <span class="step-order-pill" id="pillOrder0">Thứ tự #1</span>
@@ -837,7 +906,7 @@
 
                   <div class="case-step-row" id="stepRow1">
                     <label class="check-row">
-                      <input type="checkbox" class="case-sub-opt" checked data-mode="lower" data-name="chữ thường tất cả" onchange="syncToolsState()">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="lower" data-name="chữ thường tất cả" onchange="onChangeCaseSubOpts()">
                       <span><b>chữ thường tất cả</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: xin chào việt nam)</span></span>
                     </label>
                     <span class="step-order-pill" id="pillOrder1">Thứ tự #2</span>
@@ -845,7 +914,7 @@
 
                   <div class="case-step-row" id="stepRow2">
                     <label class="check-row">
-                      <input type="checkbox" class="case-sub-opt" checked data-mode="title" data-name="Viết Hoa Chữ Cái Đầu Từ" onchange="syncToolsState()">
+                      <input type="checkbox" class="case-sub-opt" checked data-mode="title" data-name="Viết Hoa Chữ Cái Đầu Từ" onchange="onChangeCaseSubOpts()">
                       <span><b>Viết Hoa Chữ Cái Đầu Từ</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: Xin Chào Việt Nam)</span></span>
                     </label>
                     <span class="step-order-pill" id="pillOrder2">Thứ tự #3</span>
@@ -853,7 +922,7 @@
 
                   <div class="case-step-row" id="stepRow3">
                     <label class="check-row">
-                      <input type="checkbox" class="case-sub-opt" data-mode="sentence" data-name="Viết hoa chữ đầu câu" onchange="syncToolsState()">
+                      <input type="checkbox" class="case-sub-opt" data-mode="sentence" data-name="Viết hoa chữ đầu câu" onchange="onChangeCaseSubOpts()">
                       <span><b>Viết hoa chữ đầu câu</b> <span style="color:var(--text-secondary); font-size:11px;">(VD: Xin chào việt nam)</span></span>
                     </label>
                     <span class="step-order-pill" id="pillOrder3">Đang tắt</span>
@@ -866,11 +935,12 @@
             <div class="tool-card" id="cardStrip">
               <div class="tool-card-header">
                 <div class="tool-card-title-group">
-                  <input type="checkbox" id="chkStrip" checked onchange="syncToolsState()" style="margin-top:2px;">
+                  <input type="checkbox" id="chkStrip" checked onchange="onToggleTool('strip', this.checked)" style="margin-top:2px;">
                   <div>
-                    <label for="chkStrip" class="tool-title" style="cursor:pointer;">
-                      ✂️ Xóa dấu Tiếng Việt trong Clipboard
-                    </label>
+                    <div class="tool-title">
+                      <label for="chkStrip" style="cursor:pointer;">✂️ Xóa dấu Tiếng Việt trong Clipboard</label>
+                      <span class="origin-pill" id="originPillStrip" style="display:none;" onclick="resetToolToInherit('strip')" title="Click để khôi phục kế thừa từ Toàn hệ thống"></span>
+                    </div>
                     <div class="tool-desc">
                       Loại bỏ toàn bộ dấu thanh và dấu mũ Tiếng Việt của văn bản đang lưu trong bộ nhớ Clipboard
                     </div>
@@ -889,8 +959,8 @@
 
           <!-- Footer -->
           <div class="panel-footer">
-            <span>💡 Tắt các công cụ không dùng để ẩn khỏi Tray Menu và giải phóng phím tắt</span>
-            <span style="color:var(--accent); font-weight:600;">Tự động lưu cấu hình</span>
+            <span id="footerHintText">💡 Cấu hình tại Toàn hệ thống sẽ làm mặc định cho các hồ sơ ứng dụng con</span>
+            <span style="color:var(--accent); font-weight:600;">Tự động lưu theo Profile</span>
           </div>
         </div>
       </div>
@@ -900,7 +970,7 @@
         <div class="modal-window">
           <div style="font-size:13.5px; font-weight:700; margin-bottom:6px;">⌨️ Chọn tổ hợp phím tắt mới</div>
           <div style="font-size:11.5px; color:var(--text-secondary); margin-bottom:12px;">
-            Nhấn tổ hợp phím trên bàn phím của bạn (ví dụ: Ctrl + Shift + C, Alt + Q...)
+            Nhấn tổ hợp phím trên bàn phím của bạn (áp dụng cho hồ sơ <b id="modalProfileName">Toàn hệ thống</b>)
           </div>
           <div id="hotkeyPreviewBox" tabindex="0" style="height:44px; background:var(--bg-input); border:2px dashed var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; font-family:Consolas, monospace; font-size:14px; font-weight:bold; color:var(--accent); margin-bottom:14px;">
             Ctrl + Shift + C
@@ -922,9 +992,9 @@
           <span id="badgeToastStep" style="color:var(--accent);">Sẵn sàng</span>
         </div>
         <div class="toast-notification" id="toastBox">
-          <div class="toast-title" id="toastTitle">Kora — Công cụ tiện ích</div>
+          <div class="toast-title" id="toastTitle">Kora — Công cụ theo Profile</div>
           <div class="toast-msg" id="toastMsg">
-            Bấm nút giả lập phím tắt ở thanh trên cùng hoặc click vào mục trong Tray Menu bên dưới.
+            Chọn thử các Profile bên trái (Toàn hệ thống / VS Code / Valorant) để xem kế thừa &amp; ghi đè công cụ.
           </div>
         </div>
       </div>
@@ -945,21 +1015,12 @@
       <div class="sandbox-box">
         <div class="sandbox-header">
           <span>📥 Khay hệ thống (Tray Menu)</span>
-          <span style="text-transform:none; font-weight:normal;">Đồng bộ tức thì</span>
+          <span id="trayActiveProfBadge" style="text-transform:none; font-weight:600; color:var(--accent);">Theo: Toàn hệ thống</span>
         </div>
 
         <div class="win32-tray-menu">
           <div class="tray-item">
-            <span>✓ Bật Tiếng Việt</span>
-            <span class="tray-shortcut">Ctrl+Shift</span>
-          </div>
-          <div class="tray-sep"></div>
-          <div class="tray-item">
             <span>Kiểu gõ: Telex</span>
-            <span>▸</span>
-          </div>
-          <div class="tray-item">
-            <span>Bảng mã: Unicode</span>
             <span>▸</span>
           </div>
 
@@ -984,8 +1045,9 @@
           <div class="tray-item">
             <span>Bảng điều khiển...</span>
           </div>
+          <div class="tray-sep"></div>
           <div class="tray-item" style="color:var(--danger);">
-            <span>Thoát Kora</span>
+            <span>Thoát</span>
           </div>
         </div>
       </div>
@@ -993,38 +1055,126 @@
   </div>
 
   <script>
+    let selectedProfileId = 'global';
     let currentCaseStepIdx = 0;
     let editingHotkeyTarget = null;
     let capturedHotkeyText = '';
 
-    function toggleTheme() {
-      document.body.classList.toggle('light-theme');
+    // Per-profile configuration store (null in child profile = inherit from 'global')
+    const profiles = {
+      global: {
+        name: '🌐 Toàn hệ thống',
+        sub: 'Cấu hình nền mặc định cho mọi ứng dụng trên máy tính',
+        isRoot: true,
+        tools: {
+          translate: { enabled: true, hotkey: 'Ctrl + Shift + D', targetLang: 'Tiếng Việt', autoCopy: true },
+          case: { enabled: true, hotkey: 'Ctrl + Shift + C', modes: [true, true, true, false] },
+          strip: { enabled: true, hotkey: 'Ctrl + Shift + U' }
+        }
+      },
+      vscode: {
+        name: '💻 Visual Studio Code',
+        sub: 'Tiến trình: Code.exe • Đang kế thừa & ghi đè riêng công cụ Dịch',
+        isRoot: false,
+        tools: {
+          // Overridden in VS Code: translate to English
+          translate: { enabled: true, hotkey: 'Ctrl + Shift + D', targetLang: 'Tiếng Anh', autoCopy: true },
+          // Inherited from global (null)
+          case: null,
+          strip: null
+        }
+      },
+      valorant: {
+        name: '🎮 Valorant',
+        sub: 'Tự động kích hoạt khi mở: VALORANT.exe • Tắt các công cụ để tránh kẹt phím khi chơi game',
+        isRoot: false,
+        tools: {
+          translate: { enabled: false, hotkey: 'Ctrl + Shift + D', targetLang: 'Tiếng Việt', autoCopy: true },
+          case: { enabled: false, hotkey: 'Ctrl + Shift + C', modes: [true, true, true, false] },
+          strip: { enabled: false, hotkey: 'Ctrl + Shift + U' }
+        }
+      }
+    };
+
+    function getEffectiveTool(profId, toolKey) {
+      const prof = profiles[profId];
+      const rootTool = profiles.global.tools[toolKey];
+      if (prof.isRoot || !prof.tools[toolKey]) {
+        return { ...rootTool, inherited: !prof.isRoot };
+      }
+      return { ...prof.tools[toolKey], inherited: false };
     }
 
-    function syncToolsState() {
-      const trOn = document.getElementById('chkTranslate').checked;
-      const caseOn = document.getElementById('chkCase').checked;
-      const stripOn = document.getElementById('chkStrip').checked;
-      const targetLang = document.getElementById('selTargetLang').value;
+    function ensureOwnTool(profId, toolKey) {
+      const prof = profiles[profId];
+      if (!prof.isRoot && !prof.tools[toolKey]) {
+        prof.tools[toolKey] = JSON.parse(JSON.stringify(profiles.global.tools[toolKey]));
+      }
+      return prof.tools[toolKey];
+    }
 
-      // Toggle card states & hotkey buttons
-      document.getElementById('cardTranslate').classList.toggle('disabled-card', !trOn);
-      document.getElementById('btnHkTranslate').disabled = !trOn;
+    function selectProfile(profId) {
+      selectedProfileId = profId;
+      document.querySelectorAll('.profile-item').forEach(el => el.classList.remove('active'));
+      document.getElementById('profItem_' + profId).classList.add('active');
+      document.querySelectorAll('.sidebar-footer-btn').forEach(b => b.classList.remove('active'));
 
-      document.getElementById('cardCase').classList.toggle('disabled-card', !caseOn);
-      document.getElementById('btnHkCase').disabled = !caseOn;
+      const prof = profiles[profId];
+      document.getElementById('bannerTitle').innerText = prof.name;
+      document.getElementById('bannerSub').innerText = prof.sub;
+      document.getElementById('titleActiveProfile').innerText = prof.name;
+      document.getElementById('trayActiveProfBadge').innerText = 'Theo: ' + prof.name.replace(/^[^\s]+\s/, '');
+      document.getElementById('btnDeleteProfile').style.display = prof.isRoot ? 'none' : 'inline-block';
+      document.getElementById('btnResetProfileTools').style.display = prof.isRoot ? 'none' : 'inline-block';
+      document.getElementById('footerHintText').innerText = prof.isRoot
+        ? '💡 Cấu hình tại Toàn hệ thống sẽ làm mặc định cho các hồ sơ ứng dụng con'
+        : '💡 Thay đổi tại đây sẽ ghi đè riêng cho ' + prof.name.replace(/^[^\s]+\s/, '') + ' (bấm nhãn Ghi đè để quay về Kế thừa)';
 
-      document.getElementById('cardStrip').classList.toggle('disabled-card', !stripOn);
-      document.getElementById('btnHkStrip').disabled = !stripOn;
+      renderProfileTools();
+    }
 
-      // Update Sidebar active tools count badge
-      const activeCount = (trOn ? 1 : 0) + (caseOn ? 1 : 0) + (stripOn ? 1 : 0);
-      document.getElementById('badgeToolsCount').innerText = activeCount + ' bật';
+    function updateOriginPill(pillId, isRoot, inherited, enabled) {
+      const el = document.getElementById(pillId);
+      if (isRoot) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'inline-block';
+      if (inherited) {
+        el.className = 'origin-pill inherited';
+        el.innerText = '🌐 Kế thừa: ' + (enabled ? 'Bật' : 'Tắt');
+      } else {
+        el.className = 'origin-pill overridden';
+        el.innerText = '✏️ Ghi đè (' + (enabled ? 'Bật' : 'Tắt') + ') ↺';
+      }
+    }
 
-      // Update step order pills for Case Conversion (top-to-bottom sequence)
+    function renderProfileTools() {
+      const prof = profiles[selectedProfileId];
+      const tr = getEffectiveTool(selectedProfileId, 'translate');
+      const cs = getEffectiveTool(selectedProfileId, 'case');
+      const st = getEffectiveTool(selectedProfileId, 'strip');
+
+      // Card 1: Translate
+      document.getElementById('chkTranslate').checked = tr.enabled;
+      document.getElementById('selTargetLang').value = tr.targetLang;
+      document.getElementById('chkTranslateAutoCopy').checked = tr.autoCopy;
+      document.getElementById('btnHkTranslate').innerText = tr.hotkey;
+      document.getElementById('cardTranslate').classList.toggle('disabled-card', !tr.enabled);
+      document.getElementById('btnHkTranslate').disabled = !tr.enabled;
+      updateOriginPill('originPillTranslate', prof.isRoot, tr.inherited, tr.enabled);
+
+      // Card 2: Case
+      document.getElementById('chkCase').checked = cs.enabled;
+      document.getElementById('btnHkCase').innerText = cs.hotkey;
+      document.getElementById('cardCase').classList.toggle('disabled-card', !cs.enabled);
+      document.getElementById('btnHkCase').disabled = !cs.enabled;
+      updateOriginPill('originPillCase', prof.isRoot, cs.inherited, cs.enabled);
+
       const subOpts = Array.from(document.querySelectorAll('.case-sub-opt'));
       let orderCounter = 1;
       subOpts.forEach((chk, idx) => {
+        chk.checked = !!cs.modes[idx];
         const pill = document.getElementById('pillOrder' + idx);
         if (chk.checked) {
           pill.innerText = 'Thứ tự #' + orderCounter++;
@@ -1039,12 +1189,69 @@
       });
       currentCaseStepIdx = 0;
 
-      // Sync Tray Menu items visibility
-      document.getElementById('trayItemTranslate').style.display = trOn ? 'flex' : 'none';
-      document.getElementById('trayItemCase').style.display = caseOn ? 'flex' : 'none';
-      document.getElementById('trayItemStrip').style.display = stripOn ? 'flex' : 'none';
-      document.getElementById('trayTargetLang').innerText = targetLang;
+      // Card 3: Strip
+      document.getElementById('chkStrip').checked = st.enabled;
+      document.getElementById('btnHkStrip').innerText = st.hotkey;
+      document.getElementById('cardStrip').classList.toggle('disabled-card', !st.enabled);
+      document.getElementById('btnHkStrip').disabled = !st.enabled;
+      updateOriginPill('originPillStrip', prof.isRoot, st.inherited, st.enabled);
+
+      // Sync Tray Menu items for active profile
+      const activeCount = (tr.enabled ? 1 : 0) + (cs.enabled ? 1 : 0) + (st.enabled ? 1 : 0);
+      document.getElementById('trayItemTranslate').style.display = tr.enabled ? 'flex' : 'none';
+      document.getElementById('trayItemCase').style.display = cs.enabled ? 'flex' : 'none';
+      document.getElementById('trayItemStrip').style.display = st.enabled ? 'flex' : 'none';
+      document.getElementById('trayTargetLang').innerText = tr.targetLang;
+      document.getElementById('trayHkTranslate').innerText = tr.hotkey.replace(/\s+/g, '');
+      document.getElementById('trayHkCase').innerText = cs.hotkey.replace(/\s+/g, '');
+      document.getElementById('trayHkStrip').innerText = st.hotkey.replace(/\s+/g, '');
       document.getElementById('trayToolsContainer').style.display = activeCount > 0 ? 'block' : 'none';
+    }
+
+    function onToggleTool(toolKey, checked) {
+      const tool = ensureOwnTool(selectedProfileId, toolKey);
+      tool.enabled = checked;
+      renderProfileTools();
+    }
+
+    function onChangeTargetLang(val) {
+      const tool = ensureOwnTool(selectedProfileId, 'translate');
+      tool.targetLang = val;
+      renderProfileTools();
+    }
+
+    function onChangeAutoCopy(checked) {
+      const tool = ensureOwnTool(selectedProfileId, 'translate');
+      tool.autoCopy = checked;
+      renderProfileTools();
+    }
+
+    function onChangeCaseSubOpts() {
+      const tool = ensureOwnTool(selectedProfileId, 'case');
+      tool.modes = Array.from(document.querySelectorAll('.case-sub-opt')).map(el => el.checked);
+      renderProfileTools();
+    }
+
+    function resetToolToInherit(toolKey) {
+      const prof = profiles[selectedProfileId];
+      if (prof.isRoot) return;
+      prof.tools[toolKey] = null;
+      renderProfileTools();
+      showToast('🌐 Đã khôi phục Kế thừa', `Công cụ đã quay về kế thừa cấu hình từ Toàn hệ thống.`, 'Kế thừa');
+    }
+
+    function resetCurrentProfileToInherit() {
+      const prof = profiles[selectedProfileId];
+      if (prof.isRoot) return;
+      prof.tools.translate = null;
+      prof.tools.case = null;
+      prof.tools.strip = null;
+      renderProfileTools();
+      showToast('🌐 Kế thừa toàn bộ từ gốc', `${prof.name} hiện kế thừa toàn bộ thiết lập Công cụ từ Toàn hệ thống.`, 'Kế thừa');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('light-theme');
     }
 
     function showToast(title, msg, badge) {
@@ -1066,8 +1273,9 @@
     }
 
     function triggerCaseCycle() {
-      if (!document.getElementById('chkCase').checked) {
-        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Chuyển đổi chữ Hoa / chữ thường" trước.', 'Đã tắt');
+      const cs = getEffectiveTool(selectedProfileId, 'case');
+      if (!cs.enabled) {
+        showToast('⚠️ Công cụ đang TẮT ở profile này', `Hồ sơ "${profiles[selectedProfileId].name}" đang tắt Chuyển đổi Hoa/thường.`, 'Đã tắt');
         return;
       }
 
@@ -1085,12 +1293,10 @@
       const item = enabledList[currentCaseStepIdx % enabledList.length];
       currentCaseStepIdx = (currentCaseStepIdx + 1) % enabledList.length;
 
-      // Highlight current row in UI
       allSubOpts.forEach((_, idx) => {
         document.getElementById('stepRow' + idx).classList.toggle('active-step', idx === item.domIndex);
       });
 
-      // Transform Clipboard text in memory
       const clip = document.getElementById('txtClipboard');
       const src = clip.value;
       if (item.mode === 'upper') clip.value = src.toUpperCase();
@@ -1114,8 +1320,9 @@
     }
 
     function triggerStripAccents() {
-      if (!document.getElementById('chkStrip').checked) {
-        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Xóa dấu Tiếng Việt trong Clipboard" trước.', 'Đã tắt');
+      const st = getEffectiveTool(selectedProfileId, 'strip');
+      if (!st.enabled) {
+        showToast('⚠️ Công cụ đang TẮT ở profile này', `Hồ sơ "${profiles[selectedProfileId].name}" đang tắt Xóa dấu Clipboard.`, 'Đã tắt');
         return;
       }
       const clip = document.getElementById('txtClipboard');
@@ -1128,12 +1335,13 @@
     }
 
     function triggerTranslate() {
-      if (!document.getElementById('chkTranslate').checked) {
-        showToast('⚠️ Công cụ đang TẮT', 'Hãy tích bật "Dịch văn bản đang bôi đen" trước.', 'Đã tắt');
+      const tr = getEffectiveTool(selectedProfileId, 'translate');
+      if (!tr.enabled) {
+        showToast('⚠️ Công cụ đang TẮT ở profile này', `Hồ sơ "${profiles[selectedProfileId].name}" đang tắt Dịch văn bản.`, 'Đã tắt');
         return;
       }
-      const targetLang = document.getElementById('selTargetLang').value;
-      const autoCopy = document.getElementById('chkTranslateAutoCopy').checked;
+      const targetLang = tr.targetLang;
+      const autoCopy = tr.autoCopy;
 
       const translatedSample = targetLang === 'Tiếng Anh'
         ? 'A hundred years in this human realm, talent and destiny are ironically poised against each other.'
@@ -1144,9 +1352,9 @@
       }
 
       showToast(
-        `🌐 Dịch sang ${targetLang}` + (autoCopy ? ' (Đã copy vào Clipboard)' : ''),
+        `🌐 Dịch sang ${targetLang}` + (autoCopy ? ' (Đã copy)' : ''),
         translatedSample,
-        'Đã dịch'
+        profiles[selectedProfileId].name.replace(/^[^\s]+\s/, '')
       );
     }
 
@@ -1158,8 +1366,9 @@
 
     function openHotkeyModal(target) {
       editingHotkeyTarget = target;
-      const btnId = target === 'translate' ? 'btnHkTranslate' : (target === 'case' ? 'btnHkCase' : 'btnHkStrip');
-      capturedHotkeyText = document.getElementById(btnId).innerText.trim();
+      const eff = getEffectiveTool(selectedProfileId, target);
+      capturedHotkeyText = eff.hotkey;
+      document.getElementById('modalProfileName').innerText = profiles[selectedProfileId].name;
       document.getElementById('hotkeyPreviewBox').innerText = capturedHotkeyText;
       document.getElementById('hotkeyModal').style.display = 'flex';
     }
@@ -1171,10 +1380,9 @@
 
     function saveHotkeyModal() {
       if (!editingHotkeyTarget) return;
-      const btnId = editingHotkeyTarget === 'translate' ? 'btnHkTranslate' : (editingHotkeyTarget === 'case' ? 'btnHkCase' : 'btnHkStrip');
-      const trayId = editingHotkeyTarget === 'translate' ? 'trayHkTranslate' : (editingHotkeyTarget === 'case' ? 'trayHkCase' : 'trayHkStrip');
-      document.getElementById(btnId).innerText = capturedHotkeyText;
-      document.getElementById(trayId).innerText = capturedHotkeyText.replace(/\s+/g, '');
+      const tool = ensureOwnTool(selectedProfileId, editingHotkeyTarget);
+      tool.hotkey = capturedHotkeyText;
+      renderProfileTools();
       closeHotkeyModal();
     }
 
@@ -1195,17 +1403,17 @@
       }
     });
 
-    function switchView(view) {
-      document.querySelectorAll('.sidebar-footer-btn').forEach(b => b.classList.remove('active'));
-      if (view === 'tools') {
-        document.getElementById('navTools').classList.add('active');
-      } else {
-        document.getElementById('navTools').classList.add('active');
-        showToast('💡 Đang ở bản Mockup Tab Công Cụ', 'Bản thiết kế này tập trung mô phỏng chi tiết Tab "Công cụ tiện ích" mới.', 'Mockup');
+    function switchProfileTab(idx) {
+      if (idx !== 4) {
+        showToast('💡 Đang xem Mockup Tab "🛠️ Công cụ"', 'Các tab Bộ gõ, Quản lý phím, Âm thanh gõ, Gõ tắt giữ nguyên như hiện tại.', 'Tab #' + (idx + 1));
       }
     }
 
-    syncToolsState();
+    function switchSystemView(view) {
+      showToast('💡 Đang xem Mockup Tab "🛠️ Công cụ"', 'Nút Công cụ đã được chuyển từ Sidebar lên thanh TabBar chung của từng Profile.', 'Mockup');
+    }
+
+    selectProfile('global');
   </script>
 </body>
 </html>

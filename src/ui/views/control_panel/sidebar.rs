@@ -1,18 +1,17 @@
 //! Sidebar Component for Profile-First Workspace Hub
 //! Contains Profile list with add button and System Settings / About quick links.
 
-use crate::engine::profile::AppProfile;
+use crate::engine::profile::ProfileRef;
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::listbox::ListBox;
 use crate::ui::win32::{
-    to_wide, fill_rect_color, round_rect, DrawTextW, InvalidateRect, SelectObject, SetBkColor,
+    to_wide, fill_rect_color, round_rect, DrawTextW, InvalidateRect, SelectObject,
     SetBkMode, SetTextColor, DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX,
     DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL, MEASUREITEMSTRUCT, RECT, TRANSPARENT,
 };
-use crate::ui::components::{ButtonVariant, Label, PushButton};
+use crate::ui::components::{ButtonVariant, Label, PushButton, SurfaceRole};
 use crate::platform::win32::ENGINE_INSTANCE;
 use super::ViewMode;
-use crate::ui::tokens::id::*;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::radii::*;
 use crate::ui::tokens::typography::*;
@@ -46,20 +45,20 @@ impl SidebarControls {
             crate::ui::tokens::typography::FONT_SIZE_SIDEBAR_TITLE,
             FW_BOLD,
         );
-        let lbl_title = Label::create_with_id(
+        let lbl_title = Label::create(
             parent,
-            IDC_SIDEBAR_TITLE,
             strings.sidebar_profiles_title,
             12,
             14,
             175,
             24,
             hfont_title,
-        )?;
+        )?
+        .on_surface(SurfaceRole::Sidebar);
 
         let btn_add_profile = PushButton::create_with_variant(
             parent,
-            IDC_BTN_ADD_PROFILE,
+            0,
             "+",
             194,
             14,
@@ -73,7 +72,7 @@ impl SidebarControls {
 
         let list_profiles = ListBox::create_owner_draw(
             parent,
-            IDC_LIST_PROFILES,
+            0,
             SIDEBAR_X,
             SIDEBAR_LIST_Y,
             SIDEBAR_WIDTH,
@@ -84,7 +83,7 @@ impl SidebarControls {
 
         let btn_system_settings = PushButton::create_owner_draw(
             parent,
-            IDC_BTN_SIDEBAR_SETTINGS,
+            0,
             strings.sidebar_btn_settings,
             SIDEBAR_X,
             SIDEBAR_BTN_SETTINGS_Y,
@@ -95,7 +94,7 @@ impl SidebarControls {
 
         let btn_about = PushButton::create_owner_draw(
             parent,
-            IDC_BTN_SIDEBAR_ABOUT,
+            0,
             strings.sidebar_btn_about,
             SIDEBAR_X,
             SIDEBAR_BTN_ABOUT_Y,
@@ -136,7 +135,7 @@ impl SidebarControls {
             } else {
                 false
             };
-            Self::draw_footer_button(dis, is_dark, is_active);
+            Self::draw_footer_button(dis, is_dark, is_active, true);
             true
         });
 
@@ -147,7 +146,7 @@ impl SidebarControls {
             } else {
                 false
             };
-            Self::draw_footer_button(dis, is_dark, is_active);
+            Self::draw_footer_button(dis, is_dark, is_active, false);
             true
         });
 
@@ -165,31 +164,35 @@ impl SidebarControls {
     /// Populates profile items into the sidebar ListBox
     pub fn populate_profiles(
         &self,
-        profiles: &[&AppProfile],
+        profiles: &[ProfileRef<'_>],
         selected_id: &str,
     ) {
         let strings = crate::language::current();
         let mut items = Vec::new();
         let mut sel_idx = 0;
-        for (i, p) in profiles.iter().enumerate() {
-            let desc = if p.is_root {
-                strings.sidebar_root_desc.to_string()
-            } else if !p.process_names.is_empty() {
-                p.process_names.join(", ")
-            } else {
-                strings.sidebar_unassigned.to_string()
-            };
-            if p.id == selected_id {
+        for (i, &p) in profiles.iter().enumerate() {
+            if p.id() == selected_id {
                 sel_idx = i as i32;
             }
-            let name = if p.is_root {
-                strings.banner_root_title.to_string()
-            } else {
-                p.name.clone()
+            let (icon, name, desc) = match p {
+                ProfileRef::Root(root) => (
+                    &root.icon,
+                    strings.banner_root_title.to_string(),
+                    strings.sidebar_root_desc.to_string(),
+                ),
+                ProfileRef::Child(child) => (
+                    &child.icon,
+                    child.name.clone(),
+                    if child.process_names.is_empty() {
+                        strings.sidebar_unassigned.to_string()
+                    } else {
+                        child.process_names.join(", ")
+                    },
+                ),
             };
             items.push(SidebarProfileItem {
-                id: p.id.clone(),
-                icon: if p.icon.is_empty() { "⌨️".to_string() } else { p.icon.clone() },
+                id: p.id().to_string(),
+                icon: if icon.is_empty() { "⌨️".to_string() } else { icon.clone() },
                 name,
                 desc,
             });
@@ -249,6 +252,13 @@ impl SidebarControls {
             let sel_id = engine.profile_manager.selected_id.clone();
             self.populate_profiles(&profiles, &sel_id);
         }
+    }
+
+    pub fn get_view_mode(&self) -> ViewMode {
+        self.current_view_mode
+            .read()
+            .map(|m| *m)
+            .unwrap_or(ViewMode::Profile(0))
     }
 
     pub fn set_view_mode(&self, mode: ViewMode) {
@@ -357,11 +367,12 @@ impl SidebarControls {
         dis: &DRAWITEMSTRUCT,
         is_dark: bool,
         is_active: bool,
+        is_settings: bool,
     ) {
         unsafe {
             let palette = ThemePalette::get(is_dark);
             let strings = crate::language::current();
-            let label = if dis.ctl_id == IDC_BTN_SIDEBAR_SETTINGS {
+            let label = if is_settings {
                 strings.sidebar_btn_settings
             } else {
                 strings.sidebar_btn_about
@@ -414,23 +425,8 @@ impl SidebarControls {
         }
     }
 
-    pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
-        if ctrl_id == IDC_SIDEBAR_TITLE {
-            let palette = ThemePalette::get(is_dark);
-            unsafe {
-                SetBkColor(hdc, palette.bg_sidebar);
-                SetTextColor(hdc, palette.text_primary);
-            }
-            let sb_br = crate::ui::theme::get_sidebar_bg_brush();
-            if sb_br != 0 {
-                return Some(sb_br);
-            }
-        }
-        None
-    }
-
     pub fn on_measure_item(&self, mis: &mut MEASUREITEMSTRUCT) -> bool {
-        if mis.ctl_id == IDC_LIST_PROFILES {
+        if mis.ctl_id == self.list_profiles.id() {
             mis.item_height = 48;
             return true;
         }
@@ -456,8 +452,8 @@ impl SidebarControls {
             {
                 let profiles = engine.profile_manager.all_profiles();
                 if let Some(p) = profiles.get(target_idx) {
-                    let is_already = p.id == engine.profile_manager.selected_id;
-                    (Some(p.id.clone()), is_already)
+                    let is_already = p.id() == engine.profile_manager.selected_id;
+                    (Some(p.id().to_string()), is_already)
                 } else {
                     (None, false)
                 }
@@ -484,10 +480,9 @@ impl SidebarControls {
         if crate::ui::controller::with_engine(|e| e.profile_manager.selected_id = id.to_string()).is_none() {
             return;
         }
-        controls.refresh_from_engine();
-
         let cur_tab = controls.tab_bar.get_cur_sel();
         controls.update_view_mode(ViewMode::Profile(cur_tab));
+        controls.refresh_from_engine();
 
         unsafe {
             InvalidateRect(hwnd, null_mut(), 0);
@@ -502,21 +497,15 @@ impl SidebarControls {
         notify_code: u32,
         controls: &super::ControlPanelControls,
     ) -> bool {
-        match ctrl_id {
-            IDC_LIST_PROFILES => {
-                if notify_code == 1 || notify_code == 2 /* LBN_SELCHANGE | LBN_DBLCLK */ {
-                    self.handle_profile_selection(controls, hwnd);
-                    true
-                } else {
-                    false
-                }
-            }
-            IDC_BTN_ADD_PROFILE => {
-                // Modeless dialog: it refreshes the panel itself after creating the profile
-                crate::ui::views::dialogs::show_add_profile_dialog(hwnd);
-                true
-            }
-            _ => false,
+        if self.list_profiles.is_sel_changed(ctrl_id, notify_code) {
+            self.handle_profile_selection(controls, hwnd);
+            return true;
         }
+        if self.btn_add_profile.is_clicked(ctrl_id, notify_code) {
+            // Modeless dialog: it refreshes the panel itself after creating the profile
+            crate::ui::views::dialogs::show_add_profile_dialog(hwnd);
+            return true;
+        }
+        false
     }
 }

@@ -120,8 +120,8 @@ fn test_conflict_with_switch_key_modifier() {
 #[test]
 fn test_inheritance_cross_conflict_detection() {
     let mut manager = kora::engine::profile::ProfileManager::new();
-    manager.global_profile.disable_enabled = Some(true);
-    manager.global_profile.remap_enabled = Some(true);
+    manager.global_profile.disable_enabled = true;
+    manager.global_profile.remap_enabled = true;
 
     // Global disables F1 (0x70)
     manager.global_profile.app_disabled.push(0x70);
@@ -158,8 +158,8 @@ fn test_inheritance_cross_conflict_detection() {
 #[test]
 fn test_inheritance_mute_resolves_conflict() {
     let mut manager = kora::engine::profile::ProfileManager::new();
-    manager.global_profile.disable_enabled = Some(true);
-    manager.global_profile.remap_enabled = Some(true);
+    manager.global_profile.disable_enabled = true;
+    manager.global_profile.remap_enabled = true;
 
     // Global has both Disable(F1) and Remap(F1 -> F2) -> Global has conflict!
     manager.global_profile.app_disabled.push(0x70);
@@ -195,7 +195,7 @@ fn test_inheritance_mute_resolves_conflict() {
 #[test]
 fn test_child_profile_custom_switch_key_conflict() {
     let mut manager = kora::engine::profile::ProfileManager::new();
-    manager.global_profile.disable_enabled = Some(true);
+    manager.global_profile.disable_enabled = true;
     // Global disables Space (0x20)
     manager.global_profile.app_disabled.push(0x20);
 
@@ -232,8 +232,8 @@ fn test_child_profile_custom_switch_key_conflict() {
 #[test]
 fn test_child_profile_feature_disabled_suppresses_conflict() {
     let mut manager = kora::engine::profile::ProfileManager::new();
-    manager.global_profile.remap_enabled = Some(true);
-    manager.global_profile.key_macro_enabled = Some(true);
+    manager.global_profile.remap_enabled = true;
+    manager.global_profile.key_macro_enabled = true;
 
     // Global has Remap(F1 -> F2) and KeyMacro(F1) -> Conflict in Global!
     manager.global_profile.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));

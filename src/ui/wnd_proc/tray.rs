@@ -74,7 +74,6 @@ fn set_input_method(method: InputMethod) {
 
 pub fn handle_menu_command(cmd: u32) {
     match cmd {
-        IDM_TOGGLE_VIET => toggle_vietnamese(),
         IDM_TELEX => set_input_method(InputMethod::Telex),
         IDM_VNI => set_input_method(InputMethod::Vni),
         IDM_SIMPLE_TELEX => set_input_method(InputMethod::SimpleTelex1),
@@ -88,17 +87,26 @@ pub fn handle_menu_command(cmd: u32) {
 }
 
 fn show_tray_menu(hwnd: isize) {
-    let mut pt = POINT { x: 0, y: 0 };
-    unsafe {
+    // Snapshot plain value; no lock may be held while TrackPopupMenu pumps messages.
+    let method = controller::with_engine(|e| e.config().method).unwrap_or(InputMethod::Telex);
+
+    let cmd = unsafe {
+        let prev_dpi_ctx = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        let mut pt = POINT { x: 0, y: 0 };
         GetCursorPos(&mut pt);
-    }
-
-    // Snapshot plain values; no lock may be held while TrackPopupMenu pumps messages.
-    let (is_viet, method) =
-        controller::with_engine(|e| (e.effective_config().enabled, e.config().method))
-            .unwrap_or((true, InputMethod::Telex));
-
-    let cmd = show_context_menu(hwnd, pt.x, pt.y, is_viet, method);
+        SetWindowPos(
+            hwnd,
+            0,
+            pt.x,
+            pt.y,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
+        let cmd = show_context_menu(hwnd, pt.x, pt.y, method);
+        SetThreadDpiAwarenessContext(prev_dpi_ctx);
+        cmd
+    };
     handle_menu_command(cmd);
 }
 

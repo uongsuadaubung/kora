@@ -21,7 +21,7 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
     let mut profiles = ProfileManager::new();
 
     let mut current_section = String::new();
-    let mut child_profiles_map: HashMap<String, AppProfile> = HashMap::new();
+    let mut child_profiles_map: HashMap<String, AppProfile< crate::engine::profile::Child >> = HashMap::new();
     let mut child_order: Vec<String> = Vec::new();
 
     for line in content.lines() {
@@ -45,45 +45,48 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
             continue;
         }
 
-        let (key, val) = if let Some((k, v)) = line.split_once('=') {
-            (k.trim(), v.trim())
-        } else if let Some((k, v)) = line.split_once(':') {
-            (k.trim(), v.trim())
-        } else {
+        let Some((key, val)) = line.split_once('=') else {
             continue;
         };
+        let (key, val) = (key.trim(), val.trim());
 
         if current_section == "macro" {
             if !key.is_empty() && !val.is_empty() {
-                let (real_val, mtype) = if let Some((v, t)) = val.split_once(':') {
-                    (v.trim(), MacroType::from(t))
-                } else {
-                    (val, MacroType::Normal)
-                };
-                if key.eq_ignore_ascii_case("muted") || key.eq_ignore_ascii_case("muted_macros") {
+                if key.eq_ignore_ascii_case("muted") {
                     for m in val.split(',') {
                         let m_trim = m.trim();
-                        if !m_trim.is_empty() && !profiles.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(m_trim)) {
+                        if !m_trim.is_empty()
+                            && !profiles
+                                .global_profile
+                                .muted_macros
+                                .iter()
+                                .any(|k| k.eq_ignore_ascii_case(m_trim))
+                        {
                             profiles.global_profile.muted_macros.push(m_trim.to_string());
                         }
                     }
                 } else {
+                    let (real_val, mtype) = if let Some((v, t)) = val.split_once(':') {
+                        (v.trim(), MacroType::from(t))
+                    } else {
+                        (val, MacroType::Normal)
+                    };
                     macros.insert_typed_no_cache(key, real_val, mtype);
                 }
             }
         } else if current_section == "remap" {
             let key_l = key.to_lowercase();
-            if key_l == "enabled" || key_l == "remap_enabled" {
+            if key_l == "enabled" {
                 let val_l = val.to_lowercase();
                 let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
                 config.remap_enabled = val_bool;
-                profiles.global_profile.remap_enabled = Some(val_bool);
-            } else if key_l == "muted" || key_l == "muted_remaps" {
+                profiles.global_profile.remap_enabled = val_bool;
+            } else if key_l == "muted" {
                 for k in val.split(',') {
-                    if let Some(vk) = name_to_vk(k.trim()) {
-                        if !profiles.global_profile.muted_remaps.contains(&vk) {
-                            profiles.global_profile.muted_remaps.push(vk);
-                        }
+                    if let Some(vk) = name_to_vk(k.trim())
+                        && !profiles.global_profile.muted_remaps.contains(&vk)
+                    {
+                        profiles.global_profile.muted_remaps.push(vk);
                     }
                 }
             } else if let (Some(f_vk), Some(t_vk)) = (name_to_vk(key), name_to_vk(val)) {
@@ -94,58 +97,58 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
             }
         } else if current_section == "disable" {
             let key_l = key.to_lowercase();
-            if key_l == "enabled" || key_l == "disable_enabled" {
+            if key_l == "enabled" {
                 let val_l = val.to_lowercase();
                 let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
                 config.disable_enabled = val_bool;
-                profiles.global_profile.disable_enabled = Some(val_bool);
-            } else if key_l == "keys" || key_l == "disabled" {
+                profiles.global_profile.disable_enabled = val_bool;
+            } else if key_l == "keys" {
                 for k in val.split(',') {
-                    if let Some(vk) = name_to_vk(k.trim()) {
-                        if !profiles.global_profile.app_disabled.contains(&vk) {
-                            profiles.global_profile.app_disabled.push(vk);
-                        }
+                    if let Some(vk) = name_to_vk(k.trim())
+                        && !profiles.global_profile.app_disabled.contains(&vk)
+                    {
+                        profiles.global_profile.app_disabled.push(vk);
                     }
                 }
-            } else if key_l == "allow_disabled" || key_l == "unmuted_disabled" || key_l == "muted" {
+            } else if key_l == "allow_disabled" {
                 for k in val.split(',') {
-                    if let Some(vk) = name_to_vk(k.trim()) {
-                        if !profiles.global_profile.unmuted_disabled.contains(&vk) {
-                            profiles.global_profile.unmuted_disabled.push(vk);
-                        }
+                    if let Some(vk) = name_to_vk(k.trim())
+                        && !profiles.global_profile.unmuted_disabled.contains(&vk)
+                    {
+                        profiles.global_profile.unmuted_disabled.push(vk);
                     }
-                }
-            } else if let Some(vk) = name_to_vk(key) {
-                let val_l = val.to_lowercase();
-                let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
-                if val_bool && !profiles.global_profile.app_disabled.contains(&vk) {
-                    profiles.global_profile.app_disabled.push(vk);
                 }
             }
-        } else if current_section == "key_macro" || current_section == "key_macros" {
+        } else if current_section == "key_macro" {
             let key_l = key.to_lowercase();
-            if key_l == "enabled" || key_l == "key_macro_enabled" {
+            if key_l == "enabled" {
                 let val_l = val.to_lowercase();
                 let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
                 config.key_macro_enabled = val_bool;
-                profiles.global_profile.key_macro_enabled = Some(val_bool);
-            } else if key_l == "muted" || key_l == "muted_key_macros" {
+                profiles.global_profile.key_macro_enabled = val_bool;
+            } else if key_l == "muted" {
                 for k in val.split(',') {
-                    if let Some(vk) = name_to_vk(k.trim()) {
-                        if !profiles.global_profile.muted_key_macros.contains(&vk) {
-                            profiles.global_profile.muted_key_macros.push(vk);
-                        }
+                    if let Some(vk) = name_to_vk(k.trim())
+                        && !profiles.global_profile.muted_key_macros.contains(&vk)
+                    {
+                        profiles.global_profile.muted_key_macros.push(vk);
                     }
                 }
-            } else if let Some(trig_vk) = name_to_vk(key) {
-                let (name, dsl) = if let Some((n, d)) = val.split_once('|') {
-                    (n.trim().to_string(), d.trim())
-                } else {
-                    (format!("Macro {}", key), val.trim())
-                };
-                let actions = MacroAction::dsl_to_actions(dsl);
-                if !profiles.global_profile.app_key_macros.iter().any(|m| m.trigger_vk == trig_vk) {
-                    profiles.global_profile.app_key_macros.push(KeyMacroRule::new(trig_vk, name, actions));
+            } else if let Some(trig_vk) = name_to_vk(key)
+                && let Some((n, d)) = val.split_once('|')
+            {
+                let name = n.trim().to_string();
+                let actions = MacroAction::dsl_to_actions(d.trim());
+                if !profiles
+                    .global_profile
+                    .app_key_macros
+                    .iter()
+                    .any(|m| m.trigger_vk == trig_vk)
+                {
+                    profiles
+                        .global_profile
+                        .app_key_macros
+                        .push(KeyMacroRule::new(trig_vk, name, actions));
                 }
             }
         } else if let Some(p_id) = current_section.strip_prefix("profile:") {
@@ -157,7 +160,7 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
 
                 match key_l.as_str() {
                     "name" => child.name = val.to_string(),
-                    "process" | "processes" | "process_names" => {
+                    "process" => {
                         child.process_names = val
                             .split(',')
                             .map(|s| s.trim().to_lowercase())
@@ -167,19 +170,23 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                     "icon" => child.icon = val.trim().to_string(),
                     "mode" => child.mode = LanguageMode::from_str(val),
                     "method" => child.method = MethodMode::from_str(val),
-                    "switch_key" => child.switch_key = Some(crate::engine::config::Hotkey::from_config_str(val)),
+                    "switch_key" => {
+                        child.switch_key = Some(crate::engine::config::Hotkey::from_config_str(val))
+                    }
                     "switch_key_enabled" => child.switch_key_enabled = Some(val_bool),
-                    "restore_on_wrong" | "restore_on_wrong_spelling" => child.restore_on_wrong_spelling = Some(val_bool),
-                    "auto_uppercase_first" | "auto_uppercase_first_char" => child.auto_uppercase_first_char = Some(val_bool),
+                    "restore_on_wrong" => child.restore_on_wrong_spelling = Some(val_bool),
+                    "auto_uppercase_first" => child.auto_uppercase_first_char = Some(val_bool),
                     "bracket_w" => child.bracket_w = Some(val_bool),
-                    "remember_history" | "remember_history_across_space" => child.remember_history_across_space = Some(val_bool),
+                    "remember_history" => child.remember_history_across_space = Some(val_bool),
                     "sound_enabled" => child.sound_enabled = Some(val_bool),
-                    "switch" | "sound_profile" => child.sound_profile = Some(std::sync::Arc::from(val)),
-                    "volume" | "sound_volume" => child.sound_volume = Some(val_l.parse().unwrap_or(50).clamp(0, 100)),
+                    "sound_profile" => child.sound_profile = Some(std::sync::Arc::from(val)),
+                    "sound_volume" => {
+                        child.sound_volume = Some(val_l.parse().unwrap_or(50).clamp(0, 100))
+                    }
                     "use_macro" => child.use_macro = Some(val_bool),
-                    "use_macro_in_english" | "macro_in_english" => child.use_macro_in_english_mode = Some(val_bool),
-                    "remap_enabled" | "enable_remap" => child.remap_enabled = Some(val_bool),
-                    "disable_enabled" | "enable_disable" => child.disable_enabled = Some(val_bool),
+                    "use_macro_in_english" => child.use_macro_in_english_mode = Some(val_bool),
+                    "remap_enabled" => child.remap_enabled = Some(val_bool),
+                    "disable_enabled" => child.disable_enabled = Some(val_bool),
                     "muted_macros" => {
                         for m in val.split(',') {
                             let m = m.trim().to_lowercase();
@@ -188,49 +195,51 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                             }
                         }
                     }
-                    "override_remap" | "override_remaps" => {
-                        if let Some((f, t)) = val.split_once(['=', ':']) {
-                            if let (Some(f_vk), Some(t_vk)) = (name_to_vk(f.trim()), name_to_vk(t.trim())) {
-                                child.overridden_remaps.insert(f_vk, t_vk);
-                            }
+                    "override_remap" => {
+                        if let Some((f, t)) = val.split_once('=')
+                            && let (Some(f_vk), Some(t_vk)) =
+                                (name_to_vk(f.trim()), name_to_vk(t.trim()))
+                        {
+                            child.overridden_remaps.insert(f_vk, t_vk);
                         }
                     }
-                    "app_remap" | "app_remaps" => {
-                        if let Some((f, t)) = val.split_once(['=', ':']) {
-                            if let (Some(f_vk), Some(t_vk)) = (name_to_vk(f.trim()), name_to_vk(t.trim())) {
-                                child.app_remaps.push(KeyRemapRule::new(f_vk, t_vk));
-                            }
+                    "app_remap" => {
+                        if let Some((f, t)) = val.split_once('=')
+                            && let (Some(f_vk), Some(t_vk)) =
+                                (name_to_vk(f.trim()), name_to_vk(t.trim()))
+                        {
+                            child.app_remaps.push(KeyRemapRule::new(f_vk, t_vk));
                         }
                     }
                     "muted_remaps" => {
                         for k in val.split(',') {
-                            if let Some(vk) = name_to_vk(k.trim()) {
-                                if !child.muted_remaps.contains(&vk) {
-                                    child.muted_remaps.push(vk);
-                                }
+                            if let Some(vk) = name_to_vk(k.trim())
+                                && !child.muted_remaps.contains(&vk)
+                            {
+                                child.muted_remaps.push(vk);
                             }
                         }
                     }
-                    "allow_disabled" | "unmuted_disabled" => {
+                    "allow_disabled" => {
                         for k in val.split(',') {
-                            if let Some(vk) = name_to_vk(k.trim()) {
-                                if !child.unmuted_disabled.contains(&vk) {
-                                    child.unmuted_disabled.push(vk);
-                                }
+                            if let Some(vk) = name_to_vk(k.trim())
+                                && !child.unmuted_disabled.contains(&vk)
+                            {
+                                child.unmuted_disabled.push(vk);
                             }
                         }
                     }
-                    "disable_keys" | "app_disabled" => {
+                    "disable_keys" => {
                         for k in val.split(',') {
-                            if let Some(vk) = name_to_vk(k.trim()) {
-                                if !child.app_disabled.contains(&vk) {
-                                    child.app_disabled.push(vk);
-                                }
+                            if let Some(vk) = name_to_vk(k.trim())
+                                && !child.app_disabled.contains(&vk)
+                            {
+                                child.app_disabled.push(vk);
                             }
                         }
                     }
-                    "override_macro" | "override_macros" => {
-                        if let Some((k, v)) = val.split_once(['=', ':']) {
+                    "override_macro" => {
+                        if let Some((k, v)) = val.split_once('=') {
                             let macro_key = k.trim().to_lowercase();
                             let (real_val, mtype) = if let Some((real_v, t)) = v.split_once(':') {
                                 (real_v.trim().to_string(), MacroType::from(t.trim()))
@@ -240,8 +249,8 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                             child.overridden_macros.insert(macro_key, (real_val, mtype));
                         }
                     }
-                    "app_macro" | "app_macros" => {
-                        if let Some((k, v)) = val.split_once(['=', ':']) {
+                    "app_macro" => {
+                        if let Some((k, v)) = val.split_once('=') {
                             let macro_key = k.trim().to_string();
                             let (real_val, mtype) = if let Some((real_v, t)) = v.split_once(':') {
                                 (real_v.trim().to_string(), MacroType::from(t.trim()))
@@ -255,40 +264,36 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                             });
                         }
                     }
-                    "key_macro_enabled" | "enable_key_macro" => child.key_macro_enabled = Some(val_bool),
+                    "key_macro_enabled" => child.key_macro_enabled = Some(val_bool),
                     "muted_key_macros" => {
                         for k in val.split(',') {
-                            if let Some(vk) = name_to_vk(k.trim()) {
-                                if !child.muted_key_macros.contains(&vk) {
-                                    child.muted_key_macros.push(vk);
-                                }
+                            if let Some(vk) = name_to_vk(k.trim())
+                                && !child.muted_key_macros.contains(&vk)
+                            {
+                                child.muted_key_macros.push(vk);
                             }
                         }
                     }
-                    "override_key_macro" | "override_key_macros" => {
-                        if let Some((k, v)) = val.split_once(['=', ':']) {
-                            if let Some(trig_vk) = name_to_vk(k.trim()) {
-                                let (name, dsl) = if let Some((n, d)) = v.split_once('|') {
-                                    (n.trim().to_string(), d.trim())
-                                } else {
-                                    (format!("Macro {}", k.trim()), v.trim())
-                                };
-                                let actions = MacroAction::dsl_to_actions(dsl);
-                                child.overridden_key_macros.insert(trig_vk, (name, actions));
-                            }
+                    "override_key_macro" => {
+                        if let Some((k, v)) = val.split_once('=')
+                            && let Some(trig_vk) = name_to_vk(k.trim())
+                            && let Some((n, d)) = v.split_once('|')
+                        {
+                            let name = n.trim().to_string();
+                            let actions = MacroAction::dsl_to_actions(d.trim());
+                            child.overridden_key_macros.insert(trig_vk, (name, actions));
                         }
                     }
-                    "app_key_macro" | "app_key_macros" => {
-                        if let Some((k, v)) = val.split_once(['=', ':']) {
-                            if let Some(trig_vk) = name_to_vk(k.trim()) {
-                                let (name, dsl) = if let Some((n, d)) = v.split_once('|') {
-                                    (n.trim().to_string(), d.trim())
-                                } else {
-                                    (format!("Macro {}", k.trim()), v.trim())
-                                };
-                                let actions = MacroAction::dsl_to_actions(dsl);
-                                child.app_key_macros.push(KeyMacroRule::new(trig_vk, name, actions));
-                            }
+                    "app_key_macro" => {
+                        if let Some((k, v)) = val.split_once('=')
+                            && let Some(trig_vk) = name_to_vk(k.trim())
+                            && let Some((n, d)) = v.split_once('|')
+                        {
+                            let name = n.trim().to_string();
+                            let actions = MacroAction::dsl_to_actions(d.trim());
+                            child
+                                .app_key_macros
+                                .push(KeyMacroRule::new(trig_vk, name, actions));
                         }
                     }
                     _ => {}
@@ -300,57 +305,41 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
             let val_bool = val_l == "true" || val_l == "1" || val_l == "yes";
 
             match (current_section.as_str(), key_l.as_str()) {
-                ("key_macro", "enabled") | (_, "key_macro_enabled") => {
-                    config.key_macro_enabled = val_bool;
-                }
-                ("sound", "enabled") | (_, "sound_enabled") | (_, "sound") => {
-                    config.sound_enabled = val_bool;
-                }
-                (_, "method") => {
+                ("general", "method") => {
                     config.method = val_l.parse().unwrap_or_default();
                 }
-                (_, "enabled") => config.enabled = val_bool,
-                (_, "switch_key_enabled") | (_, "use_switch_key") | (_, "switch_enabled") => {
-                    config.switch_key_enabled = val_bool;
-                }
-                (_, "switch_key") | (_, "switch_with_ctrl_shift") => {
+                ("general", "enabled") => config.enabled = val_bool,
+                ("general", "switch_key_enabled") => config.switch_key_enabled = val_bool,
+                ("general", "switch_key") => {
                     config.switch_key = crate::engine::config::Hotkey::from_config_str(val);
                     config.switch_with_ctrl_shift = config.switch_key.is_ctrl_shift();
                 }
-                (_, "restore_on_wrong") | (_, "restore_on_wrong_spelling") => {
-                    config.restore_on_wrong_spelling = val_bool;
+                ("spelling", "restore_on_wrong") => config.restore_on_wrong_spelling = val_bool,
+                ("spelling", "auto_uppercase_first") => {
+                    config.auto_uppercase_first_char = val_bool
                 }
-                (_, "auto_uppercase_first") | (_, "auto_uppercase_first_char") => {
-                    config.auto_uppercase_first_char = val_bool;
+                ("features", "use_macro") => config.use_macro = val_bool,
+                ("features", "use_macro_in_english") => {
+                    config.use_macro_in_english_mode = val_bool
                 }
-                (_, "use_macro") => config.use_macro = val_bool,
-                (_, "bracket_w") => config.bracket_w = val_bool,
-                (_, "remember_history") | (_, "remember_history_across_space") => {
-                    config.remember_history_across_space = val_bool;
+                ("features", "bracket_w") => config.bracket_w = val_bool,
+                ("features", "remember_history") => {
+                    config.remember_history_across_space = val_bool
                 }
-                (_, "show_dialog_on_startup") | (_, "show_dialog") => {
-                    config.show_dialog_on_startup = val_bool;
-                }
-                (_, "debug") => config.debug = val_bool,
-                (_, "theme") => {
-                    config.theme = val_l.parse().unwrap_or_default();
-                }
-                (_, "language") | (_, "lang") => {
-                    config.language = val_l.parse().unwrap_or_default();
-                }
-                (_, "sound_profile") | (_, "switch") | (_, "switch_type") => {
+                ("sound", "enabled") => config.sound_enabled = val_bool,
+                ("sound", "switch") => {
                     config.sound_profile = std::sync::Arc::from(val.trim());
                 }
-                (_, "sound_volume") | (_, "volume") => {
+                ("sound", "volume") => {
                     config.sound_volume = val_l.parse().unwrap_or(50).clamp(0, 100);
                 }
-                (_, "remap_enabled") => {
-                    config.remap_enabled = val_bool;
-                    profiles.global_profile.remap_enabled = Some(val_bool);
+                ("system", "language") => {
+                    config.language = val_l.parse().unwrap_or_default();
                 }
-                (_, "disable_enabled") => {
-                    config.disable_enabled = val_bool;
-                    profiles.global_profile.disable_enabled = Some(val_bool);
+                ("system", "show_dialog_on_startup") => config.show_dialog_on_startup = val_bool,
+                ("system", "debug") => config.debug = val_bool,
+                ("system", "theme") => {
+                    config.theme = val_l.parse().unwrap_or_default();
                 }
                 _ => {}
             }

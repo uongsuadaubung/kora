@@ -33,20 +33,5 @@ pub fn handle_command(
         c.on_command(hwnd, control_id, notify_code);
     }
 
-    if control_id == crate::ui::tokens::id::IDC_COMBO_TYPING_MODE && notify_code == CBN_SELCHANGE {
-        let enabled = crate::platform::win32::ENGINE_INSTANCE
-            .lock()
-            .ok()
-            .and_then(|g| g.as_ref().map(|e| e.effective_config().enabled));
-        if let Some(enabled) = enabled {
-            crate::ui::update_tray_icon(enabled);
-        }
-    } else if (control_id == crate::ui::tokens::id::IDC_COMBO_THEME
-        || control_id == crate::ui::tokens::id::IDC_COMBO_LANG)
-        && let Some(ui) = crate::ui::ui()
-    {
-        ui.tray.borrow_mut().refresh_icon();
-    }
-
     0
 }

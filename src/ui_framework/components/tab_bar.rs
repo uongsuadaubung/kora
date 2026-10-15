@@ -1,9 +1,10 @@
 //! Modern Segmented Pill TabBar Control
 //! Native Win32 Fluent Design Segmented Control with smooth pill animations and hover states.
 
-use crate::ui::colors::ThemePalette;
-use crate::ui::tokens::{borders, radii};
-use crate::ui::win32::*;
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::theme::is_current_dark;
+use crate::ui_framework::tokens::{borders, radii};
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex, Once};
 
@@ -93,7 +94,8 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                             let track_padding = 3;
                             let available_w = (w - (track_padding * 2)).max(1);
                             let tab_w = (available_w / num_tabs as i32).max(1);
-                            let idx = ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as isize;
+                            let idx =
+                                ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as isize;
                             let old = g.hover_idx;
                             g.hover_idx = idx;
                             old != idx
@@ -145,7 +147,8 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                         let track_padding = 3;
                         let available_w = (w - (track_padding * 2)).max(1);
                         let tab_w = (available_w / num_tabs as i32).max(1);
-                        let idx = ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as usize;
+                        let idx =
+                            ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as usize;
                         let old = g.cur_sel;
                         if old != idx {
                             g.cur_sel = idx;
@@ -202,34 +205,45 @@ unsafe extern "system" fn tab_bar_wnd_proc(
 
 fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>) {
     unsafe {
-        let is_dark = crate::ui::is_current_dark();
+        let is_dark = is_current_dark();
         let palette = ThemePalette::get(is_dark);
 
         let (tabs, cur_sel, hover_idx, font_normal, font_bold) = if let Ok(g) = state_mutex.lock() {
-            (g.tabs.clone(), g.cur_sel, g.hover_idx, g.font_normal, g.font_bold)
+            (
+                g.tabs.clone(),
+                g.cur_sel,
+                g.hover_idx,
+                g.font_normal,
+                g.font_bold,
+            )
         } else {
             (Vec::new(), 0, -1, 0, 0)
         };
 
-        // 0. Fill the entire control rect with the window background
         let brush_bg = CreateSolidBrush(palette.bg_window);
         FillRect(hdc, rc, brush_bg);
         DeleteObject(brush_bg);
 
-        // 1. Paint Outer Segmented Track Pill
         let brush_track = CreateSolidBrush(palette.tab_track_bg);
         let pen_track = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_track_border);
         let old_brush = SelectObject(hdc, brush_track);
         let old_pen = SelectObject(hdc, pen_track);
 
-        RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radii::RADIUS_PILL, radii::RADIUS_PILL);
+        RoundRect(
+            hdc,
+            rc.left,
+            rc.top,
+            rc.right,
+            rc.bottom,
+            radii::RADIUS_PILL,
+            radii::RADIUS_PILL,
+        );
 
         SelectObject(hdc, old_brush);
         SelectObject(hdc, old_pen);
         DeleteObject(brush_track);
         DeleteObject(pen_track);
 
-        // 2. Draw Tabs
         let num_tabs = tabs.len() as i32;
         if num_tabs > 0 {
             let track_padding = 3;
@@ -257,9 +271,9 @@ fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>)
                 };
 
                 if i == cur_sel {
-                    // Active Tab Pill
                     let h_active_br = CreateSolidBrush(palette.tab_active_bg);
-                    let h_active_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_active_border);
+                    let h_active_pen =
+                        CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.tab_active_border);
                     let ob = SelectObject(hdc, h_active_br);
                     let op = SelectObject(hdc, h_active_pen);
 
@@ -278,7 +292,6 @@ fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>)
                     DeleteObject(h_active_br);
                     DeleteObject(h_active_pen);
 
-                    // Text & Underline indicator
                     if font_bold != 0 {
                         SelectObject(hdc, font_bold);
                     }
@@ -294,7 +307,6 @@ fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>)
                     FillRect(hdc, &line_rc, line_br);
                     DeleteObject(line_br);
                 } else {
-                    // Inactive Tab (with subtle hover)
                     if hover_idx == i as isize {
                         let h_hvr_br = CreateSolidBrush(palette.tab_hover_bg);
                         let h_null_pen = CreatePen(PS_NULL, 0, 0);
@@ -339,6 +351,7 @@ fn render_tab_bar_to_dc(hdc: isize, rc: &RECT, state_mutex: &Mutex<TabBarState>)
 #[derive(Clone)]
 pub struct TabBar {
     hwnd: isize,
+    id: u32,
     state: Arc<Mutex<TabBarState>>,
 }
 
@@ -355,6 +368,7 @@ impl TabBar {
         hfont_bold: isize,
         tabs: &[impl AsRef<str>],
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         ensure_class_registered();
 
         let state = Arc::new(Mutex::new(TabBarState {
@@ -398,11 +412,20 @@ impl TabBar {
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, raw_state as isize);
         }
 
-        Some(Self { hwnd, state })
+        Some(Self { hwnd, id, state })
     }
 
     pub fn hwnd(&self) -> isize {
         self.hwnd
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    #[inline]
+    pub fn is_changed(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == 0
     }
 
     pub fn get_cur_sel(&self) -> usize {
@@ -443,3 +466,4 @@ impl TabBar {
         }
     }
 }
+

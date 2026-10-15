@@ -20,7 +20,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     check_switch_key: "Switch key:",
 
     // Navigation TabBar
-    tab_typing: "⌨️ Typing & Hotkeys",
+    tab_typing: "⌨️ Typing",
     tab_remap: "🔄 Key Manager",
     tab_sound: "🔊 Typing Sound",
     tab_macro: "⚡ Macro",
@@ -66,7 +66,6 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     action_mute: "Disable",
     action_unmute: "Enable",
     action_combo: "Edit   Delete",
-    action_jump_to_feature: "View",
     macro_type_normal: "Normal",
     macro_type_start: "Start consonant",
     macro_type_end: "End consonant",
@@ -133,10 +132,6 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     // System Tray Menu & Tooltips
     tray_tooltip_vi: "Kora - Vietnamese IME (Vietnamese)",
     tray_tooltip_en: "Kora - Modern Input & Keyboard Suite (English)",
-    tray_toggle_vi: "Vietnamese Mode",
-    tray_method_telex: "Telex Input",
-    tray_method_vni: "VNI Input",
-    tray_method_simple_telex: "Simple Telex Input",
     tray_control_panel: "Control Panel...",
     tray_exit: "Exit",
 

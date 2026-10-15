@@ -24,13 +24,11 @@ pub use tab_system::*;
 pub use tab_typing::*;
 
 use crate::engine::EngineConfig;
-use crate::engine::profile::AppProfile;
+use crate::engine::profile::{AppProfile, Child, ProfileRef, Root};
 use crate::language::Language;
 use crate::ui::components::*;
 use crate::ui::win32::{InvalidateRect, MEASUREITEMSTRUCT};
-pub use crate::ui::tokens::id::*;
 pub use crate::ui::tokens::layout::*;
-use std::cell::Cell;
 use std::ptr::null_mut;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,14 +49,15 @@ pub struct ControlPanelControls {
     pub tab_system: TabSystem,
     pub tab_about: TabAbout,
     pub footer: FooterControls,
-    pub current_view_mode: Cell<ViewMode>,
 }
 
 /// Engine data needed to populate the panel, copied out under one short lock.
 struct EngineSnapshot {
     config: EngineConfig,
-    selected: AppProfile,
-    all_profiles: Vec<AppProfile>,
+    global_profile: AppProfile<Root>,
+    selected_child: Option<AppProfile<Child>>,
+    children: Vec<AppProfile<Child>>,
+    selected_id: String,
     remaps: Vec<crate::engine::profile::ResolvedRemapItem>,
     disabled: Vec<crate::engine::profile::ResolvedDisableItem>,
     key_macros: Vec<crate::engine::profile::ResolvedKeyMacroItem>,
@@ -73,7 +72,7 @@ impl ControlPanelControls {
         let strings = crate::language::current();
         let tab_bar = TabBar::create(
             parent,
-            IDC_TAB_MAIN,
+            0,
             TAB_BAR_X,
             TAB_BAR_Y,
             TAB_BAR_WIDTH,
@@ -102,17 +101,15 @@ impl ControlPanelControls {
             tab_system,
             tab_about,
             footer,
-            current_view_mode: Cell::new(ViewMode::Profile(0)),
         })
     }
 
     pub fn get_view_mode(&self) -> ViewMode {
-        self.current_view_mode.get()
+        self.sidebar.get_view_mode()
     }
 
     /// Dynamically switches visibility between Profile Subtabs, System Settings, and About
     pub fn update_view_mode(&self, mode: ViewMode) {
-        self.current_view_mode.set(mode);
         self.sidebar.set_view_mode(mode);
         let subtab = match mode {
             ViewMode::Profile(t) => Some(t),
@@ -148,11 +145,10 @@ impl ControlPanelControls {
             let sel_id = pm.selected_id.as_str();
             EngineSnapshot {
                 config: engine.config().clone(),
-                selected: pm
-                    .get_profile(sel_id)
-                    .cloned()
-                    .unwrap_or_else(|| pm.global_profile.clone()),
-                all_profiles: pm.all_profiles().into_iter().cloned().collect(),
+                global_profile: pm.global_profile.clone(),
+                selected_child: pm.get_profile(sel_id).cloned(),
+                children: pm.profiles.clone(),
+                selected_id: pm.selected_id.clone(),
                 remaps: pm.resolve_remap_items_for_ui(sel_id),
                 disabled: pm.resolve_disable_items_for_ui(sel_id),
                 key_macros: pm.resolve_key_macro_items_for_ui(sel_id),
@@ -160,14 +156,17 @@ impl ControlPanelControls {
             }
         };
 
-        let all_refs: Vec<&AppProfile> = snap.all_profiles.iter().collect();
-        let (profile, cfg) = (&snap.selected, &snap.config);
-        self.sidebar.populate_profiles(&all_refs, &profile.id);
-        self.banner.update_profile(profile);
-        self.tab_typing.load_profile(profile, cfg);
-        self.tab_keys.load_profile(profile, cfg);
-        self.tab_sound.load_profile(profile, cfg);
-        self.tab_macro.load_profile(profile, cfg);
+        let mut all_refs = Vec::with_capacity(1 + snap.children.len());
+        all_refs.push(ProfileRef::Root(&snap.global_profile));
+        all_refs.extend(snap.children.iter().map(ProfileRef::Child));
+
+        let (child, cfg) = (snap.selected_child.as_ref(), &snap.config);
+        self.sidebar.populate_profiles(&all_refs, &snap.selected_id);
+        self.banner.update_profile(child);
+        self.tab_typing.load_profile(child, cfg);
+        self.tab_keys.load_profile(child, cfg);
+        self.tab_sound.load_profile(child, cfg);
+        self.tab_macro.load_profile(child, cfg);
         self.tab_system.load_config(cfg);
         self.tab_keys.populate_remaps(&snap.remaps);
         self.tab_keys.populate_disabled(&snap.disabled);
@@ -200,82 +199,59 @@ impl ControlPanelControls {
         }
     }
 
-    /// Master dispatcher for WM_CTLCOLORSTATIC across all components
-    pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
-        if let Some(br) = self.sidebar.on_ctlcolor_static(hdc, ctrl_id, is_dark) {
-            return Some(br);
+    /// Delegates custom card and decoration painting to the currently active view/tab
+    pub fn paint_active_view(
+        &self,
+        hwnd: isize,
+        hdc: isize,
+        right_bound: i32,
+        palette: &crate::ui::colors::ThemePalette,
+    ) {
+        match self.get_view_mode() {
+            ViewMode::Profile(0) => self.tab_typing.paint(hwnd, hdc, right_bound, palette),
+            ViewMode::Profile(1) => self.tab_keys.paint(hdc, right_bound),
+            ViewMode::Profile(2) => self.tab_sound.paint(hdc, right_bound),
+            ViewMode::Profile(3) => self.tab_macro.paint(hdc, right_bound),
+            ViewMode::SystemSettings => self.tab_system.paint(hdc, right_bound),
+            ViewMode::About => self.tab_about.paint(hdc, right_bound, palette),
+            _ => {}
         }
-        if let Some(br) = self.banner.on_ctlcolor_static(hdc, ctrl_id, is_dark) {
-            return Some(br);
+    }
+
+    fn switch_global_view(&self, hwnd: isize, mode: ViewMode) -> bool {
+        self.sidebar.list_profiles.set_selected_index(-1);
+        self.update_view_mode(mode);
+        unsafe {
+            InvalidateRect(hwnd, null_mut(), 0);
+            InvalidateRect(self.sidebar.list_profiles.hwnd(), null_mut(), 0);
         }
-        if let Some(br) = self.tab_typing.on_ctlcolor_static(hdc, ctrl_id, is_dark) {
-            return Some(br);
-        }
-        if let Some(br) = self.tab_system.on_ctlcolor_static(hdc, ctrl_id, is_dark) {
-            return Some(br);
-        }
-        if let Some(br) = self.tab_about.on_ctlcolor_static(hdc, ctrl_id, is_dark) {
-            return Some(br);
-        }
-        None
+        true
     }
 
     /// Master dispatcher for WM_COMMAND across all components
     pub fn on_command(&self, hwnd: isize, ctrl_id: u32, notify_code: u32) -> bool {
-        if ctrl_id == IDC_TAB_MAIN {
-            let cur_tab = self.tab_bar.get_cur_sel();
-            self.update_view_mode(ViewMode::Profile(cur_tab));
+        if self.tab_bar.is_changed(ctrl_id, notify_code) {
+            self.update_view_mode(ViewMode::Profile(self.tab_bar.get_cur_sel()));
             unsafe {
                 InvalidateRect(hwnd, null_mut(), 0);
             }
             return true;
         }
-        if ctrl_id == IDC_BTN_SIDEBAR_SETTINGS {
-            self.sidebar.list_profiles.set_selected_index(-1);
-            self.update_view_mode(ViewMode::SystemSettings);
-            unsafe {
-                InvalidateRect(hwnd, null_mut(), 0);
-                InvalidateRect(self.sidebar.list_profiles.hwnd(), null_mut(), 0);
-            }
-            return true;
+        if self.sidebar.btn_system_settings.is_clicked(ctrl_id, notify_code) {
+            return self.switch_global_view(hwnd, ViewMode::SystemSettings);
         }
-        if ctrl_id == IDC_BTN_SIDEBAR_ABOUT {
-            self.sidebar.list_profiles.set_selected_index(-1);
-            self.update_view_mode(ViewMode::About);
-            unsafe {
-                InvalidateRect(hwnd, null_mut(), 0);
-                InvalidateRect(self.sidebar.list_profiles.hwnd(), null_mut(), 0);
-            }
-            return true;
+        if self.sidebar.btn_about.is_clicked(ctrl_id, notify_code) {
+            return self.switch_global_view(hwnd, ViewMode::About);
         }
-        if self.footer.on_command(hwnd, ctrl_id, self) {
-            return true;
-        }
-        if self.banner.on_command(hwnd, ctrl_id) {
-            return true;
-        }
-        if self.sidebar.on_command(hwnd, ctrl_id, notify_code, self) {
-            return true;
-        }
-        if self.tab_typing.on_command(hwnd, ctrl_id, notify_code) {
-            return true;
-        }
-        if self.tab_keys.on_command(hwnd, ctrl_id, notify_code) {
-            return true;
-        }
-        if self.tab_sound.on_command(hwnd, ctrl_id, notify_code) {
-            return true;
-        }
-        if self.tab_macro.on_command(self, ctrl_id, notify_code) {
-            return true;
-        }
-        if self.tab_system.on_command(hwnd, ctrl_id, notify_code, self) {
-            return true;
-        }
-        if self.tab_about.on_command(hwnd, ctrl_id) {
-            return true;
-        }
-        false
+        self.footer.on_command(hwnd, ctrl_id, notify_code)
+            || self.banner.on_command(hwnd, ctrl_id, notify_code)
+            || self.sidebar.on_command(hwnd, ctrl_id, notify_code, self)
+            || self.tab_typing.on_command(hwnd, ctrl_id, notify_code)
+            || self.tab_keys.on_command(hwnd, ctrl_id, notify_code)
+            || self.tab_sound.on_command(hwnd, ctrl_id, notify_code)
+            || self.tab_macro.on_command(self, ctrl_id, notify_code)
+            || self.tab_system.on_command(hwnd, ctrl_id, notify_code, self)
+            || self.tab_about.on_command(hwnd, ctrl_id, notify_code)
     }
 
     /// Master dispatcher for WM_HSCROLL across all components

@@ -1,7 +1,8 @@
 //! Native Win32 Trackbar / Slider Component
 //! Uses msctls_trackbar32 from comctl32.dll for smooth native Windows slider controls.
 
-use crate::ui::win32::*;
+use crate::ui_framework::theme::is_current_dark;
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 
 const TBS_HORZ: u32 = 0x0000;
@@ -29,6 +30,7 @@ impl Slider {
         min: u32,
         max: u32,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("msctls_trackbar32");
         let hwnd = unsafe {
             CreateWindowExW(
@@ -58,11 +60,10 @@ impl Slider {
         }
 
         let slider = Self { hwnd, id };
-        slider.apply_theme(crate::ui::theme::is_current_dark());
+        slider.apply_theme(is_current_dark());
         Some(slider)
     }
 
-    /// Declarative helper: creates a Slider with initial value in 1 line
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_value(
         parent: isize,
@@ -90,6 +91,25 @@ impl Slider {
         self.id
     }
 
+    #[inline]
+    pub fn is_scrolled(&self, lparam: isize) -> bool {
+        lparam != 0 && lparam == self.hwnd
+    }
+
+    #[inline]
+    pub const fn is_dragging(wparam: usize) -> bool {
+        const TB_THUMBTRACK: usize = 5;
+        (wparam & 0xFFFF) == TB_THUMBTRACK
+    }
+
+    #[inline]
+    pub fn parse_scroll(&self, wparam: usize, lparam: isize) -> Option<(u32, bool)> {
+        if !self.is_scrolled(lparam) {
+            return None;
+        }
+        Some((self.get_pos(), !Self::is_dragging(wparam)))
+    }
+
     pub fn get_pos(&self) -> u32 {
         unsafe { SendMessageW(self.hwnd, TBM_GETPOS, 0, 0) as u32 }
     }
@@ -97,6 +117,13 @@ impl Slider {
     pub fn set_pos(&self, pos: u32) {
         unsafe {
             SendMessageW(self.hwnd, TBM_SETPOS, 1, pos as isize);
+        }
+    }
+
+    pub fn set_range(&self, min: u32, max: u32) {
+        unsafe {
+            let range = ((max as isize) << 16) | (min as isize & 0xFFFF);
+            SendMessageW(self.hwnd, TBM_SETRANGE, 1, range);
         }
     }
 
@@ -117,6 +144,9 @@ impl Slider {
     pub fn set_visible(&self, visible: bool) {
         unsafe {
             ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
+        }
+        if visible {
+            self.apply_theme(is_current_dark());
         }
     }
 
@@ -146,3 +176,4 @@ impl Slider {
         }
     }
 }
+

@@ -2,14 +2,11 @@
 //! Shows current profile icon, name, active status, and delete action.
 
 use crate::engine::profile::AppProfile;
-use crate::ui::colors::ThemePalette;
 use crate::ui::win32::{
-    EnableWindow, SetBkColor, SetTextColor,
-    ShowWindow, FW_BOLD, SW_HIDE, SW_SHOW,
+    set_hwnds_visible, EnableWindow, ShowWindow, FW_BOLD, SW_HIDE, SW_SHOW,
 };
-use crate::ui::components::{ButtonVariant, Label, PushButton};
-use crate::ui::theme::{cached_font, get_panel_bg_brush};
-use crate::ui::tokens::id::*;
+use crate::ui::components::{ButtonVariant, Label, LabelTone, PushButton, SurfaceRole};
+use crate::ui::theme::cached_font;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::typography::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -29,31 +26,32 @@ impl ProfileBanner {
         let hfont_title = cached_font(FONT_SIZE_TITLE, FW_BOLD);
 
         let initial_title = format!("🌐 {}", strings.banner_root_title);
-        let lbl_name = Label::create_with_id(
+        let lbl_name = Label::create(
             parent,
-            IDC_BANNER_TITLE,
             &initial_title,
             HEADER_X,
             HEADER_TITLE_Y,
             DELETE_BTN_X - HEADER_X - 8, // end before the delete button so it doesn't cover it
             HEADER_TITLE_HEIGHT,
             hfont_title,
-        )?;
+        )?
+        .on_surface(SurfaceRole::Window);
 
-        let lbl_status = Label::create_with_id(
+        let lbl_status = Label::create(
             parent,
-            IDC_BANNER_STATUS,
             strings.banner_root_desc,
             HEADER_X,
             HEADER_SUB_Y,
             HEADER_SUB_WIDTH,
             HEADER_SUB_HEIGHT,
             hfont_normal,
-        )?;
+        )?
+        .with_tone(LabelTone::Secondary)
+        .on_surface(SurfaceRole::Window);
 
         let btn_delete = PushButton::create_with_variant(
             parent,
-            IDC_BTN_DEL_PROFILE,
+            0,
             strings.banner_btn_delete,
             DELETE_BTN_X,
             HEADER_TITLE_Y,
@@ -77,131 +75,85 @@ impl ProfileBanner {
         })
     }
 
-    /// Updates banner display for the selected profile
-    pub fn update_profile(&self, profile: &AppProfile) {
+    /// Updates banner display for the selected profile (`None` = Global Root, `Some(child)` = Child profile).
+    pub fn update_profile(&self, child: Option<&AppProfile>) {
         let strings = crate::language::current();
-        self.is_root.store(profile.is_root, Ordering::SeqCst);
+        self.is_root.store(child.is_none(), Ordering::SeqCst);
 
-        let title = if profile.is_root {
-            format!("{} {}", profile.icon, strings.banner_root_title)
-        } else {
-            format!("{} {}", profile.icon, profile.name)
-        };
-        self.lbl_name.set_text(&title);
-
-        let status = if profile.is_root {
-            strings.banner_root_desc.to_string()
-        } else {
-            let proc_str = if profile.process_names.is_empty() {
-                strings.sidebar_unassigned.to_string()
-            } else {
-                profile.process_names.join(", ")
-            };
-            format!("{}{}", strings.banner_status_inactive_prefix, proc_str)
-        };
-        self.lbl_status.set_text(&status);
-
-        unsafe {
-            if profile.is_root {
-                ShowWindow(self.btn_delete.hwnd(), SW_HIDE);
-            } else {
-                ShowWindow(self.btn_delete.hwnd(), SW_SHOW);
-                EnableWindow(self.btn_delete.hwnd(), 1);
+        match child {
+            None => {
+                self.lbl_name
+                    .set_text(&format!("🌐 {}", strings.banner_root_title));
+                self.lbl_status.set_text(strings.banner_root_desc);
+                unsafe {
+                    ShowWindow(self.btn_delete.hwnd(), SW_HIDE);
+                }
+            }
+            Some(profile) => {
+                self.lbl_name
+                    .set_text(&format!("{} {}", profile.icon, profile.name));
+                let proc_str = if profile.process_names.is_empty() {
+                    strings.sidebar_unassigned.to_string()
+                } else {
+                    profile.process_names.join(", ")
+                };
+                self.lbl_status.set_text(&format!(
+                    "{}{}",
+                    strings.banner_status_inactive_prefix, proc_str
+                ));
+                unsafe {
+                    ShowWindow(self.btn_delete.hwnd(), SW_SHOW);
+                    EnableWindow(self.btn_delete.hwnd(), 1);
+                }
             }
         }
     }
 
     pub fn update_language(&self, strings: &crate::language::LanguageStrings) {
-        if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let sel_id = engine.profile_manager.selected_id.clone();
-            if let Some(prof) = engine.profile_manager.get_profile(&sel_id) {
-                self.update_profile(prof);
-            }
+        if let Some(child) = crate::ui::controller::with_engine(|engine| {
+            let sel_id = &engine.profile_manager.selected_id;
+            engine.profile_manager.get_profile(sel_id).cloned()
+        }) {
+            self.update_profile(child.as_ref());
         }
         self.btn_delete.set_text(strings.banner_btn_delete);
     }
 
-
-    pub fn on_ctlcolor_static(&self, hdc: isize, ctrl_id: u32, is_dark: bool) -> Option<isize> {
-        if ctrl_id == IDC_BANNER_TITLE || ctrl_id == IDC_BANNER_STATUS {
-            let palette = ThemePalette::get(is_dark);
-            unsafe {
-                SetBkColor(hdc, palette.bg_window);
-                SetTextColor(
-                    hdc,
-                    if ctrl_id == IDC_BANNER_STATUS {
-                        palette.text_secondary
-                    } else {
-                        palette.text_primary
-                    },
-                );
-            }
-            let p_br = get_panel_bg_brush();
-            if p_br != 0 {
-                return Some(p_br);
-            }
-        }
-        None
-    }
-
     pub fn handle_delete_profile(&self, hwnd: isize) {
-        let name = match crate::platform::win32::ENGINE_INSTANCE.lock() {
-            Ok(guard) => guard.as_ref().and_then(|engine| {
-                let sel_id = &engine.profile_manager.selected_id;
-                (sel_id != "global")
-                    .then(|| engine.profile_manager.get_profile(sel_id).map(|p| p.name.clone()))
-                    .flatten()
-            }),
-            Err(_) => None,
-        };
+        let name = crate::ui::controller::with_engine(|engine| {
+            let sel_id = &engine.profile_manager.selected_id;
+            (sel_id != crate::ui::GLOBAL_PROFILE_ID)
+                .then(|| engine.profile_manager.get_profile(sel_id).map(|p| p.name.clone()))
+                .flatten()
+        })
+        .flatten();
         let Some(name) = name else { return };
 
         let strings = crate::language::current();
-        let options = crate::ui::views::dialogs::ConfirmDialogOptions::new(
-            strings.confirm_delete_title,
-            strings.confirm_delete_profile_msg.replace("{name}", &name),
-        )
-        .danger(true);
-
-        crate::ui::views::dialogs::show_confirm_dialog(hwnd, options, move || {
-            let mut deleted = false;
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
+        let message = strings.confirm_delete_profile_msg.replace("{name}", &name);
+        crate::ui::views::dialogs::show_delete_confirm(hwnd, message, move || {
+            let deleted = crate::ui::controller::with_engine(|engine| {
                 let sel_id = engine.profile_manager.selected_id.clone();
-                if sel_id != "global" {
+                if sel_id != crate::ui::GLOBAL_PROFILE_ID {
                     engine.profile_manager.remove_profile(&sel_id);
-                    engine.profile_manager.selected_id = "global".to_string();
-                    crate::engine::config_store::save_config_all_debounced(
-                        engine.config(),
-                        &engine.macro_table,
-                        &engine.profile_manager,
-                    );
-                    deleted = true;
+                    engine.profile_manager.selected_id = crate::ui::GLOBAL_PROFILE_ID.to_string();
+                    crate::ui::controller::save(engine);
+                    true
+                } else {
+                    false
                 }
-            }
+            })
+            .unwrap_or(false);
             if deleted
-                && let Some(c) = crate::ui::controls().or_else(|| {
-                    let ptr = unsafe {
-                        crate::ui::win32::GetWindowLongPtrW(hwnd, crate::ui::win32::GWLP_USERDATA)
-                            as *const super::ControlPanelControls
-                    };
-                    if !ptr.is_null() {
-                        unsafe { Some(&*ptr) }
-                    } else {
-                        None
-                    }
-                })
+                && let Some(c) = crate::ui::controls()
             {
-                super::SidebarControls::switch_to_profile(c, hwnd, "global");
+                super::SidebarControls::switch_to_profile(c, hwnd, crate::ui::GLOBAL_PROFILE_ID);
             }
         });
     }
 
-    pub fn on_command(&self, hwnd: isize, ctl_id: u32) -> bool {
-        if ctl_id == IDC_BTN_DEL_PROFILE {
+    pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
+        if self.btn_delete.is_clicked(ctl_id, notify_code) {
             self.handle_delete_profile(hwnd);
             true
         } else {
@@ -210,11 +162,9 @@ impl ProfileBanner {
     }
 
     pub fn set_visible(&self, visible: bool) {
-        let cmd = if visible { SW_SHOW } else { SW_HIDE };
         let is_root = self.is_root.load(Ordering::SeqCst);
+        set_hwnds_visible(&[self.lbl_name.hwnd(), self.lbl_status.hwnd()], visible);
         unsafe {
-            ShowWindow(self.lbl_name.hwnd(), cmd);
-            ShowWindow(self.lbl_status.hwnd(), cmd);
             if visible && !is_root {
                 ShowWindow(self.btn_delete.hwnd(), SW_SHOW);
                 EnableWindow(self.btn_delete.hwnd(), 1);

@@ -1,12 +1,10 @@
 //! Native Win32 PushButton Component
 
-use crate::ui::win32::*;
-use crate::ui::colors::ThemePalette;
-use crate::ui::theme::{get_app_font_bold, get_app_font_normal};
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
-
-
 
 const BS_PUSHBUTTON: u32 = 0x00000000;
 const BS_OWNERDRAW: u32 = 0x0000000B;
@@ -14,6 +12,7 @@ const BS_OWNERDRAW: u32 = 0x0000000B;
 const BUTTON_SUBCLASS_ID: usize = 0x501;
 
 pub type ButtonCustomDrawer = Arc<dyn Fn(&DRAWITEMSTRUCT, bool) -> bool + Send + Sync>;
+pub type ButtonClickCallback = Arc<dyn Fn() + Send + Sync>;
 
 #[derive(Clone)]
 pub struct ButtonData {
@@ -23,6 +22,7 @@ pub struct ButtonData {
     pub corner_radius: i32,
     pub align_left: bool,
     pub custom_drawer: Option<ButtonCustomDrawer>,
+    pub on_click: Option<ButtonClickCallback>,
 }
 
 impl Default for ButtonData {
@@ -34,6 +34,7 @@ impl Default for ButtonData {
             corner_radius: 6,
             align_left: false,
             custom_drawer: None,
+            on_click: None,
         }
     }
 }
@@ -111,6 +112,15 @@ unsafe extern "system" fn button_subclass_proc(
                 InvalidateRect(hwnd, null_mut(), 0);
             }
         }
+    } else if msg == OCM_COMMAND {
+        let notify_code = ((wparam >> 16) & 0xFFFF) as u32;
+        if notify_code == 0 {
+            let cb = state_arc.lock().ok().and_then(|s| s.on_click.clone());
+            if let Some(cb) = cb {
+                cb();
+                return 1;
+            }
+        }
     } else if msg == OCM_DRAWITEM {
         let dis = unsafe { &*(lparam as *const DRAWITEMSTRUCT) };
         let (custom_drawer, variant, is_hover, bg_erase, corner_radius, align_left) =
@@ -127,7 +137,7 @@ unsafe extern "system" fn button_subclass_proc(
                 (None, ButtonVariant::Secondary, false, None, 6, false)
             };
 
-        let is_dark = crate::ui::is_current_dark();
+        let is_dark = is_current_dark();
         if let Some(ref drawer) = custom_drawer
             && drawer(dis, is_dark)
         {
@@ -185,6 +195,7 @@ impl PushButton {
         height: i32,
         hfont: isize,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("BUTTON");
         let window_name = to_wide(text);
 
@@ -260,6 +271,7 @@ impl PushButton {
         variant: ButtonVariant,
         bg_erase: Option<u32>,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("BUTTON");
         let window_name = to_wide(text);
 
@@ -288,6 +300,7 @@ impl PushButton {
                 corner_radius: 6,
                 align_left: false,
                 custom_drawer: None,
+                on_click: None,
             }));
             let state_raw = Arc::into_raw(state.clone()) as usize;
             unsafe {
@@ -315,6 +328,15 @@ impl PushButton {
         }
     }
 
+    pub fn set_align_left(&self, align_left: bool) {
+        if let Ok(mut s) = self.state.lock() {
+            s.align_left = align_left;
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
     pub fn set_custom_drawer<F>(&self, drawer: F)
     where
         F: Fn(&DRAWITEMSTRUCT, bool) -> bool + Send + Sync + 'static,
@@ -325,6 +347,30 @@ impl PushButton {
         unsafe {
             InvalidateRect(self.hwnd, null_mut(), 0);
         }
+    }
+
+    /// Builder: attaches a click callback invoked automatically on `OCM_COMMAND` (`BN_CLICKED`).
+    pub fn on_click<F>(self, callback: F) -> Self
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.set_on_click(callback);
+        self
+    }
+
+    pub fn set_on_click<F>(&self, callback: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        if let Ok(mut s) = self.state.lock() {
+            s.on_click = Some(Arc::new(callback));
+        }
+    }
+
+    /// Returns `true` when this button was clicked in `WM_COMMAND` (`BN_CLICKED = 0`).
+    #[inline]
+    pub fn is_clicked(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == 0
     }
 
     pub fn hwnd(&self) -> isize {
@@ -377,7 +423,6 @@ impl PushButton {
         }
     }
 
-    /// Check if mouse cursor is currently hovering inside the window bounds
     pub fn is_mouse_hover(hwnd: isize) -> bool {
         let mut pt = POINT::default();
         unsafe {
@@ -389,7 +434,6 @@ impl PushButton {
         }
     }
 
-    /// Unified Fluent Design Button Renderer with explicit hover state, radius, and alignment
     #[allow(clippy::too_many_arguments)]
     pub fn render_ext_state(
         hdc: isize,
@@ -407,14 +451,12 @@ impl PushButton {
         unsafe {
             let palette = ThemePalette::get(is_dark);
 
-            // 1. Erase background if specified (ensures crisp rounded corners)
             if bg_erase != 0 {
                 let bg_br = CreateSolidBrush(bg_erase);
                 FillRect(hdc, rc, bg_br);
                 DeleteObject(bg_br);
             }
 
-            // 2. Resolve colors and font based on variant and state (web-like hover highlight)
             let (btn_color, border_color, text_color, font) = match variant {
                 ButtonVariant::Primary => {
                     if is_disabled {
@@ -502,6 +544,16 @@ impl PushButton {
                         )
                     }
                 }
+                ButtonVariant::DangerSolid => {
+                    let (bg, border) = if is_pressed {
+                        (0x002420DC, 0x002420DC)
+                    } else if is_hover {
+                        (0x004A50F8, 0x004A50F8)
+                    } else {
+                        (0x004444EF, 0x004444EF)
+                    };
+                    (bg, border, palette.text_white, get_app_font_bold())
+                }
                 ButtonVariant::Ghost => {
                     if is_pressed {
                         (
@@ -528,10 +580,8 @@ impl PushButton {
                 }
             };
 
-            // 3. Paint Rounded Pill
             round_rect(hdc, rc, radius, btn_color, Some(border_color));
 
-            // 4. Paint Label Text
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, text_color);
             SelectObject(hdc, font);
@@ -553,12 +603,10 @@ impl PushButton {
 /// Visual style variants for Fluent Buttons
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ButtonVariant {
-    /// Fluent Accent Blue (#0078D4) with bold white text
     Primary,
-    /// Surface card (#38383C), subtle border, primary text
     Secondary,
-    /// Danger/delete button (red text/border on hover, subtle dark surface)
     Danger,
-    /// Flat transparent, hover card, secondary or primary text
+    DangerSolid,
     Ghost,
 }
+

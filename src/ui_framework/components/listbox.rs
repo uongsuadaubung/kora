@@ -1,6 +1,7 @@
 //! Native Win32 ListBox Component (Owner-Drawn Support)
 
-use crate::ui::win32::*;
+use crate::ui_framework::theme::is_current_dark;
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
@@ -55,7 +56,7 @@ unsafe extern "system" fn listbox_subclass_proc(
             None
         };
         if let Some(drawer) = drawer {
-            let is_dark = crate::ui::is_current_dark();
+            let is_dark = is_current_dark();
             if drawer(dis, is_dark) {
                 return 1;
             }
@@ -72,7 +73,6 @@ unsafe extern "system" fn listbox_subclass_proc(
         let id = uid_subclass as u32;
         if parent != 0 {
             unsafe {
-                // Post LBN_SELCHANGE (1) to parent so even clicking an already-selected item notifies
                 PostMessageW(parent, WM_COMMAND, (1 << 16) | (id as usize), hwnd);
             }
         }
@@ -96,8 +96,15 @@ impl ListBox {
         height: i32,
         hfont: isize,
     ) -> Option<Self> {
+        let id = super::resolve_id(id);
         let class_name = to_wide("LISTBOX");
-        let style = WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_TABSTOP | LBS_NOTIFY | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT;
+        let style = WS_CHILD
+            | WS_VISIBLE
+            | WS_VSCROLL
+            | WS_TABSTOP
+            | LBS_NOTIFY
+            | LBS_OWNERDRAWFIXED
+            | LBS_NOINTEGRALHEIGHT;
 
         let hwnd = unsafe {
             CreateWindowExW(
@@ -128,12 +135,7 @@ impl ListBox {
             }));
             let data_raw = Arc::into_raw(data.clone()) as usize;
             unsafe {
-                SetWindowSubclass(
-                    hwnd,
-                    listbox_subclass_proc,
-                    id as usize,
-                    data_raw,
-                );
+                SetWindowSubclass(hwnd, listbox_subclass_proc, id as usize, data_raw);
             }
             Some(Self { hwnd, id, data })
         } else {
@@ -158,6 +160,11 @@ impl ListBox {
         self.id
     }
 
+    #[inline]
+    pub fn is_sel_changed(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == 1
+    }
+
     pub fn set_item_height(&self, height: i32) {
         unsafe {
             SendMessageW(self.hwnd, LB_SETITEMHEIGHT, 0, height as isize);
@@ -166,9 +173,7 @@ impl ListBox {
 
     pub fn add_item(&self, text: &str) -> i32 {
         let wide = to_wide(text);
-        unsafe {
-            SendMessageW(self.hwnd, LB_ADDSTRING, 0, wide.as_ptr() as isize) as i32
-        }
+        unsafe { SendMessageW(self.hwnd, LB_ADDSTRING, 0, wide.as_ptr() as isize) as i32 }
     }
 
     pub fn reset_content(&self) {

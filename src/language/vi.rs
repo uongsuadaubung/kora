@@ -20,7 +20,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     check_switch_key: "Phím chuyển:",
 
     // Navigation TabBar
-    tab_typing: "⌨️ Bộ gõ & Phím tắt",
+    tab_typing: "⌨️ Bộ gõ",
     tab_remap: "🔄 Quản lý phím",
     tab_sound: "🔊 Âm thanh gõ",
     tab_macro: "⚡ Gõ tắt",
@@ -66,7 +66,6 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     action_mute: "Tắt",
     action_unmute: "Bật",
     action_combo: "Sửa   Xóa",
-    action_jump_to_feature: "Xem",
     macro_type_normal: "Bình thường",
     macro_type_start: "Đầu từ",
     macro_type_end: "Cuối từ",
@@ -133,10 +132,6 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     // System Tray Menu & Tooltips
     tray_tooltip_vi: "Kora - Modern Input & Keyboard Suite (Tiếng Việt)",
     tray_tooltip_en: "Kora - Modern Input & Keyboard Suite (Tiếng Anh)",
-    tray_toggle_vi: "Bật tiếng Việt",
-    tray_method_telex: "Kiểu gõ Telex",
-    tray_method_vni: "Kiểu gõ VNI",
-    tray_method_simple_telex: "Kiểu gõ Simple Telex",
     tray_control_panel: "Bảng điều khiển...",
     tray_exit: "Thoát",
 

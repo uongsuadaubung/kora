@@ -19,7 +19,6 @@ pub fn set_preferred_app_mode(is_dark: bool) {
     unsafe {
         let uxtheme = GetModuleHandleW(to_wide("uxtheme.dll").as_ptr());
         if uxtheme != 0 {
-            // Ordinal 135: SetPreferredAppMode (0 = Default, 1 = AllowDark, 2 = ForceDark, 3 = ForceLight)
             let set_mode: Option<unsafe extern "system" fn(i32) -> i32> =
                 std::mem::transmute(GetProcAddress(uxtheme, 135 as *const u8));
             if let Some(f) = set_mode {
@@ -30,7 +29,6 @@ pub fn set_preferred_app_mode(is_dark: bool) {
                 };
                 f(mode);
             }
-            // Ordinal 136: FlushMenuThemes
             let flush: Option<unsafe extern "system" fn()> =
                 std::mem::transmute(GetProcAddress(uxtheme, 136 as *const u8));
             if let Some(f) = flush {
@@ -45,7 +43,6 @@ pub fn allow_window_dark_mode(hwnd: isize, is_dark: bool) {
     unsafe {
         let uxtheme = GetModuleHandleW(to_wide("uxtheme.dll").as_ptr());
         if uxtheme != 0 {
-            // Ordinal 133: AllowDarkModeForWindow (hwnd, bool)
             let allow_dark: Option<unsafe extern "system" fn(isize, bool) -> bool> =
                 std::mem::transmute(GetProcAddress(uxtheme, 133 as *const u8));
             if let Some(f) = allow_dark {
@@ -123,6 +120,18 @@ pub fn center_window(hwnd: isize, width: i32, height: i32) {
             height,
             0x0004 /* SWP_NOZORDER */ | 0x0010, /* SWP_NOACTIVATE */
         );
+    }
+}
+
+/// Shows or hides a slice of child window handles in one call.
+pub fn set_hwnds_visible(hwnds: &[isize], visible: bool) {
+    let cmd = if visible { SW_SHOW } else { SW_HIDE };
+    unsafe {
+        for &h in hwnds {
+            if h != 0 {
+                ShowWindow(h, cmd);
+            }
+        }
     }
 }
 

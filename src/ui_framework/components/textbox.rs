@@ -1,33 +1,11 @@
-use crate::ui::win32::*;
-use crate::ui::tokens::spacing;
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::theme::{get_input_bg_brush, is_current_dark};
+use crate::ui_framework::tokens::spacing;
+use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 
 const CONTAINER_SUBCLASS_ID: usize = 0x408;
 const EDIT_SUBCLASS_ID: usize = 0x407;
-
-#[link(name = "user32")]
-unsafe extern "system" {
-    fn CreateWindowExW(
-        dw_ex_style: u32,
-        lp_class_name: *const u16,
-        lp_window_name: *const u16,
-        dw_style: u32,
-        x: i32,
-        y: i32,
-        n_width: i32,
-        n_height: i32,
-        h_wnd_parent: isize,
-        h_menu: isize,
-        h_instance: isize,
-        lp_param: *mut std::ffi::c_void,
-    ) -> isize;
-    fn SendMessageW(h_wnd: isize, msg: u32, w_param: usize, l_param: isize) -> isize;
-    fn GetWindowTextW(h_wnd: isize, lp_string: *mut u16, n_max_count: i32) -> i32;
-    fn SetWindowTextW(h_wnd: isize, lp_string: *const u16) -> i32;
-    fn GetWindowTextLengthW(h_wnd: isize) -> i32;
-    fn GetParent(h_wnd: isize) -> isize;
-    fn SetFocus(h_wnd: isize) -> isize;
-}
 
 const WS_CHILD: u32 = 0x40000000;
 const WS_VISIBLE: u32 = 0x10000000;
@@ -108,12 +86,12 @@ unsafe extern "system" fn container_subclass_proc(
 
     if msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORSTATIC {
         let hdc = wparam as isize;
-        let is_dark = crate::ui::is_current_dark();
-        let palette = crate::ui::colors::ThemePalette::get(is_dark);
+        let is_dark = is_current_dark();
+        let palette = ThemePalette::get(is_dark);
         unsafe {
             SetTextColor(hdc, palette.text_input);
             SetBkColor(hdc, palette.bg_input);
-            let br = crate::ui::theme::get_input_bg_brush();
+            let br = get_input_bg_brush();
             if br != 0 {
                 return br;
             }
@@ -162,21 +140,19 @@ unsafe extern "system" fn container_subclass_proc(
         let mut ps: PAINTSTRUCT = unsafe { std::mem::zeroed() };
         let hdc = unsafe { BeginPaint(hwnd, &mut ps) };
         if hdc != 0 {
-            let is_dark = crate::ui::is_current_dark();
-            let palette = crate::ui::colors::ThemePalette::get(is_dark);
+            let is_dark = is_current_dark();
+            let palette = ThemePalette::get(is_dark);
             let mut rc = RECT::default();
             unsafe {
                 GetClientRect(hwnd, &mut rc);
             }
 
-            // 1. Fill background
             let bg_brush = unsafe { CreateSolidBrush(palette.bg_input) };
             unsafe {
                 FillRect(hdc, &rc, bg_brush);
                 DeleteObject(bg_brush);
             }
 
-            // 2. Draw 1px border around all 4 sides (highlighted with accent when focused)
             let is_focused = unsafe { GetFocus() == data.inner_edit };
             let border_color = if is_focused {
                 palette.accent
@@ -272,12 +248,11 @@ unsafe extern "system" fn edit_subclass_proc(
                 if GetWindowTextLengthW(hwnd) == 0 && GetFocus() != hwnd {
                     let hdc = GetDC(hwnd);
                     if hdc != 0 {
-                        let is_dark = crate::ui::is_current_dark();
-                        let palette = crate::ui::colors::ThemePalette::get(is_dark);
+                        let is_dark = is_current_dark();
+                        let palette = ThemePalette::get(is_dark);
                         let mut rc = RECT::default();
                         GetClientRect(hwnd, &mut rc);
 
-                        // Clear background cleanly first so font anti-aliasing NEVER accumulates or blurs on hover!
                         let bg_brush = CreateSolidBrush(palette.bg_input);
                         FillRect(hdc, &rc, bg_brush);
                         DeleteObject(bg_brush);
@@ -330,7 +305,7 @@ impl TextBox {
         height: i32,
         hfont: isize,
     ) -> Option<Self> {
-        // 1. Container window (holds custom border, background, and pads child edit)
+        let id = super::resolve_id(id);
         let container = unsafe {
             CreateWindowExW(
                 0,
@@ -352,7 +327,6 @@ impl TextBox {
             return None;
         }
 
-        // 2. Borderless native EDIT control centered vertically inside container
         let inner_h = 18;
         let inner_y = (height - inner_h) / 2;
         let inner_x = spacing::SPACE_8;
@@ -388,10 +362,7 @@ impl TextBox {
             }
         }
 
-        // 3. Subclass container
-        let c_data = Box::into_raw(Box::new(ContainerSubclassData {
-            inner_edit,
-        }));
+        let c_data = Box::into_raw(Box::new(ContainerSubclassData { inner_edit }));
         unsafe {
             SetWindowSubclass(
                 container,
@@ -401,7 +372,6 @@ impl TextBox {
             );
         }
 
-        // 4. Subclass inner edit
         let e_data = Box::into_raw(Box::new(EditSubclassData {
             cue: to_wide(cue_banner),
             font: hfont,
@@ -431,7 +401,6 @@ impl TextBox {
         })
     }
 
-    /// Declarative helper: creates a TextBox with a placeholder in 1 line
     #[allow(clippy::too_many_arguments)]
     pub fn create_with_placeholder(
         parent: isize,
@@ -452,6 +421,11 @@ impl TextBox {
 
     pub fn id(&self) -> u32 {
         self.id
+    }
+
+    #[inline]
+    pub fn is_changed(&self, ctrl_id: u32, notify_code: u32) -> bool {
+        ctrl_id == self.id && notify_code == 0x0300
     }
 
     pub fn get_text(&self) -> String {
@@ -492,4 +466,30 @@ impl TextBox {
             SendMessageW(self.inner_hwnd, WM_SET_CUE_BANNER, 0, wide.as_ptr() as isize);
         }
     }
+
+    #[inline]
+    pub fn set_placeholder(&self, text: &str) {
+        self.set_cue_banner(text);
+    }
+
+    pub fn focus(&self) {
+        unsafe {
+            SetFocus(self.inner_hwnd);
+        }
+    }
+
+    pub fn set_enabled(&self, enabled: bool) {
+        unsafe {
+            EnableWindow(self.container_hwnd, enabled as i32);
+            EnableWindow(self.inner_hwnd, enabled as i32);
+            InvalidateRect(self.container_hwnd, null_mut(), 1);
+        }
+    }
+
+    pub fn set_visible(&self, visible: bool) {
+        unsafe {
+            ShowWindow(self.container_hwnd, if visible { SW_SHOW } else { SW_HIDE });
+        }
+    }
 }
+

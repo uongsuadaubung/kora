@@ -172,7 +172,7 @@ impl VietnameseEngine {
         let new_state = !self.effective_config().enabled;
         let active_id = self.profile_manager.active_id.clone();
         match self.profile_manager.get_profile_mut(&active_id) {
-            Some(p) if !p.is_root && p.mode != profile::LanguageMode::Inherit => {
+            Some(p) if p.mode != profile::LanguageMode::Inherit => {
                 p.mode = if new_state {
                     profile::LanguageMode::Vietnamese
                 } else {

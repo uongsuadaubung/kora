@@ -201,6 +201,7 @@ pub const OCM_DRAWITEM: u32 = OCM_BASE + 0x002B;
 pub const OCM_CTLCOLORSTATIC: u32 = OCM_BASE + 0x0138;
 pub const OCM_CTLCOLOREDIT: u32 = OCM_BASE + 0x0133;
 pub const OCM_CTLCOLORLISTBOX: u32 = OCM_BASE + 0x0134;
+pub const OCM_THEMECHANGED: u32 = OCM_BASE + 0x031A;
 
 pub const RDW_INVALIDATE: u32 = 0x0001;
 pub const RDW_ERASE: u32 = 0x0004;
@@ -275,4 +276,6 @@ pub const NULL_BRUSH: i32 = 5;
 pub const NULL_PEN: i32 = 8;
 pub const DC_BRUSH: i32 = 18;
 pub const DC_PEN: i32 = 19;
+
+pub const DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: isize = -4;
 

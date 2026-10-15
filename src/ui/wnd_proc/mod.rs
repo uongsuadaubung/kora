@@ -1,6 +1,6 @@
 //! Kora Win32 Window Procedures & Message Handlers
 
-pub mod colors;
+pub use crate::ui_framework::win32::ctlcolor as colors;
 pub mod commands;
 pub mod tray;
 
@@ -158,7 +158,7 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
         WM_CTLCOLOREDIT | WM_CTLCOLORLISTBOX => {
             colors::handle_ctlcolor_edit_listbox(hwnd, msg, wparam, lparam)
         }
-        WM_CTLCOLORSTATIC => colors::handle_ctlcolor_static(hwnd, msg, wparam, lparam, controls),
+        WM_CTLCOLORSTATIC => colors::handle_ctlcolor_static(hwnd, msg, wparam, lparam),
         WM_SETCURSOR => colors::handle_setcursor(hwnd, msg, wparam, lparam),
         WM_CLOSE => {
             crate::ui::hide_control_panel();

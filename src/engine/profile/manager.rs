@@ -12,8 +12,8 @@ use std::collections::HashMap;
 /// System-wide Profile Manager
 #[derive(Debug, Clone)]
 pub struct ProfileManager {
-    pub global_profile: AppProfile,
-    pub profiles: Vec<AppProfile>,
+    pub global_profile: AppProfile<Root>,
+    pub profiles: Vec<AppProfile<Child>>,
     pub active_id: String,
     pub selected_id: String,
 }
@@ -27,44 +27,42 @@ impl Default for ProfileManager {
 impl ProfileManager {
     pub fn new() -> Self {
         Self {
-            global_profile: AppProfile::new_global(),
+            global_profile: AppProfile::<Root>::new_global(),
             profiles: Vec::new(),
             active_id: "global".to_string(),
             selected_id: "global".to_string(),
         }
     }
 
-    /// Returns a list of all profiles starting with Global
-    pub fn all_profiles(&self) -> Vec<&AppProfile> {
+    /// Returns a list of all profiles starting with Global (`ProfileRef::Root`), followed by children (`ProfileRef::Child`).
+    pub fn all_profiles(&self) -> Vec<ProfileRef<'_>> {
         let mut list = Vec::with_capacity(1 + self.profiles.len());
-        list.push(&self.global_profile);
-        for p in &self.profiles {
-            list.push(p);
-        }
+        list.push(ProfileRef::Root(&self.global_profile));
+        list.extend(self.profiles.iter().map(ProfileRef::Child));
         list
     }
 
-    /// Gets a profile by ID
-    pub fn get_profile(&self, id: &str) -> Option<&AppProfile> {
+    /// Gets a child profile (`AppProfile<Child>`) by ID. Returns `None` for `"global"`.
+    pub fn get_profile(&self, id: &str) -> Option<&AppProfile<Child>> {
         if id == "global" {
-            Some(&self.global_profile)
+            None
         } else {
             self.profiles.iter().find(|p| p.id == id)
         }
     }
 
-    /// Gets a mutable profile by ID
-    pub fn get_profile_mut(&mut self, id: &str) -> Option<&mut AppProfile> {
+    /// Gets a mutable child profile (`AppProfile<Child>`) by ID. Returns `None` for `"global"`.
+    pub fn get_profile_mut(&mut self, id: &str) -> Option<&mut AppProfile<Child>> {
         if id == "global" {
-            Some(&mut self.global_profile)
+            None
         } else {
             self.profiles.iter_mut().find(|p| p.id == id)
         }
     }
 
-    /// Adds or updates a child profile
-    pub fn add_profile(&mut self, profile: AppProfile) {
-        if profile.is_root || profile.id == "global" {
+    /// Adds or updates a child profile (`AppProfile<Child>` guarantees child role at compile time).
+    pub fn add_profile(&mut self, profile: AppProfile<Child>) {
+        if profile.id == "global" {
             return;
         }
         if let Some(pos) = self.profiles.iter().position(|p| p.id == profile.id) {
@@ -93,8 +91,8 @@ impl ProfileManager {
         }
     }
 
-    /// Finds a profile matching the executable filename (e.g. "cs2.exe")
-    pub fn find_profile_by_process(&self, exe_name: &str) -> Option<&AppProfile> {
+    /// Finds a child profile matching the executable filename (e.g. "cs2.exe")
+    pub fn find_profile_by_process(&self, exe_name: &str) -> Option<&AppProfile<Child>> {
         self.profiles.iter().find(|p| p.matches_process(exe_name))
     }
 
@@ -119,23 +117,10 @@ impl ProfileManager {
     pub fn resolve_effective_config(&self, profile_id: &str, base: &EngineConfig) -> EngineConfig {
         let mut cfg = base.clone();
 
-        // Overlay Global profile options on top of base
-        if let Some(r) = self.global_profile.remap_enabled {
-            cfg.remap_enabled = r;
-        }
-        if let Some(d) = self.global_profile.disable_enabled {
-            cfg.disable_enabled = d;
-        }
-        if let Some(km) = self.global_profile.key_macro_enabled {
-            cfg.key_macro_enabled = km;
-        }
-        if let Some(sw) = self.global_profile.switch_key {
-            cfg.switch_key = sw;
-            cfg.switch_with_ctrl_shift = sw.is_ctrl_shift();
-        }
-        if let Some(en) = self.global_profile.switch_key_enabled {
-            cfg.switch_key_enabled = en;
-        }
+        // Overlay Global profile rule feature flags on top of base
+        cfg.remap_enabled = self.global_profile.remap_enabled;
+        cfg.disable_enabled = self.global_profile.disable_enabled;
+        cfg.key_macro_enabled = self.global_profile.key_macro_enabled;
 
         if profile_id == "global" {
             return cfg;
@@ -203,7 +188,7 @@ impl ProfileManager {
     /// Resolves effective active KeyRemapRules for the hook execution
     /// Formula: (Global \ Muted) U Overridden U AppSpecific
     pub fn resolve_effective_remaps(&self, profile_id: &str) -> Vec<KeyRemapRule> {
-        let global_enabled = self.global_profile.remap_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.remap_enabled;
         let global_remaps = &self.global_profile.app_remaps;
         if profile_id == "global" {
             if !global_enabled {
@@ -270,7 +255,7 @@ impl ProfileManager {
     /// Resolves effective disabled keys (VK codes) for hook execution
     /// Formula: (Global \ Unmuted) U AppDisabled
     pub fn resolve_effective_disabled(&self, profile_id: &str) -> Vec<u32> {
-        let global_enabled = self.global_profile.disable_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.disable_enabled;
         let global_disabled = &self.global_profile.app_disabled;
         if profile_id == "global" {
             if !global_enabled {
@@ -381,7 +366,7 @@ impl ProfileManager {
     /// Resolves effective active KeyMacroRules for the hook execution
     /// Formula: (Global \ Muted) U Overridden U AppSpecific
     pub fn resolve_effective_key_macros(&self, profile_id: &str) -> Vec<KeyMacroRule> {
-        let global_enabled = self.global_profile.key_macro_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.key_macro_enabled;
         let global_macros = &self.global_profile.app_key_macros;
         if profile_id == "global" {
             if !global_enabled {
@@ -450,7 +435,7 @@ impl ProfileManager {
         &self,
         profile_id: &str,
         child_idx: Option<usize>,
-    ) -> Option<&AppProfile> {
+    ) -> Option<&AppProfile<Child>> {
         child_idx
             .and_then(|idx| self.profiles.get(idx))
             .filter(|p| p.id == profile_id)
@@ -466,7 +451,7 @@ impl ProfileManager {
         child_idx: Option<usize>,
         vk: u32,
     ) -> bool {
-        let global_enabled = self.global_profile.disable_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.disable_enabled;
         if is_global {
             return global_enabled
                 && self.global_profile.app_disabled.contains(&vk)
@@ -502,7 +487,7 @@ impl ProfileManager {
         child_idx: Option<usize>,
         vk: u32,
     ) -> Option<u32> {
-        let global_enabled = self.global_profile.remap_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.remap_enabled;
         if is_global {
             if !global_enabled || self.global_profile.muted_remaps.contains(&vk) {
                 return None;
@@ -557,7 +542,7 @@ impl ProfileManager {
         child_idx: Option<usize>,
         vk: u32,
     ) -> Option<&[MacroAction]> {
-        let global_enabled = self.global_profile.key_macro_enabled.unwrap_or(false);
+        let global_enabled = self.global_profile.key_macro_enabled;
         if is_global {
             if !global_enabled || self.global_profile.muted_key_macros.contains(&vk) {
                 return None;
@@ -617,7 +602,7 @@ impl ProfileManager {
     /// Builds UI list items for Key Remapping table
     pub fn resolve_remap_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedRemapItem> {
         let global_remaps = &self.global_profile.app_remaps;
-        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
+        if profile_id == "global" {
             return global_remaps
                 .iter()
                 .map(|r| {
@@ -704,7 +689,7 @@ impl ProfileManager {
     /// Builds UI list items for Key Disabling table
     pub fn resolve_disable_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedDisableItem> {
         let global_disabled = &self.global_profile.app_disabled;
-        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
+        if profile_id == "global" {
             return global_disabled
                 .iter()
                 .map(|&vk| {
@@ -764,7 +749,7 @@ impl ProfileManager {
 
     /// Builds UI list items for Macro table
     pub fn resolve_macro_items_for_ui(&self, profile_id: &str, global_macros: &[MacroEntry]) -> Vec<ResolvedMacroItem> {
-        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
+        if profile_id == "global" {
             return global_macros
                 .iter()
                 .map(|m| {
@@ -846,7 +831,7 @@ impl ProfileManager {
     /// Builds UI list items for Key Macro table
     pub fn resolve_key_macro_items_for_ui(&self, profile_id: &str) -> Vec<ResolvedKeyMacroItem> {
         let global_macros = &self.global_profile.app_key_macros;
-        if profile_id == "global" || self.get_profile(profile_id).is_some_and(|p| p.is_root) {
+        if profile_id == "global" {
             return global_macros
                 .iter()
                 .map(|m| {

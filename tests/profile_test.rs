@@ -11,7 +11,7 @@ use kora::{parse_config_all, serialize_config_all};
 #[test]
 fn test_live_inheritance_remap() {
     let mut manager = ProfileManager::new();
-    manager.global_profile.remap_enabled = Some(true);
+    manager.global_profile.remap_enabled = true;
 
     // 1. Setup Global Remaps:
     // CapsLock (0x14) -> Ctrl (0x11)
@@ -74,7 +74,7 @@ fn test_live_inheritance_remap() {
     assert_eq!(manager.resolve_effective_remaps("cs2").len(), 2);
 
     // When global remap is disabled, both global and child return empty
-    manager.global_profile.remap_enabled = Some(false);
+    manager.global_profile.remap_enabled = false;
     assert!(manager.resolve_effective_remaps("global").is_empty());
     assert!(manager.resolve_effective_remaps("cs2").is_empty());
 }
@@ -82,7 +82,7 @@ fn test_live_inheritance_remap() {
 #[test]
 fn test_live_inheritance_disable() {
     let mut manager = ProfileManager::new();
-    manager.global_profile.disable_enabled = Some(true);
+    manager.global_profile.disable_enabled = true;
 
     // Global disables: Insert (0x2D), Pause (0x13)
     manager.global_profile.app_disabled.push(0x2D);
@@ -114,7 +114,7 @@ fn test_live_inheritance_disable() {
     assert_eq!(manager.resolve_effective_disabled("word").len(), 2);
 
     // When global disable is disabled, both global and child return empty
-    manager.global_profile.disable_enabled = Some(false);
+    manager.global_profile.disable_enabled = false;
     assert!(manager.resolve_effective_disabled("global").is_empty());
     assert!(manager.resolve_effective_disabled("word").is_empty());
 }
@@ -217,8 +217,8 @@ fn test_profile_ini_roundtrip() {
     assert_eq!(parsed_cfg.method, InputMethod::Telex);
     assert!(!parsed_cfg.remap_enabled);
     assert!(!parsed_cfg.disable_enabled);
-    assert_eq!(parsed_manager.global_profile.remap_enabled, Some(false));
-    assert_eq!(parsed_manager.global_profile.disable_enabled, Some(false));
+    assert!(!parsed_manager.global_profile.remap_enabled);
+    assert!(!parsed_manager.global_profile.disable_enabled);
     assert_eq!(parsed_macros.get("vn").unwrap().value, "Việt Nam");
 
     assert_eq!(parsed_manager.global_profile.app_remaps.len(), 1);
@@ -303,7 +303,7 @@ fn test_live_inheritance_key_macro() {
     use kora::engine::profile::{KeyMacroRule, MacroAction};
 
     let mut manager = ProfileManager::new();
-    manager.global_profile.key_macro_enabled = Some(true);
+    manager.global_profile.key_macro_enabled = true;
 
     // Global Key Macros:
     // F1 -> "Bunny Hop" | down(Space) + delay(15) + up(Space)
@@ -404,7 +404,7 @@ fn test_key_macro_ini_roundtrip() {
     config.key_macro_enabled = true;
     let macros = MacroTable::new();
     let mut profiles = ProfileManager::new();
-    profiles.global_profile.key_macro_enabled = Some(true);
+    profiles.global_profile.key_macro_enabled = true;
 
     profiles.global_profile.app_key_macros.push(KeyMacroRule::new(
         0x70, // F1
@@ -454,9 +454,9 @@ fn test_child_inherits_root_muted_state() {
     use kora::engine::profile::{KeyMacroRule, MacroAction};
 
     let mut manager = ProfileManager::new();
-    manager.global_profile.remap_enabled = Some(true);
-    manager.global_profile.disable_enabled = Some(true);
-    manager.global_profile.key_macro_enabled = Some(true);
+    manager.global_profile.remap_enabled = true;
+    manager.global_profile.disable_enabled = true;
+    manager.global_profile.key_macro_enabled = true;
 
     // 1. Remap: Root has 0x14 (CapsLock) and 0x91 (ScrollLock)
     manager.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
@@ -581,9 +581,9 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     });
 
     let pm = &mut engine.profile_manager;
-    pm.global_profile.remap_enabled = Some(true);
-    pm.global_profile.disable_enabled = Some(true);
-    pm.global_profile.key_macro_enabled = Some(true);
+    pm.global_profile.remap_enabled = true;
+    pm.global_profile.disable_enabled = true;
+    pm.global_profile.key_macro_enabled = true;
 
     // 1. Remap: CapsLock (0x14) -> Ctrl (0x11), ScrollLock (0x91) -> Mute (0xAD)
     pm.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));

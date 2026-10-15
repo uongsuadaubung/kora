@@ -10,6 +10,8 @@ pub mod logger;
 pub mod platform;
 #[cfg(windows)]
 pub mod ui;
+#[cfg(windows)]
+pub mod ui_framework;
 pub mod updater;
 pub mod vietnamese;
 

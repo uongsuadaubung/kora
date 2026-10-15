@@ -1,13 +1,7 @@
 //! ActionTable Models & Data Types
-//!
-//! Định nghĩa cấu trúc dữ liệu cho bảng:
-//! - Ô dữ liệu (`TableCell`), dòng dữ liệu (`TableRow`), cột (`ColumnDef`).
-//! - Huy hiệu phím (`BadgeConfig`, `BadgeVariant`).
-//! - Nút hành động tương tác trong ô (`TableAction`, `ActionVariant`).
-//! - Trạng thái hoạt động của bảng (`ActionTableState`).
 
-use crate::ui::colors::ThemePalette;
-use crate::ui::win32::RECT;
+use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::win32::RECT;
 use std::sync::Arc;
 
 pub const HEADER_HEIGHT: i32 = 30;
@@ -103,9 +97,9 @@ impl BadgeConfig {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActionVariant {
-    Primary,   // Accent / Blue (Edit, Run)
-    Danger,    // Danger / Red (Delete, Block)
-    Secondary, // Neutral / Gray
+    Primary,
+    Danger,
+    Secondary,
 }
 
 #[derive(Clone)]
@@ -208,12 +202,14 @@ impl TableRow {
     }
 
     pub fn key_with_arrow(mut self, text: impl Into<String>) -> Self {
-        self.cells.push(TableCell::Badge(BadgeConfig::key_with_arrow(text)));
+        self.cells
+            .push(TableCell::Badge(BadgeConfig::key_with_arrow(text)));
         self
     }
 
     pub fn danger_key(mut self, text: impl Into<String>) -> Self {
-        self.cells.push(TableCell::Badge(BadgeConfig::danger_key(text)));
+        self.cells
+            .push(TableCell::Badge(BadgeConfig::danger_key(text)));
         self
     }
 
@@ -297,7 +293,11 @@ impl ColumnDef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionHover {
     None,
-    Action { row: usize, col: usize, action_idx: usize },
+    Action {
+        row: usize,
+        col: usize,
+        action_idx: usize,
+    },
 }
 
 pub type ActionCallback = Arc<dyn Fn(i32) + Send + Sync>;
@@ -316,7 +316,6 @@ pub struct ActionTableState {
     pub scroll_drag_start_y: i32,
     pub scroll_drag_start_val: i32,
     pub is_hover_scrollbar: bool,
-    /// Header height in px; 0 hides the header row
     pub header_h: i32,
 }
 

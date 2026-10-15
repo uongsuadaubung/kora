@@ -288,14 +288,45 @@ pub struct ResolvedMacroItem {
     pub is_active: bool,
 }
 
-/// Application profile model
+/// Typestate marker for the Global Root profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Root;
+
+/// Typestate marker for an Application Child profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Child;
+
+/// Trait associating each compile-time profile role marker `R` with its exact payload `R::Data`.
+pub trait Role {
+    type Data: Clone + std::fmt::Debug;
+}
+
+/// Payload for [`AppProfile<Root>`] (`global_profile`):
+/// Stores only global rule lists and root feature flags without child inheritance deltas.
 #[derive(Debug, Clone)]
-pub struct AppProfile {
+pub struct RootProfileData {
+    pub id: String,
+    pub icon: String,
+    pub remap_enabled: bool,
+    pub muted_remaps: Vec<u32>,
+    pub app_remaps: Vec<KeyRemapRule>,
+    pub disable_enabled: bool,
+    pub unmuted_disabled: Vec<u32>,
+    pub app_disabled: Vec<u32>,
+    pub muted_macros: Vec<String>,
+    pub key_macro_enabled: bool,
+    pub muted_key_macros: Vec<u32>,
+    pub app_key_macros: Vec<KeyMacroRule>,
+}
+
+/// Payload for [`AppProfile<Child>`]:
+/// Stores child application metadata and delta inheritance overrides (`None` = inherit from Global).
+#[derive(Debug, Clone)]
+pub struct ChildProfileData {
     pub id: String,
     pub name: String,
     pub process_names: Vec<String>,
     pub icon: String,
-    pub is_root: bool,
 
     // 1. Vietnamese Typing & Language mode
     pub mode: LanguageMode,
@@ -337,47 +368,86 @@ pub struct AppProfile {
     pub app_key_macros: Vec<KeyMacroRule>,
 }
 
-impl AppProfile {
-    /// Creates the global root profile
-    pub fn new_global() -> Self {
-        Self {
-            id: "global".to_string(),
-            name: "Toàn hệ thống".to_string(),
-            process_names: Vec::new(),
-            icon: "🌐".to_string(),
-            is_root: true,
-            mode: LanguageMode::Vietnamese,
-            method: MethodMode::Specific(InputMethod::Telex),
-            switch_key: Some(Hotkey::default()),
-            switch_key_enabled: Some(true),
-            restore_on_wrong_spelling: Some(true),
-            auto_uppercase_first_char: Some(false),
-            bracket_w: Some(true),
-            remember_history_across_space: Some(true),
-            remap_enabled: Some(false),
-            muted_remaps: Vec::new(),
-            overridden_remaps: HashMap::new(),
-            app_remaps: Vec::new(),
-            unmuted_disabled: Vec::new(),
-            disable_enabled: Some(false),
-            app_disabled: Vec::new(),
-            sound_enabled: Some(false),
-            sound_profile: Some(std::sync::Arc::from("Holy Panda")),
-            sound_volume: Some(50),
-            use_macro: Some(false),
-            use_macro_in_english_mode: Some(true),
-            muted_macros: Vec::new(),
-            overridden_macros: HashMap::new(),
-            app_macros: Vec::new(),
-            key_macro_enabled: Some(false),
-            muted_key_macros: Vec::new(),
-            overridden_key_macros: HashMap::new(),
-            app_key_macros: Vec::new(),
+impl Role for Root {
+    type Data = RootProfileData;
+}
+
+impl Role for Child {
+    type Data = ChildProfileData;
+}
+
+/// Borrowed reference to either the Global Root profile or an Application Child profile.
+#[derive(Debug, Clone, Copy)]
+pub enum ProfileRef<'a> {
+    Root(&'a AppProfile<Root>),
+    Child(&'a AppProfile<Child>),
+}
+
+impl<'a> ProfileRef<'a> {
+    #[inline]
+    pub fn id(self) -> &'a str {
+        match self {
+            Self::Root(p) => &p.id,
+            Self::Child(p) => &p.id,
         }
     }
+}
 
-    /// Creates a new child application profile inheriting everything from Global by default
-    pub fn new_child(id: impl Into<String>, name: impl Into<String>, process: impl Into<String>, icon: impl Into<String>) -> Self {
+/// Application profile model parameterized by role typestate (`Root` or `Child`).
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct AppProfile<R: Role = Child> {
+    pub data: R::Data,
+    pub _role: std::marker::PhantomData<R>,
+}
+
+impl<R: Role> std::ops::Deref for AppProfile<R> {
+    type Target = R::Data;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
+impl<R: Role> std::ops::DerefMut for AppProfile<R> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.data
+    }
+}
+
+impl AppProfile<Root> {
+    /// Creates the global root profile (`AppProfile<Root>`).
+    pub fn new_global() -> Self {
+        Self {
+            data: RootProfileData {
+                id: "global".to_string(),
+                icon: "🌐".to_string(),
+                remap_enabled: false,
+                muted_remaps: Vec::new(),
+                app_remaps: Vec::new(),
+                disable_enabled: false,
+                unmuted_disabled: Vec::new(),
+                app_disabled: Vec::new(),
+                muted_macros: Vec::new(),
+                key_macro_enabled: false,
+                muted_key_macros: Vec::new(),
+                app_key_macros: Vec::new(),
+            },
+            _role: std::marker::PhantomData,
+        }
+    }
+}
+
+impl AppProfile<Child> {
+    /// Creates a new child application profile (`AppProfile<Child>`) inheriting everything from Global by default.
+    pub fn new_child(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        process: impl Into<String>,
+        icon: impl Into<String>,
+    ) -> Self {
         let p_name = process.into();
         let process_names = if p_name.trim().is_empty() {
             Vec::new()
@@ -386,44 +456,50 @@ impl AppProfile {
         };
 
         Self {
-            id: id.into(),
-            name: name.into(),
-            process_names,
-            icon: icon.into(),
-            is_root: false,
-            mode: LanguageMode::Inherit,
-            method: MethodMode::Inherit,
-            switch_key: None,
-            switch_key_enabled: None,
-            restore_on_wrong_spelling: None,
-            auto_uppercase_first_char: None,
-            bracket_w: None,
-            remember_history_across_space: None,
-            remap_enabled: None,
-            muted_remaps: Vec::new(),
-            overridden_remaps: HashMap::new(),
-            app_remaps: Vec::new(),
-            disable_enabled: None,
-            unmuted_disabled: Vec::new(),
-            app_disabled: Vec::new(),
-            sound_enabled: None,
-            sound_profile: None,
-            sound_volume: None,
-            use_macro: None,
-            use_macro_in_english_mode: None,
-            muted_macros: Vec::new(),
-            overridden_macros: HashMap::new(),
-            app_macros: Vec::new(),
-            key_macro_enabled: None,
-            muted_key_macros: Vec::new(),
-            overridden_key_macros: HashMap::new(),
-            app_key_macros: Vec::new(),
+            data: ChildProfileData {
+                id: id.into(),
+                name: name.into(),
+                process_names,
+                icon: icon.into(),
+                mode: LanguageMode::Inherit,
+                method: MethodMode::Inherit,
+                switch_key: None,
+                switch_key_enabled: None,
+                restore_on_wrong_spelling: None,
+                auto_uppercase_first_char: None,
+                bracket_w: None,
+                remember_history_across_space: None,
+                remap_enabled: None,
+                muted_remaps: Vec::new(),
+                overridden_remaps: HashMap::new(),
+                app_remaps: Vec::new(),
+                disable_enabled: None,
+                unmuted_disabled: Vec::new(),
+                app_disabled: Vec::new(),
+                sound_enabled: None,
+                sound_profile: None,
+                sound_volume: None,
+                use_macro: None,
+                use_macro_in_english_mode: None,
+                muted_macros: Vec::new(),
+                overridden_macros: HashMap::new(),
+                app_macros: Vec::new(),
+                key_macro_enabled: None,
+                muted_key_macros: Vec::new(),
+                overridden_key_macros: HashMap::new(),
+                app_key_macros: Vec::new(),
+            },
+            _role: std::marker::PhantomData,
         }
     }
 
-    /// Checks if this profile matches an executable name
+    /// Checks if this child profile matches an executable name.
     pub fn matches_process(&self, exe: &str) -> bool {
         let exe_lower = exe.trim().to_lowercase();
-        self.process_names.iter().any(|p| p.to_lowercase() == exe_lower)
+        self.process_names
+            .iter()
+            .any(|p| p.to_lowercase() == exe_lower)
     }
 }
+
+

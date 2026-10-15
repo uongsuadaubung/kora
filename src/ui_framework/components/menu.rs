@@ -1,6 +1,6 @@
 //! Native Win32 Popup / Context Menu Component
 
-use crate::ui::win32::to_wide;
+use crate::ui_framework::win32::{to_wide, PostMessageW};
 use std::ptr::null_mut;
 
 #[link(name = "user32")]
@@ -26,10 +26,12 @@ unsafe extern "system" {
 }
 
 const MF_STRING: u32 = 0x0000;
+const MF_POPUP: u32 = 0x0010;
 const MF_SEPARATOR: u32 = 0x0800;
 const MF_CHECKED: u32 = 0x0008;
 const MF_UNCHECKED: u32 = 0x0000;
 
+const TPM_BOTTOMALIGN: u32 = 0x0020;
 const TPM_RETURNCMD: u32 = 0x0100;
 const TPM_NONOTIFY: u32 = 0x0080;
 const TPM_RIGHTBUTTON: u32 = 0x0002;
@@ -63,6 +65,14 @@ impl PopupMenu {
         }
     }
 
+    pub fn add_submenu(&mut self, text: &str, mut submenu: PopupMenu) {
+        let wide = to_wide(text);
+        unsafe {
+            AppendMenuW(self.h_menu, MF_POPUP, submenu.h_menu as usize, wide.as_ptr());
+        }
+        submenu.h_menu = 0;
+    }
+
     pub fn add_separator(&mut self) {
         unsafe {
             AppendMenuW(self.h_menu, MF_SEPARATOR, 0, null_mut());
@@ -74,15 +84,14 @@ impl PopupMenu {
             SetForegroundWindow(hwnd);
             let cmd = TrackPopupMenu(
                 self.h_menu,
-                TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
+                TPM_BOTTOMALIGN | TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON,
                 x,
                 y,
                 0,
                 hwnd,
                 null_mut(),
             );
-            // KB135788: ensure the menu closes properly when the user clicks elsewhere
-            crate::ui::win32::PostMessageW(hwnd, 0 /* WM_NULL */, 0, 0);
+            PostMessageW(hwnd, 0 /* WM_NULL */, 0, 0);
             cmd
         }
     }
@@ -97,3 +106,4 @@ impl Drop for PopupMenu {
         }
     }
 }
+

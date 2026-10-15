@@ -3,19 +3,15 @@
 //! Layout follows mockup_profiles.html: custom header, hint box, icon + name,
 //! .exe field with file browser, searchable running-app list and footer bar.
 
+use super::{attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state, ModalSpec};
 use crate::engine::profile::AppProfile;
 use crate::platform::win32::app_detect::get_process_name_for_pid;
 use crate::platform::win32::types::GetWindowThreadProcessId;
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::*;
-use crate::ui::theme::{get_app_font_bold, get_app_font_normal, get_panel_bg_brush, is_current_dark};
-use crate::ui::tokens::id::*;
+use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
 use crate::ui::win32::*;
-use std::sync::atomic::{AtomicIsize, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-
-static DIALOG_PARENT_HWND: AtomicIsize = AtomicIsize::new(0);
-static SELECTED_ICON: AtomicUsize = AtomicUsize::new(DEFAULT_ICON);
 
 /// Emoji per entry of `Strings::profile_icons()` (same order)
 const ICONS: [&str; 6] = ["🎮", "💻", "📝", "🎨", "🌐", "⚙️"];
@@ -43,7 +39,6 @@ const H: i32 = FOOTER_Y + FOOTER_H;
 const DT_RIGHT: u32 = 0x0002;
 const DT_CALCRECT: u32 = 0x0400;
 const DT_END_ELLIPSIS: u32 = 0x4000;
-const EN_CHANGE: usize = 0x0300;
 
 #[link(name = "user32")]
 unsafe extern "system" {
@@ -86,6 +81,25 @@ unsafe extern "system" {
     fn GetOpenFileNameW(ofn: *mut OPENFILENAMEW) -> i32;
 }
 
+#[derive(Clone)]
+struct AppWindowEntry {
+    title: String,
+    exe_name: String,
+}
+
+struct AddProfileState {
+    parent: isize,
+    selected_icon: usize,
+    running_apps: Arc<Mutex<Vec<AppWindowEntry>>>,
+    visible_apps: Vec<AppWindowEntry>,
+    btn_icon: Option<PushButton>,
+    txt_name: Option<TextBox>,
+    txt_exe: Option<TextBox>,
+    lnk_rescan: Option<Label<Link>>,
+    txt_search: Option<TextBox>,
+    table: Option<ActionTable>,
+}
+
 static REGISTERED: std::sync::Once = std::sync::Once::new();
 const CLASS_NAME: &str = "KoraAddProfileDialogClass";
 const WM_APP_ENUM_DONE: u32 = 0x8000 + 104;
@@ -98,60 +112,49 @@ pub fn show_add_profile_dialog(parent: isize) {
         0x0002_0000,
     );
 
-    unsafe {
-        let class_name = to_wide(CLASS_NAME);
-        DIALOG_PARENT_HWND.store(parent, Ordering::SeqCst);
-        SELECTED_ICON.store(DEFAULT_ICON, Ordering::SeqCst);
+    let strings = crate::language::current();
+    let st = Box::new(AddProfileState {
+        parent,
+        selected_icon: DEFAULT_ICON,
+        running_apps: Arc::new(Mutex::new(Vec::new())),
+        visible_apps: Vec::new(),
+        btn_icon: None,
+        txt_name: None,
+        txt_exe: None,
+        lnk_rescan: None,
+        txt_search: None,
+        table: None,
+    });
 
-        let mut rc: RECT = std::mem::zeroed();
-        GetWindowRect(parent, &mut rc);
-        let x = rc.left + ((rc.right - rc.left) - W) / 2;
-        let y = rc.top + ((rc.bottom - rc.top) - H) / 2;
+    // Borderless popup: header/close button are drawn by the dialog itself
+    let hwnd = open_modal(
+        parent,
+        &ModalSpec {
+            class_name: CLASS_NAME,
+            title: strings.dlg_add_prof_title,
+            width: W,
+            height: H,
+            ex_style: WS_EX_CONTROLPARENT,
+            style: 0x8000_0000 /* WS_POPUP */ | WS_CLIPCHILDREN,
+        },
+        st,
+    );
 
-        EnableWindow(parent, 0);
-
-        let strings = crate::language::current();
-        // Borderless popup: header/close button are drawn by the dialog itself
-        let hwnd = CreateWindowExW(
-            WS_EX_CONTROLPARENT,
-            class_name.as_ptr(),
-            to_wide(strings.dlg_add_prof_title).as_ptr(),
-            0x8000_0000 /* WS_POPUP */ | WS_CLIPCHILDREN,
-            x,
-            y,
-            W,
-            H,
-            parent,
-            0,
-            0,
-            std::ptr::null_mut(),
-        );
-
-        if hwnd != 0 {
-            apply_modern_window_styling(hwnd, is_current_dark());
+    if hwnd != 0 {
+        unsafe {
             let disable: i32 = 1; // DWMWA_TRANSITIONS_FORCEDISABLED: no fade on show/hide
             DwmSetWindowAttribute(hwnd, 3, &disable as *const i32 as *const _, 4);
-            ShowWindow(hwnd, SW_SHOW);
-            SetForegroundWindow(hwnd);
-            SetFocus(GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32));
-        } else {
-            EnableWindow(parent, 1);
+            let name_hwnd = state::<AddProfileState>(hwnd)
+                .and_then(|s| s.txt_name.as_ref().map(|t| t.hwnd()))
+                .unwrap_or(0);
+            if name_hwnd != 0 {
+                SetFocus(name_hwnd);
+            }
         }
     }
 }
 
-#[derive(Clone)]
-struct AppWindowEntry {
-    title: String,
-    exe_name: String,
-}
-
-static RUNNING_APPS: Mutex<Vec<AppWindowEntry>> = Mutex::new(Vec::new());
-/// Entries currently shown in the list (after search filter), indexed by row
-static VISIBLE_APPS: Mutex<Vec<AppWindowEntry>> = Mutex::new(Vec::new());
-static APP_TABLE: Mutex<Option<ActionTable>> = Mutex::new(None);
-
-fn scan_running_apps_async(hwnd: isize) {
+fn scan_running_apps_async(hwnd: isize, running_apps: Arc<Mutex<Vec<AppWindowEntry>>>) {
     std::thread::spawn(move || {
         let mut list: Vec<AppWindowEntry> = Vec::new();
         unsafe extern "system" fn worker_enum_proc(wnd: isize, lparam: isize) -> i32 {
@@ -185,7 +188,7 @@ fn scan_running_apps_async(hwnd: isize) {
                 &mut list as *mut Vec<AppWindowEntry> as isize,
             );
         }
-        if let Ok(mut g) = RUNNING_APPS.lock() {
+        if let Ok(mut g) = running_apps.lock() {
             *g = list;
         }
         unsafe {
@@ -241,15 +244,21 @@ fn app_row(app: &AppWindowEntry) -> TableRow {
 }
 
 /// Re-enumerates windows (if `rescan`) and refills the list using the search box filter
-fn refresh_running_apps(hwnd: isize, rescan: bool) {
+unsafe fn refresh_running_apps(hwnd: isize, rescan: bool) {
+    let Some(st) = (unsafe { state::<AddProfileState>(hwnd) }) else {
+        return;
+    };
     if rescan {
-        scan_running_apps_async(hwnd);
+        scan_running_apps_async(hwnd, st.running_apps.clone());
         return;
     }
-    let query = window_text(unsafe { GetDlgItem(hwnd, IDC_EDIT_SEARCH_APPS as i32) })
-        .trim()
-        .to_lowercase();
-    let visible: Vec<AppWindowEntry> = RUNNING_APPS
+    let query = st
+        .txt_search
+        .as_ref()
+        .map(|t| t.get_text().trim().to_lowercase())
+        .unwrap_or_default();
+    let visible: Vec<AppWindowEntry> = st
+        .running_apps
         .lock()
         .map(|list| {
             list.iter()
@@ -262,15 +271,11 @@ fn refresh_running_apps(hwnd: isize, rescan: bool) {
         })
         .unwrap_or_default();
 
-    if let Ok(guard) = APP_TABLE.lock()
-        && let Some(ref tbl) = *guard
-    {
+    if let Some(ref tbl) = st.table {
         tbl.clear();
         tbl.set_rows(visible.iter().map(app_row));
     }
-    if let Ok(mut v) = VISIBLE_APPS.lock() {
-        *v = visible;
-    }
+    st.visible_apps = visible;
 }
 
 /// Opens the native file picker and returns the chosen file name (e.g. "app.exe")
@@ -393,108 +398,181 @@ unsafe fn create_controls(hwnd: isize) {
         let cw = W - 2 * PAD;
 
         // Header close button
-        PushButton::create_with_variant(
-            hwnd, IDC_BTN_CLOSE_ADD_PROFILE, "✕", W - PAD - 32, 10, 32, 32,
+        if let Some(btn) = PushButton::create_with_variant(
+            hwnd, 0, "✕", W - PAD - 32, 10, 32, 32,
             font_normal, ButtonVariant::Ghost, Some(palette.bg_sidebar),
-        );
+        ) {
+            btn.on_click(move || {
+                PostMessageW(hwnd, WM_CLOSE, 0, 0);
+            });
+        }
 
         // Icon + display name
-        Label::create(hwnd, strings.dlg_add_prof_icon, PAD, NAME_LBL_Y, 56, 18, font_label);
-        Label::create(hwnd, strings.dlg_add_prof_name, PAD + 68, NAME_LBL_Y, 300, 18, font_label);
-        PushButton::create_with_variant(
-            hwnd, IDC_BTN_PROFILE_ICON, ICONS[DEFAULT_ICON], PAD, NAME_Y, 56, FIELD_H,
+        Label::create(hwnd, strings.dlg_add_prof_icon, PAD, NAME_LBL_Y, 56, 18, font_label)
+            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        Label::create(hwnd, strings.dlg_add_prof_name, PAD + 68, NAME_LBL_Y, 300, 18, font_label)
+            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        let btn_icon = PushButton::create_with_variant(
+            hwnd, 0, ICONS[DEFAULT_ICON], PAD, NAME_Y, 56, FIELD_H,
             font_normal, ButtonVariant::Secondary, Some(palette.bg_window),
         );
-        TextBox::create_with_placeholder(
-            hwnd, IDC_EDIT_PROFILE_NAME, strings.dlg_add_prof_name_placeholder,
+        if let Some(ref btn) = btn_icon {
+            btn.set_on_click(move || pick_icon(hwnd));
+        }
+        let txt_name = TextBox::create_with_placeholder(
+            hwnd, 0, strings.dlg_add_prof_name_placeholder,
             PAD + 68, NAME_Y, cw - 68, FIELD_H, font_normal,
         );
 
         // Executable + file browser
-        Label::create(hwnd, strings.dlg_add_prof_exe, PAD, EXE_LBL_Y, 300, 18, font_label);
-        PushButton::create_with_variant(
-            hwnd, IDC_BTN_BROWSE_EXE, strings.dlg_add_prof_browse, W - PAD - 150, EXE_LBL_Y - 6, 150, 28,
+        Label::create(hwnd, strings.dlg_add_prof_exe, PAD, EXE_LBL_Y, 300, 18, font_label)
+            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        if let Some(btn) = PushButton::create_with_variant(
+            hwnd, 0, strings.dlg_add_prof_browse, W - PAD - 150, EXE_LBL_Y - 6, 150, 28,
             font_normal, ButtonVariant::Secondary, Some(palette.bg_window),
-        );
-        TextBox::create_with_placeholder(
-            hwnd, IDC_EDIT_PROFILE_EXE, strings.dlg_add_prof_exe_placeholder,
+        ) {
+            btn.on_click(move || {
+                if let Some(exe) = browse_exe(hwnd)
+                    && let Some(st) = state::<AddProfileState>(hwnd)
+                {
+                    if let Some(ref txt_exe) = st.txt_exe {
+                        txt_exe.set_text(&exe);
+                    }
+                    if let Some(ref txt_name) = st.txt_name
+                        && txt_name.get_text().is_empty()
+                    {
+                        let stem = exe
+                            .strip_suffix(".exe")
+                            .or_else(|| exe.strip_suffix(".EXE"))
+                            .unwrap_or(&exe);
+                        txt_name.set_text(stem);
+                    }
+                }
+            });
+        }
+        let txt_exe = TextBox::create_with_placeholder(
+            hwnd, 0, strings.dlg_add_prof_exe_placeholder,
             PAD, EXE_Y, cw, FIELD_H, font_normal,
         );
 
         // Running apps: label, rescan link, search box, list
-        Label::create(hwnd, strings.dlg_add_prof_linked_app, PAD, APPS_LBL_Y, 340, 18, font_label);
-        Label::create_right_with_id(
-            hwnd, IDC_LINK_RESCAN_APPS, strings.dlg_add_prof_rescan, W - PAD - 120, APPS_LBL_Y, 120, 18,
+        Label::create(hwnd, strings.dlg_add_prof_linked_app, PAD, APPS_LBL_Y, 340, 18, font_label)
+            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        let lnk_rescan = Label::create_right(
+            hwnd, strings.dlg_add_prof_rescan, W - PAD - 120, APPS_LBL_Y, 120, 18,
             font_normal,
-        );
-        TextBox::create_with_placeholder(
-            hwnd, IDC_EDIT_SEARCH_APPS, strings.dlg_add_prof_search_placeholder,
+        )
+        .map(|l| l.as_link().on_surface(SurfaceRole::Window));
+        let txt_search = TextBox::create_with_placeholder(
+            hwnd, 0, strings.dlg_add_prof_search_placeholder,
             PAD, SEARCH_Y, cw, FIELD_H, font_normal,
         );
 
         let table = ActionTable::create_with_defs(
-            hwnd, IDC_LIST_RUNNING_APPS, PAD, LIST_Y, cw, LIST_H, font_normal,
+            hwnd, 0, PAD, LIST_Y, cw, LIST_H, font_normal,
             vec![ColumnDef::flex("", ColumnStyle::Default)],
         );
         if let Some(ref tbl) = table {
             tbl.hide_header();
             tbl.set_on_select(move |sel| {
-                let app = VISIBLE_APPS.lock().ok().and_then(|v| v.get(sel as usize).cloned());
-                if let Some(app) = app {
-                    let h_name = GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32);
-                    let h_exe = GetDlgItem(hwnd, IDC_EDIT_PROFILE_EXE as i32);
-                    if GetWindowTextLengthW(h_name) == 0 {
-                        let clean_title = app.title.split(['-', '|', '—']).next().unwrap_or(&app.title).trim();
-                        SetWindowTextW(h_name, to_wide(clean_title).as_ptr());
+                let Some(st) = state::<AddProfileState>(hwnd) else {
+                    return;
+                };
+                if let Some(app) = st.visible_apps.get(sel as usize).cloned() {
+                    if let Some(ref txt_name) = st.txt_name
+                        && txt_name.get_text().is_empty()
+                    {
+                        let clean_title = app
+                            .title
+                            .split(['-', '|', '—'])
+                            .next()
+                            .unwrap_or(&app.title)
+                            .trim();
+                        txt_name.set_text(clean_title);
                     }
-                    SetWindowTextW(h_exe, to_wide(&app.exe_name).as_ptr());
+                    if let Some(ref txt_exe) = st.txt_exe {
+                        txt_exe.set_text(&app.exe_name);
+                    }
                 }
             });
         }
-        if let Ok(mut guard) = APP_TABLE.lock() {
-            *guard = table;
-        }
-        refresh_running_apps(hwnd, true);
 
         // Footer buttons
         let btn_y = FOOTER_Y + (FOOTER_H - 32) / 2;
-        PushButton::create_with_variant(
-            hwnd, IDC_BTN_CANCEL_PROFILE, strings.dlg_btn_cancel, W - PAD - 110 - 8 - 90, btn_y, 90, 32,
-            font_normal, ButtonVariant::Secondary, Some(palette.bg_sidebar),
+        super::create_dialog_footer_buttons(
+            hwnd,
+            (strings.dlg_btn_cancel, W - PAD - 110 - 8 - 90, 90),
+            (
+                strings.dlg_add_prof_btn_create,
+                W - PAD - 110,
+                110,
+                ButtonVariant::Primary,
+            ),
+            btn_y,
+            32,
+            Some(palette.bg_sidebar),
+            move || create_profile(hwnd),
         );
-        PushButton::create_with_variant(
-            hwnd, IDC_BTN_CREATE_PROFILE, strings.dlg_add_prof_btn_create, W - PAD - 110, btn_y, 110, 32,
-            font_label, ButtonVariant::Primary, Some(palette.bg_sidebar),
-        );
+
+        if let Some(st) = state::<AddProfileState>(hwnd) {
+            st.btn_icon = btn_icon;
+            st.txt_name = txt_name;
+            st.txt_exe = txt_exe;
+            st.lnk_rescan = lnk_rescan;
+            st.txt_search = txt_search;
+            st.table = table;
+        }
+        refresh_running_apps(hwnd, true);
     }
 }
 
 unsafe fn pick_icon(hwnd: isize) {
     unsafe {
+        let (current, btn_hwnd) = state::<AddProfileState>(hwnd)
+            .map(|s| (s.selected_icon, s.btn_icon.as_ref().map_or(0, |b| b.hwnd())))
+            .unwrap_or((DEFAULT_ICON, 0));
+        if btn_hwnd == 0 {
+            return;
+        }
         let Some(mut menu) = PopupMenu::new() else { return };
-        let current = SELECTED_ICON.load(Ordering::SeqCst);
         for (i, label) in crate::language::current().profile_icons().iter().enumerate() {
             menu.add_checked_item(i as u32 + 1, label, i == current);
         }
-        let btn = GetDlgItem(hwnd, IDC_BTN_PROFILE_ICON as i32);
         let mut rc = RECT::default();
-        GetWindowRect(btn, &mut rc);
+        GetWindowRect(btn_hwnd, &mut rc);
         let cmd = menu.track(hwnd, rc.left, rc.bottom + 2) as usize;
-        if (1..=ICONS.len()).contains(&cmd) {
-            SELECTED_ICON.store(cmd - 1, Ordering::SeqCst);
-            SetWindowTextW(btn, to_wide(ICONS[cmd - 1]).as_ptr());
-            InvalidateRect(btn, std::ptr::null(), 0);
+        if (1..=ICONS.len()).contains(&cmd)
+            && let Some(st) = state::<AddProfileState>(hwnd)
+        {
+            st.selected_icon = cmd - 1;
+            if let Some(ref btn) = st.btn_icon {
+                btn.set_text(ICONS[cmd - 1]);
+            }
         }
     }
 }
 
 unsafe fn create_profile(hwnd: isize) {
     unsafe {
-        let name = window_text(GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32)).trim().to_string();
-        let exe = window_text(GetDlgItem(hwnd, IDC_EDIT_PROFILE_EXE as i32)).trim().to_lowercase();
+        let Some(st) = state::<AddProfileState>(hwnd) else {
+            return;
+        };
+        let name = st
+            .txt_name
+            .as_ref()
+            .map(|t| t.get_text().trim().to_string())
+            .unwrap_or_default();
+        let exe = st
+            .txt_exe
+            .as_ref()
+            .map(|t| t.get_text().trim().to_lowercase())
+            .unwrap_or_default();
+        let selected_icon = st.selected_icon;
+        let parent = st.parent;
+        let name_hwnd = st.txt_name.as_ref().map_or(0, |t| t.hwnd());
 
         if !name.is_empty() {
-            let icon = ICONS[SELECTED_ICON.load(Ordering::SeqCst).min(ICONS.len() - 1)];
+            let icon = ICONS[selected_icon.min(ICONS.len() - 1)];
 
             let id = exe
                 .trim_end_matches(".exe")
@@ -521,9 +599,6 @@ unsafe fn create_profile(hwnd: isize) {
             }
 
             // Hide first so the user sees the result immediately, then refresh the panel
-            // (engine lock above is already released; switch_to_profile re-locks it).
-            // Owner must be enabled before hiding, otherwise Windows activates another app.
-            let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
             EnableWindow(parent, 1);
             ShowWindow(hwnd, SW_HIDE);
             if parent != 0
@@ -539,11 +614,8 @@ unsafe fn create_profile(hwnd: isize) {
                 crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, parent, &id);
             }
             PostMessageW(hwnd, WM_CLOSE, 0, 0);
-        } else {
-            let h_name = GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32);
-            if h_name != 0 {
-                SetFocus(h_name);
-            }
+        } else if name_hwnd != 0 {
+            SetFocus(name_hwnd);
         }
     }
 }
@@ -559,10 +631,15 @@ pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
 ) -> isize {
     const HTCLIENT: isize = 1;
     const HTCAPTION: isize = 2;
+    const WM_NCDESTROY: u32 = 0x0082;
 
     unsafe {
+        if let Some(res) = reflect_dialog_messages(hwnd, msg, wparam, lparam) {
+            return res;
+        }
         match msg {
             WM_CREATE => {
+                attach_state::<AddProfileState>(hwnd, lparam);
                 create_controls(hwnd);
                 0
             }
@@ -587,49 +664,29 @@ pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
                 ScreenToClient(hwnd, &mut pt);
                 if pt.y < HEADER_H { HTCAPTION } else { HTCLIENT }
             }
-            WM_SETCURSOR => {
-                if wparam as isize == GetDlgItem(hwnd, IDC_LINK_RESCAN_APPS as i32) {
-                    SetCursor(LoadCursorW(0, IDC_HAND));
-                    return 1;
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            WM_CTLCOLORSTATIC => {
-                let palette = ThemePalette::get(is_current_dark());
-                let hdc = wparam as isize;
-                let color = if GetDlgCtrlID(lparam) == IDC_LINK_RESCAN_APPS as i32 {
-                    palette.text_link
-                } else {
-                    palette.text_secondary
-                };
-                SetTextColor(hdc, color);
-                SetBkColor(hdc, palette.bg_window);
-                get_panel_bg_brush()
-            }
             WM_COMMAND => {
-                // TextBox forwards EN_* with its container hwnd in lparam
-                if wparam >> 16 == EN_CHANGE && lparam == GetDlgItem(hwnd, IDC_EDIT_SEARCH_APPS as i32) {
-                    refresh_running_apps(hwnd, false);
+                let ctl_id = (wparam & 0xFFFF) as u32;
+                let notify_code = ((wparam >> 16) & 0xFFFF) as u32;
+                let Some(st) = state::<AddProfileState>(hwnd) else {
                     return 0;
-                }
-                match (wparam & 0xFFFF) as u32 {
-                    IDC_BTN_CANCEL_PROFILE | IDC_BTN_CLOSE_ADD_PROFILE => {
-                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    }
-                    IDC_BTN_PROFILE_ICON => pick_icon(hwnd),
-                    IDC_LINK_RESCAN_APPS => refresh_running_apps(hwnd, true),
-                    IDC_BTN_BROWSE_EXE => {
-                        if let Some(exe) = browse_exe(hwnd) {
-                            SetWindowTextW(GetDlgItem(hwnd, IDC_EDIT_PROFILE_EXE as i32), to_wide(&exe).as_ptr());
-                            let h_name = GetDlgItem(hwnd, IDC_EDIT_PROFILE_NAME as i32);
-                            if GetWindowTextLengthW(h_name) == 0 {
-                                let stem = exe.strip_suffix(".exe").or_else(|| exe.strip_suffix(".EXE")).unwrap_or(&exe);
-                                SetWindowTextW(h_name, to_wide(stem).as_ptr());
-                            }
-                        }
-                    }
-                    IDC_BTN_CREATE_PROFILE => create_profile(hwnd),
-                    _ => {}
+                };
+
+                if st
+                    .txt_search
+                    .as_ref()
+                    .is_some_and(|t| t.is_changed(ctl_id, notify_code))
+                {
+                    refresh_running_apps(hwnd, false);
+                } else if st
+                    .lnk_rescan
+                    .as_ref()
+                    .is_some_and(|l| l.is_clicked(ctl_id, notify_code))
+                {
+                    refresh_running_apps(hwnd, true);
+                } else if ctl_id == IDCANCEL {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                } else if ctl_id == IDOK {
+                    create_profile(hwnd);
                 }
                 0
             }
@@ -638,34 +695,16 @@ pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
                 paint(hwnd);
                 0
             }
-            WM_DRAWITEM => {
-                let dis = &*(lparam as *const DRAWITEMSTRUCT);
-                if dis.hwnd_item != 0 {
-                    let res = SendMessageW(dis.hwnd_item, OCM_DRAWITEM, wparam, lparam);
-                    if res != 0 {
-                        return res;
-                    }
-                }
-                0
-            }
             WM_CLOSE => {
-                let parent = DIALOG_PARENT_HWND.load(Ordering::SeqCst);
-                if parent != 0 {
-                    EnableWindow(parent, 1);
-                    SetForegroundWindow(parent);
-                }
-                DestroyWindow(hwnd);
+                let parent = state::<AddProfileState>(hwnd).map_or(0, |s| s.parent);
+                close_modal(hwnd, parent);
                 0
             }
-            WM_DESTROY => {
-                if let Ok(mut guard) = APP_TABLE.lock() {
-                    *guard = None;
+            WM_NCDESTROY => {
+                if let Some(st) = detach_state::<AddProfileState>(hwnd) {
+                    EnableWindow(st.parent, 1);
                 }
-                let parent = DIALOG_PARENT_HWND.swap(0, Ordering::SeqCst);
-                if parent != 0 {
-                    EnableWindow(parent, 1);
-                }
-                0
+                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
