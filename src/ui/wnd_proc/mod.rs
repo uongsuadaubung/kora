@@ -34,7 +34,10 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
+    let _dpi_guard = ScopedThreadDpiContext::for_window(hwnd);
+
     // 1. Direct Lock-Free Window State Access via thread-local UI with GWLP_USERDATA fallback
+
     let controls = crate::ui::controls().or_else(|| {
         let controls_ptr = unsafe {
             GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls

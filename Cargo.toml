@@ -1,7 +1,8 @@
 [package]
 name = "kora"
-version = "0.10.0"
+version = "0.10.1"
 edition = "2024"
+
 authors = ["Mạnh Kiên <manhkien13041997@gmail.com>"]
 description = "Kora - Modern Input & Keyboard Suite written in Rust"
 repository = "https://github.com/uongsuadaubung/kora"

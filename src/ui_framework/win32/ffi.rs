@@ -163,7 +163,9 @@ unsafe extern "system" {
     pub fn GetActiveWindow() -> isize;
     pub fn GetParent(h_wnd: isize) -> isize;
     pub fn SetThreadDpiAwarenessContext(dpi_context: isize) -> isize;
+    pub fn GetWindowDpiAwarenessContext(h_wnd: isize) -> isize;
 }
+
 
 #[link(name = "comctl32")]
 unsafe extern "system" {

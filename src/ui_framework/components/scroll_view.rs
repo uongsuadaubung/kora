@@ -235,10 +235,23 @@ impl ScrollView {
     pub fn set_visible(&self, visible: bool) {
         if let Ok(state) = self.state.lock() {
             unsafe {
-                ShowWindow(state.h_viewport, if visible { SW_SHOW } else { SW_HIDE });
+                if visible {
+                    SetWindowPos(
+                        state.h_viewport,
+                        HWND_TOP,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+                    );
+                } else {
+                    ShowWindow(state.h_viewport, SW_HIDE);
+                }
             }
         }
     }
+
 
     /// Invalidates both viewport and content so they repaint cleanly.
     pub fn invalidate(&self) {
@@ -280,6 +293,8 @@ unsafe extern "system" fn scroll_viewport_wndproc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
+    let _dpi_guard = ScopedThreadDpiContext::for_window(hwnd);
+
     let state_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
     if msg == WM_DESTROY {
         if !state_ptr.is_null() {
@@ -297,7 +312,18 @@ unsafe extern "system" fn scroll_viewport_wndproc(
 
     unsafe {
         match msg {
-            WM_ERASEBKGND => 1,
+            WM_ERASEBKGND => {
+                let hdc = wparam as isize;
+                if hdc != 0 {
+                    let palette = ThemePalette::get(is_current_dark());
+                    let mut rc = RECT::default();
+                    GetClientRect(hwnd, &mut rc);
+                    let bg_brush = CreateSolidBrush(palette.bg_window);
+                    FillRect(hdc, &rc, bg_brush);
+                    DeleteObject(bg_brush);
+                }
+                1
+            }
             WM_PAINT => {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
                 let hdc = BeginPaint(hwnd, &mut ps);
@@ -306,15 +332,13 @@ unsafe extern "system" fn scroll_viewport_wndproc(
                     if let Ok(state) = state_arc.lock() {
                         let mut rc = RECT::default();
                         GetClientRect(hwnd, &mut rc);
-                        let gutter_rc = RECT {
-                            left: state.content_w,
-                            top: 0,
-                            right: rc.right,
-                            bottom: rc.bottom,
-                        };
+                        // Fill exposed viewport area with window background color.
+                        // WS_CLIPCHILDREN ensures child windows (h_content) are automatically
+                        // excluded from this paint, so there is no flicker or overdraw.
                         let bg_brush = CreateSolidBrush(palette.bg_window);
-                        FillRect(hdc, &gutter_rc, bg_brush);
+                        FillRect(hdc, &rc, bg_brush);
                         DeleteObject(bg_brush);
+
 
                         if state.max_scroll > 0 {
                             let viewport_h = rc.bottom - rc.top;
@@ -437,6 +461,8 @@ unsafe extern "system" fn scroll_content_wndproc(
     wparam: usize,
     lparam: isize,
 ) -> isize {
+    let _dpi_guard = ScopedThreadDpiContext::for_window(hwnd);
+
     let state_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
     if msg == WM_DESTROY {
         if !state_ptr.is_null() {
@@ -454,7 +480,19 @@ unsafe extern "system" fn scroll_content_wndproc(
 
     unsafe {
         match msg {
-            WM_ERASEBKGND => 1,
+            WM_ERASEBKGND => {
+                let hdc = wparam as isize;
+                if hdc != 0 {
+                    let palette = ThemePalette::get(is_current_dark());
+                    let mut rc = RECT::default();
+                    GetClientRect(hwnd, &mut rc);
+                    let bg_brush = CreateSolidBrush(palette.bg_window);
+                    FillRect(hdc, &rc, bg_brush);
+                    DeleteObject(bg_brush);
+                }
+                1
+            }
+
             WM_DRAWITEM => {
                 let dis = &*(lparam as *const DRAWITEMSTRUCT);
                 if dis.hwnd_item != 0 {

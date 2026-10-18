@@ -127,9 +127,19 @@ fn selected_mode_combo_index() -> Option<usize> {
 
 pub fn show_control_panel() {
     let Some(ui) = ui() else { return };
+
+    // Align thread DPI awareness context with the Control Panel's native context
+    // (DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED) to prevent physical/logical coordinate
+    // divergence when invoked from a Per-Monitor V2 window or context (e.g. tray menu).
+    let panel_dpi_ctx = unsafe { GetWindowDpiAwarenessContext(ui.h_panel) };
+    if panel_dpi_ctx != 0 {
+        unsafe { SetThreadDpiAwarenessContext(panel_dpi_ctx); }
+    }
+
     let c = &ui.controls;
     c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
     let Some(cfg) = c.refresh_from_engine() else { return };
+
 
     // Language / theme are kept in sync by their own handlers (system tab, defaults,
     // WM_SETTINGCHANGE); only re-apply here if they drifted while hidden.

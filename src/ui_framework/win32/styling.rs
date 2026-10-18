@@ -135,3 +135,37 @@ pub fn set_hwnds_visible(hwnds: &[isize], visible: bool) {
     }
 }
 
+/// RAII guard to temporarily align the thread's DPI awareness context with a target HWND's
+/// native DPI context. Prevents physical/logical coordinate distortion, clipped BitBlts,
+/// and mismatched child control sizes in mixed-mode DPI environments.
+pub struct ScopedThreadDpiContext(isize);
+
+impl ScopedThreadDpiContext {
+    #[inline]
+    pub fn for_window(hwnd: isize) -> Option<Self> {
+        if hwnd == 0 {
+            return None;
+        }
+        unsafe {
+            let win_ctx = GetWindowDpiAwarenessContext(hwnd);
+            if win_ctx != 0 {
+                let prev = SetThreadDpiAwarenessContext(win_ctx);
+                if prev != 0 && prev != win_ctx {
+                    return Some(Self(prev));
+                }
+            }
+            None
+        }
+    }
+}
+
+impl Drop for ScopedThreadDpiContext {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            SetThreadDpiAwarenessContext(self.0);
+        }
+    }
+}
+
+
