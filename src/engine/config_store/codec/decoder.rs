@@ -4,7 +4,8 @@ use crate::engine::config::EngineConfig;
 use crate::engine::config::hotkey::name_to_vk;
 use crate::engine::macro_table::{MacroEntry, MacroTable, MacroType};
 use crate::engine::profile::{
-    AppProfile, KeyMacroRule, KeyRemapRule, LanguageMode, MacroAction, MethodMode, ProfileManager,
+    AppProfile, KeyInjectionStrategy, KeyMacroRule, KeyRemapRule, LanguageMode, MacroAction,
+    MethodMode, ProfileManager, TargetRule,
 };
 use std::collections::HashMap;
 
@@ -174,6 +175,18 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                         child.switch_key = Some(crate::engine::config::Hotkey::from_config_str(val))
                     }
                     "switch_key_enabled" => child.switch_key_enabled = Some(val_bool),
+                    "target_capture_hotkey" => {
+                        child.target_capture_hotkey = Some(crate::engine::config::Hotkey::from_config_str(val))
+                    }
+                    "target_capture_enabled" => child.target_capture_enabled = Some(val_bool),
+                    "app_strategy" => {
+                        let s = val.trim().to_lowercase();
+                        if s == "inherit" || s.is_empty() {
+                            child.app_strategy = None;
+                        } else {
+                            child.app_strategy = Some(KeyInjectionStrategy::from_str(&s));
+                        }
+                    }
                     "restore_on_wrong" => child.restore_on_wrong_spelling = Some(val_bool),
                     "auto_uppercase_first" => child.auto_uppercase_first_char = Some(val_bool),
                     "bracket_w" => child.bracket_w = Some(val_bool),
@@ -296,6 +309,15 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                                 .push(KeyMacroRule::new(trig_vk, name, actions));
                         }
                     }
+                    "target" => {
+                        if let Some((target_id, strat_str)) = val.split_once('=') {
+                            let tid = target_id.trim().to_string();
+                            let strat = KeyInjectionStrategy::from_str(strat_str.trim());
+                            if !child.target_rules.iter().any(|r| r.target_id == tid) {
+                                child.target_rules.push(TargetRule::new(tid, strat));
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -313,6 +335,10 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 ("general", "switch_key") => {
                     config.switch_key = crate::engine::config::Hotkey::from_config_str(val);
                     config.switch_with_ctrl_shift = config.switch_key.is_ctrl_shift();
+                }
+                ("general", "target_capture_enabled") => config.target_capture_enabled = val_bool,
+                ("general", "target_capture_hotkey") => {
+                    config.target_capture_hotkey = crate::engine::config::Hotkey::from_config_str(val);
                 }
                 ("spelling", "restore_on_wrong") => config.restore_on_wrong_spelling = val_bool,
                 ("spelling", "auto_uppercase_first") => {

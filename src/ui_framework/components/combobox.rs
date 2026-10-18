@@ -35,6 +35,25 @@ unsafe extern "system" fn combobox_self_subclass(
         return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
     }
 
+    const WM_MOUSEWHEEL: u32 = 0x020A;
+    const WM_MOUSEHWHEEL: u32 = 0x020E;
+    const CB_GETDROPPEDSTATE: u32 = 0x0157;
+
+    if msg == WM_MOUSEWHEEL || msg == WM_MOUSEHWHEEL {
+        let is_dropped = unsafe { SendMessageW(hwnd, CB_GETDROPPEDSTATE, 0, 0) != 0 };
+        if !is_dropped {
+            // Chặn combobox tự ý nhảy lựa chọn khi người dùng cuộn chuột qua lúc menu đang đóng.
+            // Chuyển tiếp sự kiện cuộn chuột lên cửa sổ cha (ví dụ: ScrollView/Panel) để cuộn nội dung mượt mà.
+            let parent = unsafe { GetParent(hwnd) };
+            if parent != 0 {
+                unsafe {
+                    SendMessageW(parent, msg, wparam, lparam);
+                }
+            }
+            return 0;
+        }
+    }
+
     if msg == OCM_DRAWITEM {
         let dis = unsafe { &*(lparam as *const DRAWITEMSTRUCT) };
         let is_dark = is_current_dark();
@@ -99,9 +118,50 @@ impl ComboBox {
 
                 SetWindowSubclass(hwnd, combobox_self_subclass, id as usize, 0);
             }
+            Self::apply_theme(hwnd, is_current_dark());
             Some(Self { hwnd, id })
         } else {
             None
+        }
+    }
+
+    /// Applies Dark Mode CFD / Explorer theme to a ComboBox HWND
+    pub fn apply_theme(hwnd: isize, is_dark: bool) {
+        allow_window_dark_mode(hwnd, is_dark);
+        let cfd_theme_str = if is_dark { "CFD" } else { "" };
+        let theme_cfd_w = to_wide(cfd_theme_str);
+        let res = unsafe { SetWindowTheme(hwnd, theme_cfd_w.as_ptr(), null_mut()) };
+        if is_dark && res != 0 {
+            unsafe {
+                SetWindowTheme(hwnd, to_wide("DarkMode_CFD").as_ptr(), null_mut());
+            }
+        }
+        unsafe {
+            unsafe extern "system" fn enum_sub_theme(child: isize, lparam: isize) -> i32 {
+                let is_dark = lparam != 0;
+                allow_window_dark_mode(child, is_dark);
+                let cfd_theme_str = if is_dark { "CFD" } else { "" };
+                let theme_cfd_w = to_wide(cfd_theme_str);
+                let res = unsafe { SetWindowTheme(child, theme_cfd_w.as_ptr(), null_mut()) };
+                if is_dark && res != 0 {
+                    unsafe {
+                        SetWindowTheme(child, to_wide("DarkMode_CFD").as_ptr(), null_mut());
+                    }
+                }
+                1
+            }
+            EnumChildWindows(hwnd, Some(enum_sub_theme), is_dark as isize);
+
+            SetWindowPos(
+                hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+            );
+            InvalidateRect(hwnd, null_mut(), 1);
         }
     }
 

@@ -36,7 +36,7 @@ pub mod prelude {
         ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
         CellAlign, CheckBox, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
         InCard, I18nSource, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
-        PillBadge, PopupMenu, PushButton, Slider, StaticText, SurfaceRole, TabBar, TableAction,
+        PillBadge, PopupMenu, PushButton, ScrollView, Slider, StaticText, SurfaceRole, TabBar, TableAction,
         TableCell, TableRow, TextBox, ThemePalette, TwoState, RECT,
     };
 
@@ -356,6 +356,7 @@ pub fn init_ui() -> bool {
         );
         UI.with(|cell| cell.set(Some(state)));
         HELPER_HWND.store(h_helper, Ordering::Relaxed);
+        crate::platform::win32::capture::set_target_capture_notify_hwnd(h_panel);
 
         true
     }

@@ -29,8 +29,9 @@ pub const WTS_SESSION_LOCK: usize = 0x7;
 pub const WTS_SESSION_UNLOCK: usize = 0x8;
 pub const NOTIFY_FOR_THIS_SESSION: u32 = 0;
 
-// --- 5. Sự kiện Chuyển đổi Cửa sổ Foreground (WinEvent Hook) ---
+// --- 5. Sự kiện Chuyển đổi Cửa sổ Foreground & Tiêu điểm (WinEvent Hook) ---
 pub const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
+pub const EVENT_OBJECT_FOCUS: u32 = 0x8005;
 pub const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 pub const WINEVENT_SKIPOWNPROCESS: u32 = 0x0002;
 

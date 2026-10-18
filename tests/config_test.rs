@@ -314,6 +314,85 @@ switch_key = ctrl_space
 }
 
 #[test]
+fn test_target_capture_hotkey_and_state() {
+    #[cfg(target_os = "windows")]
+    {
+        use kora::platform::win32::capture::*;
+        assert!(is_target_capture_enabled());
+        let hk = get_target_capture_hotkey();
+        assert_eq!(hk.display_text(), "Ctrl + ~");
+        assert!(hk.ctrl && !hk.alt && !hk.shift && !hk.win);
+        assert_eq!(hk.vk, 0xC0);
+
+        set_target_capture_enabled(false);
+        assert!(!is_target_capture_enabled());
+        set_target_capture_enabled(true);
+        assert!(is_target_capture_enabled());
+
+        let custom_hk = kora::engine::config::Hotkey::new(true, true, false, false, 0x4B);
+        set_target_capture_hotkey(custom_hk);
+        assert_eq!(get_target_capture_hotkey().display_text(), "Ctrl + Shift + K");
+
+        set_target_capture_hotkey(hk);
+        assert_eq!(get_target_capture_hotkey().display_text(), "Ctrl + ~");
+    }
+}
+
+#[test]
+fn test_target_capture_inheritance_and_codec() {
+    use kora::engine::profile::{AppProfile, ProfileManager};
+    use kora::Hotkey;
+
+    // 1. Root default configuration
+    let root = EngineConfig::default();
+    assert!(root.target_capture_enabled, "root default must have target_capture_enabled = true");
+    assert_eq!(root.target_capture_hotkey.display_text(), "Ctrl + ~");
+    assert_eq!(root.target_capture_hotkey.vk, 0xC0);
+
+    // 2. Child profile inheritance
+    let mut pm = ProfileManager::new();
+    let child = AppProfile::new_child("figma", "Figma", "figma.exe", "🎨");
+    pm.add_profile(child);
+    let child_ref = pm.get_profile("figma").unwrap();
+    assert_eq!(child_ref.target_capture_enabled, None);
+    assert_eq!(child_ref.target_capture_hotkey, None);
+
+    // Resolve effective config when child inherits
+    let eff = pm.resolve_effective_config("figma", &root);
+    assert!(eff.target_capture_enabled);
+    assert_eq!(eff.target_capture_hotkey.display_text(), "Ctrl + ~");
+
+    // 3. Child profile overrides target capture
+    if let Some(c) = pm.get_profile_mut("figma") {
+        c.target_capture_enabled = Some(false);
+        c.target_capture_hotkey = Some(Hotkey::new(true, false, true, false, 0x4B)); // Ctrl + Alt + K
+    }
+    let eff_override = pm.resolve_effective_config("figma", &root);
+    assert!(!eff_override.target_capture_enabled);
+    assert_eq!(eff_override.target_capture_hotkey.display_text(), "Ctrl + Alt + K");
+
+    // 4. Codec serialization and deserialization
+    let macros = MacroTable::new();
+    let serialized = kora::engine::config_store::codec::encoder::serialize_config_all(&root, &macros, &pm);
+    assert!(serialized.contains("target_capture_enabled = true"));
+    assert!(serialized.contains("target_capture_hotkey = ctrl_~"));
+    assert!(serialized.contains("target_capture_enabled = false"));
+    assert!(serialized.contains("target_capture_hotkey = ctrl_alt_k"));
+
+    let (dec_cfg, _, dec_pm) = kora::parse_config_all(&serialized);
+    assert!(dec_cfg.target_capture_enabled);
+    assert_eq!(dec_cfg.target_capture_hotkey.display_text(), "Ctrl + ~");
+    let dec_child = dec_pm.get_profile("figma").unwrap();
+    assert_eq!(dec_child.target_capture_enabled, Some(false));
+    assert_eq!(dec_child.target_capture_hotkey.as_ref().map(|k| k.display_text()), Some("Ctrl + Alt + K".to_string()));
+
+    // 5. Backward compatibility: verify decoding legacy ctrl_` still parses to 0xC0
+    let (dec_legacy, _, _) = kora::parse_config_all("[general]\ntarget_capture_hotkey = ctrl_`\n");
+    assert_eq!(dec_legacy.target_capture_hotkey.vk, 0xC0);
+    assert_eq!(dec_legacy.target_capture_hotkey.display_text(), "Ctrl + ~");
+}
+
+#[test]
 fn test_modifier_reset_and_reinstall_hooks() {
     #[cfg(target_os = "windows")]
     {
@@ -322,4 +401,14 @@ fn test_modifier_reset_and_reinstall_hooks() {
         kora::platform::reset_modifier_states();
     }
 }
+
+#[test]
+fn test_uia_focused() {
+    #[cfg(target_os = "windows")]
+    {
+        // Verifies that COM initialization, UIAutomation runtime resolution, and query succeed without error or panic
+        let _ = kora::platform::win32::get_focused_element_id();
+    }
+}
+
 

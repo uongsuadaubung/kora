@@ -49,6 +49,18 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
     match msg {
         WM_ERASEBKGND => 1,
         WM_SHOWWINDOW => 0,
+        WM_ACTIVATE => {
+            if wparam != 0 {
+                let captured = crate::platform::win32::capture::CAPTURED_TARGET_ID
+                    .lock()
+                    .ok()
+                    .and_then(|mut g| g.take());
+                if let Some(target_id) = captured {
+                    crate::ui::controller::add_target_rule_to_selected(&target_id);
+                }
+            }
+            0
+        }
         WM_PAINT => {
             unsafe {
                 let mut ps: PAINTSTRUCT = std::mem::zeroed();
@@ -120,6 +132,17 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             }
             0
         }
+        WM_MOUSEWHEEL => {
+            if let Some(c) = controls {
+                if c.get_view_mode() == crate::ui::views::control_panel::ViewMode::Profile(0) {
+                    let vhwnd = c.tab_typing.viewport_hwnd();
+                    if vhwnd != 0 {
+                        return unsafe { SendMessageW(vhwnd, WM_MOUSEWHEEL, wparam, lparam) };
+                    }
+                }
+            }
+            0
+        }
         crate::ui::WM_APP_UPDATE_CHECKED => {
             // lparam owns a Box<UpdateStatus> handed over by the update-check worker thread
             let status = unsafe { Box::from_raw(lparam as *mut crate::updater::UpdateStatus) };
@@ -141,6 +164,16 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                 c.tab_sound.on_soundpack_installed(&status);
             }
             crate::platform::win32::sound::installer::show_soundpack_install_dialog(hwnd, &status);
+            0
+        }
+        crate::platform::win32::WM_INSPECT_TARGET_CAPTURED => {
+            let captured = crate::platform::win32::capture::CAPTURED_TARGET_ID
+                .lock()
+                .ok()
+                .and_then(|mut g| g.take());
+            if let Some(target_id) = captured {
+                crate::ui::controller::add_target_rule_to_selected(&target_id);
+            }
             0
         }
         WM_COMMAND => commands::handle_command(hwnd, wparam, lparam, controls),

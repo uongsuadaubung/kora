@@ -131,6 +131,7 @@ unsafe extern "system" {
         lp_enum_func: Option<unsafe extern "system" fn(isize, isize) -> i32>,
         l_param: isize,
     ) -> i32;
+    pub fn GetWindow(h_wnd: isize, u_cmd: u32) -> isize;
     pub fn GetCursorPos(lp_point: *mut POINT) -> i32;
     pub fn WindowFromPoint(point: POINT) -> isize;
     pub fn TrackMouseEvent(lp_event_track: *mut TRACKMOUSEEVENT) -> i32;

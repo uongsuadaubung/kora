@@ -21,6 +21,7 @@ struct HotkeyDialogState {
     is_listening: bool,
     is_inherit: bool,
     is_root: bool,
+    is_target_capture: bool,
     target_profile_id: String,
     target_display: String,
     global_hotkey: Hotkey,
@@ -81,6 +82,68 @@ pub fn show_hotkey_dialog(parent: isize) {
             is_listening: false,
             is_inherit,
             is_root,
+            is_target_capture: false,
+            target_profile_id,
+            target_display,
+            global_hotkey,
+            current_hotkey,
+            display_text,
+            btn_display: None,
+        }),
+    );
+}
+
+/// Displays the modal Hotkey Capture Dialog specifically for the target field capture shortcut
+pub fn show_target_capture_hotkey_dialog(parent: isize) {
+    let strings = crate::language::current();
+    let default_root_name = format!(
+        "{} 🎯 {}",
+        strings.hotkey_apply_prefix, strings.typing_group_target_hotkey
+    );
+    let (is_root, target_profile_id, target_display, current_hotkey, global_hotkey) = {
+        if let Ok(guard) = ENGINE_INSTANCE.lock()
+            && let Some(ref engine) = *guard
+        {
+            let global_hk = engine.config().target_capture_hotkey;
+            let sel_id = engine.profile_manager.selected_id.clone();
+            if sel_id == "global" {
+                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
+            } else if let Some(child) = engine.profile_manager.get_profile(&sel_id) {
+                let name = format!("{} {} {}", strings.hotkey_apply_prefix, child.icon, child.name);
+                (false, sel_id, name, child.target_capture_hotkey, global_hk)
+            } else {
+                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
+            }
+        } else {
+            let def_hk = Hotkey::new(true, false, false, false, 0xC0);
+            (true, "global".to_string(), default_root_name.clone(), Some(def_hk), def_hk)
+        }
+    };
+
+    let is_inherit = !is_root && current_hotkey.is_none();
+    let display_text = if is_inherit {
+        format!("{} ({})", strings.typing_inherit_prefix, global_hotkey.display_text())
+    } else {
+        current_hotkey.unwrap_or(global_hotkey).display_text()
+    };
+
+    set_captured_hotkey(current_hotkey, &display_text);
+
+    open_client_modal(
+        parent,
+        strings.hotkey_target_dialog_title,
+        440,
+        336,
+        CLASS_NAME,
+        hotkey_dialog_wnd_proc,
+        &REGISTERED,
+        Box::new(HotkeyDialogState {
+            parent,
+            display_font: 0,
+            is_listening: false,
+            is_inherit,
+            is_root,
+            is_target_capture: true,
             target_profile_id,
             target_display,
             global_hotkey,
@@ -125,6 +188,29 @@ unsafe fn submit_hotkey(hwnd: isize) {
     st.is_listening = false;
     let strings = crate::language::current();
     if st.display_text.is_empty() || st.display_text == strings.hotkey_listening {
+        return;
+    }
+
+    if st.is_target_capture {
+        let final_hotkey = if st.is_inherit {
+            None
+        } else {
+            let valid_hk = st
+                .current_hotkey
+                .or_else(get_captured_hotkey)
+                .or_else(get_pending_modifier_hotkey);
+            match valid_hk {
+                Some(hk) if hk.is_valid() => Some(hk),
+                _ => return,
+            }
+        };
+
+        let is_root = st.is_root;
+        let target_profile_id = st.target_profile_id.clone();
+        crate::ui::controller::save_target_capture_hotkey(&target_profile_id, is_root, final_hotkey);
+        unsafe {
+            PostMessageW(hwnd, WM_CLOSE, 0, 0);
+        }
         return;
     }
 
@@ -224,72 +310,142 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
 
                 // Preset buttons (Row 1 + Row 2)
-                let presets = [
-                    (
-                        strings.hotkey_preset_ctrl_shift,
-                        20,
-                        182,
-                        175,
-                        Hotkey::new(true, true, false, false, 0),
-                        "Ctrl + Shift",
-                    ),
-                    (
-                        strings.hotkey_preset_alt_z,
-                        203,
-                        182,
-                        155,
-                        Hotkey::new(false, false, true, false, 0x5A),
-                        "Alt + Z",
-                    ),
-                    (
-                        strings.hotkey_preset_win_space,
-                        20,
-                        216,
-                        100,
-                        Hotkey::new(false, false, false, true, 0x20),
-                        "Win + Space",
-                    ),
-                    (
-                        strings.hotkey_preset_shift_space,
-                        128,
-                        216,
-                        105,
-                        Hotkey::new(false, true, false, false, 0x20),
-                        "Shift + Space",
-                    ),
-                ];
-                for (label, x, y, w, hk, text) in presets {
-                    if let Some(btn) = PushButton::create_with_variant(
-                        hwnd,
-                        0,
-                        label,
-                        x,
-                        y,
-                        w,
-                        28,
-                        0,
-                        ButtonVariant::Secondary,
-                        None,
-                    ) {
-                        btn.on_click(move || apply_hotkey_preset(hwnd, Some(hk), text));
+                if st.is_target_capture {
+                    let presets = [
+                        (
+                            strings.hotkey_preset_ctrl_tilde,
+                            20,
+                            182,
+                            175,
+                            Hotkey::new(true, false, false, false, 0xC0),
+                            "Ctrl + ~",
+                        ),
+                        (
+                            "Ctrl + Alt + K",
+                            203,
+                            182,
+                            155,
+                            Hotkey::new(true, false, true, false, 0x4B),
+                            "Ctrl + Alt + K",
+                        ),
+                        (
+                            "Ctrl + Shift + K",
+                            20,
+                            216,
+                            120,
+                            Hotkey::new(true, true, false, false, 0x4B),
+                            "Ctrl + Shift + K",
+                        ),
+                        (
+                            "Alt + ~",
+                            148,
+                            216,
+                            85,
+                            Hotkey::new(false, false, true, false, 0xC0),
+                            "Alt + ~",
+                        ),
+                    ];
+                    for (label, x, y, w, hk, text) in presets {
+                        if let Some(btn) = PushButton::create_with_variant(
+                            hwnd,
+                            0,
+                            label,
+                            x,
+                            y,
+                            w,
+                            28,
+                            0,
+                            ButtonVariant::Secondary,
+                            None,
+                        ) {
+                            btn.on_click(move || apply_hotkey_preset(hwnd, Some(hk), text));
+                        }
                     }
-                }
 
-                if !st.is_root
-                    && let Some(btn) = PushButton::create_with_variant(
-                        hwnd,
-                        0,
-                        strings.typing_inherit_global,
-                        241,
-                        216,
-                        179,
-                        28,
-                        0,
-                        ButtonVariant::Secondary,
-                        None,
-                    )
-                {
-                    btn.on_click(move || apply_hotkey_preset(hwnd, None, ""));
+                    if !st.is_root
+                        && let Some(btn) = PushButton::create_with_variant(
+                            hwnd,
+                            0,
+                            strings.typing_inherit_global,
+                            241,
+                            216,
+                            179,
+                            28,
+                            0,
+                            ButtonVariant::Secondary,
+                            None,
+                        )
+                    {
+                        btn.on_click(move || apply_hotkey_preset(hwnd, None, ""));
+                    }
+                } else {
+                    let presets = [
+                        (
+                            strings.hotkey_preset_ctrl_shift,
+                            20,
+                            182,
+                            175,
+                            Hotkey::new(true, true, false, false, 0),
+                            "Ctrl + Shift",
+                        ),
+                        (
+                            strings.hotkey_preset_alt_z,
+                            203,
+                            182,
+                            155,
+                            Hotkey::new(false, false, true, false, 0x5A),
+                            "Alt + Z",
+                        ),
+                        (
+                            strings.hotkey_preset_win_space,
+                            20,
+                            216,
+                            100,
+                            Hotkey::new(false, false, false, true, 0x20),
+                            "Win + Space",
+                        ),
+                        (
+                            strings.hotkey_preset_shift_space,
+                            128,
+                            216,
+                            105,
+                            Hotkey::new(false, true, false, false, 0x20),
+                            "Shift + Space",
+                        ),
+                    ];
+                    for (label, x, y, w, hk, text) in presets {
+                        if let Some(btn) = PushButton::create_with_variant(
+                            hwnd,
+                            0,
+                            label,
+                            x,
+                            y,
+                            w,
+                            28,
+                            0,
+                            ButtonVariant::Secondary,
+                            None,
+                        ) {
+                            btn.on_click(move || apply_hotkey_preset(hwnd, Some(hk), text));
+                        }
+                    }
+
+                    if !st.is_root
+                        && let Some(btn) = PushButton::create_with_variant(
+                            hwnd,
+                            0,
+                            strings.typing_inherit_global,
+                            241,
+                            216,
+                            179,
+                            28,
+                            0,
+                            ButtonVariant::Secondary,
+                            None,
+                        )
+                    {
+                        btn.on_click(move || apply_hotkey_preset(hwnd, None, ""));
+                    }
                 }
 
                 // Footer Buttons
@@ -316,11 +472,24 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     let strings = crate::language::current();
 
                     super::base::fill_dialog_bg(hwnd, hdc, &palette);
+                    let prompt_text = if state::<HotkeyDialogState>(hwnd)
+                        .map(|s| s.is_target_capture)
+                        .unwrap_or(false)
+                    {
+                        strings.typing_target_hotkey_desc
+                    } else {
+                        strings.hotkey_dialog_prompt
+                    };
                     super::base::draw_dialog_callout(
                         hdc,
                         &palette,
-                        RECT { left: 20, top: 12, right: 420, bottom: 58 },
-                        strings.hotkey_dialog_prompt,
+                        RECT {
+                            left: 20,
+                            top: 12,
+                            right: 420,
+                            bottom: 58,
+                        },
+                        prompt_text,
                     );
 
                     let default_root = format!("🌐 {}", strings.banner_root_title);

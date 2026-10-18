@@ -144,6 +144,12 @@ impl ProfileManager {
             if let Some(en) = child.switch_key_enabled {
                 cfg.switch_key_enabled = en;
             }
+            if let Some(cap_hk) = child.target_capture_hotkey {
+                cfg.target_capture_hotkey = cap_hk;
+            }
+            if let Some(cap_en) = child.target_capture_enabled {
+                cfg.target_capture_enabled = cap_en;
+            }
             if let Some(r) = child.restore_on_wrong_spelling {
                 cfg.restore_on_wrong_spelling = r;
             }

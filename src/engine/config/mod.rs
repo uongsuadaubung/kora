@@ -30,13 +30,17 @@ pub struct EngineConfig {
     /// Khôi phục từ khi bấm Backspace xoá dấu cách
     pub remember_history_across_space: bool,
 
-    // --- 2. Mode Switch Hotkey ---
+    // --- 2. Mode Switch & Target Capture Hotkeys ---
     /// Bật/tắt sử dụng phím tắt chuyển chế độ
     pub switch_key_enabled: bool,
     /// Phím chuyển chế độ (mặc định Ctrl + Shift, hoặc bất kỳ phím nào người dùng cài đặt)
     pub switch_key: Hotkey,
     /// Tương thích ngược: true nếu switch_key là Ctrl + Shift
     pub switch_with_ctrl_shift: bool,
+    /// Bật/tắt phím tắt nhận diện ô text (mặc định false trong Root profile)
+    pub target_capture_enabled: bool,
+    /// Phím tắt nhận diện ô text (mặc định Ctrl + `)
+    pub target_capture_hotkey: Hotkey,
 
     // --- 2.5 Key Remapping, Disabling & Key Macro ---
     /// Bật/tắt tính năng đổi phím (Key Remapping)
@@ -85,6 +89,8 @@ impl Default for EngineConfig {
             switch_key_enabled: true,
             switch_key: Hotkey::default(),
             switch_with_ctrl_shift: true,
+            target_capture_enabled: true,
+            target_capture_hotkey: Hotkey::new(true, false, false, false, 0xC0), // Ctrl + `
             remap_enabled: false,
             disable_enabled: false,
             key_macro_enabled: false,

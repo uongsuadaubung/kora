@@ -8,6 +8,7 @@ pub mod injector;
 pub mod macro_executor;
 pub mod sound;
 pub mod types;
+pub mod uia_detect;
 
 pub use app_detect::*;
 pub use app_tracker::*;
@@ -16,6 +17,7 @@ pub use injector::*;
 pub use macro_executor::*;
 pub use sound::*;
 pub use types::*;
+pub use uia_detect::get_focused_element_id;
 
 use crate::engine::VietnameseEngine;
 use crate::engine::action::EngineAction;
@@ -206,24 +208,55 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 return 1;
             }
 
-            let (is_disabled, remap_target, macro_actions, switch_key_enabled, switch_key) =
-                if let Ok(guard) = ENGINE_INSTANCE.lock() {
-                    if let Some(ref engine) = *guard {
-                        let eff_cfg = engine.effective_config();
-                        let disabled = engine.is_key_disabled(vk);
-                        let remap = engine.lookup_key_remap(vk);
-                        let key_macro = if eff_cfg.key_macro_enabled {
-                            engine.lookup_key_macro(vk).map(|s| s.to_vec())
-                        } else {
-                            None
-                        };
-                        (disabled, remap, key_macro, eff_cfg.switch_key_enabled, eff_cfg.switch_key)
+            let (
+                is_disabled,
+                remap_target,
+                macro_actions,
+                switch_key_enabled,
+                switch_key,
+                target_capture_enabled,
+                target_capture_hotkey,
+            ) = if let Ok(guard) = ENGINE_INSTANCE.lock() {
+                if let Some(ref engine) = *guard {
+                    let eff_cfg = engine.effective_config();
+                    let disabled = engine.is_key_disabled(vk);
+                    let remap = engine.lookup_key_remap(vk);
+                    let key_macro = if eff_cfg.key_macro_enabled {
+                        engine.lookup_key_macro(vk).map(|s| s.to_vec())
                     } else {
-                        (false, None, None, true, crate::engine::config::Hotkey::default())
-                    }
+                        None
+                    };
+                    (
+                        disabled,
+                        remap,
+                        key_macro,
+                        eff_cfg.switch_key_enabled,
+                        eff_cfg.switch_key,
+                        eff_cfg.target_capture_enabled,
+                        eff_cfg.target_capture_hotkey,
+                    )
                 } else {
-                    (false, None, None, true, crate::engine::config::Hotkey::default())
-                };
+                    (
+                        false,
+                        None,
+                        None,
+                        true,
+                        crate::engine::config::Hotkey::default(),
+                        false,
+                        crate::engine::config::Hotkey::new(true, false, false, false, 0xC0),
+                    )
+                }
+            } else {
+                (
+                    false,
+                    None,
+                    None,
+                    true,
+                    crate::engine::config::Hotkey::default(),
+                    false,
+                    crate::engine::config::Hotkey::new(true, false, false, false, 0xC0),
+                )
+            };
 
             // 1. Intercept Key Disabling: swallow event completely
             if is_disabled {
@@ -363,6 +396,19 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                     }
                 }
 
+                // Check target input field capture hotkey (e.g. Ctrl + `)
+                if target_capture_enabled
+                    && target_capture_hotkey.is_valid()
+                    && vk == target_capture_hotkey.vk
+                    && is_ctrl == target_capture_hotkey.ctrl
+                    && is_shift == target_capture_hotkey.shift
+                    && is_alt == target_capture_hotkey.alt
+                    && is_win == target_capture_hotkey.win
+                {
+                    capture::trigger_target_capture_async();
+                    return 1;
+                }
+
                 // If Ctrl, Alt, or Win are held down, let OS handle and reset buffer
                 if is_ctrl || is_alt || is_win {
                     if let Ok(mut guard) = ENGINE_INSTANCE.lock()
@@ -450,10 +496,11 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                     && let Some(ch) = char::decode_utf16(buff[0..count as usize].iter().cloned())
                         .next()
                         .and_then(|r| r.ok())
-                    && let Ok(mut guard) = ENGINE_INSTANCE.lock()
-                    && let Some(ref mut engine) = *guard
                 {
-                    let action = engine.on_key(ch, is_shift, is_caps);
+                    if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                        && let Some(ref mut engine) = *guard
+                    {
+                        let action = engine.on_key(ch, is_shift, is_caps);
                     match action {
                         EngineAction::Passthrough => {
                             // Let OS handle original keystroke
@@ -471,6 +518,7 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 }
             }
         }
+    }
 
         CallNextHookEx(0, n_code, w_param, l_param)
     }

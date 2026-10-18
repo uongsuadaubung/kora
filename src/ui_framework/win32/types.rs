@@ -165,6 +165,8 @@ pub const WM_PAINT: u32 = 0x000F;
 pub const WM_ERASEBKGND: u32 = 0x0014;
 pub const WM_SETCURSOR: u32 = 0x0020;
 pub const WM_DRAWITEM: u32 = 0x002B;
+pub const WM_MEASUREITEM: u32 = 0x002C;
+pub const WM_NOTIFY: u32 = 0x004E;
 pub const WM_SETICON: u32 = 0x0080;
 pub const WM_NCHITTEST: u32 = 0x0084;
 pub const WM_KEYDOWN: u32 = 0x0100;
@@ -214,6 +216,9 @@ pub const SWP_NOZORDER: u32 = 0x0004;
 pub const SWP_NOACTIVATE: u32 = 0x0010;
 pub const SWP_FRAMECHANGED: u32 = 0x0020;
 pub const SWP_SHOWWINDOW: u32 = 0x0040;
+
+pub const GW_HWNDNEXT: u32 = 2;
+pub const GW_CHILD: u32 = 5;
 
 pub const DT_LEFT: u32 = 0x00000000;
 pub const DT_CENTER: u32 = 0x00000001;

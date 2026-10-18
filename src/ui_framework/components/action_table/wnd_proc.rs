@@ -88,20 +88,26 @@ pub unsafe extern "system" fn action_table_wndproc(
         }
         let body_h = (client_rc.bottom - header_h).max(0);
 
-        let changed = if let Ok(mut g) = state_mutex.lock() {
+        let (changed, at_limit) = if let Ok(mut g) = state_mutex.lock() {
             let total_h = g.rows.len() as i32 * ROW_HEIGHT;
             let max_scroll = (total_h - body_h).max(0);
             let scroll_lines = (delta / 120) * (ROW_HEIGHT * 3);
             let old_scroll = g.scroll_y;
             g.scroll_y = (g.scroll_y - scroll_lines).clamp(0, max_scroll);
-            old_scroll != g.scroll_y
+            (old_scroll != g.scroll_y, max_scroll == 0)
         } else {
-            false
+            (false, true)
         };
 
         if changed {
             unsafe {
                 InvalidateRect(hwnd, null_mut(), 0);
+            }
+            return 0;
+        } else if at_limit {
+            let parent = unsafe { GetParent(hwnd) };
+            if parent != 0 {
+                return unsafe { SendMessageW(parent, msg, wparam, lparam) };
             }
         }
         return 0;

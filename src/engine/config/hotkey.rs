@@ -61,7 +61,10 @@ impl Hotkey {
             parts.push("Win");
         }
         if self.vk != 0 {
-            let name = vk_to_name(self.vk);
+            let name = match self.vk {
+                0xC0 => "~",
+                _ => vk_to_name(self.vk),
+            };
             if !name.is_empty() {
                 parts.push(name);
             } else {
@@ -251,7 +254,7 @@ pub fn name_to_vk(name: &str) -> Option<u32> {
     let lower = name.trim().to_ascii_lowercase();
     match lower.as_str() {
         "space" => Some(0x20),
-        "~" | "`" | "tilde" | "grave" => Some(0xC0),
+        "~" | "`" | "tilde" | "grave" | "backtick" => Some(0xC0),
         ";" | "semicolon" => Some(0xBA),
         "," | "comma" => Some(0xBC),
         "." | "period" => Some(0xBE),

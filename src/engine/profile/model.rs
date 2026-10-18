@@ -333,6 +333,8 @@ pub struct ChildProfileData {
     pub method: MethodMode,
     pub switch_key: Option<Hotkey>,
     pub switch_key_enabled: Option<bool>,
+    pub target_capture_hotkey: Option<Hotkey>,
+    pub target_capture_enabled: Option<bool>,
     pub restore_on_wrong_spelling: Option<bool>,
     pub auto_uppercase_first_char: Option<bool>,
     pub bracket_w: Option<bool>,
@@ -366,6 +368,78 @@ pub struct ChildProfileData {
     pub muted_key_macros: Vec<u32>,
     pub overridden_key_macros: HashMap<u32, (String, Vec<MacroAction>)>,
     pub app_key_macros: Vec<KeyMacroRule>,
+
+    // 7. Surgical target key injection rules
+    pub app_strategy: Option<KeyInjectionStrategy>,
+    pub target_rules: Vec<TargetRule>,
+}
+
+/// Key injection strategy for target text fields (e.g. Omnibox, Excel cell, code editor, game console)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum KeyInjectionStrategy {
+    #[default]
+    AutocompleteGuard,
+    ClipboardPaste,
+}
+
+impl KeyInjectionStrategy {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AutocompleteGuard => "autocomplete_guard",
+            Self::ClipboardPaste => "clipboard_paste",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "clipboard_paste" | "clipboard" | "paste" => Self::ClipboardPaste,
+            _ => Self::AutocompleteGuard,
+        }
+    }
+
+    pub fn to_raw_u8(&self) -> u8 {
+        match self {
+            Self::AutocompleteGuard => 1,
+            Self::ClipboardPaste => 2,
+        }
+    }
+
+    pub fn from_raw_u8(val: u8) -> Self {
+        match val {
+            2 | 4 => Self::ClipboardPaste,
+            _ => Self::AutocompleteGuard,
+        }
+    }
+
+    pub fn localized_label(&self, s: &crate::language::LanguageStrings) -> &'static str {
+        match self {
+            Self::AutocompleteGuard => s.strategy_autocomplete_guard,
+            Self::ClipboardPaste => s.strategy_clipboard_paste,
+        }
+    }
+
+    pub fn localized_desc(&self, s: &crate::language::LanguageStrings) -> &'static str {
+        match self {
+            Self::AutocompleteGuard => s.strategy_desc_autocomplete_guard,
+            Self::ClipboardPaste => s.strategy_desc_clipboard_paste,
+        }
+    }
+}
+
+/// Surgical text-field key injection target rule
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetRule {
+    pub target_id: String,
+    pub strategy: KeyInjectionStrategy,
+}
+
+impl TargetRule {
+    pub fn new(target_id: impl Into<String>, strategy: KeyInjectionStrategy) -> Self {
+        Self {
+            target_id: target_id.into(),
+            strategy,
+        }
+    }
 }
 
 impl Role for Root {
@@ -465,6 +539,8 @@ impl AppProfile<Child> {
                 method: MethodMode::Inherit,
                 switch_key: None,
                 switch_key_enabled: None,
+                target_capture_hotkey: None,
+                target_capture_enabled: None,
                 restore_on_wrong_spelling: None,
                 auto_uppercase_first_char: None,
                 bracket_w: None,
@@ -488,6 +564,8 @@ impl AppProfile<Child> {
                 muted_key_macros: Vec::new(),
                 overridden_key_macros: HashMap::new(),
                 app_key_macros: Vec::new(),
+                app_strategy: None,
+                target_rules: Vec::new(),
             },
             _role: std::marker::PhantomData,
         }

@@ -337,6 +337,15 @@ impl PushButton {
         }
     }
 
+    pub fn set_variant(&self, variant: ButtonVariant) {
+        if let Ok(mut s) = self.state.lock() {
+            s.variant = variant;
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null_mut(), 0);
+        }
+    }
+
     pub fn set_custom_drawer<F>(&self, drawer: F)
     where
         F: Fn(&DRAWITEMSTRUCT, bool) -> bool + Send + Sync + 'static,

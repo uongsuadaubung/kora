@@ -671,5 +671,72 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x70));
 }
 
+#[test]
+fn test_child_profile_target_rules_serialization() {
+    use kora::engine::profile::{AppProfile, KeyInjectionStrategy, TargetRule};
+    use kora::VietnameseEngine;
+
+    let mut engine = VietnameseEngine::new(EngineConfig::default());
+    let mut child = AppProfile::new_child("firefox", "Mozilla Firefox", "firefox.exe", "🦊");
+    child.app_strategy = None; // Inherit
+    child.target_rules.push(TargetRule::new(
+        "urlbar-input",
+        KeyInjectionStrategy::AutocompleteGuard,
+    ));
+    child.target_rules.push(TargetRule::new(
+        "webconsole-input",
+        KeyInjectionStrategy::ClipboardPaste,
+    ));
+    engine.profile_manager.add_profile(child);
+
+    let mut cs2 = AppProfile::new_child("cs2", "Counter-Strike 2", "cs2.exe", "🎮");
+    cs2.app_strategy = Some(KeyInjectionStrategy::ClipboardPaste);
+    engine.profile_manager.add_profile(cs2);
+
+    let mut excel = AppProfile::new_child("excel", "Microsoft Excel", "excel.exe", "📊");
+    excel.app_strategy = Some(KeyInjectionStrategy::AutocompleteGuard);
+    engine.profile_manager.add_profile(excel);
+
+    let ini = serialize_config_all(
+        engine.config(),
+        &engine.macro_table,
+        &engine.profile_manager,
+    );
+    assert!(ini.contains("target = urlbar-input = autocomplete_guard"));
+    assert!(ini.contains("target = webconsole-input = clipboard_paste"));
+    assert!(ini.contains("app_strategy = clipboard_paste"));
+    assert!(ini.contains("app_strategy = autocomplete_guard"));
+
+    let (_, _, restored_pm) = parse_config_all(&ini);
+    let restored_child = restored_pm.get_profile("firefox").expect("firefox profile must exist");
+    assert_eq!(restored_child.app_strategy, None);
+    assert_eq!(restored_child.target_rules.len(), 2);
+    assert_eq!(restored_child.target_rules[0].target_id, "urlbar-input");
+    assert_eq!(
+        restored_child.target_rules[0].strategy,
+        KeyInjectionStrategy::AutocompleteGuard
+    );
+    assert_eq!(restored_child.target_rules[1].target_id, "webconsole-input");
+    assert_eq!(
+        restored_child.target_rules[1].strategy,
+        KeyInjectionStrategy::ClipboardPaste
+    );
+
+    let restored_cs2 = restored_pm.get_profile("cs2").expect("cs2 profile must exist");
+    assert_eq!(
+        restored_cs2.app_strategy,
+        Some(KeyInjectionStrategy::ClipboardPaste)
+    );
+    assert!(restored_cs2.target_rules.is_empty());
+
+    let restored_excel = restored_pm.get_profile("excel").expect("excel profile must exist");
+    assert_eq!(
+        restored_excel.app_strategy,
+        Some(KeyInjectionStrategy::AutocompleteGuard)
+    );
+    assert!(restored_excel.target_rules.is_empty());
+}
+
+
 
 

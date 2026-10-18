@@ -13,6 +13,8 @@ use std::sync::Mutex;
 pub const WM_COMBO_CAPTURED: u32 = 0x8000 + 101;
 pub const WM_SINGLE_KEY_CAPTURED: u32 = 0x8000 + 102;
 pub const WM_COMBO_CANCELLED: u32 = 0x8000 + 103;
+pub const WM_TARGET_CAPTURED: u32 = 0x8000 + 104;
+pub const WM_INSPECT_TARGET_CAPTURED: u32 = WM_TARGET_CAPTURED;
 
 pub(crate) static COMBO_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub(crate) static COMBO_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -20,6 +22,82 @@ pub(crate) static CAPTURED_HOTKEY: Mutex<Option<crate::engine::config::Hotkey>> 
 pub(crate) static CAPTURE_DISPLAY_TEXT: Mutex<String> = Mutex::new(String::new());
 pub(crate) static HOTKEY_MOD_ARMED: AtomicBool = AtomicBool::new(false);
 pub(crate) static HOTKEY_ALLOW_SINGLE_KEY: AtomicBool = AtomicBool::new(false);
+
+// Target Field Capture Hotkey state tracking
+pub static TARGET_CAPTURE_ENABLED: AtomicBool = AtomicBool::new(true);
+pub static TARGET_NOTIFY_HWND: AtomicIsize = AtomicIsize::new(0);
+pub static CAPTURED_TARGET_ID: Mutex<Option<String>> = Mutex::new(None);
+pub static TARGET_CAPTURE_HOTKEY: Mutex<crate::engine::config::Hotkey> =
+    Mutex::new(crate::engine::config::Hotkey {
+        ctrl: true,
+        shift: false,
+        alt: false,
+        win: false,
+        vk: 0xC0, // VK_OEM_3 (` ~)
+    });
+
+pub fn set_target_capture_notify_hwnd(hwnd: isize) {
+    TARGET_NOTIFY_HWND.store(hwnd, Ordering::SeqCst);
+}
+
+pub fn is_target_capture_enabled() -> bool {
+    TARGET_CAPTURE_ENABLED.load(Ordering::SeqCst)
+}
+
+pub fn set_target_capture_enabled(enabled: bool) {
+    TARGET_CAPTURE_ENABLED.store(enabled, Ordering::SeqCst);
+}
+
+pub fn get_target_capture_hotkey() -> crate::engine::config::Hotkey {
+    TARGET_CAPTURE_HOTKEY
+        .lock()
+        .map(|h| *h)
+        .unwrap_or(crate::engine::config::Hotkey {
+            ctrl: true,
+            shift: false,
+            alt: false,
+            win: false,
+            vk: 0xC0,
+        })
+}
+
+pub fn set_target_capture_hotkey(hk: crate::engine::config::Hotkey) {
+    if let Ok(mut lock) = TARGET_CAPTURE_HOTKEY.lock() {
+        *lock = hk;
+    }
+}
+
+/// Triggers background resolution of the focused UIA element and notifies UI
+pub fn trigger_target_capture_async() {
+    let notify_hwnd = TARGET_NOTIFY_HWND.load(Ordering::SeqCst);
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(80));
+
+        let mut resolved = None;
+        for _ in 0..5 {
+            if let Some(target_id) = super::uia_detect::get_focused_element_id() {
+                if !target_id.trim().is_empty() {
+                    resolved = Some(target_id);
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        if let Some(target_id) = resolved {
+            if let Ok(mut lock) = CAPTURED_TARGET_ID.lock() {
+                *lock = Some(target_id.clone());
+            }
+            if notify_hwnd != 0 {
+                unsafe {
+                    PostMessageW(notify_hwnd, WM_INSPECT_TARGET_CAPTURED, 0, 0);
+                }
+            } else {
+                crate::ui::controller::add_target_rule_to_selected(&target_id);
+            }
+        }
+    });
+}
 
 // Global runtime modifier tracking flags
 pub(crate) static TRACKED_CTRL: AtomicBool = AtomicBool::new(false);

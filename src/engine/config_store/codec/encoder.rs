@@ -29,8 +29,16 @@ pub fn serialize_config_all(
         config.switch_key_enabled
     ));
     out.push_str(&format!(
-        "switch_key = {}\n\n",
+        "switch_key = {}\n",
         config.switch_key.to_config_str()
+    ));
+    out.push_str(&format!(
+        "target_capture_enabled = {}\n",
+        config.target_capture_enabled
+    ));
+    out.push_str(&format!(
+        "target_capture_hotkey = {}\n\n",
+        config.target_capture_hotkey.to_config_str()
     ));
 
     out.push_str("[spelling]\n");
@@ -183,6 +191,12 @@ pub fn serialize_config_all(
         if let Some(en) = child.switch_key_enabled {
             out.push_str(&format!("switch_key_enabled = {}\n", en));
         }
+        if let Some(cap_hk) = child.target_capture_hotkey {
+            out.push_str(&format!("target_capture_hotkey = {}\n", cap_hk.to_config_str()));
+        }
+        if let Some(cap_en) = child.target_capture_enabled {
+            out.push_str(&format!("target_capture_enabled = {}\n", cap_en));
+        }
         if let Some(r) = child.restore_on_wrong_spelling {
             out.push_str(&format!("restore_on_wrong = {}\n", r));
         }
@@ -306,6 +320,12 @@ pub fn serialize_config_all(
                 let dsl = MacroAction::actions_to_dsl(&m.actions);
                 out.push_str(&format!("app_key_macro = {} = {} | {}\n", m.trigger_name, m.name, dsl));
             }
+        }
+        if let Some(strat) = child.app_strategy {
+            out.push_str(&format!("app_strategy = {}\n", strat.as_str()));
+        }
+        for tr in &child.target_rules {
+            out.push_str(&format!("target = {} = {}\n", tr.target_id, tr.strategy.as_str()));
         }
         out.push('\n');
     }

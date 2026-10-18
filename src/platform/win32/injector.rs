@@ -1,6 +1,5 @@
 //! Keystroke Injection & Native SendInput Synthesizer
 
-use super::app_detect::{AutocompleteFixType, detect_autocomplete_context};
 use super::types::{
     INPUT, INPUT_KEYBOARD, INPUT_UNION, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
     MAGIC_EXTRA_INFO, SendInput, VK_BACK,
@@ -84,20 +83,80 @@ pub fn push_unicode_char(inputs: &mut Vec<INPUT>, code_unit: u16) {
 
 const STACK_INPUT_LIMIT: usize = 64;
 
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn OpenClipboard(h_wnd_new_owner: isize) -> i32;
+    fn CloseClipboard() -> i32;
+    fn EmptyClipboard() -> i32;
+    fn SetClipboardData(u_format: u32, h_mem: isize) -> isize;
+}
+
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GlobalAlloc(u_flags: u32, dw_bytes: usize) -> isize;
+    fn GlobalLock(h_mem: isize) -> *mut std::ffi::c_void;
+    fn GlobalUnlock(h_mem: isize) -> i32;
+}
+
+const CF_UNICODETEXT: u32 = 13;
+const GMEM_MOVEABLE: u32 = 0x0002;
+
+fn copy_to_clipboard_utf16(text: &str) -> bool {
+    let utf16: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+    let bytes = utf16.len() * 2;
+    unsafe {
+        let h_mem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if h_mem == 0 {
+            return false;
+        }
+        let ptr = GlobalLock(h_mem) as *mut u16;
+        if ptr.is_null() {
+            return false;
+        }
+        std::ptr::copy_nonoverlapping(utf16.as_ptr(), ptr, utf16.len());
+        GlobalUnlock(h_mem);
+
+        if OpenClipboard(0) != 0 {
+            EmptyClipboard();
+            SetClipboardData(CF_UNICODETEXT, h_mem);
+            CloseClipboard();
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Sends backspaces and replacement string in a SINGLE atomic SendInput batch.
 /// - In normal apps & web pages: sends pure standard Backspaces and replacement characters (no invisible chars).
 /// - In browser Omnibox / Excel: collapses inline autocomplete selection cleanly without polluting document text.
+/// - In configured target controls: applies the surgical injection strategy bound to that control.
 pub fn send_replace(backspaces: usize, text: &str) {
     let utf16_count = text.encode_utf16().count();
     if backspaces == 0 && utf16_count == 0 {
         return;
     }
 
-    let fix_type = detect_autocomplete_context();
-    let is_autocomplete = matches!(
-        fix_type,
-        AutocompleteFixType::ChromiumOmnibox | AutocompleteFixType::GenericAutocomplete
-    );
+    let target_strat = super::app_detect::get_current_target_strategy_raw();
+
+    // Strategy 2 (or legacy 4): Clipboard Paste — send backspaces then paste via Ctrl+V
+    if target_strat == 2 || target_strat == 4 {
+        if backspaces > 0 {
+            for _ in 0..backspaces {
+                send_vk_event(VK_BACK as u32, false);
+                send_vk_event(VK_BACK as u32, true);
+            }
+        }
+        if !text.is_empty() && copy_to_clipboard_utf16(text) {
+            send_vk_event(0x11 /* VK_CONTROL */, false);
+            send_vk_event(0x56 /* V */, false);
+            send_vk_event(0x56, true);
+            send_vk_event(0x11, true);
+        }
+        return;
+    }
+
+    let is_autocomplete = target_strat == 1; // Strategy 1: AutocompleteGuard (forces U+202F fix)
 
     let extra = if is_autocomplete && backspaces > 0 && utf16_count > 0 {
         4

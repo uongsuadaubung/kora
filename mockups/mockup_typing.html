@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kora - Tab Bộ Gõ & Tùy Chỉnh Phương Pháp Gửi Phím Theo Target</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-window: #1E1E1E;
+      --bg-sidebar: #252526;
+      --bg-card: #2D2D30;
+      --bg-card-header: #28282B;
+      --bg-input: #333337;
+      --text-primary: #F1F1F1;
+      --text-secondary: #9E9E9E;
+      --border: #3E3E42;
+      --border-subtle: #333336;
+      --tab-active-bg: #3E3E42;
+      --accent: #0078D4;
+      --accent-hover: #1684D8;
+      --accent-glow: rgba(0, 120, 212, 0.4);
+      --success: #10B981;
+      --danger: #F44747;
+      --warning: #F59E0B;
+      --purple: #8B5CF6;
+      --font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body.light-theme {
+      color-scheme: light;
+      --bg-window: #F8F8F8;
+      --bg-sidebar: #F0F0F0;
+      --bg-card: #FFFFFF;
+      --bg-card-header: #FAFAFA;
+      --bg-input: #FFFFFF;
+      --text-primary: #1E1E1E;
+      --text-secondary: #6E6E6E;
+      --border: #E0E0E0;
+      --border-subtle: #EAEAEA;
+      --tab-active-bg: #E4E4E4;
+      --accent: #0066CC;
+      --accent-hover: #0078D4;
+      --accent-glow: rgba(0, 102, 204, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: #111;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 12.5px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      gap: 14px;
+    }
+
+    /* Top Toolbar */
+    .top-toolbar {
+      width: 820px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .top-toolbar-left, .top-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-toolbar button {
+      background: #2D2D30;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .top-toolbar button:hover {
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .guide-banner {
+      background: rgba(0, 120, 212, 0.15);
+      border: 1px solid rgba(0, 120, 212, 0.4);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: #bfe0ff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Main Kora Window */
+    .app-window {
+      width: 820px;
+      height: 640px;
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Title Bar */
+    .titlebar {
+      height: 38px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .titlebar-logo {
+      width: 19px;
+      height: 19px;
+      background: var(--accent);
+      color: white;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 11px;
+    }
+
+    .titlebar-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .window-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .dot-close { background: #ff5f56; }
+    .dot-min { background: #ffbd2e; }
+    .dot-max { background: #27c93f; }
+
+    /* Window Body Layout */
+    .window-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 200px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px 0;
+    }
+
+    .sidebar-section-title {
+      padding: 6px 14px 4px 14px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .profile-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 0 8px;
+    }
+
+    .profile-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-weight: 500;
+      font-size: 12px;
+      transition: background 0.1s;
+    }
+
+    .profile-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .profile-item.active {
+      background: rgba(0, 120, 212, 0.16);
+      color: var(--accent);
+      border: 1px solid rgba(0, 120, 212, 0.35);
+      font-weight: 600;
+    }
+
+    .profile-item .badge-dot {
+      margin-left: auto;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .sidebar-footer {
+      padding: 8px 12px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .sidebar-footer a {
+      padding: 5px 8px;
+      border-radius: 5px;
+      text-decoration: none;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .sidebar-footer a:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      background: var(--bg-window);
+    }
+
+    /* Profile Banner */
+    .profile-banner {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .profile-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .profile-icon-box {
+      font-size: 20px;
+    }
+
+    .profile-title-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .profile-exe-tag {
+      font-family: monospace;
+      font-size: 10.5px;
+      padding: 1px 6px;
+      background: rgba(0, 120, 212, 0.2);
+      color: var(--accent);
+      border-radius: 4px;
+      border: 1px solid rgba(0, 120, 212, 0.3);
+    }
+
+    .profile-subtitle {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 1px;
+    }
+
+    /* Subtabs */
+    .subtabs-nav {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2px;
+    }
+
+    .subtab-btn {
+      padding: 6px 14px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .subtab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .two-col-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .form-select {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .form-select:hover {
+      border-color: var(--text-secondary);
+    }
+
+    .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .form-select option {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .checkbox-row input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: var(--accent);
+      width: 14px;
+      height: 14px;
+    }
+
+    .pill-badge {
+      background: rgba(0, 120, 212, 0.2);
+      color: var(--accent);
+      border: 1px solid rgba(0, 120, 212, 0.4);
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    .btn-secondary {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 5px 12px;
+      border-radius: 5px;
+      font-size: 11.5px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 5px 12px;
+      border-radius: 5px;
+      font-size: 11.5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    /* ==================== CARD 4: TRỌNG TÂM - CƠ CHẾ GỬI PHÍM VÀO ỨNG DỤNG ==================== */
+    .card-target-optimizer {
+      background: linear-gradient(145deg, rgba(0, 120, 212, 0.08) 0%, var(--bg-card) 100%);
+      border: 1.5px solid var(--accent);
+      box-shadow: 0 4px 20px rgba(0, 120, 212, 0.12);
+      position: relative;
+    }
+
+    /* KHỐI CƠ CHẾ GỬI PHÍM TOÀN ỨNG DỤNG (APP-LEVEL STRATEGY) */
+    .app-strategy-box {
+      background: var(--bg-card-header);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .app-strategy-box:hover {
+      border-color: rgba(0, 120, 212, 0.45);
+    }
+
+    .app-strategy-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* PHÂN CÁCH NGOẠI LỆ Ô TEXT */
+    .section-divider {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+      margin-bottom: 6px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .section-divider-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* EMPTY RULES BOX (KHI PROFILE KHÔNG CÓ NGOẠI LỆ Ô TEXT) */
+    .empty-rules-box {
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 22px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 6px;
+    }
+
+    /* CAPTURE HOTKEY BOX (GIỐNG CARD 2) */
+    .capture-hotkey-box {
+      background: var(--bg-card-header);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .inspect-steps-guide {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    /* Modal Dialog for Changing Hotkey */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-window);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 400px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modal-pop 0.15s ease-out;
+    }
+
+    @keyframes modal-pop {
+      from { transform: scale(0.94); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: var(--bg-card-header);
+      border-bottom: 1px solid var(--border-subtle);
+      font-weight: 700;
+      font-size: 12.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hotkey-recording-box {
+      background: var(--bg-input);
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+      font-size: 14.5px;
+      font-weight: bold;
+      color: #93C5FD;
+      font-family: Consolas, monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .preset-hotkeys {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .preset-badge {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 4px 9px;
+      border-radius: 5px;
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+
+    .preset-badge:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+      background: rgba(0, 120, 212, 0.12);
+    }
+
+    .modal-footer {
+      padding: 10px 16px;
+      background: var(--bg-card-header);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .step-badge {
+      background: var(--bg-input);
+      color: var(--accent);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
+    .target-rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Clean Target Rule Item: No redundant status, spacious ID, dedicated description block */
+    .target-rule-item {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .target-rule-item.flash-highlight {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.15);
+    }
+
+    .target-rule-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .target-rule-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .target-tag {
+      font-family: Consolas, monospace;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: rgba(0, 120, 212, 0.16);
+      color: #93C5FD;
+      border: 1px solid rgba(0, 120, 212, 0.35);
+      padding: 3px 10px;
+      border-radius: 5px;
+      letter-spacing: 0.3px;
+    }
+
+    .target-rule-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--bg-card-header);
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .strategy-select-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .strategy-select {
+      flex: 1;
+      max-width: 360px;
+    }
+
+    /* Explanation block on its own line */
+    .strategy-desc-block {
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      padding-top: 4px;
+      border-top: 1px dashed var(--border-subtle);
+    }
+
+    /* Notification Toast */
+    .toast-box {
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 120, 212, 0.12);
+      border: 1px solid rgba(0, 120, 212, 0.3);
+      color: #BFDBFE;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Toolbar -->
+  <div class="top-toolbar">
+    <div class="top-toolbar-left">
+      <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">Giao diện Tab Bộ Gõ — Kora</span>
+    </div>
+    <div class="top-toolbar-right">
+      <button id="btnToggleTheme">☀️ Đổi Theme</button>
+      <button id="btnResetDemo">↻ Đặt lại</button>
+    </div>
+  </div>
+
+  <!-- Main Kora Window (820px Standard Width) -->
+  <div class="app-window">
+    
+    <!-- Title Bar -->
+    <div class="titlebar">
+      <div class="titlebar-brand">
+        <div class="titlebar-logo">K</div>
+        <span>Kora — Bảng điều khiển Profile & Bộ gõ</span>
+      </div>
+      <div class="titlebar-controls">
+        <span class="window-dot dot-min"></span>
+        <span class="window-dot dot-max"></span>
+        <span class="window-dot dot-close"></span>
+      </div>
+    </div>
+
+    <!-- Window Body -->
+    <div class="window-body">
+      
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div>
+          <div class="sidebar-section-title">Hồ sơ ứng dụng</div>
+          <div class="profile-list">
+            <div class="profile-item" id="profItemDefault" onclick="selectProfile('default')">
+              <span>🌐</span> <span>Mặc định (Root)</span>
+            </div>
+            <div class="profile-item active" id="profItemFirefox" onclick="selectProfile('firefox')">
+              <span>🦊</span> <span>Firefox</span>
+              <span class="badge-dot"></span>
+            </div>
+            <div class="profile-item" id="profItemChrome" onclick="selectProfile('chrome')">
+              <span>🧭</span> <span>Google Chrome</span>
+            </div>
+            <div class="profile-item" id="profItemExcel" onclick="selectProfile('excel')">
+              <span>📊</span> <span>Microsoft Excel</span>
+            </div>
+            <div class="profile-item" id="profItemCS2" onclick="selectProfile('cs2')">
+              <span>🎮</span> <span>Counter-Strike 2</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <a href="#">⚙️ Cài đặt hệ thống</a>
+          <a href="#">ℹ️ Thông tin Kora</a>
+        </div>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="content-area">
+        
+        <!-- Profile Banner -->
+        <div class="profile-banner">
+          <div class="profile-banner-left">
+            <div class="profile-icon-box">🦊</div>
+            <div>
+              <div class="profile-title-text">
+                <span>Hồ sơ: Mozilla Firefox</span>
+                <span class="profile-exe-tag">firefox.exe</span>
+              </div>
+              <div class="profile-subtitle">Áp dụng thiết lập tối ưu khi cửa sổ Firefox active</div>
+            </div>
+          </div>
+          <div>
+            <span style="font-size: 11px; color: var(--success); display: flex; align-items: center; gap: 4px;">
+              ● Đang kết nối
+            </span>
+          </div>
+        </div>
+
+        <!-- Subtabs Nav -->
+        <div class="subtabs-nav">
+          <button class="subtab-btn active">⌨️ Bộ gõ</button>
+          <button class="subtab-btn">Phím bấm</button>
+          <button class="subtab-btn">Âm thanh</button>
+          <button class="subtab-btn">Gõ tắt</button>
+        </div>
+
+        <!-- Card 1: Thiết lập bộ gõ tiếng Việt -->
+        <div class="card">
+          <div class="card-header-title">Thiết lập Bộ gõ tiếng Việt</div>
+          <div class="two-col-grid">
+            <div class="form-group">
+              <label>Chế độ ngôn ngữ:</label>
+              <select class="form-select">
+                <option>Tiếng Việt</option>
+                <option>Tiếng Anh (Passthrough)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Kiểu gõ:</label>
+              <select class="form-select">
+                <option selected>Telex</option>
+                <option>VNI</option>
+                <option>Simple Telex</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Phím chuyển đổi E ⇄ V -->
+        <div class="card">
+          <div class="card-row">
+            <div>
+              <label class="checkbox-row">
+                <input type="checkbox" checked>
+                <strong style="color: var(--text-primary);">Phím tắt chuyển đổi E ⇄ V</strong>
+              </label>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-left: 22px; margin-top: 2px;">
+                Chuyển nhanh ngôn ngữ trong phiên làm việc hiện tại
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="pill-badge">Ctrl + Shift</span>
+              <button class="btn-secondary">Đổi phím</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Tính năng hỗ trợ gõ & kiểm tra chính tả -->
+        <div class="card">
+          <div class="card-header-title">Tính năng hỗ trợ gõ & kiểm tra chính tả</div>
+          <div style="display: flex; flex-direction: column; gap: 9px; padding: 2px 0;">
+            <label class="checkbox-row">
+              <input type="checkbox" checked>
+              <span>Tự động khôi phục phím khi gõ sai từ</span>
+              <span class="inherit-badge" style="font-size: 10.5px; color: var(--text-secondary); margin-left: 6px;">(Kế thừa: bật)</span>
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox">
+              <span>Tự động viết hoa chữ cái đầu câu</span>
+              <span class="inherit-badge" style="font-size: 10.5px; color: var(--text-secondary); margin-left: 6px;">(Kế thừa: tắt)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ==================== CARD 4: TRỌNG TÂM - CƠ CHẾ GỬI PHÍM VÀO ỨNG DỤNG ==================== -->
+        <div class="card card-target-optimizer" id="cardTargetOptimizer">
+          <div class="card-header-title" style="color: var(--accent); justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span>⚡</span>
+              <span>Cơ chế gửi phím vào ứng dụng</span>
+            </div>
+            <span class="pill-badge" id="appScopeBadge" style="font-size: 10px; font-weight: 600; text-transform: none; font-family: inherit;">Hồ sơ: Firefox</span>
+          </div>
+
+          <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+            Cấu hình phương pháp đưa ký tự tiếng Việt vào ứng dụng. Bạn có thể chọn phương pháp chung cho toàn bộ app hoặc đặt ngoại lệ riêng cho từng ô text.
+          </p>
+
+          <!-- PHẦN 1: CƠ CHẾ MẶC ĐỊNH CHO TOÀN ỨNG DỤNG (APP-LEVEL STRATEGY) -->
+          <div class="app-strategy-box">
+            <div class="app-strategy-row">
+              <div style="flex: 1; min-width: 240px;">
+                <div style="font-weight: 600; font-size: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                  <span>🚀</span>
+                  <span>Phương pháp mặc định cho toàn app:</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                  Áp dụng cho mọi khung nhập liệu, ô tìm kiếm và khung chat của <strong id="appStrategyAppName" style="color: #93C5FD;">Firefox</strong>
+                </div>
+              </div>
+              <div style="min-width: 290px;">
+                <select class="form-select" id="selectAppStrategy" onchange="changeAppStrategy(this.value)">
+                  <option value="inherit">🌐 Kế thừa toàn hệ thống (Chuẩn SendInput)</option>
+                  <option value="autocomplete_guard">🛡️ Chống nuốt chữ & gợi ý (U+202F)</option>
+                  <option value="clipboard_paste">📋 Dán từ Clipboard (Ctrl + V)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Khối giải thích phương pháp đang chọn cho app -->
+            <div class="strategy-desc-block" id="appStrategyDesc">
+              <span>💡 Áp dụng cơ chế gửi phím SendInput tiêu chuẩn của Windows. Mượt mà, siêu tốc cho văn bản và trình duyệt.</span>
+            </div>
+          </div>
+
+          <!-- Toast Notification Bar (hidden) -->
+          <div id="demoToast" style="display: none;"></div>
+
+          <!-- PHẦN 2: NGOẠI LỆ THEO TỪNG Ô TEXT (FIELD-LEVEL EXCEPTIONS) -->
+          <div class="exceptions-section" id="exceptionsSection">
+            <div class="section-divider">
+              <div class="section-divider-title">
+                <span>🎯</span>
+                <span>Ngoại lệ theo từng ô text</span>
+                <span style="font-size: 10.5px; font-weight: normal; color: var(--text-secondary);">(Tùy chọn nâng cao)</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="rulesCountBadge" class="pill-badge" style="font-size: 10px;">1 ngoại lệ</span>
+                <button class="btn-secondary" style="font-size: 10.5px; padding: 2px 8px;" onclick="triggerMockCapture()" title="Mô phỏng bấm phím tắt nhận diện ô text">
+                  + Thử nhận diện (Demo)
+                </button>
+              </div>
+            </div>
+
+            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4;">
+              Chỉ cấu hình phần này khi bạn muốn một vài ô text cụ thể (như thanh địa chỉ URL, thanh tìm kiếm) sử dụng phương pháp khác với phương pháp chung của app ở trên.
+            </p>
+
+            <!-- CAPTURE HOTKEY BOX (2 HÀNG GỌN GÀNG) -->
+            <div class="capture-hotkey-box">
+              <!-- Hàng 1: Tiêu đề + Phím tắt badge + Nút đổi phím -->
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <strong style="color: var(--text-primary); font-size: 12px; display: flex; align-items: center; gap: 5px;">
+                    <span>🔍</span>
+                    <span>Phím tắt nhận diện ô text:</span>
+                  </strong>
+                  <span class="pill-badge" id="captureHotkeyBadge" style="font-weight: bold; border-color: rgba(0, 120, 212, 0.4); font-size: 12px; letter-spacing: 0.5px;">Kế thừa (Ctrl + ~)</span>
+                </div>
+                <button class="btn-secondary" id="btnChangeCaptureKey" onclick="openCaptureHotkeyDialog()">Đổi phím</button>
+              </div>
+
+              <!-- Hàng 2: Visual Guide Banner Inset -->
+              <div class="inspect-steps-guide">
+                <div><span class="step-badge">1</span> Nhấp con trỏ vào ô text</div>
+                <div>➔</div>
+                <div><span class="step-badge">2</span> Bấm phím tắt <strong style="color: #93C5FD;" id="guideHotkeyValue">Ctrl + ~</strong></div>
+                <div>➔</div>
+                <div><span class="step-badge">3</span> Ô text tự động thêm vào danh sách</div>
+              </div>
+            </div>
+
+            <!-- Danh sách các ô text ngoại lệ -->
+            <div id="targetRulesContainer" class="target-rules-list"></div>
+
+            <!-- Empty State Box (Hiển thị khi profile không có ngoại lệ nào) -->
+            <div class="empty-rules-box" id="emptyRulesBox" style="display: none;">
+              <div style="font-size: 22px; opacity: 0.85;">✨</div>
+              <div style="font-weight: 600; color: var(--text-primary); font-size: 12px;" id="emptyTitle">
+                Không có ngoại lệ nào
+              </div>
+              <div style="font-size: 11px; color: var(--text-secondary); max-width: 440px; line-height: 1.45;" id="emptyDesc">
+                Toàn bộ các ô text trong ứng dụng này sẽ tự động áp dụng phương pháp mặc định ở trên.
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Modal Dialog: Đổi phím tắt nhận diện ô text -->
+  <div class="modal-overlay" id="hotkeyModalOverlay" onclick="if(event.target===this) closeCaptureHotkeyDialog()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span>Cài đặt phím tắt nhận diện ô text</span>
+        <button class="btn-secondary" style="border:none; padding:2px 7px; font-size:12px;" onclick="closeCaptureHotkeyDialog()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size: 11.5px; color: var(--text-secondary);">
+          Bấm tổ hợp phím bạn muốn gán hoặc chọn từ danh sách phím gợi ý:
+        </div>
+        <div class="hotkey-recording-box" id="modalHotkeyValue">Kế thừa (Ctrl + ~)</div>
+        <div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">Các tổ hợp phím thông dụng:</div>
+          <div class="preset-hotkeys">
+            <span class="preset-badge" onclick="setPresetHotkey('Ctrl + ~')">Ctrl + ~ (Mặc định)</span>
+            <span class="preset-badge" onclick="setPresetHotkey('Ctrl + Alt + K')">Ctrl + Alt + K</span>
+            <span class="preset-badge" onclick="setPresetHotkey('Ctrl + Shift + K')">Ctrl + Shift + K</span>
+            <span class="preset-badge" onclick="setPresetHotkey('Alt + ~')">Alt + ~</span>
+            <span class="preset-badge" onclick="setPresetHotkey('Kế thừa (Ctrl + ~)')">🌐 Kế thừa toàn hệ thống</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeCaptureHotkeyDialog()">Hủy bỏ</button>
+        <button class="btn-primary" onclick="saveCaptureHotkey()">Lưu phím tắt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive JavaScript Logic -->
+  <script>
+    const btnResetDemo = document.getElementById('btnResetDemo');
+    const btnToggleTheme = document.getElementById('btnToggleTheme');
+    const demoToast = document.getElementById('demoToast');
+    const targetRulesContainer = document.getElementById('targetRulesContainer');
+    const emptyRulesBox = document.getElementById('emptyRulesBox');
+    const emptyTitle = document.getElementById('emptyTitle');
+    const emptyDesc = document.getElementById('emptyDesc');
+    const rulesCountBadge = document.getElementById('rulesCountBadge');
+    const selectAppStrategy = document.getElementById('selectAppStrategy');
+    const appStrategyDesc = document.getElementById('appStrategyDesc');
+    const appStrategyAppName = document.getElementById('appStrategyAppName');
+    const appScopeBadge = document.getElementById('appScopeBadge');
+
+    let currentProfileKey = 'firefox';
+    let currentCaptureHotkey = 'Kế thừa (Ctrl + ~)';
+
+    // Strategy details
+    const strategyNames = {
+      inherit: 'Kế thừa Chuẩn SendInput',
+      autocomplete_guard: 'Chống nuốt chữ & gợi ý (U+202F)',
+      clipboard_paste: 'Dán từ Clipboard (Ctrl + V)'
+    };
+
+    const appStrategyDescriptions = {
+      inherit: '<span>💡 <strong>Kế thừa Chuẩn SendInput:</strong> Sử dụng cơ chế gửi phím chuẩn của Windows với tốc độ cao nhất. Phù hợp với đa số ứng dụng gõ văn bản và trình duyệt web thông thường.</span>',
+      autocomplete_guard: '<span>💡 <strong>Chống nuốt chữ & gợi ý (U+202F):</strong> Tự động gửi đệm ký tự U+202F cho MỌI ô nhập liệu trong ứng dụng này. Giúp chống nuốt chữ, chống nhảy con trỏ khi phần mềm có gợi ý tự động (như bảng tính Excel, IDE).</span>',
+      clipboard_paste: '<span>💡 <strong>Dán từ Clipboard (Ctrl + V):</strong> Tự động đưa từ tiếng Việt vào Clipboard rồi dán tức thì (Ctrl+V) cho toàn bộ ứng dụng. Rất hiệu quả cho game (CS2, LMHT, Valorant), Terminal hoặc các app không nhận SendInput.</span>'
+    };
+
+    const targetRuleDescriptions = {
+      autocomplete_guard: '💡 Gửi U+202F + Backspace để xóa vùng bôi đen gợi ý, chống nuốt ký tự/nhân đôi chữ (ggõ).',
+      clipboard_paste: '💡 Sao chép từ hoàn chỉnh vào Clipboard rồi gửi Ctrl+V để tránh nuốt phím trong game/terminal.'
+    };
+
+    // Mock profiles database
+    const profilesData = {
+      default: {
+        name: 'Hồ sơ Mặc định (Root)',
+        label: 'Toàn hệ thống',
+        exe: 'Toàn hệ thống',
+        icon: '🌐',
+        subtitle: 'Thiết lập nền tảng áp dụng cho mọi ứng dụng không có hồ sơ riêng',
+        appStrategy: 'inherit',
+        rules: {}
+      },
+      firefox: {
+        name: 'Mozilla Firefox',
+        label: 'Firefox',
+        exe: 'firefox.exe',
+        icon: '🦊',
+        subtitle: 'Áp dụng thiết lập tối ưu khi cửa sổ Firefox active',
+        appStrategy: 'inherit',
+        rules: {
+          'rule-urlbar': {
+            id: 'urlbar-input',
+            strategy: 'autocomplete_guard'
+          }
+        }
+      },
+      chrome: {
+        name: 'Google Chrome',
+        label: 'Google Chrome',
+        exe: 'chrome.exe',
+        icon: '🧭',
+        subtitle: 'Áp dụng thiết lập tối ưu khi cửa sổ Chrome active',
+        appStrategy: 'inherit',
+        rules: {
+          'rule-omnibox': {
+            id: 'OmniboxViewViews',
+            strategy: 'autocomplete_guard'
+          }
+        }
+      },
+      excel: {
+        name: 'Microsoft Excel',
+        label: 'Excel',
+        exe: 'excel.exe',
+        icon: '📊',
+        subtitle: 'Áp dụng thiết lập tối ưu khi bảng tính Excel active',
+        appStrategy: 'autocomplete_guard', // Toàn bộ Excel dùng U+202F!
+        rules: {} // 0 ngoại lệ cần thiết
+      },
+      cs2: {
+        name: 'Counter-Strike 2',
+        label: 'CS2',
+        exe: 'cs2.exe',
+        icon: '🎮',
+        subtitle: 'Áp dụng dán Clipboard khi chơi game để chat tiếng Việt mượt mà',
+        appStrategy: 'clipboard_paste', // Toàn bộ CS2 dùng Clipboard!
+        rules: {} // 0 ngoại lệ cần thiết
+      }
+    };
+
+    // Theme Toggle
+    btnToggleTheme.addEventListener('click', () => {
+      document.body.classList.toggle('light-theme');
+      btnToggleTheme.textContent = document.body.classList.contains('light-theme') ? '🌙 Giao diện Tối' : '☀️ Giao diện Sáng';
+    });
+
+    // Render the rules list or empty state for currentProfileKey
+    function renderRules() {
+      const prof = profilesData[currentProfileKey];
+      if (!prof) return;
+
+      const ruleKeys = Object.keys(prof.rules);
+      const count = ruleKeys.length;
+      rulesCountBadge.textContent = `${count} ngoại lệ`;
+
+      if (count === 0) {
+        targetRulesContainer.innerHTML = '';
+        emptyRulesBox.style.display = 'flex';
+        emptyTitle.textContent = `Toàn bộ ${prof.label} đang dùng: ${strategyNames[prof.appStrategy]}`;
+        emptyDesc.innerHTML = `Hiện không có ô text nào cần quy tắc riêng. Tất cả khung nhập liệu trong <strong>${prof.name}</strong> sẽ tự động áp dụng phương pháp mặc định của app ở trên.`;
+      } else {
+        emptyRulesBox.style.display = 'none';
+        targetRulesContainer.innerHTML = '';
+
+        ruleKeys.forEach((key, index) => {
+          const rule = prof.rules[key];
+          const div = document.createElement('div');
+          div.className = 'target-rule-item';
+          div.id = key;
+          div.innerHTML = `
+            <div class="target-rule-header">
+              <div class="target-rule-header-left">
+                <span style="color: var(--accent); font-weight: bold; font-family: monospace;">#${index + 1}</span>
+                <span class="target-tag">${rule.id}</span>
+              </div>
+              <button class="btn-secondary" style="font-size: 11px; padding: 2px 7px; color: var(--danger);" onclick="deleteRule('${key}')" title="Xóa quy tắc ngoại lệ này">✕</button>
+            </div>
+            <div class="target-rule-controls">
+              <div class="strategy-select-row">
+                <span style="font-size: 11px; color: var(--text-secondary); white-space: nowrap;">Phương pháp riêng:</span>
+                <select class="form-select strategy-select" onchange="updateRuleStrategy('${key}', this.value)">
+                  <option value="autocomplete_guard" ${rule.strategy === 'autocomplete_guard' ? 'selected' : ''}>🛡️ Autocomplete Guard (U+202F)</option>
+                  <option value="clipboard_paste" ${rule.strategy === 'clipboard_paste' ? 'selected' : ''}>📋 Dán từ Clipboard (Ctrl + V)</option>
+                </select>
+              </div>
+              <div class="strategy-desc-block" id="desc-${key}">
+                <span>${targetRuleDescriptions[rule.strategy]}</span>
+              </div>
+            </div>
+          `;
+          targetRulesContainer.appendChild(div);
+        });
+      }
+    }
+
+    // Change App-Level Strategy
+    window.changeAppStrategy = function(val) {
+      const prof = profilesData[currentProfileKey];
+      if (!prof) return;
+
+      prof.appStrategy = val;
+      appStrategyDesc.innerHTML = appStrategyDescriptions[val];
+      renderRules();
+
+      demoToast.style.display = 'block';
+      demoToast.innerHTML = `✔ Đã đặt phương pháp mặc định của <strong>${prof.label}</strong> thành: <strong>${strategyNames[val]}</strong>.`;
+    };
+
+    // Update single target rule strategy
+    window.updateRuleStrategy = function(ruleKey, val) {
+      const prof = profilesData[currentProfileKey];
+      if (prof && prof.rules[ruleKey]) {
+        prof.rules[ruleKey].strategy = val;
+        const descElem = document.getElementById(`desc-${ruleKey}`);
+        if (descElem) {
+          descElem.innerHTML = `<span>${targetRuleDescriptions[val]}</span>`;
+        }
+        demoToast.style.display = 'block';
+        demoToast.innerHTML = `✔ Đã cập nhật phương pháp ngoại lệ cho <strong>${prof.rules[ruleKey].id}</strong>.`;
+      }
+    };
+
+    // Delete single target rule
+    window.deleteRule = function(ruleKey) {
+      const prof = profilesData[currentProfileKey];
+      if (prof && prof.rules[ruleKey]) {
+        const deletedId = prof.rules[ruleKey].id;
+        delete prof.rules[ruleKey];
+        renderRules();
+        demoToast.style.display = 'block';
+        demoToast.innerHTML = `Đã xóa ngoại lệ <code>${deletedId}</code>. Ô này sẽ tự động quay về dùng phương pháp mặc định của app (${strategyNames[prof.appStrategy]}).`;
+      }
+    };
+
+    // ==================== CAPTURE HOTKEY MODAL & LOGIC ====================
+    let tempRecordingHotkey = currentCaptureHotkey;
+    window.openCaptureHotkeyDialog = function() {
+      tempRecordingHotkey = currentCaptureHotkey;
+      document.getElementById('modalHotkeyValue').textContent = tempRecordingHotkey;
+      document.getElementById('hotkeyModalOverlay').classList.add('active');
+    };
+
+    window.closeCaptureHotkeyDialog = function() {
+      document.getElementById('hotkeyModalOverlay').classList.remove('active');
+    };
+
+    window.setPresetHotkey = function(val) {
+      tempRecordingHotkey = val;
+      document.getElementById('modalHotkeyValue').textContent = val;
+    };
+
+    window.saveCaptureHotkey = function() {
+      currentCaptureHotkey = tempRecordingHotkey;
+      document.getElementById('captureHotkeyBadge').textContent = currentCaptureHotkey;
+      document.getElementById('guideHotkeyValue').textContent = currentCaptureHotkey;
+      closeCaptureHotkeyDialog();
+      demoToast.style.display = 'block';
+      demoToast.innerHTML = `✔ Đã cập nhật phím tắt nhận diện ô text thành: <strong>${currentCaptureHotkey}</strong>`;
+    };
+
+    // Listen for custom hotkeys while in modal dialog or on page
+    window.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('hotkeyModalOverlay');
+      if (modal && modal.classList.contains('active')) {
+        e.preventDefault();
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey) parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.metaKey) parts.push('Win');
+        
+        let key = e.key.toUpperCase();
+        if (['CONTROL', 'ALT', 'SHIFT', 'META'].includes(key)) {
+          key = '...';
+        }
+        if (key !== '...') parts.push(key);
+        if (parts.length > 0) {
+          tempRecordingHotkey = parts.join(' + ');
+          document.getElementById('modalHotkeyValue').textContent = tempRecordingHotkey;
+        }
+        return;
+      }
+
+      // Check if user pressed current capture hotkey on page
+      if (isCaptureHotkeyEnabled) {
+        if ((e.ctrlKey && e.altKey && e.key.toLowerCase() === 'k') || (e.key === 'F8')) {
+          e.preventDefault();
+          triggerMockCapture();
+        }
+      }
+    });
+
+    window.triggerMockCapture = function() {
+      const prof = profilesData[currentProfileKey];
+      if (!prof) return;
+
+      const appFieldMocks = {
+        firefox: ['findbar-textbox', 'identity-permission-input', 'downloads-search'],
+        chrome: ['OmniboxViewViews', 'SearchField', 'ExtensionsMenuSearch'],
+        excel: ['FormulaBarTextBox', 'FindAndReplaceInput', 'CellInlineEdit'],
+        cs2: ['GameConsoleInput', 'TeamChatBox', 'AllChatInput']
+      };
+
+      const candidates = appFieldMocks[currentProfileKey] || ['custom-search-input', 'chatbox-field'];
+      const chosenId = candidates[Math.floor(Math.random() * candidates.length)];
+      const ruleKey = `rule-captured-${Date.now()}`;
+      
+      const newStrategy = (prof.appStrategy === 'autocomplete_guard') ? 'clipboard_paste' : 'autocomplete_guard';
+      prof.rules[ruleKey] = {
+        id: chosenId,
+        strategy: newStrategy
+      };
+
+      renderRules();
+
+      const newItem = document.getElementById(ruleKey);
+      if (newItem) {
+        newItem.classList.add('flash-highlight');
+        setTimeout(() => newItem.classList.remove('flash-highlight'), 1800);
+      }
+
+      demoToast.style.display = 'block';
+      demoToast.innerHTML = `🎉 <strong>Thành công!</strong> Đã nhận diện ô input: <code>${chosenId}</code> qua phím tắt <strong>${currentCaptureHotkey}</strong> và thêm vào ngoại lệ của ${prof.label}!`;
+    };
+
+    // Switch Active Profile in Mockup
+    window.selectProfile = function(profKey) {
+      currentProfileKey = profKey;
+      document.querySelectorAll('.profile-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.inherit-badge').forEach(el => {
+        el.style.display = (profKey === 'default') ? 'none' : 'inline';
+      });
+
+      const prof = profilesData[profKey];
+      if (!prof) return;
+
+      // Sidebar highlight
+      const sidebarMap = {
+        default: 'profItemDefault',
+        firefox: 'profItemFirefox',
+        chrome: 'profItemChrome',
+        excel: 'profItemExcel',
+        cs2: 'profItemCS2'
+      };
+      const sidebarItem = document.getElementById(sidebarMap[profKey]);
+      if (sidebarItem) sidebarItem.classList.add('active');
+
+      // Update Profile Banner
+      const bannerIcon = document.querySelector('.profile-icon-box');
+      const bannerTitle = document.querySelector('.profile-title-text span:first-child');
+      const bannerExe = document.querySelector('.profile-exe-tag');
+      const bannerSubtitle = document.querySelector('.profile-subtitle');
+      if (bannerIcon) bannerIcon.textContent = prof.icon;
+      if (bannerTitle) bannerTitle.textContent = 'Hồ sơ: ' + prof.name;
+      if (bannerExe) bannerExe.textContent = prof.exe;
+      if (bannerSubtitle) bannerSubtitle.textContent = prof.subtitle;
+
+      // Update Card 4
+      const cardTarget = document.getElementById('cardTargetOptimizer');
+      const exceptionsSection = document.getElementById('exceptionsSection');
+
+      if (profKey === 'default') {
+        if (cardTarget) cardTarget.style.display = 'flex';
+        appScopeBadge.textContent = 'Toàn hệ thống (Root)';
+        appStrategyAppName.textContent = 'toàn bộ Windows';
+        selectAppStrategy.value = 'inherit';
+        selectAppStrategy.disabled = true;
+        appStrategyDesc.innerHTML = '<span>🌐 <strong>Chuẩn SendInput:</strong> Toàn bộ hệ thống Windows mặc định sử dụng cơ chế SendInput siêu tốc. Để thay đổi phương pháp cho ứng dụng hoặc game cụ thể (như Excel hoặc CS2), hãy chọn hồ sơ ứng dụng tương ứng ở thanh bên trái.</span>';
+        if (exceptionsSection) exceptionsSection.style.display = 'none';
+      } else {
+        if (cardTarget) cardTarget.style.display = 'flex';
+        if (exceptionsSection) exceptionsSection.style.display = 'block';
+        appScopeBadge.textContent = 'Hồ sơ: ' + prof.label;
+        appStrategyAppName.textContent = prof.label;
+        selectAppStrategy.disabled = false;
+        selectAppStrategy.value = prof.appStrategy;
+        appStrategyDesc.innerHTML = appStrategyDescriptions[prof.appStrategy];
+        renderRules();
+      }
+    };
+
+    // Reset Demo
+    btnResetDemo.addEventListener('click', () => {
+      profilesData.firefox.appStrategy = 'inherit';
+      profilesData.firefox.rules = {
+        'rule-urlbar': { id: 'urlbar-input', strategy: 'autocomplete_guard' }
+      };
+      profilesData.excel.appStrategy = 'autocomplete_guard';
+      profilesData.excel.rules = {};
+      profilesData.cs2.appStrategy = 'clipboard_paste';
+      profilesData.cs2.rules = {};
+      profilesData.chrome.appStrategy = 'inherit';
+      profilesData.chrome.rules = {
+        'rule-omnibox': { id: 'OmniboxViewViews', strategy: 'autocomplete_guard' }
+      };
+
+      currentCaptureHotkey = 'Kế thừa (Ctrl + ~)';
+      isCaptureHotkeyEnabled = true;
+      document.getElementById('checkCaptureHotkey').checked = true;
+      toggleCaptureHotkey(true);
+      document.getElementById('captureHotkeyBadge').textContent = currentCaptureHotkey;
+      document.getElementById('guideHotkeyValue').textContent = currentCaptureHotkey;
+      demoToast.style.display = 'none';
+      selectProfile('firefox');
+    });
+
+    // Initialize on page load
+    selectProfile('firefox');
+  </script>
+</body>
+</html>

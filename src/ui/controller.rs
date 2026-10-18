@@ -673,3 +673,155 @@ pub fn save_switch_hotkey(target_profile_id: &str, is_root: bool, hotkey: Option
     refresh_keys_overview();
 }
 
+/// Saves the target capture hotkey (`None` = inherit global) for `target_profile_id` and refreshes UI.
+pub fn save_target_capture_hotkey(target_profile_id: &str, is_root: bool, hotkey: Option<Hotkey>) {
+    with_engine(|engine| {
+        if let Some(hk) = hotkey {
+            if is_root {
+                engine.config_mut().target_capture_hotkey = hk;
+            } else if let Some(child) = engine.profile_manager.get_profile_mut(target_profile_id) {
+                child.target_capture_hotkey = Some(hk);
+            }
+        } else if !is_root
+            && let Some(child) = engine.profile_manager.get_profile_mut(target_profile_id)
+        {
+            child.target_capture_hotkey = None;
+        }
+        save(engine);
+        if let Some(c) = super::controls() {
+            let child = engine.profile_manager.get_profile(target_profile_id);
+            c.tab_typing.load_profile(child, engine.config());
+        }
+    });
+}
+
+/// Adds a target rule to the active (or selected) child profile and refreshes the panel.
+pub fn add_target_rule_to_selected(target_id: &str) {
+    let tid = target_id.to_string();
+    let updated = with_engine(|engine| {
+        let target_prof_id = if engine.profile_manager.active_id != GLOBAL_PROFILE_ID {
+            engine.profile_manager.active_id.clone()
+        } else {
+            engine.profile_manager.selected_id.clone()
+        };
+        if target_prof_id != GLOBAL_PROFILE_ID {
+            if let Some(child) = engine.profile_manager.get_profile_mut(&target_prof_id) {
+                if !child
+                    .target_rules
+                    .iter()
+                    .any(|r| r.target_id.eq_ignore_ascii_case(&tid))
+                {
+                    child.target_rules.push(crate::engine::profile::TargetRule::new(
+                        tid,
+                        crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+                    ));
+                }
+            }
+            engine.profile_manager.selected_id = target_prof_id.clone();
+            save(engine);
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if updated {
+        crate::platform::win32::app_tracker::sync_active_target_rules_flag();
+        if let Some(c) = super::controls() {
+            c.refresh_from_engine();
+        }
+    }
+}
+
+/// Updates the key injection strategy for a target rule in the selected child profile.
+pub fn update_target_rule_strategy(
+    target_id: &str,
+    strategy: crate::engine::profile::KeyInjectionStrategy,
+) {
+    let tid = target_id.to_string();
+    let updated = with_engine(|engine| {
+        let sel_id = engine.profile_manager.selected_id.clone();
+        if sel_id != GLOBAL_PROFILE_ID {
+            if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
+                if let Some(r) = child
+                    .target_rules
+                    .iter_mut()
+                    .find(|r| r.target_id.eq_ignore_ascii_case(&tid))
+                {
+                    r.strategy = strategy;
+                }
+            }
+            save(engine);
+            if let Some(c) = super::controls() {
+                let child = engine.profile_manager.get_profile(&sel_id);
+                c.tab_typing.load_profile(child, engine.config());
+            }
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if updated {
+        crate::platform::win32::app_tracker::sync_active_target_rules_flag();
+    }
+}
+
+/// Deletes a target rule from the selected child profile.
+pub fn delete_target_rule(target_id: &str) {
+    let tid = target_id.to_string();
+    let updated = with_engine(|engine| {
+        let sel_id = engine.profile_manager.selected_id.clone();
+        if sel_id != GLOBAL_PROFILE_ID {
+            if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
+                child
+                    .target_rules
+                    .retain(|r| !r.target_id.eq_ignore_ascii_case(&tid));
+            }
+            save(engine);
+            if let Some(c) = super::controls() {
+                let child = engine.profile_manager.get_profile(&sel_id);
+                c.tab_typing.load_profile(child, engine.config());
+            }
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if updated {
+        crate::platform::win32::app_tracker::sync_active_target_rules_flag();
+    }
+}
+
+/// Updates the app-level default key injection strategy for the selected child profile.
+pub fn update_app_key_injection_strategy(
+    strategy: Option<crate::engine::profile::KeyInjectionStrategy>,
+) {
+    let updated = with_engine(|engine| {
+        let sel_id = engine.profile_manager.selected_id.clone();
+        if sel_id != GLOBAL_PROFILE_ID {
+            if let Some(child) = engine.profile_manager.get_profile_mut(&sel_id) {
+                child.app_strategy = strategy;
+            }
+            save(engine);
+            if let Some(c) = super::controls() {
+                let child = engine.profile_manager.get_profile(&sel_id);
+                c.tab_typing.load_profile(child, engine.config());
+            }
+            true
+        } else {
+            false
+        }
+    })
+    .unwrap_or(false);
+
+    if updated {
+        crate::platform::win32::app_tracker::sync_active_target_rules_flag();
+    }
+}
+
+
