@@ -737,6 +737,96 @@ fn test_child_profile_target_rules_serialization() {
     assert!(restored_excel.target_rules.is_empty());
 }
 
+#[test]
+fn test_auto_create_profile_on_target_capture() {
+    let mut pm = ProfileManager::new();
+
+    // 1. Initial state: only Windows Terminal exists
+    let terminal = AppProfile::new_child(
+        "windowsterminal",
+        "Windows Terminal",
+        "windowsterminal.exe",
+        "💻",
+    );
+    pm.add_profile(terminal);
+    pm.selected_id = "windowsterminal".to_string();
+    pm.active_id = "global".to_string(); // In Firefox, active_id is global because firefox has no profile yet
+
+    // Simulate capturing in firefox.exe:
+    let proc = "firefox.exe";
+    let tid = "urlbar-input";
+
+    // find_profile_by_process_mut returns None for firefox.exe
+    assert!(pm.find_profile_by_process_mut(proc).is_none());
+
+    // Auto-create new child profile
+    let base_id = proc
+        .trim_end_matches(".exe")
+        .replace([' ', '-', '.'], "_")
+        .to_lowercase();
+    let mut id = base_id.clone();
+    let mut counter = 1;
+    while id == "global" || pm.get_profile(&id).is_some() {
+        id = format!("{}_{}", base_id, counter);
+        counter += 1;
+    }
+    assert_eq!(id, "firefox");
+
+    let raw_name = proc.trim_end_matches(".exe");
+    let display_name = if let Some(first) = raw_name.chars().next() {
+        format!("{}{}", first.to_uppercase(), &raw_name[first.len_utf8()..])
+    } else {
+        "App".to_string()
+    };
+    assert_eq!(display_name, "Firefox");
+
+    let mut new_profile = AppProfile::new_child(id.clone(), display_name, proc, "💻");
+    new_profile
+        .target_rules
+        .push(kora::engine::profile::TargetRule::new(
+            tid,
+            kora::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+        ));
+    pm.add_profile(new_profile);
+    pm.active_id = id.clone();
+    pm.selected_id = id.clone();
+
+    // 2. Verify:
+    // - Windows Terminal must NOT contain urlbar-input
+    let term_prof = pm.get_profile("windowsterminal").unwrap();
+    assert!(
+        term_prof.target_rules.is_empty(),
+        "Windows Terminal must remain clean!"
+    );
+
+    // - Firefox profile must exist, have active_id, and contain urlbar-input
+    let ff_prof = pm.get_profile("firefox").unwrap();
+    assert_eq!(ff_prof.name, "Firefox");
+    assert_eq!(ff_prof.process_names, vec!["firefox.exe"]);
+    assert_eq!(ff_prof.target_rules.len(), 1);
+    assert_eq!(ff_prof.target_rules[0].target_id, "urlbar-input");
+    assert_eq!(
+        ff_prof.target_rules[0].strategy,
+        kora::engine::profile::KeyInjectionStrategy::AutocompleteGuard
+    );
+
+    // 3. Second capture in Firefox (searchbar): must add to existing Firefox profile without creating a new one
+    let ff_mut = pm
+        .find_profile_by_process_mut(proc)
+        .expect("Firefox profile now exists");
+    ff_mut
+        .target_rules
+        .push(kora::engine::profile::TargetRule::new(
+            "searchbar",
+            kora::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+        ));
+
+    assert_eq!(pm.profiles.len(), 2);
+    let ff_updated = pm.get_profile("firefox").unwrap();
+    assert_eq!(ff_updated.target_rules.len(), 2);
+    assert_eq!(ff_updated.target_rules[1].target_id, "searchbar");
+}
+
 
 
 

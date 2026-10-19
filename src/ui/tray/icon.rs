@@ -24,7 +24,7 @@ pub struct NOTIFYICONDATAW {
 
 #[link(name = "shell32")]
 unsafe extern "system" {
-    fn Shell_NotifyIconW(dw_message: u32, lp_data: *mut NOTIFYICONDATAW) -> i32;
+    pub fn Shell_NotifyIconW(dw_message: u32, lp_data: *mut NOTIFYICONDATAW) -> i32;
 }
 
 pub const NIM_ADD: u32 = 0x00000000;
@@ -34,6 +34,12 @@ pub const NIM_DELETE: u32 = 0x00000002;
 pub const NIF_MESSAGE: u32 = 0x00000001;
 pub const NIF_ICON: u32 = 0x00000002;
 pub const NIF_TIP: u32 = 0x00000004;
+pub const NIF_INFO: u32 = 0x00000010;
+
+pub const NIIF_NONE: u32 = 0x00000000;
+pub const NIIF_INFO: u32 = 0x00000001;
+pub const NIIF_WARNING: u32 = 0x00000002;
+pub const NIIF_ERROR: u32 = 0x00000003;
 
 pub struct TrayIcon {
     nid: NOTIFYICONDATAW,

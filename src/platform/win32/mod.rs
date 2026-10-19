@@ -17,7 +17,7 @@ pub use injector::*;
 pub use macro_executor::*;
 pub use sound::*;
 pub use types::*;
-pub use uia_detect::get_focused_element_id;
+pub use uia_detect::{get_focused_element_id, get_focused_element_info, FocusedElementInfo};
 
 use crate::engine::VietnameseEngine;
 use crate::engine::action::EngineAction;

@@ -100,34 +100,16 @@ pub fn show_target_capture_hotkey_dialog(parent: isize) {
         "{} 🎯 {}",
         strings.hotkey_apply_prefix, strings.typing_group_target_hotkey
     );
-    let (is_root, target_profile_id, target_display, current_hotkey, global_hotkey) = {
-        if let Ok(guard) = ENGINE_INSTANCE.lock()
-            && let Some(ref engine) = *guard
-        {
-            let global_hk = engine.config().target_capture_hotkey;
-            let sel_id = engine.profile_manager.selected_id.clone();
-            if sel_id == "global" {
-                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
-            } else if let Some(child) = engine.profile_manager.get_profile(&sel_id) {
-                let name = format!("{} {} {}", strings.hotkey_apply_prefix, child.icon, child.name);
-                (false, sel_id, name, child.target_capture_hotkey, global_hk)
-            } else {
-                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
-            }
-        } else {
-            let def_hk = Hotkey::new(true, false, false, false, 0xC0);
-            (true, "global".to_string(), default_root_name.clone(), Some(def_hk), def_hk)
-        }
-    };
-
-    let is_inherit = !is_root && current_hotkey.is_none();
-    let display_text = if is_inherit {
-        format!("{} ({})", strings.typing_inherit_prefix, global_hotkey.display_text())
+    let global_hotkey = if let Ok(guard) = ENGINE_INSTANCE.lock()
+        && let Some(ref engine) = *guard
+    {
+        engine.config().target_capture_hotkey
     } else {
-        current_hotkey.unwrap_or(global_hotkey).display_text()
+        Hotkey::new(true, false, false, false, 0xC0)
     };
 
-    set_captured_hotkey(current_hotkey, &display_text);
+    let display_text = global_hotkey.display_text();
+    set_captured_hotkey(Some(global_hotkey), &display_text);
 
     open_client_modal(
         parent,
@@ -141,13 +123,13 @@ pub fn show_target_capture_hotkey_dialog(parent: isize) {
             parent,
             display_font: 0,
             is_listening: false,
-            is_inherit,
-            is_root,
+            is_inherit: false,
+            is_root: true,
             is_target_capture: true,
-            target_profile_id,
-            target_display,
+            target_profile_id: "global".to_string(),
+            target_display: default_root_name,
             global_hotkey,
-            current_hotkey,
+            current_hotkey: Some(global_hotkey),
             display_text,
             btn_display: None,
         }),
@@ -192,24 +174,17 @@ unsafe fn submit_hotkey(hwnd: isize) {
     }
 
     if st.is_target_capture {
-        let final_hotkey = if st.is_inherit {
-            None
-        } else {
-            let valid_hk = st
-                .current_hotkey
-                .or_else(get_captured_hotkey)
-                .or_else(get_pending_modifier_hotkey);
-            match valid_hk {
-                Some(hk) if hk.is_valid() => Some(hk),
-                _ => return,
+        let valid_hk = st
+            .current_hotkey
+            .or_else(get_captured_hotkey)
+            .or_else(get_pending_modifier_hotkey);
+        if let Some(hk) = valid_hk {
+            if hk.is_valid() {
+                crate::ui::controller::save_target_capture_hotkey(hk);
+                unsafe {
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                }
             }
-        };
-
-        let is_root = st.is_root;
-        let target_profile_id = st.target_profile_id.clone();
-        crate::ui::controller::save_target_capture_hotkey(&target_profile_id, is_root, final_hotkey);
-        unsafe {
-            PostMessageW(hwnd, WM_CLOSE, 0, 0);
         }
         return;
     }

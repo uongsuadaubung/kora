@@ -168,7 +168,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     typing_app_strategy_desc_inherit: "💡 Uses Windows standard SendInput mechanism. Fast, smooth, and lightweight for general text and browsers.",
     typing_exceptions_title: "🎯 Field-Level Exceptions",
     typing_exceptions_desc: "Only configure this section if specific text controls require a different strategy than the app-wide default.",
-    typing_group_target_hotkey: "🔍 Target capture shortcut:",
+    typing_group_target_hotkey: "Target capture shortcut",
     typing_target_hotkey_desc: "Focus the cursor on any input field and press the shortcut to automatically detect and add it.",
     typing_target_step_guide: "1 Focus target text field   ➔   2 Press Ctrl + ~   ➔   3 Text field added automatically",
     typing_target_desc: "Configure how Vietnamese characters are injected into this app. Choose an app-wide default method or set field-level overrides when needed.",
@@ -184,6 +184,10 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     strategy_clipboard_paste: "📋 Clipboard Paste (Ctrl + V)",
     strategy_desc_autocomplete_guard: "💡 Send U+202F + Backspace to collapse autocomplete selection.",
     strategy_desc_clipboard_paste: "💡 Copy transformed word to Clipboard and send Ctrl+V for games/terminals.",
+
+    // System Notifications
+    notif_target_created_profile: "Created profile \"{app}\" and added rule: {target}",
+    notif_target_added_rule: "Added target rule for {app}: {target}",
 
     // Tab 2: Remap, Disable & Key Macro
     remap_table_title: "Enable key remapping",

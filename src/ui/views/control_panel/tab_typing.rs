@@ -159,11 +159,12 @@ pub struct TabTyping {
     pub check_restore_wrong: CheckBox<Inheritable>,
     pub check_auto_upper: CheckBox<Inheritable>,
 
-    // Card 4: 🎯 Phương pháp gửi phím theo ô text (Chỉ hiện khi ở Child Profile)
+    // Card 4: 🎯 Phương pháp gửi phím theo ô text (Chỉ hiện khi ở Child Profile) / Hotkey nhận diện ô text (Root)
     h_content: isize,
     hfont_normal: isize,
     hfont_bold: isize,
     y_card4: i32,
+    pub check_target_capture: CheckBox<TwoState>,
     pub lbl_target_title: Label<StaticText>,
     pub lbl_target_desc: Label<StaticText>,
     pub lbl_app_strat_title: Label<StaticText>,
@@ -192,17 +193,17 @@ impl TabTyping {
 
     #[inline]
     fn card4_y_exc(y_card4: i32) -> i32 {
-        Self::card4_y_app_box(y_card4) + 130
+        Self::card4_y_app_box(y_card4) + 122
     }
 
     #[inline]
     fn card4_y_box(y_card4: i32) -> i32 {
-        Self::card4_y_exc(y_card4) + 70
+        y_card4 + 40
     }
 
     #[inline]
     fn card4_y_list(y_card4: i32) -> i32 {
-        Self::card4_y_box(y_card4) + 94
+        Self::card4_y_exc(y_card4) + 68
     }
     pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
         let viewport_x = layout::CARD_X;
@@ -288,9 +289,20 @@ impl TabTyping {
             Some((check_restore_wrong, check_auto_upper))
         })?;
 
-        // --- Card 4: ⚡ Cơ chế gửi phím vào ứng dụng (Chỉ hiện khi ở Child Profile) ---
+        // --- Card 4: ⚡ Cơ chế gửi phím vào ứng dụng / 🔍 Phím tắt nhận diện ô text ---
         let y_card4 = ly.y();
         let strings = crate::language::current();
+
+        let check_target_capture = CheckBox::create(
+            h_content,
+            0,
+            strings.typing_group_target_hotkey,
+            16,
+            y_card4 + 8,
+            530,
+            24,
+            hfont_bold,
+        )?;
 
         let lbl_target_title = Label::create(
             h_content,
@@ -401,11 +413,11 @@ impl TabTyping {
         let y_box = Self::card4_y_box(y_card4);
         let lbl_capture_title = Label::create(
             h_content,
-            strings.typing_group_target_hotkey,
+            strings.typing_lbl_current_key,
             28,
-            y_box + 12,
-            200,
-            24,
+            y_box + 14,
+            124,
+            20,
             hfont_bold,
         )?
         .on_surface(SurfaceRole::Window);
@@ -413,13 +425,13 @@ impl TabTyping {
         let lbl_capture_badge = Label::create_centered(
             h_content,
             "",
-            236,
+            158,
             y_box + 10,
-            198,
-            26,
+            120,
+            28,
             hfont_bold,
         )?
-        .as_pill_badge(80, 200)
+        .as_pill_badge(120, 276)
         .on_surface(SurfaceRole::Window);
 
         let btn_capture_change = PushButton::create_with_variant(
@@ -429,7 +441,7 @@ impl TabTyping {
             446,
             y_box + 10,
             88,
-            26,
+            28,
             hfont_bold,
             ButtonVariant::Primary,
             None,
@@ -438,9 +450,9 @@ impl TabTyping {
         let lbl_capture_guide = Label::create(
             h_content,
             strings.typing_target_step_guide,
-            32,
+            28,
             y_box + 46,
-            498,
+            506,
             20,
             hfont_normal,
         )?
@@ -463,15 +475,18 @@ impl TabTyping {
 
         let sub_boxes = Arc::new(Mutex::new(SubBoxesState {
             is_child: false,
-            boxes: Vec::new(),
+            boxes: vec![SubBoxRect {
+                left: 16,
+                top: y_box,
+                right: 546,
+                bottom: y_box + 80,
+                kind: SubBoxKind::InspectBox,
+            }],
         }));
 
         let sub_boxes_paint = sub_boxes.clone();
         scroll_view.set_on_paint(move |hdc, palette| {
             if let Ok(state) = sub_boxes_paint.lock() {
-                if !state.is_child {
-                    return;
-                }
                 for b in &state.boxes {
                     match b.kind {
                         SubBoxKind::AppStrategyBox => {
@@ -598,7 +613,9 @@ impl TabTyping {
             }
         });
 
-        scroll_view.set_cards(ly.cards().to_vec());
+        let mut cards = ly.cards().to_vec();
+        cards.push((y_card4, Self::card4_y_box(y_card4) + 80 + 12));
+        scroll_view.set_cards(cards);
         let tab = Self {
             scroll_view,
             layout: ly,
@@ -613,6 +630,7 @@ impl TabTyping {
             hfont_normal,
             hfont_bold,
             y_card4,
+            check_target_capture,
             lbl_target_title,
             lbl_target_desc,
             lbl_app_strat_title,
@@ -632,8 +650,9 @@ impl TabTyping {
             is_child_profile: Cell::new(false),
             is_tab_visible: Cell::new(true),
         };
-        tab.set_target_ui_visible(false);
+        tab.apply_card4_visibility();
         tab.update_switch_controls_state();
+        tab.update_capture_controls_state();
         tab.update_capture_hotkey_badge();
         Some(tab)
     }
@@ -645,27 +664,17 @@ impl TabTyping {
         self.lbl_switch_badge.set_enabled(is_enabled);
     }
 
+    /// Dynamically enables or disables target capture controls based on `check_target_capture`
+    pub fn update_capture_controls_state(&self) {
+        let is_enabled = self.check_target_capture.is_checked();
+        self.btn_capture_change.set_enabled(is_enabled);
+        self.lbl_capture_badge.set_enabled(is_enabled);
+    }
+
     /// Updates the target capture hotkey badge with latest configured hotkey
     pub fn update_capture_hotkey_badge(&self) {
-        let strings = crate::language::current();
         let cap_text = crate::ui::controller::with_engine(|e| {
-            let pm = &e.profile_manager;
-            let sel_id = &pm.selected_id;
-            let g_hk = e.config().target_capture_hotkey;
-            if sel_id == "global" {
-                g_hk.display_text()
-            } else if let Some(c) = pm.get_profile(sel_id) {
-                match &c.target_capture_hotkey {
-                    Some(k) => k.display_text(),
-                    None => format!(
-                        "{} ({})",
-                        strings.typing_inherit_prefix,
-                        g_hk.display_text()
-                    ),
-                }
-            } else {
-                g_hk.display_text()
-            }
+            e.config().target_capture_hotkey.display_text()
         })
         .unwrap_or_else(|| "Ctrl + ~".to_string());
         self.lbl_capture_badge.set_text(&cap_text);
@@ -691,7 +700,6 @@ impl TabTyping {
 
         let y_app_box = Self::card4_y_app_box(self.y_card4);
         let y_exc = Self::card4_y_exc(self.y_card4);
-        let y_box = Self::card4_y_box(self.y_card4);
         let y_list = Self::card4_y_list(self.y_card4);
 
         let mut boxes = vec![
@@ -708,13 +716,6 @@ impl TabTyping {
                 right: 534,
                 bottom: y_exc - 10,
                 kind: SubBoxKind::SectionDivider,
-            },
-            SubBoxRect {
-                left: 16,
-                top: y_box,
-                right: 546,
-                bottom: y_box + 80,
-                kind: SubBoxKind::InspectBox,
             },
         ];
 
@@ -891,41 +892,49 @@ impl TabTyping {
     }
 
     pub fn calculate_card4_bottom(&self) -> i32 {
-        let n = self.rule_items.borrow().len();
-        let y_list = Self::card4_y_list(self.y_card4);
-        if n == 0 {
-            y_list + 64 + 16
+        if self.is_child_profile.get() {
+            let n = self.rule_items.borrow().len();
+            let y_list = Self::card4_y_list(self.y_card4);
+            if n == 0 {
+                y_list + 64 + 16
+            } else {
+                y_list + (n as i32) * 136 + 12
+            }
         } else {
-            y_list + (n as i32) * 136 + 12
+            Self::card4_y_box(self.y_card4) + 80 + 12
         }
     }
 
     pub fn content_height(&self) -> i32 {
-        if self.is_child_profile.get() {
-            self.calculate_card4_bottom() + 12
-        } else {
-            self.layout.cards().last().map(|&(_, b)| b).unwrap_or(0) + 8
-        }
+        self.calculate_card4_bottom() + 12
     }
 
-    fn set_target_ui_visible(&self, visible: bool) {
-        self.lbl_target_title.set_visible(visible);
-        self.lbl_target_desc.set_visible(visible);
-        self.lbl_app_strat_title.set_visible(visible);
-        self.lbl_app_strat_sub.set_visible(visible);
-        self.combo_app_strategy.set_visible(visible);
-        self.lbl_app_strat_desc.set_visible(visible);
-        self.lbl_exceptions_title.set_visible(visible);
-        self.lbl_exceptions_desc.set_visible(visible);
-        self.lbl_capture_title.set_visible(visible);
-        self.lbl_capture_badge.set_visible(visible);
-        self.btn_capture_change.set_visible(visible);
-        self.lbl_capture_guide.set_visible(visible);
-        self.lbl_target_subtitle.set_visible(visible);
+    fn apply_card4_visibility(&self) {
+        let tab_vis = self.is_tab_visible.get();
+        let is_child = self.is_child_profile.get();
+
+        let show_root_cap = tab_vis && !is_child;
+        self.check_target_capture.set_visible(show_root_cap);
+        self.lbl_capture_title.set_visible(show_root_cap);
+        self.lbl_capture_badge.set_visible(show_root_cap);
+        self.btn_capture_change.set_visible(show_root_cap);
+        self.lbl_capture_guide.set_visible(show_root_cap);
+
+        let show_child = tab_vis && is_child;
+        self.lbl_target_title.set_visible(show_child);
+        self.lbl_target_desc.set_visible(show_child);
+        self.lbl_app_strat_title.set_visible(show_child);
+        self.lbl_app_strat_sub.set_visible(show_child);
+        self.combo_app_strategy.set_visible(show_child);
+        self.lbl_app_strat_desc.set_visible(show_child);
+        self.lbl_exceptions_title.set_visible(show_child);
+        self.lbl_target_subtitle.set_visible(show_child);
+        self.lbl_exceptions_desc.set_visible(show_child);
+
         let empty = self.rule_items.borrow().is_empty();
-        self.lbl_empty_state.set_visible(visible && empty);
+        self.lbl_empty_state.set_visible(show_child && empty);
         for item in self.rule_items.borrow().iter() {
-            item.set_visible(visible);
+            item.set_visible(show_child);
         }
     }
 
@@ -937,9 +946,11 @@ impl TabTyping {
         let offset = usize::from(is_root);
         self.is_child_profile.set(is_child);
 
-        // Card 4 visibility: completely hidden if root/global profile!
         let is_tab_vis = self.is_tab_visible.get();
         if is_child {
+            self.lbl_target_title.set_text(strings.typing_group_target);
+            self.lbl_target_desc.set_text(strings.typing_target_desc);
+
             if let Some(c) = child {
                 let app_strat_items = [
                     strings.typing_app_strategy_inherit,
@@ -964,7 +975,7 @@ impl TabTyping {
                 sb.is_child = true;
             }
             if is_tab_vis {
-                self.set_target_ui_visible(true);
+                self.apply_card4_visibility();
             }
             let card4_bottom = self.calculate_card4_bottom();
             let mut cards = self.layout.cards().to_vec();
@@ -973,12 +984,36 @@ impl TabTyping {
             self.scroll_view.set_content_height(card4_bottom + 12);
         } else {
             self.scroll_view.scroll_to(0);
+            self.check_target_capture.set_checked(global_config.target_capture_enabled);
+            self.update_capture_controls_state();
+            self.lbl_capture_title.set_text(strings.typing_lbl_current_key);
+            self.lbl_capture_badge.set_text(&global_config.target_capture_hotkey.display_text());
+            self.lbl_capture_guide.set_text(strings.typing_target_step_guide);
+
+            for item in self.rule_items.borrow().iter() {
+                item.destroy();
+            }
+            self.rule_items.borrow_mut().clear();
+
+            let y_box = Self::card4_y_box(self.y_card4);
             if let Ok(mut sb) = self.sub_boxes.lock() {
                 sb.is_child = false;
+                sb.boxes = vec![SubBoxRect {
+                    left: 16,
+                    top: y_box,
+                    right: 546,
+                    bottom: y_box + 80,
+                    kind: SubBoxKind::InspectBox,
+                }];
             }
-            self.set_target_ui_visible(false);
-            self.scroll_view.set_cards(self.layout.cards().to_vec());
-            self.scroll_view.set_content_height(self.content_height());
+            if is_tab_vis {
+                self.apply_card4_visibility();
+            }
+            let card4_bottom = self.calculate_card4_bottom();
+            let mut cards = self.layout.cards().to_vec();
+            cards.push((self.y_card4, card4_bottom));
+            self.scroll_view.set_cards(cards);
+            self.scroll_view.set_content_height(card4_bottom + 12);
         }
         self.scroll_view.invalidate();
 
@@ -1046,19 +1081,6 @@ impl TabTyping {
             child.and_then(|c| c.auto_uppercase_first_char),
             global_config.auto_uppercase_first_char,
         );
-
-        let cap_badge_text = match child {
-            None => global_config.target_capture_hotkey.display_text(),
-            Some(c) => match &c.target_capture_hotkey {
-                Some(k) => k.display_text(),
-                None => format!(
-                    "{} ({})",
-                    strings.typing_inherit_prefix,
-                    global_config.target_capture_hotkey.display_text()
-                ),
-            },
-        };
-        self.lbl_capture_badge.set_text(&cap_badge_text);
     }
 
     /// Saves controls back into the active target (`Global` config or `Child` profile).
@@ -1076,6 +1098,7 @@ impl TabTyping {
                 {
                     config.method = m;
                 }
+                config.target_capture_enabled = self.check_target_capture.is_checked();
             }
             EditTarget::Child(profile) => {
                 if let Some(sel) = self.combo_mode.get_selected() {
@@ -1116,12 +1139,13 @@ impl TabTyping {
 
     pub fn update_language(&self, strings: &LanguageStrings) {
         self.layout.update_language(strings);
+        self.check_target_capture.set_text(strings.typing_group_target_hotkey);
         self.lbl_target_title.set_text(strings.typing_group_target);
         self.lbl_target_desc.set_text(strings.typing_target_desc);
         self.lbl_app_strat_title.set_text(strings.typing_app_strategy_label);
         self.lbl_exceptions_title.set_text(strings.typing_exceptions_title);
         self.lbl_exceptions_desc.set_text(strings.typing_exceptions_desc);
-        self.lbl_capture_title.set_text(strings.typing_group_target_hotkey);
+        self.lbl_capture_title.set_text(strings.typing_lbl_current_key);
         self.btn_capture_change.set_text(strings.typing_btn_change_key);
         self.lbl_capture_guide.set_text(strings.typing_target_step_guide);
         self.lbl_empty_state.set_text(strings.typing_target_empty_hint);
@@ -1153,6 +1177,13 @@ impl TabTyping {
             if self.btn_capture_change.is_enabled() {
                 crate::ui::views::dialogs::show_target_capture_hotkey_dialog(hwnd);
             }
+            return true;
+        }
+
+        if self.check_target_capture.is_toggled(ctrl_id, notify_code) {
+            self.update_capture_controls_state();
+            let enabled = self.check_target_capture.is_checked();
+            crate::ui::controller::save_target_capture_enabled(enabled);
             return true;
         }
 
@@ -1219,7 +1250,6 @@ impl TabTyping {
     pub fn update_visibility(&self, visible: bool) {
         self.is_tab_visible.set(visible);
         self.scroll_view.set_visible(visible);
-        let show_card4 = visible && self.is_child_profile.get();
-        self.set_target_ui_visible(show_card4);
+        self.apply_card4_visibility();
     }
 }

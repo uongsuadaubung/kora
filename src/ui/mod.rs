@@ -2,6 +2,7 @@
 //! Fully componentized, lightweight, zero-dependency native Windows UI.
 
 pub mod controller;
+pub mod notification;
 pub mod theme;
 pub mod tray;
 pub mod views;
@@ -78,6 +79,11 @@ pub fn controls() -> Option<&'static ControlPanelControls> {
 
 /// Hidden helper window (tray owner). Used as the target for messages posted from the hook.
 static HELPER_HWND: AtomicIsize = AtomicIsize::new(0);
+
+/// Retrieves the handle of the helper message window.
+pub fn helper_hwnd() -> isize {
+    HELPER_HWND.load(Ordering::Relaxed)
+}
 
 /// Posted to the helper window when the typing mode toggles (wparam = 1 for Vietnamese).
 pub const WM_APP_MODE_CHANGED: u32 = 0x8000 + 120;

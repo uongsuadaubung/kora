@@ -191,12 +191,6 @@ pub fn serialize_config_all(
         if let Some(en) = child.switch_key_enabled {
             out.push_str(&format!("switch_key_enabled = {}\n", en));
         }
-        if let Some(cap_hk) = child.target_capture_hotkey {
-            out.push_str(&format!("target_capture_hotkey = {}\n", cap_hk.to_config_str()));
-        }
-        if let Some(cap_en) = child.target_capture_enabled {
-            out.push_str(&format!("target_capture_enabled = {}\n", cap_en));
-        }
         if let Some(r) = child.restore_on_wrong_spelling {
             out.push_str(&format!("restore_on_wrong = {}\n", r));
         }

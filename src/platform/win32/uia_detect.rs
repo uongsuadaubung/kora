@@ -93,7 +93,10 @@ pub struct IUIAutomationElementVtbl {
     pub get_cached_pattern: usize,
     pub get_cached_parent: usize,
     pub get_cached_children: usize,
-    pub get_current_process_id: usize,
+    pub get_current_process_id: unsafe extern "system" fn(
+        this: *mut std::ffi::c_void,
+        ret_val: *mut i32,
+    ) -> i32,
     pub get_current_control_type: usize,
     pub get_current_localized_control_type: usize,
     pub get_current_name: unsafe extern "system" fn(
@@ -124,12 +127,19 @@ pub const CLSID_CUI_AUTOMATION8: GUID = GUID {
 
 pub const CLSCTX_INPROC_SERVER: u32 = 1;
 
-/// Retrieves the UI Automation identifier of the currently focused control.
-/// Resolution priority:
+/// Information about the currently focused UI element
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FocusedElementInfo {
+    pub process_name: String,
+    pub target_id: String,
+}
+
+/// Retrieves the UI Automation identifier and associated process name of the currently focused control.
+/// Resolution priority for identifier:
 /// 1. `AutomationId` (e.g., "urlbar-input", "search-box")
 /// 2. `ClassName` (e.g., "MozillaCompositorWindowClass", "Edit")
 /// 3. `Name` (e.g., "Search or enter address")
-pub fn get_focused_element_id() -> Option<String> {
+pub fn get_focused_element_info() -> Option<FocusedElementInfo> {
     unsafe {
         let _ = CoInitializeEx(null_mut(), COINIT_MULTITHREADED);
 
@@ -168,6 +178,20 @@ pub fn get_focused_element_id() -> Option<String> {
         if hr_elem == 0 && !elem_ptr.is_null() {
             let elem_vtbl = **(elem_ptr as *mut *mut IUIAutomationElementVtbl);
 
+            // Retrieve process ID of the focused element
+            let mut pid = 0i32;
+            let hr_pid = (elem_vtbl.get_current_process_id)(elem_ptr, &mut pid);
+            let mut proc_name = if hr_pid == 0 && pid > 0 {
+                crate::platform::win32::app_detect::get_process_name_for_pid(pid as u32)
+            } else {
+                String::new()
+            };
+            if proc_name.is_empty() {
+                proc_name = crate::platform::win32::app_detect::get_foreground_process_name();
+            }
+
+            let mut resolved_id = None;
+
             // 1. Try AutomationId first
             let mut bstr: *mut u16 = null_mut();
             let hr_id = (elem_vtbl.get_current_automation_id)(elem_ptr, &mut bstr);
@@ -177,14 +201,14 @@ pub fn get_focused_element_id() -> Option<String> {
                     let slice = std::slice::from_raw_parts(bstr, len);
                     let id_str = String::from_utf16_lossy(slice).trim().to_string();
                     if !id_str.is_empty() {
-                        result = Some(id_str);
+                        resolved_id = Some(id_str);
                     }
                 }
                 SysFreeString(bstr);
             }
 
             // 2. Fallback to ClassName if AutomationId is empty
-            if result.is_none() {
+            if resolved_id.is_none() {
                 let mut bstr_class: *mut u16 = null_mut();
                 let hr_class = (elem_vtbl.get_current_class_name)(elem_ptr, &mut bstr_class);
                 if hr_class == 0 && !bstr_class.is_null() {
@@ -193,7 +217,7 @@ pub fn get_focused_element_id() -> Option<String> {
                         let slice = std::slice::from_raw_parts(bstr_class, len);
                         let class_str = String::from_utf16_lossy(slice).trim().to_string();
                         if !class_str.is_empty() {
-                            result = Some(class_str);
+                            resolved_id = Some(class_str);
                         }
                     }
                     SysFreeString(bstr_class);
@@ -201,7 +225,7 @@ pub fn get_focused_element_id() -> Option<String> {
             }
 
             // 3. Fallback to Name if both AutomationId and ClassName are empty
-            if result.is_none() {
+            if resolved_id.is_none() {
                 let mut bstr_name: *mut u16 = null_mut();
                 let hr_name = (elem_vtbl.get_current_name)(elem_ptr, &mut bstr_name);
                 if hr_name == 0 && !bstr_name.is_null() {
@@ -210,11 +234,18 @@ pub fn get_focused_element_id() -> Option<String> {
                         let slice = std::slice::from_raw_parts(bstr_name, len);
                         let name_str = String::from_utf16_lossy(slice).trim().to_string();
                         if !name_str.is_empty() {
-                            result = Some(name_str);
+                            resolved_id = Some(name_str);
                         }
                     }
                     SysFreeString(bstr_name);
                 }
+            }
+
+            if let Some(target_id) = resolved_id {
+                result = Some(FocusedElementInfo {
+                    process_name: proc_name,
+                    target_id,
+                });
             }
 
             (elem_vtbl.release)(elem_ptr);
@@ -225,4 +256,9 @@ pub fn get_focused_element_id() -> Option<String> {
 
         result
     }
+}
+
+/// Retrieves the UI Automation identifier of the currently focused control.
+pub fn get_focused_element_id() -> Option<String> {
+    get_focused_element_info().map(|info| info.target_id)
 }

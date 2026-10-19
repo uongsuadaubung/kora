@@ -26,6 +26,14 @@ pub(crate) static HOTKEY_ALLOW_SINGLE_KEY: AtomicBool = AtomicBool::new(false);
 // Target Field Capture Hotkey state tracking
 pub static TARGET_CAPTURE_ENABLED: AtomicBool = AtomicBool::new(true);
 pub static TARGET_NOTIFY_HWND: AtomicIsize = AtomicIsize::new(0);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapturedTarget {
+    pub process_name: String,
+    pub target_id: String,
+}
+
+pub static CAPTURED_TARGET: Mutex<Option<CapturedTarget>> = Mutex::new(None);
 pub static CAPTURED_TARGET_ID: Mutex<Option<String>> = Mutex::new(None);
 pub static TARGET_CAPTURE_HOTKEY: Mutex<crate::engine::config::Hotkey> =
     Mutex::new(crate::engine::config::Hotkey {
@@ -75,25 +83,31 @@ pub fn trigger_target_capture_async() {
 
         let mut resolved = None;
         for _ in 0..5 {
-            if let Some(target_id) = super::uia_detect::get_focused_element_id() {
-                if !target_id.trim().is_empty() {
-                    resolved = Some(target_id);
+            if let Some(info) = super::uia_detect::get_focused_element_info() {
+                if !info.target_id.trim().is_empty() {
+                    resolved = Some(info);
                     break;
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
 
-        if let Some(target_id) = resolved {
+        if let Some(target) = resolved {
+            if let Ok(mut lock) = CAPTURED_TARGET.lock() {
+                *lock = Some(CapturedTarget {
+                    process_name: target.process_name.clone(),
+                    target_id: target.target_id.clone(),
+                });
+            }
             if let Ok(mut lock) = CAPTURED_TARGET_ID.lock() {
-                *lock = Some(target_id.clone());
+                *lock = Some(target.target_id.clone());
             }
             if notify_hwnd != 0 {
                 unsafe {
                     PostMessageW(notify_hwnd, WM_INSPECT_TARGET_CAPTURED, 0, 0);
                 }
             } else {
-                crate::ui::controller::add_target_rule_to_selected(&target_id);
+                crate::ui::controller::capture_target_for_app(&target.process_name, &target.target_id);
             }
         }
     });

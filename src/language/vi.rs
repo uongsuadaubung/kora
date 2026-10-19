@@ -168,7 +168,7 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     typing_app_strategy_desc_inherit: "💡 Áp dụng cơ chế gửi phím SendInput tiêu chuẩn của Windows. Mượt mà, siêu tốc cho văn bản và trình duyệt web.",
     typing_exceptions_title: "🎯 Ngoại lệ theo từng ô text",
     typing_exceptions_desc: "Chỉ cấu hình phần này khi bạn muốn một vài ô text cụ thể (như thanh địa chỉ URL, thanh tìm kiếm) sử dụng phương pháp khác với phương pháp chung của app ở trên.",
-    typing_group_target_hotkey: "🔍 Phím tắt nhận diện ô text:",
+    typing_group_target_hotkey: "Phím tắt nhận diện ô text",
     typing_target_hotkey_desc: "Đặt con trỏ chuột vào ô text và bấm phím tắt để tự động nhận diện và thêm vào danh sách.",
     typing_target_step_guide: "1 Nhấp con trỏ vào ô text   ➔   2 Bấm Ctrl + ~   ➔   3 Ô text tự động thêm vào danh sách",
     typing_target_desc: "Chọn phương pháp đưa ký tự tiếng Việt cho toàn bộ ứng dụng này, hoặc tùy chỉnh riêng từng ô text khi cần thiết.",
@@ -184,6 +184,10 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     strategy_clipboard_paste: "📋 Dán từ Clipboard (Ctrl + V)",
     strategy_desc_autocomplete_guard: "💡 Gửi U+202F + Backspace để xóa vùng bôi đen gợi ý, chống nuốt ký tự/nhân đôi chữ (ggõ).",
     strategy_desc_clipboard_paste: "💡 Sao chép từ hoàn chỉnh vào Clipboard rồi gửi Ctrl+V để tránh nuốt phím trong game/terminal.",
+
+    // System Notifications
+    notif_target_created_profile: "Đã tạo profile \"{app}\" và thêm quy tắc: {target}",
+    notif_target_added_rule: "Đã thêm quy tắc cho {app}: {target}",
 
     // Tab 2: Remap, Disable & Key Macro
     remap_table_title: "Bật đổi phím",

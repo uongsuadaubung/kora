@@ -673,65 +673,149 @@ pub fn save_switch_hotkey(target_profile_id: &str, is_root: bool, hotkey: Option
     refresh_keys_overview();
 }
 
-/// Saves the target capture hotkey (`None` = inherit global) for `target_profile_id` and refreshes UI.
-pub fn save_target_capture_hotkey(target_profile_id: &str, is_root: bool, hotkey: Option<Hotkey>) {
+/// Saves the global target capture hotkey and refreshes UI.
+pub fn save_target_capture_hotkey(hotkey: Hotkey) {
     with_engine(|engine| {
-        if let Some(hk) = hotkey {
-            if is_root {
-                engine.config_mut().target_capture_hotkey = hk;
-            } else if let Some(child) = engine.profile_manager.get_profile_mut(target_profile_id) {
-                child.target_capture_hotkey = Some(hk);
-            }
-        } else if !is_root
-            && let Some(child) = engine.profile_manager.get_profile_mut(target_profile_id)
-        {
-            child.target_capture_hotkey = None;
-        }
+        engine.config_mut().target_capture_hotkey = hotkey;
         save(engine);
         if let Some(c) = super::controls() {
-            let child = engine.profile_manager.get_profile(target_profile_id);
+            let sel_id = engine.profile_manager.selected_id.clone();
+            let child = engine.profile_manager.get_profile(&sel_id);
             c.tab_typing.load_profile(child, engine.config());
         }
     });
 }
 
-/// Adds a target rule to the active (or selected) child profile and refreshes the panel.
-pub fn add_target_rule_to_selected(target_id: &str) {
-    let tid = target_id.to_string();
-    let updated = with_engine(|engine| {
-        let target_prof_id = if engine.profile_manager.active_id != GLOBAL_PROFILE_ID {
-            engine.profile_manager.active_id.clone()
-        } else {
-            engine.profile_manager.selected_id.clone()
-        };
-        if target_prof_id != GLOBAL_PROFILE_ID {
-            if let Some(child) = engine.profile_manager.get_profile_mut(&target_prof_id) {
-                if !child
-                    .target_rules
-                    .iter()
-                    .any(|r| r.target_id.eq_ignore_ascii_case(&tid))
-                {
-                    child.target_rules.push(crate::engine::profile::TargetRule::new(
-                        tid,
-                        crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
-                    ));
-                }
+/// Saves the global target capture enabled state and persists config.
+pub fn save_target_capture_enabled(enabled: bool) {
+    with_engine(|engine| {
+        engine.config_mut().target_capture_enabled = enabled;
+        engine.refresh_effective_config();
+        save(engine);
+    });
+    #[cfg(target_os = "windows")]
+    crate::platform::win32::capture::set_target_capture_enabled(enabled);
+}
+
+/// Captures a target input field for the specified process:
+/// - If a profile for this executable exists, adds the target rule to that profile.
+/// - If no profile exists, automatically creates a new default child profile (inheriting from Global)
+///   for this process and adds the target rule to it.
+/// - Synchronizes active target rules flag, refreshes UI if open, and dispatches a Windows desktop notification.
+pub fn capture_target_for_app(process_name: &str, target_id: &str) {
+    let tid = target_id.trim().to_string();
+    if tid.is_empty() {
+        return;
+    }
+
+    let mut proc = process_name.trim().to_lowercase();
+    if proc.is_empty() {
+        proc = crate::platform::win32::app_detect::get_foreground_process_name();
+    }
+    if proc.is_empty() {
+        return;
+    }
+
+    // Never auto-create profile for Kora / OpenKey itself
+    let current_exe = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_lowercase()))
+        .unwrap_or_default();
+    if proc == current_exe || proc == "kora.exe" || proc == "openkey.exe" {
+        return;
+    }
+
+    let outcome = with_engine(|engine| {
+        let pm = &mut engine.profile_manager;
+        if let Some(child) = pm.find_profile_by_process_mut(&proc) {
+            let prof_id = child.id.clone();
+            let app_name = child.name.clone();
+            let already = child
+                .target_rules
+                .iter()
+                .any(|r| r.target_id.eq_ignore_ascii_case(&tid));
+            if !already {
+                child.target_rules.push(crate::engine::profile::TargetRule::new(
+                    tid.clone(),
+                    crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+                ));
             }
-            engine.profile_manager.selected_id = target_prof_id.clone();
+            pm.active_id = prof_id.clone();
+            pm.selected_id = prof_id.clone();
             save(engine);
-            true
+            Some((prof_id, app_name, false))
         } else {
-            false
+            // Auto-create new child profile inheriting from Global
+            let base_id = proc
+                .trim_end_matches(".exe")
+                .replace([' ', '-', '.'], "_")
+                .to_lowercase();
+            let base_id = if base_id.is_empty() {
+                "app".to_string()
+            } else {
+                base_id
+            };
+            let mut id = base_id.clone();
+            let mut counter = 1;
+            while id == GLOBAL_PROFILE_ID || pm.get_profile(&id).is_some() {
+                id = format!("{}_{}", base_id, counter);
+                counter += 1;
+            }
+
+            let raw_name = proc.trim_end_matches(".exe");
+            let display_name = if let Some(first) = raw_name.chars().next() {
+                format!("{}{}", first.to_uppercase(), &raw_name[first.len_utf8()..])
+            } else {
+                "App".to_string()
+            };
+
+            let mut new_profile = AppProfile::new_child(id.clone(), display_name.clone(), proc.clone(), "💻");
+            new_profile.target_rules.push(crate::engine::profile::TargetRule::new(
+                tid.clone(),
+                crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+            ));
+
+            pm.add_profile(new_profile);
+            pm.active_id = id.clone();
+            pm.selected_id = id.clone();
+            save(engine);
+            Some((id, display_name, true))
         }
     })
-    .unwrap_or(false);
+    .flatten();
 
-    if updated {
+    if let Some((prof_id, app_name, is_new)) = outcome {
         crate::platform::win32::app_tracker::sync_active_target_rules_flag();
+
         if let Some(c) = super::controls() {
-            c.refresh_from_engine();
+            if let Some(ui_st) = super::ui() {
+                crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, ui_st.h_panel, &prof_id);
+            } else {
+                c.refresh_from_engine();
+            }
         }
+
+        // Dispatch Windows native notification
+        let strings = crate::language::current();
+        let message = if is_new {
+            strings
+                .notif_target_created_profile
+                .replace("{app}", &app_name)
+                .replace("{target}", &tid)
+        } else {
+            strings
+                .notif_target_added_rule
+                .replace("{app}", &app_name)
+                .replace("{target}", &tid)
+        };
+        crate::ui::notification::notify_info("Kora", message);
     }
+}
+
+/// Adds a target rule to the active (or selected) child profile and refreshes the panel.
+pub fn add_target_rule_to_selected(target_id: &str) {
+    let proc = crate::platform::win32::app_detect::get_foreground_process_name();
+    capture_target_for_app(&proc, target_id);
 }
 
 /// Updates the key injection strategy for a target rule in the selected child profile.

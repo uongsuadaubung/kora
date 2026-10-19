@@ -349,42 +349,37 @@ fn test_target_capture_inheritance_and_codec() {
     assert_eq!(root.target_capture_hotkey.display_text(), "Ctrl + ~");
     assert_eq!(root.target_capture_hotkey.vk, 0xC0);
 
-    // 2. Child profile inheritance
+    // 2. Child profile inherits global target capture
     let mut pm = ProfileManager::new();
     let child = AppProfile::new_child("figma", "Figma", "figma.exe", "🎨");
     pm.add_profile(child);
-    let child_ref = pm.get_profile("figma").unwrap();
-    assert_eq!(child_ref.target_capture_enabled, None);
-    assert_eq!(child_ref.target_capture_hotkey, None);
 
-    // Resolve effective config when child inherits
+    // Resolve effective config: child always uses global target capture
     let eff = pm.resolve_effective_config("figma", &root);
     assert!(eff.target_capture_enabled);
     assert_eq!(eff.target_capture_hotkey.display_text(), "Ctrl + ~");
 
-    // 3. Child profile overrides target capture
+    // 3. Child profile fields target_capture_enabled/hotkey do not override global
+    // (target capture is purely a global shortcut)
     if let Some(c) = pm.get_profile_mut("figma") {
         c.target_capture_enabled = Some(false);
         c.target_capture_hotkey = Some(Hotkey::new(true, false, true, false, 0x4B)); // Ctrl + Alt + K
     }
     let eff_override = pm.resolve_effective_config("figma", &root);
-    assert!(!eff_override.target_capture_enabled);
-    assert_eq!(eff_override.target_capture_hotkey.display_text(), "Ctrl + Alt + K");
+    assert!(eff_override.target_capture_enabled);
+    assert_eq!(eff_override.target_capture_hotkey.display_text(), "Ctrl + ~");
 
-    // 4. Codec serialization and deserialization
+    // 4. Codec serialization and deserialization (global-only)
     let macros = MacroTable::new();
     let serialized = kora::engine::config_store::codec::encoder::serialize_config_all(&root, &macros, &pm);
     assert!(serialized.contains("target_capture_enabled = true"));
     assert!(serialized.contains("target_capture_hotkey = ctrl_~"));
-    assert!(serialized.contains("target_capture_enabled = false"));
-    assert!(serialized.contains("target_capture_hotkey = ctrl_alt_k"));
+    // Child section does not serialize target capture hotkey
+    assert!(!serialized.contains("target_capture_hotkey = ctrl_alt_k"));
 
-    let (dec_cfg, _, dec_pm) = kora::parse_config_all(&serialized);
+    let (dec_cfg, _, _) = kora::parse_config_all(&serialized);
     assert!(dec_cfg.target_capture_enabled);
     assert_eq!(dec_cfg.target_capture_hotkey.display_text(), "Ctrl + ~");
-    let dec_child = dec_pm.get_profile("figma").unwrap();
-    assert_eq!(dec_child.target_capture_enabled, Some(false));
-    assert_eq!(dec_child.target_capture_hotkey.as_ref().map(|k| k.display_text()), Some("Ctrl + Alt + K".to_string()));
 
     // 5. Backward compatibility: verify decoding legacy ctrl_` still parses to 0xC0
     let (dec_legacy, _, _) = kora::parse_config_all("[general]\ntarget_capture_hotkey = ctrl_`\n");

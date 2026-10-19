@@ -96,6 +96,11 @@ impl ProfileManager {
         self.profiles.iter().find(|p| p.matches_process(exe_name))
     }
 
+    /// Finds a mutable child profile matching the executable filename (e.g. "cs2.exe")
+    pub fn find_profile_by_process_mut(&mut self, exe_name: &str) -> Option<&mut AppProfile<Child>> {
+        self.profiles.iter_mut().find(|p| p.matches_process(exe_name))
+    }
+
     /// Switches active profile based on the foreground application executable name.
     /// Returns (has_changed, active_profile_id).
     pub fn set_active_by_process(&mut self, exe_name: &str) -> (bool, String) {
@@ -143,12 +148,6 @@ impl ProfileManager {
             }
             if let Some(en) = child.switch_key_enabled {
                 cfg.switch_key_enabled = en;
-            }
-            if let Some(cap_hk) = child.target_capture_hotkey {
-                cfg.target_capture_hotkey = cap_hk;
-            }
-            if let Some(cap_en) = child.target_capture_enabled {
-                cfg.target_capture_enabled = cap_en;
             }
             if let Some(r) = child.restore_on_wrong_spelling {
                 cfg.restore_on_wrong_spelling = r;

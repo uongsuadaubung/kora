@@ -257,6 +257,10 @@ pub struct LanguageStrings {
     pub strategy_desc_autocomplete_guard: &'static str,
     pub strategy_desc_clipboard_paste: &'static str,
 
+    // System Notifications
+    pub notif_target_created_profile: &'static str,
+    pub notif_target_added_rule: &'static str,
+
     // Tab 2: Remap, Disable & Key Macro
     pub remap_table_title: &'static str,
     pub disable_table_title: &'static str,
