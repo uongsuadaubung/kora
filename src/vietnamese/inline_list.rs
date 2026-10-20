@@ -169,4 +169,3 @@ impl<T: Copy + Default, const N: usize> FromIterator<T> for InlineList<T, N> {
         list
     }
 }
-

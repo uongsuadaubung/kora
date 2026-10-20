@@ -27,8 +27,8 @@ use crate::engine::EngineConfig;
 use crate::engine::profile::{AppProfile, Child, ProfileRef, Root};
 use crate::language::Language;
 use crate::ui::components::*;
-use crate::ui::win32::{InvalidateRect, MEASUREITEMSTRUCT};
 pub use crate::ui::tokens::layout::*;
+use crate::ui::win32::{InvalidateRect, MEASUREITEMSTRUCT};
 use std::ptr::null_mut;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -122,7 +122,8 @@ impl ControlPanelControls {
         self.tab_keys.update_visibility(subtab == Some(1));
         self.tab_sound.update_visibility(subtab == Some(2));
         self.tab_macro.update_visibility(subtab == Some(3));
-        self.tab_system.update_visibility(mode == ViewMode::SystemSettings);
+        self.tab_system
+            .update_visibility(mode == ViewMode::SystemSettings);
         self.tab_about.update_visibility(mode == ViewMode::About);
         unsafe {
             InvalidateRect(self.sidebar.btn_system_settings.hwnd(), null_mut(), 0);
@@ -152,7 +153,8 @@ impl ControlPanelControls {
                 remaps: pm.resolve_remap_items_for_ui(sel_id),
                 disabled: pm.resolve_disable_items_for_ui(sel_id),
                 key_macros: pm.resolve_key_macro_items_for_ui(sel_id),
-                macros: pm.resolve_macro_items_for_ui(sel_id, &engine.macro_table.get_sorted_entries()),
+                macros: pm
+                    .resolve_macro_items_for_ui(sel_id, &engine.macro_table.get_sorted_entries()),
             }
         };
 
@@ -171,7 +173,8 @@ impl ControlPanelControls {
         self.tab_keys.populate_remaps(&snap.remaps);
         self.tab_keys.populate_disabled(&snap.disabled);
         self.tab_keys.populate_key_macros(&snap.key_macros);
-        self.tab_keys.refresh_overview(&snap.remaps, &snap.disabled, &snap.key_macros);
+        self.tab_keys
+            .refresh_overview(&snap.remaps, &snap.disabled, &snap.key_macros);
         self.populate_macro_items(&snap.macros);
         Some(snap.config)
     }
@@ -237,7 +240,11 @@ impl ControlPanelControls {
             }
             return true;
         }
-        if self.sidebar.btn_system_settings.is_clicked(ctrl_id, notify_code) {
+        if self
+            .sidebar
+            .btn_system_settings
+            .is_clicked(ctrl_id, notify_code)
+        {
             return self.switch_global_view(hwnd, ViewMode::SystemSettings);
         }
         if self.sidebar.btn_about.is_clicked(ctrl_id, notify_code) {

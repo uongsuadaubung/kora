@@ -463,7 +463,12 @@ impl TextBox {
         let wide = to_wide(text);
         unsafe {
             SendMessageW(self.inner_hwnd, EM_SETCUEBANNER, 1, wide.as_ptr() as isize);
-            SendMessageW(self.inner_hwnd, WM_SET_CUE_BANNER, 0, wide.as_ptr() as isize);
+            SendMessageW(
+                self.inner_hwnd,
+                WM_SET_CUE_BANNER,
+                0,
+                wide.as_ptr() as isize,
+            );
         }
     }
 
@@ -492,4 +497,3 @@ impl TextBox {
         }
     }
 }
-

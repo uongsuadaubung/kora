@@ -7,5 +7,3 @@ pub mod model;
 pub use conflict::*;
 pub use manager::*;
 pub use model::*;
-
-

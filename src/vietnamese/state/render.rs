@@ -48,4 +48,3 @@ impl SyllableState {
         self.render_compact().to_string()
     }
 }
-

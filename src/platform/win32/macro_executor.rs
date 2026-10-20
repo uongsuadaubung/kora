@@ -7,8 +7,8 @@
 use crate::engine::config::hotkey::name_to_vk;
 use crate::engine::profile::MacroAction;
 use crate::platform::win32::injector::{send_unicode_string, send_vk_event};
-use std::sync::mpsc::{channel, Sender};
 use std::sync::OnceLock;
+use std::sync::mpsc::{Sender, channel};
 use std::thread;
 use std::time::Duration;
 
@@ -68,7 +68,11 @@ fn run_actions(actions: &[MacroAction]) {
 
 /// Executes a combined or single key press (Down then Up)
 fn execute_press(combo: &str) {
-    let parts: Vec<&str> = combo.split('+').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    let parts: Vec<&str> = combo
+        .split('+')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
     if parts.is_empty() {
         return;
     }
@@ -110,4 +114,3 @@ fn execute_press(combo: &str) {
         send_vk_event(mod_vk, true);
     }
 }
-

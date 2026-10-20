@@ -631,4 +631,3 @@ fn test_completed_syllable_preservation_and_backspace_recovery() {
     backspace(&mut engine, &mut screen);
     assert_eq!(screen, "nấu");
 }
-

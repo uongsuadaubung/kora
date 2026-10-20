@@ -1,8 +1,8 @@
 //! Kora Control Panel GDI Painting & Custom Card Rendering
 
 use crate::ui::colors::ThemePalette;
-use crate::ui::win32::*;
 use crate::ui::tokens::{borders, layout, radii, spacing};
+use crate::ui::win32::*;
 
 /// Custom paints the Control Panel window background, sidebar, rounded card containers, and borders
 pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
@@ -49,7 +49,8 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
         DeleteObject(sep_brush);
 
         let controls = crate::ui::controls().or_else(|| {
-            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls;
+            let ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA)
+                as *const crate::ui::views::ControlPanelControls;
             if !ptr.is_null() { Some(&*ptr) } else { None }
         });
 
@@ -100,4 +101,3 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
         DeleteObject(b_pen);
     }
 }
-

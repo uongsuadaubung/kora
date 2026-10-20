@@ -4,7 +4,7 @@
 use crate::language::LanguageStrings;
 use crate::ui::prelude::*;
 use crate::ui::views::dialogs::show_danger_confirm;
-use crate::ui_framework::win32::{RedrawWindow, SetWindowTextW, RDW_ALLCHILDREN, RDW_INVALIDATE};
+use crate::ui_framework::win32::{RDW_ALLCHILDREN, RDW_INVALIDATE, RedrawWindow, SetWindowTextW};
 
 const SYS_CARD_X: i32 = 246;
 const SYS_CONTENT_X: i32 = 266;
@@ -31,8 +31,8 @@ impl TabSystem {
         ly.page_header(|s| s.sys_header_title, |s| s.sys_header_sub)?;
 
         // --- Card 1: Windows System ---
-        let (check_autostart, check_show_dialog, check_debug_log, btn_open_log) =
-            ly.card_with_pad(16, 18, |card| {
+        let (check_autostart, check_show_dialog, check_debug_log, btn_open_log) = ly
+            .card_with_pad(16, 18, |card| {
                 card.section_title(|s| s.sys_title, 8)?;
                 let check_autostart =
                     card.checkbox_row(|s| s.check_autostart, 24, 6, false, false)?;
@@ -53,7 +53,12 @@ impl TabSystem {
                     false,
                     ButtonVariant::Secondary,
                 )?;
-                Some((check_autostart, check_show_dialog, check_debug_log, btn_open_log))
+                Some((
+                    check_autostart,
+                    check_show_dialog,
+                    check_debug_log,
+                    btn_open_log,
+                ))
             })?;
 
         // --- Card 2: Theme & Language ---
@@ -88,15 +93,8 @@ impl TabSystem {
             )?;
 
             let y_def_desc = card.row(36, 0);
-            card.label_at(
-                |s| s.sys_defaults_desc,
-                x_def,
-                y_def_desc,
-                w_def,
-                36,
-                false,
-            )?
-            .with_tone(LabelTone::Secondary);
+            card.label_at(|s| s.sys_defaults_desc, x_def, y_def_desc, w_def, 36, false)?
+                .with_tone(LabelTone::Secondary);
 
             card.button_at(
                 |s| s.btn_restore_defaults,
@@ -189,36 +187,37 @@ impl TabSystem {
                 strings.confirm_defaults_title,
                 strings.confirm_defaults_msg,
                 move || {
-                let def_config = crate::engine::EngineConfig::default();
-                crate::ui::controller::with_engine(|engine| {
-                    *engine.config_mut() = def_config.clone();
-                    engine.profile_manager = crate::engine::profile::ProfileManager::new();
-                    engine.macro_table = crate::engine::macro_table::MacroTable::new();
-                    let _ = crate::engine::config_store::save_config_all(
-                        engine.config(),
-                        &engine.macro_table,
-                        &engine.profile_manager,
-                    );
-                    crate::ui::controller::reconfigure_sound(engine);
-                });
+                    let def_config = crate::engine::EngineConfig::default();
+                    crate::ui::controller::with_engine(|engine| {
+                        *engine.config_mut() = def_config.clone();
+                        engine.profile_manager = crate::engine::profile::ProfileManager::new();
+                        engine.macro_table = crate::engine::macro_table::MacroTable::new();
+                        let _ = crate::engine::config_store::save_config_all(
+                            engine.config(),
+                            &engine.macro_table,
+                            &engine.profile_manager,
+                        );
+                        crate::ui::controller::reconfigure_sound(engine);
+                    });
 
-                if let Some(controls) = crate::ui::controls() {
-                    controls.refresh_from_engine();
-                    controls.update_language(def_config.language);
-                    let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
-                    crate::ui::theme::apply_ui_theme(hwnd_panel, controls, is_dark);
-                }
-                unsafe {
-                    let strings = crate::language::get_strings(def_config.language);
-                    SetWindowTextW(hwnd_panel, to_wide(strings.window_title).as_ptr());
-                    RedrawWindow(
-                        hwnd_panel,
-                        std::ptr::null(),
-                        0,
-                        RDW_INVALIDATE | RDW_ALLCHILDREN,
-                    );
-                }
-            });
+                    if let Some(controls) = crate::ui::controls() {
+                        controls.refresh_from_engine();
+                        controls.update_language(def_config.language);
+                        let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
+                        crate::ui::theme::apply_ui_theme(hwnd_panel, controls, is_dark);
+                    }
+                    unsafe {
+                        let strings = crate::language::get_strings(def_config.language);
+                        SetWindowTextW(hwnd_panel, to_wide(strings.window_title).as_ptr());
+                        RedrawWindow(
+                            hwnd_panel,
+                            std::ptr::null(),
+                            0,
+                            RDW_INVALIDATE | RDW_ALLCHILDREN,
+                        );
+                    }
+                },
+            );
             return true;
         }
 
@@ -227,12 +226,7 @@ impl TabSystem {
                 if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
                     guard
                         .as_ref()
-                        .and_then(|e| {
-                            e.config()
-                                .debug_file_path
-                                .as_deref()
-                                .map(|s| s.to_string())
-                        })
+                        .and_then(|e| e.config().debug_file_path.as_deref().map(|s| s.to_string()))
                         .unwrap_or_else(|| "kora_debug.log".to_string())
                 } else {
                     "kora_debug.log".to_string()
@@ -288,12 +282,7 @@ impl TabSystem {
                     unsafe {
                         let strings = crate::language::get_strings(lang);
                         SetWindowTextW(hwnd, to_wide(strings.window_title).as_ptr());
-                        RedrawWindow(
-                            hwnd,
-                            std::ptr::null(),
-                            0,
-                            RDW_INVALIDATE | RDW_ALLCHILDREN,
-                        );
+                        RedrawWindow(hwnd, std::ptr::null(), 0, RDW_INVALIDATE | RDW_ALLCHILDREN);
                     }
                 }
             }

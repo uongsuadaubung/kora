@@ -27,7 +27,10 @@ pub fn is_current_dark() -> bool {
 pub fn cached_font(point_size: i32, weight: i32) -> isize {
     static CACHE: Mutex<Vec<(i32, i32, isize)>> = Mutex::new(Vec::new());
     let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(&(_, _, f)) = cache.iter().find(|&&(s, w, _)| s == point_size && w == weight) {
+    if let Some(&(_, _, f)) = cache
+        .iter()
+        .find(|&&(s, w, _)| s == point_size && w == weight)
+    {
         return f;
     }
     let f = create_app_font(point_size, weight);
@@ -213,4 +216,3 @@ pub fn apply_window_theme(hwnd: isize, is_dark: bool) -> bool {
     IS_APPLYING_THEME.store(false, Ordering::SeqCst);
     true
 }
-

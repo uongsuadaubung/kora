@@ -364,4 +364,3 @@ fn test_orthography_instant_passthrough_english_words() {
     engine.reset();
     assert_eq!(simulate_typing(&mut engine, "booong "), "boong ");
 }
-

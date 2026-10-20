@@ -166,7 +166,6 @@ unsafe extern "system" {
     pub fn GetWindowDpiAwarenessContext(h_wnd: isize) -> isize;
 }
 
-
 #[link(name = "comctl32")]
 unsafe extern "system" {
     pub fn SetWindowSubclass(
@@ -215,4 +214,3 @@ unsafe extern "system" {
     pub fn SetDCBrushColor(hdc: isize, color: u32) -> u32;
     pub fn SetDCPenColor(hdc: isize, color: u32) -> u32;
 }
-

@@ -155,8 +155,8 @@ unsafe extern "system" fn button_subclass_proc(
             String::new()
         };
 
-        let is_pressed = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
-        let is_disabled = (dis.item_state & 0x0004 /* ODS_DISABLED */) != 0;
+        let is_pressed = (dis.item_state & 0x0001/* ODS_SELECTED */) != 0;
+        let is_disabled = (dis.item_state & 0x0004/* ODS_DISABLED */) != 0;
 
         PushButton::render_ext_state(
             dis.hdc,
@@ -618,4 +618,3 @@ pub enum ButtonVariant {
     DangerSolid,
     Ghost,
 }
-

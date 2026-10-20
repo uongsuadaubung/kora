@@ -78,7 +78,11 @@ unsafe fn fit_pill_width(hwnd: isize, min_w: i32, max_w: i32) {
 
         let hdc = GetDC(hwnd);
         let hfont = SendMessageW(hwnd, WM_GETFONT, 0, 0);
-        let old_font = if hfont != 0 { SelectObject(hdc, hfont) } else { 0 };
+        let old_font = if hfont != 0 {
+            SelectObject(hdc, hfont)
+        } else {
+            0
+        };
         let mut sz = SIZE::default();
         if copied > 0 {
             GetTextExtentPoint32W(hdc, buf.as_ptr(), copied as i32, &mut sz);
@@ -97,7 +101,10 @@ unsafe fn fit_pill_width(hwnd: isize, min_w: i32, max_w: i32) {
         if parent != 0 {
             let mut wrc = RECT::default();
             GetWindowRect(hwnd, &mut wrc);
-            let mut tl = POINT { x: wrc.left, y: wrc.top };
+            let mut tl = POINT {
+                x: wrc.left,
+                y: wrc.top,
+            };
             ScreenToClient(parent, &mut tl);
             let dirty = RECT {
                 left: tl.x - 2,
@@ -182,8 +189,8 @@ unsafe extern "system" fn label_pill_subclass_proc(
                 GetClientRect(hwnd, &mut rc);
                 let is_dark = is_current_dark();
                 let palette = ThemePalette::get(is_dark);
-                let (tone, surface, _) = Label::style_of(hwnd)
-                    .unwrap_or((LabelTone::Accent, SurfaceRole::Card, false));
+                let (tone, surface, _) =
+                    Label::style_of(hwnd).unwrap_or((LabelTone::Accent, SurfaceRole::Card, false));
 
                 let outer_bg = match surface {
                     SurfaceRole::Card => palette.bg_card,
@@ -228,7 +235,11 @@ unsafe extern "system" fn label_pill_subclass_proc(
                         }
                     };
                     let hfont = SendMessageW(hwnd, WM_GETFONT, 0, 0);
-                    let old_f = if hfont != 0 { SelectObject(hdc, hfont) } else { 0 };
+                    let old_f = if hfont != 0 {
+                        SelectObject(hdc, hfont)
+                    } else {
+                        0
+                    };
                     SetBkMode(hdc, TRANSPARENT);
                     SetTextColor(hdc, text_color);
                     DrawTextW(
@@ -394,8 +405,8 @@ impl Label<StaticText> {
     /// Transitions a static label into an interactive hyperlink (`Label<Link>`),
     /// automatically assigning a non-zero control ID and enabling `SS_NOTIFY`.
     pub fn as_link(self) -> Label<Link> {
-        let (_, surface, _) = Label::style_of(self.hwnd)
-            .unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
+        let (_, surface, _) =
+            Label::style_of(self.hwnd).unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
         let new_id = super::next_control_id();
         unsafe {
             let style = GetWindowLongW(self.hwnd, GWL_STYLE) as u32;
@@ -416,10 +427,10 @@ impl Label<StaticText> {
 
     /// Transitions a static label into an auto-sizing rounded pill badge (`Label<PillBadge>`).
     pub fn as_pill_badge(self, min_w: i32, max_w: i32) -> Label<PillBadge> {
-        let (_, surface, is_link) = Label::style_of(self.hwnd)
-            .unwrap_or((LabelTone::Accent, SurfaceRole::Card, false));
-        let bounds = ((min_w.max(0) as usize) & 0xFFFF)
-            | (((max_w.max(min_w) as usize) & 0xFFFF) << 16);
+        let (_, surface, is_link) =
+            Label::style_of(self.hwnd).unwrap_or((LabelTone::Accent, SurfaceRole::Card, false));
+        let bounds =
+            ((min_w.max(0) as usize) & 0xFFFF) | (((max_w.max(min_w) as usize) & 0xFFFF) << 16);
         unsafe {
             SetWindowLongPtrW(
                 self.hwnd,
@@ -463,8 +474,8 @@ impl<K: LabelKind> Label<K> {
     }
 
     pub fn on_surface(self, surface: SurfaceRole) -> Self {
-        let (tone, _, is_link) = Label::style_of(self.hwnd)
-            .unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
+        let (tone, _, is_link) =
+            Label::style_of(self.hwnd).unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
         unsafe {
             SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, pack_style(tone, surface, is_link));
         }
@@ -472,8 +483,8 @@ impl<K: LabelKind> Label<K> {
     }
 
     pub fn set_tone(&self, tone: LabelTone) {
-        let (_, surface, is_link) = Label::style_of(self.hwnd)
-            .unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
+        let (_, surface, is_link) =
+            Label::style_of(self.hwnd).unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
         unsafe {
             SetWindowLongPtrW(
                 self.hwnd,
@@ -523,5 +534,3 @@ impl<K: LabelKind> Label<K> {
         self.set_visible(false);
     }
 }
-
-

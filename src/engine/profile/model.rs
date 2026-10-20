@@ -62,6 +62,33 @@ impl MethodMode {
     }
 }
 
+/// Vietnamese Charset mode: Inherit or Specific
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CharsetMode {
+    #[default]
+    Inherit,
+    Specific(crate::vietnamese::Charset),
+}
+
+impl CharsetMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Inherit => "inherit",
+            Self::Specific(c) => c.as_str(),
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        let trimmed = s.trim().to_ascii_lowercase();
+        if trimmed == "inherit" || trimmed.is_empty() {
+            Self::Inherit
+        } else {
+            let c: crate::vietnamese::Charset = trimmed.parse().unwrap_or_default();
+            Self::Specific(c)
+        }
+    }
+}
+
 /// Single key remapping rule (Virtual Key Code and friendly name)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyRemapRule {
@@ -180,7 +207,11 @@ impl MacroAction {
         if actions.is_empty() {
             return String::new();
         }
-        actions.iter().map(|a| a.to_dsl()).collect::<Vec<_>>().join(" + ")
+        actions
+            .iter()
+            .map(|a| a.to_dsl())
+            .collect::<Vec<_>>()
+            .join(" + ")
     }
 
     pub fn dsl_to_actions(dsl: &str) -> Vec<MacroAction> {
@@ -331,6 +362,7 @@ pub struct ChildProfileData {
     // 1. Vietnamese Typing & Language mode
     pub mode: LanguageMode,
     pub method: MethodMode,
+    pub charset: CharsetMode,
     pub switch_key: Option<Hotkey>,
     pub switch_key_enabled: Option<bool>,
     pub target_capture_hotkey: Option<Hotkey>,
@@ -537,6 +569,7 @@ impl AppProfile<Child> {
                 icon: icon.into(),
                 mode: LanguageMode::Inherit,
                 method: MethodMode::Inherit,
+                charset: CharsetMode::Inherit,
                 switch_key: None,
                 switch_key_enabled: None,
                 target_capture_hotkey: None,
@@ -579,5 +612,3 @@ impl AppProfile<Child> {
             .any(|p| p.to_lowercase() == exe_lower)
     }
 }
-
-

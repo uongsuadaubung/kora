@@ -264,9 +264,16 @@ fn test_diacritic_switching() {
 
     for i in 1..=20 {
         type_key(&mut vni_engine, '7', &mut vni_scr);
-        assert_eq!(vni_scr, "lươn", "Lỗi VNI vòng lặp {} khi chuyển luôn -> lươn", i);
+        assert_eq!(
+            vni_scr, "lươn",
+            "Lỗi VNI vòng lặp {} khi chuyển luôn -> lươn",
+            i
+        );
         type_key(&mut vni_engine, '6', &mut vni_scr);
-        assert_eq!(vni_scr, "luôn", "Lỗi VNI vòng lặp {} khi chuyển lươn -> luôn", i);
+        assert_eq!(
+            vni_scr, "luôn",
+            "Lỗi VNI vòng lặp {} khi chuyển lươn -> luôn",
+            i
+        );
     }
 }
-

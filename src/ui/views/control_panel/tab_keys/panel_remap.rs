@@ -2,8 +2,8 @@
 //! Allows mapping one hardware key to another key.
 
 use crate::engine::profile::ResolvedRemapItem;
-use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use crate::ui::prelude::*;
+use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use std::ops::Deref;
 
 #[repr(transparent)]
@@ -88,4 +88,3 @@ impl RemapPanel {
         });
     }
 }
-

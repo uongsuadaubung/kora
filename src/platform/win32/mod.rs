@@ -17,7 +17,7 @@ pub use injector::*;
 pub use macro_executor::*;
 pub use sound::*;
 pub use types::*;
-pub use uia_detect::{get_focused_element_id, get_focused_element_info, FocusedElementInfo};
+pub use uia_detect::{FocusedElementInfo, get_focused_element_id, get_focused_element_info};
 
 use crate::engine::VietnameseEngine;
 use crate::engine::action::EngineAction;
@@ -501,24 +501,24 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                         && let Some(ref mut engine) = *guard
                     {
                         let action = engine.on_key(ch, is_shift, is_caps);
-                    match action {
-                        EngineAction::Passthrough => {
-                            // Let OS handle original keystroke
-                            return CallNextHookEx(0, n_code, w_param, l_param);
-                        }
-                        EngineAction::Replace { backspaces, output } => {
-                            // Consume this key, send backspaces and replacement string in a single atomic SendInput call
-                            send_replace(backspaces, &output);
-                            return 1; // Intercept: do not pass to target window
-                        }
-                        EngineAction::Consume => {
-                            return 1; // Drop key entirely
+                        match action {
+                            EngineAction::Passthrough => {
+                                // Let OS handle original keystroke
+                                return CallNextHookEx(0, n_code, w_param, l_param);
+                            }
+                            EngineAction::Replace { backspaces, output } => {
+                                // Consume this key, send backspaces and replacement string in a single atomic SendInput call
+                                send_replace(backspaces, &output);
+                                return 1; // Intercept: do not pass to target window
+                            }
+                            EngineAction::Consume => {
+                                return 1; // Drop key entirely
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
         CallNextHookEx(0, n_code, w_param, l_param)
     }

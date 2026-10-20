@@ -2,13 +2,11 @@
 //! Shows current profile icon, name, active status, and delete action.
 
 use crate::engine::profile::AppProfile;
-use crate::ui::win32::{
-    set_hwnds_visible, EnableWindow, ShowWindow, FW_BOLD, SW_HIDE, SW_SHOW,
-};
 use crate::ui::components::{ButtonVariant, Label, LabelTone, PushButton, SurfaceRole};
 use crate::ui::theme::cached_font;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::typography::*;
+use crate::ui::win32::{EnableWindow, FW_BOLD, SW_HIDE, SW_SHOW, ShowWindow, set_hwnds_visible};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 const DELETE_BTN_X: i32 = 690;
@@ -123,7 +121,12 @@ impl ProfileBanner {
         let name = crate::ui::controller::with_engine(|engine| {
             let sel_id = &engine.profile_manager.selected_id;
             (sel_id != crate::ui::GLOBAL_PROFILE_ID)
-                .then(|| engine.profile_manager.get_profile(sel_id).map(|p| p.name.clone()))
+                .then(|| {
+                    engine
+                        .profile_manager
+                        .get_profile(sel_id)
+                        .map(|p| p.name.clone())
+                })
                 .flatten()
         })
         .flatten();
@@ -144,9 +147,7 @@ impl ProfileBanner {
                 }
             })
             .unwrap_or(false);
-            if deleted
-                && let Some(c) = crate::ui::controls()
-            {
+            if deleted && let Some(c) = crate::ui::controls() {
                 super::SidebarControls::switch_to_profile(c, hwnd, crate::ui::GLOBAL_PROFILE_ID);
             }
         });

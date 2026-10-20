@@ -149,6 +149,7 @@ pub struct TabTyping {
     // Card 1: Thiết lập Bộ gõ tiếng Việt
     pub combo_mode: ComboBox,
     pub combo_method: ComboBox,
+    pub combo_charset: ComboBox,
 
     // Card 2: Phím chuyển đổi E ⇄ V (Checkbox title toggles switch shortcut)
     pub check_switch_key: CheckBox<Inheritable>,
@@ -210,7 +211,8 @@ impl TabTyping {
         let viewport_y = layout::CARD_START_Y;
         let viewport_w = layout::CARD_WIDTH + 8;
         let viewport_h = layout::CARD_BOTTOM_Y - layout::CARD_START_Y;
-        let scroll_view = ScrollView::create(parent, viewport_x, viewport_y, viewport_w, viewport_h)?;
+        let scroll_view =
+            ScrollView::create(parent, viewport_x, viewport_y, viewport_w, viewport_h)?;
         let h_content = scroll_view.content_hwnd();
 
         let mut ly = CardLayout::with_parent(h_content, hfont_normal, hfont_bold)
@@ -218,19 +220,31 @@ impl TabTyping {
             .with_bounds(16, 530);
 
         // --- Card 1: Thiết lập Bộ gõ tiếng Việt ---
-        let (combo_mode, combo_method) = ly.card_with_pad(10, 12, |card| {
+        let (combo_mode, combo_method, combo_charset) = ly.card_with_pad(10, 12, |card| {
             card.section_title(|s| s.typing_group_main, 4)?;
             let ((_, combo_mode), (_, combo_method)) = card.two_col_combos(
                 20,
-                0,
+                10,
                 true,
-                (|s| s.typing_lbl_mode, |s| vec![s.mode_vietnamese, s.mode_english]),
+                (
+                    |s| s.typing_lbl_mode,
+                    |s| vec![s.mode_vietnamese, s.mode_english],
+                ),
                 (
                     |s| s.typing_lbl_method,
                     |s| vec![s.method_telex, s.method_vni, s.method_simple_telex],
                 ),
             )?;
-            Some((combo_mode, combo_method))
+
+            let (_, combo_charset) = card.single_col_combo(
+                0,
+                true,
+                (
+                    |s| s.typing_lbl_charset,
+                    |s| vec![s.charset_unicode, s.charset_tcvn3],
+                ),
+            )?;
+            Some((combo_mode, combo_method, combo_charset))
         })?;
 
         // --- Card 2: Phím chuyển đổi E ⇄ V ---
@@ -339,27 +353,13 @@ impl TabTyping {
         )?
         .on_surface(SurfaceRole::Window);
 
-        let combo_app_strategy = ComboBox::create(
-            h_content,
-            0,
-            254,
-            y_app_box + 10,
-            280,
-            160,
-            hfont_normal,
-        )?;
+        let combo_app_strategy =
+            ComboBox::create(h_content, 0, 254, y_app_box + 10, 280, 160, hfont_normal)?;
 
-        let lbl_app_strat_sub = Label::create(
-            h_content,
-            "",
-            28,
-            y_app_box + 38,
-            506,
-            18,
-            hfont_normal,
-        )?
-        .with_tone(LabelTone::Secondary)
-        .on_surface(SurfaceRole::Window);
+        let lbl_app_strat_sub =
+            Label::create(h_content, "", 28, y_app_box + 38, 506, 18, hfont_normal)?
+                .with_tone(LabelTone::Secondary)
+                .on_surface(SurfaceRole::Window);
 
         let lbl_app_strat_desc = Label::create(
             h_content,
@@ -387,16 +387,9 @@ impl TabTyping {
         .with_tone(LabelTone::Accent);
 
         // Pill badge trên tiêu đề: "{count} ngoại lệ"
-        let lbl_target_subtitle = Label::create_centered(
-            h_content,
-            "",
-            446,
-            y_exc - 2,
-            88,
-            24,
-            hfont_bold,
-        )?
-        .as_pill_badge(70, 96);
+        let lbl_target_subtitle =
+            Label::create_centered(h_content, "", 446, y_exc - 2, 88, 24, hfont_bold)?
+                .as_pill_badge(70, 96);
 
         let lbl_exceptions_desc = Label::create(
             h_content,
@@ -422,17 +415,10 @@ impl TabTyping {
         )?
         .on_surface(SurfaceRole::Window);
 
-        let lbl_capture_badge = Label::create_centered(
-            h_content,
-            "",
-            158,
-            y_box + 10,
-            120,
-            28,
-            hfont_bold,
-        )?
-        .as_pill_badge(120, 276)
-        .on_surface(SurfaceRole::Window);
+        let lbl_capture_badge =
+            Label::create_centered(h_content, "", 158, y_box + 10, 120, 28, hfont_bold)?
+                .as_pill_badge(120, 276)
+                .on_surface(SurfaceRole::Window);
 
         let btn_capture_change = PushButton::create_with_variant(
             h_content,
@@ -491,7 +477,8 @@ impl TabTyping {
                     match b.kind {
                         SubBoxKind::AppStrategyBox => {
                             let br = unsafe { CreateSolidBrush(palette.bg_window) };
-                            let pen = unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
+                            let pen =
+                                unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
                             let ob = unsafe { SelectObject(hdc, br) };
                             let op = unsafe { SelectObject(hdc, pen) };
                             unsafe {
@@ -509,7 +496,8 @@ impl TabTyping {
                                 DeleteObject(br);
                                 DeleteObject(pen);
 
-                                let line_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
+                                let line_pen =
+                                    CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
                                 let old_p = SelectObject(hdc, line_pen);
                                 MoveToEx(hdc, b.left + 12, b.top + 60, null_mut());
                                 LineTo(hdc, b.right - 12, b.top + 60);
@@ -518,7 +506,8 @@ impl TabTyping {
                             }
                         }
                         SubBoxKind::SectionDivider => {
-                            let pen_div = unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
+                            let pen_div =
+                                unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
                             let op_div = unsafe { SelectObject(hdc, pen_div) };
                             unsafe {
                                 MoveToEx(hdc, b.left, b.top, null_mut());
@@ -529,7 +518,8 @@ impl TabTyping {
                         }
                         SubBoxKind::InspectBox => {
                             let br = unsafe { CreateSolidBrush(palette.bg_window) };
-                            let pen = unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
+                            let pen =
+                                unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
                             let ob = unsafe { SelectObject(hdc, br) };
                             let op = unsafe { SelectObject(hdc, pen) };
                             unsafe {
@@ -548,7 +538,8 @@ impl TabTyping {
                                 DeleteObject(pen);
 
                                 let g_br = CreateSolidBrush(palette.bg_card);
-                                let g_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
+                                let g_pen =
+                                    CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
                                 let g_ob = SelectObject(hdc, g_br);
                                 let g_op = SelectObject(hdc, g_pen);
                                 RoundRect(
@@ -568,7 +559,8 @@ impl TabTyping {
                         }
                         SubBoxKind::EmptyBox | SubBoxKind::RuleItem => {
                             let br = unsafe { CreateSolidBrush(palette.bg_window) };
-                            let pen = unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
+                            let pen =
+                                unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
                             let ob = unsafe { SelectObject(hdc, br) };
                             let op = unsafe { SelectObject(hdc, pen) };
                             unsafe {
@@ -589,7 +581,8 @@ impl TabTyping {
                         }
                         SubBoxKind::RuleControls => {
                             let br = unsafe { CreateSolidBrush(palette.bg_card) };
-                            let pen = unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
+                            let pen =
+                                unsafe { CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border) };
                             let ob = unsafe { SelectObject(hdc, br) };
                             let op = unsafe { SelectObject(hdc, pen) };
                             unsafe {
@@ -621,6 +614,7 @@ impl TabTyping {
             layout: ly,
             combo_mode,
             combo_method,
+            combo_charset,
             check_switch_key,
             lbl_switch_badge,
             btn_switch_key,
@@ -673,10 +667,9 @@ impl TabTyping {
 
     /// Updates the target capture hotkey badge with latest configured hotkey
     pub fn update_capture_hotkey_badge(&self) {
-        let cap_text = crate::ui::controller::with_engine(|e| {
-            e.config().target_capture_hotkey.display_text()
-        })
-        .unwrap_or_else(|| "Ctrl + ~".to_string());
+        let cap_text =
+            crate::ui::controller::with_engine(|e| e.config().target_capture_hotkey.display_text())
+                .unwrap_or_else(|| "Ctrl + ~".to_string());
         self.lbl_capture_badge.set_text(&cap_text);
     }
 
@@ -780,7 +773,10 @@ impl TabTyping {
                     24,
                     self.hfont_bold,
                 )
-                .map(|l| l.with_tone(LabelTone::Accent).on_surface(SurfaceRole::Window));
+                .map(|l| {
+                    l.with_tone(LabelTone::Accent)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 let lbl_badge = Label::create_centered(
                     self.h_content,
@@ -815,7 +811,10 @@ impl TabTyping {
                     22,
                     self.hfont_normal,
                 )
-                .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Card));
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Card)
+                });
 
                 let combo_strategy = ComboBox::create(
                     self.h_content,
@@ -842,7 +841,10 @@ impl TabTyping {
                     26,
                     self.hfont_normal,
                 )
-                .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Card));
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Card)
+                });
 
                 if let (
                     Some(lbl_index),
@@ -984,11 +986,15 @@ impl TabTyping {
             self.scroll_view.set_content_height(card4_bottom + 12);
         } else {
             self.scroll_view.scroll_to(0);
-            self.check_target_capture.set_checked(global_config.target_capture_enabled);
+            self.check_target_capture
+                .set_checked(global_config.target_capture_enabled);
             self.update_capture_controls_state();
-            self.lbl_capture_title.set_text(strings.typing_lbl_current_key);
-            self.lbl_capture_badge.set_text(&global_config.target_capture_hotkey.display_text());
-            self.lbl_capture_guide.set_text(strings.typing_target_step_guide);
+            self.lbl_capture_title
+                .set_text(strings.typing_lbl_current_key);
+            self.lbl_capture_badge
+                .set_text(&global_config.target_capture_hotkey.display_text());
+            self.lbl_capture_guide
+                .set_text(strings.typing_target_step_guide);
 
             for item in self.rule_items.borrow().iter() {
                 item.destroy();
@@ -1050,6 +1056,23 @@ impl TabTyping {
         self.combo_method
             .reset_items(&all_methods[offset..], Some(method_idx));
 
+        let all_charsets = [
+            strings.typing_inherit_global,
+            strings.charset_unicode,
+            strings.charset_tcvn3,
+        ];
+        let charset_idx_of = |c: crate::vietnamese::Charset| match c {
+            crate::vietnamese::Charset::Unicode => 0,
+            crate::vietnamese::Charset::Tcvn3 => 1,
+        };
+        let charset_idx = match child.map(|c| c.charset) {
+            None => charset_idx_of(global_config.charset),
+            Some(crate::engine::profile::CharsetMode::Inherit) => 0,
+            Some(crate::engine::profile::CharsetMode::Specific(c)) => 1 + charset_idx_of(c),
+        };
+        self.combo_charset
+            .reset_items(&all_charsets[offset..], Some(charset_idx));
+
         self.check_switch_key.set_inherited(
             is_root,
             child.and_then(|c| c.switch_key_enabled),
@@ -1098,6 +1121,12 @@ impl TabTyping {
                 {
                     config.method = m;
                 }
+                if let Some(sel) = self.combo_charset.get_selected() {
+                    config.charset = match sel {
+                        1 => crate::vietnamese::Charset::Tcvn3,
+                        _ => crate::vietnamese::Charset::Unicode,
+                    };
+                }
                 config.target_capture_enabled = self.check_target_capture.is_checked();
             }
             EditTarget::Child(profile) => {
@@ -1117,6 +1146,17 @@ impl TabTyping {
                         .checked_sub(1)
                         .and_then(|idx| decode_input_method(idx, current))
                         .map_or(MethodMode::Inherit, MethodMode::Specific);
+                }
+                if let Some(sel) = self.combo_charset.get_selected() {
+                    profile.charset = match sel {
+                        1 => crate::engine::profile::CharsetMode::Specific(
+                            crate::vietnamese::Charset::Unicode,
+                        ),
+                        2 => crate::engine::profile::CharsetMode::Specific(
+                            crate::vietnamese::Charset::Tcvn3,
+                        ),
+                        _ => crate::engine::profile::CharsetMode::Inherit,
+                    };
                 }
             }
         }
@@ -1139,16 +1179,24 @@ impl TabTyping {
 
     pub fn update_language(&self, strings: &LanguageStrings) {
         self.layout.update_language(strings);
-        self.check_target_capture.set_text(strings.typing_group_target_hotkey);
+        self.check_target_capture
+            .set_text(strings.typing_group_target_hotkey);
         self.lbl_target_title.set_text(strings.typing_group_target);
         self.lbl_target_desc.set_text(strings.typing_target_desc);
-        self.lbl_app_strat_title.set_text(strings.typing_app_strategy_label);
-        self.lbl_exceptions_title.set_text(strings.typing_exceptions_title);
-        self.lbl_exceptions_desc.set_text(strings.typing_exceptions_desc);
-        self.lbl_capture_title.set_text(strings.typing_lbl_current_key);
-        self.btn_capture_change.set_text(strings.typing_btn_change_key);
-        self.lbl_capture_guide.set_text(strings.typing_target_step_guide);
-        self.lbl_empty_state.set_text(strings.typing_target_empty_hint);
+        self.lbl_app_strat_title
+            .set_text(strings.typing_app_strategy_label);
+        self.lbl_exceptions_title
+            .set_text(strings.typing_exceptions_title);
+        self.lbl_exceptions_desc
+            .set_text(strings.typing_exceptions_desc);
+        self.lbl_capture_title
+            .set_text(strings.typing_lbl_current_key);
+        self.btn_capture_change
+            .set_text(strings.typing_btn_change_key);
+        self.lbl_capture_guide
+            .set_text(strings.typing_target_step_guide);
+        self.lbl_empty_state
+            .set_text(strings.typing_target_empty_hint);
         self.update_capture_hotkey_badge();
 
         let snap = crate::ui::controller::with_engine(|e| {
@@ -1211,7 +1259,8 @@ impl TabTyping {
                     if let Some(sel_idx) = item.combo_strategy.get_selected() {
                         let new_strat = index_to_strategy(sel_idx);
                         let strings = crate::language::current();
-                        item.lbl_desc.set_text(strategy_description(new_strat, strings));
+                        item.lbl_desc
+                            .set_text(strategy_description(new_strat, strings));
                         let tid = item.target_id.clone();
                         drop(items);
                         crate::ui::controller::update_target_rule_strategy(&tid, new_strat);
@@ -1223,11 +1272,17 @@ impl TabTyping {
 
         let is_mode_changed = self.combo_mode.is_changed(ctrl_id, notify_code);
         let is_method_changed = self.combo_method.is_changed(ctrl_id, notify_code);
+        let is_charset_changed = self.combo_charset.is_changed(ctrl_id, notify_code);
         let is_sw_toggled = self.check_switch_key.is_toggled(ctrl_id, notify_code);
         let is_feat_toggled = self.check_restore_wrong.is_toggled(ctrl_id, notify_code)
             || self.check_auto_upper.is_toggled(ctrl_id, notify_code);
 
-        if is_mode_changed || is_method_changed || is_sw_toggled || is_feat_toggled {
+        if is_mode_changed
+            || is_method_changed
+            || is_charset_changed
+            || is_sw_toggled
+            || is_feat_toggled
+        {
             if is_sw_toggled {
                 self.update_switch_controls_state();
             }

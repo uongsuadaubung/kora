@@ -8,8 +8,8 @@ pub const INPUT_KEYBOARD: u32 = 1;
 
 /// Cờ gửi phím SendInput
 pub const KEYEVENTF_EXTENDEDKEY: u32 = 0x0001; // Phím mở rộng (mũi tên, numpad enter, v.v.)
-pub const KEYEVENTF_KEYUP: u32 = 0x0002;       // Nhả phím (Key Up)
-pub const KEYEVENTF_UNICODE: u32 = 0x0004;     // Ký tự Unicode UTF-16
+pub const KEYEVENTF_KEYUP: u32 = 0x0002; // Nhả phím (Key Up)
+pub const KEYEVENTF_UNICODE: u32 = 0x0004; // Ký tự Unicode UTF-16
 
 /// Mã nhận diện độc quyền của Kora gắn vào dwExtraInfo để phân biệt phím ảo do Kora phát
 /// với phím phần cứng do người dùng bấm, triệt tiêu đệ quy vòng lặp vô tận.
@@ -74,4 +74,3 @@ pub struct INPUT {
     pub r#type: u32,
     pub u: INPUT_UNION,
 }
-

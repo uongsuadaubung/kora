@@ -30,4 +30,3 @@ pub fn create_app_font(point_size: i32, weight: i32) -> isize {
         )
     }
 }
-

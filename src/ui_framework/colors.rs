@@ -198,4 +198,3 @@ impl ThemePalette {
         }
     }
 }
-

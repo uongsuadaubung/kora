@@ -68,7 +68,9 @@ pub fn check_for_updates() -> UpdateStatus {
 pub fn perform_self_update(download_url: &str) -> UpdateStatus {
     let current_exe = match std::env::current_exe() {
         Ok(p) => p,
-        Err(e) => return UpdateStatus::Error(format!("Không xác định được đường dẫn Kora.exe: {e}")),
+        Err(e) => {
+            return UpdateStatus::Error(format!("Không xác định được đường dẫn Kora.exe: {e}"));
+        }
     };
 
     let new_exe = current_exe.with_extension("exe.new");
@@ -134,7 +136,9 @@ fn download_binary(url: &str, output_path: &Path) -> Result<(), String> {
 pub fn validate_pe_binary(path: &Path) -> Result<(), String> {
     let meta = fs::metadata(path).map_err(|e| format!("Không thể đọc file cập nhật: {e}"))?;
     if meta.len() < 100_000 {
-        return Err("File Kora.exe tải về không hợp lệ hoặc bị hỏng (dung lượng quá nhỏ).".to_string());
+        return Err(
+            "File Kora.exe tải về không hợp lệ hoặc bị hỏng (dung lượng quá nhỏ).".to_string(),
+        );
     }
     let mut file = fs::File::open(path).map_err(|e| format!("Không thể mở file cập nhật: {e}"))?;
     let mut magic = [0u8; 2];
@@ -357,9 +361,7 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
             }
         }
         UpdateStatus::Error(err) => {
-            let msg = strings
-                .update_error_msg
-                .replace("{error}", err);
+            let msg = strings.update_error_msg.replace("{error}", err);
             let title = strings.update_error_title;
 
             unsafe {
@@ -403,7 +405,10 @@ mod tests {
         assert_eq!(parse_tag_name(json), Some("v0.8.0".to_string()));
         assert_eq!(
             parse_exe_download_url(json),
-            Some("https://github.com/uongsuadaubung/kora/releases/download/v0.8.0/Kora.exe".to_string())
+            Some(
+                "https://github.com/uongsuadaubung/kora/releases/download/v0.8.0/Kora.exe"
+                    .to_string()
+            )
         );
     }
 

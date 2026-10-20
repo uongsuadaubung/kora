@@ -1,6 +1,6 @@
 //! Native Win32 Popup / Context Menu Component
 
-use crate::ui_framework::win32::{to_wide, PostMessageW};
+use crate::ui_framework::win32::{PostMessageW, to_wide};
 use std::ptr::null_mut;
 
 #[link(name = "user32")]
@@ -68,7 +68,12 @@ impl PopupMenu {
     pub fn add_submenu(&mut self, text: &str, mut submenu: PopupMenu) {
         let wide = to_wide(text);
         unsafe {
-            AppendMenuW(self.h_menu, MF_POPUP, submenu.h_menu as usize, wide.as_ptr());
+            AppendMenuW(
+                self.h_menu,
+                MF_POPUP,
+                submenu.h_menu as usize,
+                wide.as_ptr(),
+            );
         }
         submenu.h_menu = 0;
     }
@@ -106,4 +111,3 @@ impl Drop for PopupMenu {
         }
     }
 }
-

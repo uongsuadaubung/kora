@@ -248,7 +248,26 @@ pub fn send_vk_event(vk: u32, is_up: bool) {
     }
     let is_extended = matches!(
         vk,
-        0x21 | 0x22 | 0x23 | 0x24 | 0x25 | 0x26 | 0x27 | 0x28 | 0x2D | 0x2E | 0x5B | 0x5C | 0x5D | 0x90 | 0xAD | 0xAE | 0xAF | 0xB0 | 0xB1 | 0xB2 | 0xB3
+        0x21 | 0x22
+            | 0x23
+            | 0x24
+            | 0x25
+            | 0x26
+            | 0x27
+            | 0x28
+            | 0x2D
+            | 0x2E
+            | 0x5B
+            | 0x5C
+            | 0x5D
+            | 0x90
+            | 0xAD
+            | 0xAE
+            | 0xAF
+            | 0xB0
+            | 0xB1
+            | 0xB2
+            | 0xB3
     );
     if is_extended {
         flags |= super::types::KEYEVENTF_EXTENDEDKEY;
@@ -270,4 +289,3 @@ pub fn send_vk_event(vk: u32, is_up: bool) {
         SendInput(1, &input, std::mem::size_of::<INPUT>() as i32);
     }
 }
-

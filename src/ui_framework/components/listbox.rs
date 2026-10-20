@@ -184,11 +184,7 @@ impl ListBox {
 
     pub fn get_selected_index(&self) -> Option<i32> {
         let sel = unsafe { SendMessageW(self.hwnd, LB_GETCURSEL, 0, 0) };
-        if sel >= 0 {
-            Some(sel as i32)
-        } else {
-            None
-        }
+        if sel >= 0 { Some(sel as i32) } else { None }
     }
 
     pub fn set_selected_index(&self, index: i32) {
@@ -198,4 +194,3 @@ impl ListBox {
         }
     }
 }
-

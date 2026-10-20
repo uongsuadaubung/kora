@@ -283,4 +283,3 @@ pub const DC_BRUSH: i32 = 18;
 pub const DC_PEN: i32 = 19;
 
 pub const DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2: isize = -4;
-

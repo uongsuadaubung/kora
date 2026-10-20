@@ -166,15 +166,17 @@ impl ComboBox {
     }
 
     pub fn render_item(dis: &DRAWITEMSTRUCT, is_dark: bool) -> bool {
-        if dis.ctl_type != 3 /* ODT_COMBOBOX */ {
+        if dis.ctl_type != 3
+        /* ODT_COMBOBOX */
+        {
             return false;
         }
 
         unsafe {
             let palette = ThemePalette::get(is_dark);
-            let is_selected = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
-            let is_disabled = (dis.item_state & 0x0004 /* ODS_DISABLED */) != 0;
-            let is_edit = (dis.item_state & 0x1000 /* ODS_COMBOBOXEDIT */) != 0;
+            let is_selected = (dis.item_state & 0x0001/* ODS_SELECTED */) != 0;
+            let is_disabled = (dis.item_state & 0x0004/* ODS_DISABLED */) != 0;
+            let is_edit = (dis.item_state & 0x1000/* ODS_COMBOBOXEDIT */) != 0;
 
             let bg_color = if is_edit {
                 palette.bg_input
@@ -357,4 +359,3 @@ impl ComboBox {
         }
     }
 }
-

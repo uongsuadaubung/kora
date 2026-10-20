@@ -79,4 +79,3 @@ pub fn match_file_tag(stem: &str) -> Option<KeyTag> {
         _ => None,
     }
 }
-

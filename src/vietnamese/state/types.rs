@@ -232,17 +232,18 @@ impl SyllableState {
         }
 
         // 2. Horn ('ơ', 'ư') or Breve ('ă'): purely Vietnamese diacritics.
-        if vowels.iter().any(|v| {
-            matches!(
-                v.diacritic,
-                Diacritic::Horn | Diacritic::Breve
-            )
-        }) {
-            if onset.is_none() && vowels[0].base == BaseVowel::U && vowels[0].diacritic == Diacritic::Horn {
+        if vowels
+            .iter()
+            .any(|v| matches!(v.diacritic, Diacritic::Horn | Diacritic::Breve))
+        {
+            if onset.is_none()
+                && vowels[0].base == BaseVowel::U
+                && vowels[0].diacritic == Diacritic::Horn
+            {
                 if coda.is_empty() {
                     let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
-                    let is_valid_standalone_u = vowels.len() == 1
-                        && matches!(tone, Tone::Grave | Tone::Acute);
+                    let is_valid_standalone_u =
+                        vowels.len() == 1 && matches!(tone, Tone::Grave | Tone::Acute);
                     if !is_ua && !is_valid_standalone_u {
                         return false;
                     }
@@ -262,9 +263,10 @@ impl SyllableState {
         }
 
         // 3. Circumflex on 'A' ('â' from Telex 'aa' / VNI '6'): purely Vietnamese.
-        if vowels.iter().any(|v| {
-            v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex
-        }) {
+        if vowels
+            .iter()
+            .any(|v| v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex)
+        {
             return true;
         }
 

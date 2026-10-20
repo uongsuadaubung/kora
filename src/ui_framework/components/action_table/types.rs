@@ -318,4 +318,3 @@ pub struct ActionTableState {
     pub is_hover_scrollbar: bool,
     pub header_h: i32,
 }
-

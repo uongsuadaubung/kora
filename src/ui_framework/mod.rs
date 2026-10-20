@@ -42,6 +42,7 @@ impl I18nSource for () {
 /// Prelude tiện lợi cho tầng tiêu thụ (`src/ui/views/`):
 /// chỉ cần `use crate::ui_framework::prelude::*;` là có trọn bộ Component, CardLayout, ThemePalette, Tokens và Dialog helpers.
 pub mod prelude {
+    pub use crate::ui_framework::I18nSource;
     pub use crate::ui_framework::colors::ThemePalette;
     pub use crate::ui_framework::components::*;
     pub use crate::ui_framework::dialog::*;
@@ -49,7 +50,5 @@ pub mod prelude {
         cached_font, get_app_font_bold, get_app_font_normal, is_current_dark,
     };
     pub use crate::ui_framework::tokens::{borders, layout, radii, spacing, typography};
-    pub use crate::ui_framework::win32::{set_hwnds_visible, to_wide, RECT};
-    pub use crate::ui_framework::I18nSource;
+    pub use crate::ui_framework::win32::{RECT, set_hwnds_visible, to_wide};
 }
-

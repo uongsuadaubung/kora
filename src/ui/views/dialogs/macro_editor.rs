@@ -1,7 +1,9 @@
 //! Modal Dialog for Adding / Editing Macro Shorthands (Gõ tắt)
 //! Supports both "Add new shorthand" and "Edit existing shorthand"
 
-use super::{attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state};
+use super::{
+    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
+};
 use crate::engine::macro_table::MacroType;
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::*;
@@ -122,16 +124,8 @@ pub unsafe extern "system" fn macro_dialog_wnd_proc(
                 let strings = crate::language::current();
 
                 // 1. Shortcut Key
-                Label::create(
-                    hwnd,
-                    strings.dlg_macro_lbl_key,
-                    24,
-                    16,
-                    175,
-                    18,
-                    font_bold,
-                )
-                .map(|l| l.on_surface(SurfaceRole::Window));
+                Label::create(hwnd, strings.dlg_macro_lbl_key, 24, 16, 175, 18, font_bold)
+                    .map(|l| l.on_surface(SurfaceRole::Window));
                 let txt_key = TextBox::create_with_placeholder(
                     hwnd,
                     0,
@@ -171,16 +165,8 @@ pub unsafe extern "system" fn macro_dialog_wnd_proc(
                 );
 
                 // 3. Replacement Value
-                Label::create(
-                    hwnd,
-                    strings.dlg_macro_lbl_val,
-                    24,
-                    76,
-                    386,
-                    18,
-                    font_bold,
-                )
-                .map(|l| l.on_surface(SurfaceRole::Window));
+                Label::create(hwnd, strings.dlg_macro_lbl_val, 24, 76, 386, 18, font_bold)
+                    .map(|l| l.on_surface(SurfaceRole::Window));
                 let txt_val = TextBox::create_with_placeholder(
                     hwnd,
                     0,

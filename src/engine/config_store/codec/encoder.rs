@@ -3,7 +3,7 @@
 use crate::engine::config::EngineConfig;
 use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::macro_table::{MacroTable, MacroType};
-use crate::engine::profile::{LanguageMode, MethodMode, ProfileManager, MacroAction};
+use crate::engine::profile::{CharsetMode, LanguageMode, MacroAction, MethodMode, ProfileManager};
 
 /// Serializes EngineConfig and MacroTable into unified INI string format
 pub fn serialize_config_and_macros(config: &EngineConfig, macros: &MacroTable) -> String {
@@ -23,6 +23,7 @@ pub fn serialize_config_all(
 
     out.push_str("[general]\n");
     out.push_str(&format!("method = {}\n", config.method));
+    out.push_str(&format!("charset = {}\n", config.charset.as_str()));
     out.push_str(&format!("enabled = {}\n", config.enabled));
     out.push_str(&format!(
         "switch_key_enabled = {}\n",
@@ -94,7 +95,10 @@ pub fn serialize_config_all(
         }
     }
     if !profiles.global_profile.muted_macros.is_empty() {
-        out.push_str(&format!("muted = {}\n", profiles.global_profile.muted_macros.join(", ")));
+        out.push_str(&format!(
+            "muted = {}\n",
+            profiles.global_profile.muted_macros.join(", ")
+        ));
     }
     out.push('\n');
 
@@ -185,6 +189,9 @@ pub fn serialize_config_all(
         if child.method != MethodMode::Inherit {
             out.push_str(&format!("method = {}\n", child.method.as_str()));
         }
+        if child.charset != CharsetMode::Inherit {
+            out.push_str(&format!("charset = {}\n", child.charset.as_str()));
+        }
         if let Some(sw) = child.switch_key {
             out.push_str(&format!("switch_key = {}\n", sw.to_config_str()));
         }
@@ -265,18 +272,16 @@ pub fn serialize_config_all(
         }
 
         if !child.muted_macros.is_empty() {
-            out.push_str(&format!("muted_macros = {}\n", child.muted_macros.join(", ")));
+            out.push_str(&format!(
+                "muted_macros = {}\n",
+                child.muted_macros.join(", ")
+            ));
         }
         for (k, (v, t)) in &child.overridden_macros {
             if *t == MacroType::Normal {
                 out.push_str(&format!("override_macro = {} = {}\n", k, v));
             } else {
-                out.push_str(&format!(
-                    "override_macro = {} = {}:{}\n",
-                    k,
-                    v,
-                    t.as_str()
-                ));
+                out.push_str(&format!("override_macro = {} = {}:{}\n", k, v, t.as_str()));
             }
         }
         for m in &child.app_macros {
@@ -307,23 +312,32 @@ pub fn serialize_config_all(
         for (&trig_vk, (nm, actions)) in &child.overridden_key_macros {
             let trig_nm = vk_to_name(trig_vk);
             let dsl = MacroAction::actions_to_dsl(actions);
-            out.push_str(&format!("override_key_macro = {} = {} | {}\n", trig_nm, nm, dsl));
+            out.push_str(&format!(
+                "override_key_macro = {} = {} | {}\n",
+                trig_nm, nm, dsl
+            ));
         }
         for m in &child.app_key_macros {
             if !m.trigger_name.is_empty() {
                 let dsl = MacroAction::actions_to_dsl(&m.actions);
-                out.push_str(&format!("app_key_macro = {} = {} | {}\n", m.trigger_name, m.name, dsl));
+                out.push_str(&format!(
+                    "app_key_macro = {} = {} | {}\n",
+                    m.trigger_name, m.name, dsl
+                ));
             }
         }
         if let Some(strat) = child.app_strategy {
             out.push_str(&format!("app_strategy = {}\n", strat.as_str()));
         }
         for tr in &child.target_rules {
-            out.push_str(&format!("target = {} = {}\n", tr.target_id, tr.strategy.as_str()));
+            out.push_str(&format!(
+                "target = {} = {}\n",
+                tr.target_id,
+                tr.strategy.as_str()
+            ));
         }
         out.push('\n');
     }
 
     out
 }
-

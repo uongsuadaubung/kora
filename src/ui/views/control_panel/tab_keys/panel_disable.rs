@@ -2,8 +2,8 @@
 //! Allows blocking specific hardware keys from reaching the system or apps.
 
 use crate::engine::profile::ResolvedDisableItem;
-use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use crate::ui::prelude::*;
+use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use std::ops::Deref;
 
 #[repr(transparent)]
@@ -85,4 +85,3 @@ impl DisablePanel {
         });
     }
 }
-

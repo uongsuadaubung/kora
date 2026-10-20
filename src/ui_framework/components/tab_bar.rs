@@ -94,8 +94,8 @@ unsafe extern "system" fn tab_bar_wnd_proc(
                             let track_padding = 3;
                             let available_w = (w - (track_padding * 2)).max(1);
                             let tab_w = (available_w / num_tabs as i32).max(1);
-                            let idx =
-                                ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32) as isize;
+                            let idx = ((x - track_padding) / tab_w).clamp(0, (num_tabs - 1) as i32)
+                                as isize;
                             let old = g.hover_idx;
                             g.hover_idx = idx;
                             old != idx
@@ -466,4 +466,3 @@ impl TabBar {
         }
     }
 }
-

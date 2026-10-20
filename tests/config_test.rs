@@ -36,8 +36,14 @@ fn test_textbox_composite() {
             to_wide("STATIC").as_ptr(),
             null_mut(),
             0x80000000,
-            0, 0, 300, 300,
-            0, 0, 0, null_mut(),
+            0,
+            0,
+            300,
+            300,
+            0,
+            0,
+            0,
+            null_mut(),
         );
         assert!(parent != 0);
 
@@ -331,7 +337,10 @@ fn test_target_capture_hotkey_and_state() {
 
         let custom_hk = kora::engine::config::Hotkey::new(true, true, false, false, 0x4B);
         set_target_capture_hotkey(custom_hk);
-        assert_eq!(get_target_capture_hotkey().display_text(), "Ctrl + Shift + K");
+        assert_eq!(
+            get_target_capture_hotkey().display_text(),
+            "Ctrl + Shift + K"
+        );
 
         set_target_capture_hotkey(hk);
         assert_eq!(get_target_capture_hotkey().display_text(), "Ctrl + ~");
@@ -340,12 +349,15 @@ fn test_target_capture_hotkey_and_state() {
 
 #[test]
 fn test_target_capture_inheritance_and_codec() {
-    use kora::engine::profile::{AppProfile, ProfileManager};
     use kora::Hotkey;
+    use kora::engine::profile::{AppProfile, ProfileManager};
 
     // 1. Root default configuration
     let root = EngineConfig::default();
-    assert!(root.target_capture_enabled, "root default must have target_capture_enabled = true");
+    assert!(
+        root.target_capture_enabled,
+        "root default must have target_capture_enabled = true"
+    );
     assert_eq!(root.target_capture_hotkey.display_text(), "Ctrl + ~");
     assert_eq!(root.target_capture_hotkey.vk, 0xC0);
 
@@ -367,11 +379,15 @@ fn test_target_capture_inheritance_and_codec() {
     }
     let eff_override = pm.resolve_effective_config("figma", &root);
     assert!(eff_override.target_capture_enabled);
-    assert_eq!(eff_override.target_capture_hotkey.display_text(), "Ctrl + ~");
+    assert_eq!(
+        eff_override.target_capture_hotkey.display_text(),
+        "Ctrl + ~"
+    );
 
     // 4. Codec serialization and deserialization (global-only)
     let macros = MacroTable::new();
-    let serialized = kora::engine::config_store::codec::encoder::serialize_config_all(&root, &macros, &pm);
+    let serialized =
+        kora::engine::config_store::codec::encoder::serialize_config_all(&root, &macros, &pm);
     assert!(serialized.contains("target_capture_enabled = true"));
     assert!(serialized.contains("target_capture_hotkey = ctrl_~"));
     // Child section does not serialize target capture hotkey
@@ -405,5 +421,3 @@ fn test_uia_focused() {
         let _ = kora::platform::win32::get_focused_element_id();
     }
 }
-
-

@@ -104,7 +104,9 @@ impl ScrollView {
             )
         };
         if h_content == 0 {
-            unsafe { DestroyWindow(h_viewport); }
+            unsafe {
+                DestroyWindow(h_viewport);
+            }
             return None;
         }
 
@@ -252,7 +254,6 @@ impl ScrollView {
         }
     }
 
-
     /// Invalidates both viewport and content so they repaint cleanly.
     pub fn invalidate(&self) {
         if let Ok(state) = self.state.lock() {
@@ -282,7 +283,15 @@ fn scroll_by_delta(state_arc: &Mutex<ScrollViewState>, delta: i32) {
         (state.h_content, state.h_viewport, target)
     };
     unsafe {
-        SetWindowPos(h_content, 0, 0, -new_scroll, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        SetWindowPos(
+            h_content,
+            0,
+            0,
+            -new_scroll,
+            0,
+            0,
+            SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+        );
         InvalidateRect(h_viewport, null_mut(), 0);
     }
 }
@@ -295,7 +304,8 @@ unsafe extern "system" fn scroll_viewport_wndproc(
 ) -> isize {
     let _dpi_guard = ScopedThreadDpiContext::for_window(hwnd);
 
-    let state_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
+    let state_ptr =
+        unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
     if msg == WM_DESTROY {
         if !state_ptr.is_null() {
             unsafe {
@@ -339,7 +349,6 @@ unsafe extern "system" fn scroll_viewport_wndproc(
                         FillRect(hdc, &rc, bg_brush);
                         DeleteObject(bg_brush);
 
-
                         if state.max_scroll > 0 {
                             let viewport_h = rc.bottom - rc.top;
                             let track_top = 4;
@@ -347,10 +356,12 @@ unsafe extern "system" fn scroll_viewport_wndproc(
                             let track_h = (track_bottom - track_top).max(20);
                             let total_h = state.content_h.max(viewport_h);
                             let thumb_h = ((viewport_h as f32 / total_h as f32) * track_h as f32)
-                                .clamp(28.0, track_h as f32) as i32;
+                                .clamp(28.0, track_h as f32)
+                                as i32;
                             let travel = (track_h - thumb_h).max(1);
-                            let thumb_top =
-                                track_top + ((state.scroll_y as f32 / state.max_scroll as f32) * travel as f32) as i32;
+                            let thumb_top = track_top
+                                + ((state.scroll_y as f32 / state.max_scroll as f32)
+                                    * travel as f32) as i32;
 
                             let thumb_color = if state.is_dragging_scroll {
                                 palette.accent
@@ -409,12 +420,15 @@ unsafe extern "system" fn scroll_viewport_wndproc(
                         let track_h = (track_bottom - track_top).max(20);
                         let total_h = state.content_h.max(viewport_h);
                         let thumb_h = ((viewport_h as f32 / total_h as f32) * track_h as f32)
-                            .clamp(28.0, track_h as f32) as i32;
+                            .clamp(28.0, track_h as f32)
+                            as i32;
                         let travel = (track_h - thumb_h).max(1);
 
                         let delta_y = y - state.drag_start_y;
-                        let scroll_delta = ((delta_y as f32 / travel as f32) * state.max_scroll as f32) as i32;
-                        let target = (state.drag_start_scroll + scroll_delta).clamp(0, state.max_scroll);
+                        let scroll_delta =
+                            ((delta_y as f32 / travel as f32) * state.max_scroll as f32) as i32;
+                        let target =
+                            (state.drag_start_scroll + scroll_delta).clamp(0, state.max_scroll);
                         if target != state.scroll_y {
                             state.scroll_y = target;
                             update_data = Some((state.h_content, target));
@@ -422,7 +436,15 @@ unsafe extern "system" fn scroll_viewport_wndproc(
                     }
                 }
                 if let Some((h_content, target)) = update_data {
-                    SetWindowPos(h_content, 0, 0, -target, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                    SetWindowPos(
+                        h_content,
+                        0,
+                        0,
+                        -target,
+                        0,
+                        0,
+                        SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+                    );
                     InvalidateRect(hwnd, null_mut(), 0);
                     return 0;
                 }
@@ -463,7 +485,8 @@ unsafe extern "system" fn scroll_content_wndproc(
 ) -> isize {
     let _dpi_guard = ScopedThreadDpiContext::for_window(hwnd);
 
-    let state_ptr = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
+    let state_ptr =
+        unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const Mutex<ScrollViewState> };
     if msg == WM_DESTROY {
         if !state_ptr.is_null() {
             unsafe {
@@ -514,11 +537,13 @@ unsafe extern "system" fn scroll_content_wndproc(
                 }
                 0
             }
-            WM_CTLCOLORSTATIC => {
-                crate::ui_framework::win32::ctlcolor::handle_ctlcolor_static(hwnd, msg, wparam, lparam)
-            }
+            WM_CTLCOLORSTATIC => crate::ui_framework::win32::ctlcolor::handle_ctlcolor_static(
+                hwnd, msg, wparam, lparam,
+            ),
             WM_CTLCOLOREDIT | WM_CTLCOLORLISTBOX => {
-                crate::ui_framework::win32::ctlcolor::handle_ctlcolor_edit_listbox(hwnd, msg, wparam, lparam)
+                crate::ui_framework::win32::ctlcolor::handle_ctlcolor_edit_listbox(
+                    hwnd, msg, wparam, lparam,
+                )
             }
             WM_SETCURSOR => {
                 crate::ui_framework::win32::ctlcolor::handle_setcursor(hwnd, msg, wparam, lparam)

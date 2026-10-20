@@ -636,4 +636,3 @@ pub fn render_table(hwnd: isize, hdc: isize, state: &ActionTableState) {
         DeleteDC(mem_dc);
     }
 }
-

@@ -167,5 +167,3 @@ impl Drop for ScopedThreadDpiContext {
         }
     }
 }
-
-

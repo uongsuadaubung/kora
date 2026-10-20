@@ -1,20 +1,20 @@
 //! Sidebar Component for Profile-First Workspace Hub
 //! Contains Profile list with add button and System Settings / About quick links.
 
+use super::ViewMode;
 use crate::engine::profile::ProfileRef;
+use crate::platform::win32::ENGINE_INSTANCE;
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::listbox::ListBox;
-use crate::ui::win32::{
-    to_wide, fill_rect_color, round_rect, DrawTextW, InvalidateRect, SelectObject,
-    SetBkMode, SetTextColor, DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX,
-    DT_SINGLELINE, DT_VCENTER, FW_BOLD, FW_NORMAL, MEASUREITEMSTRUCT, RECT, TRANSPARENT,
-};
 use crate::ui::components::{ButtonVariant, Label, PushButton, SurfaceRole};
-use crate::platform::win32::ENGINE_INSTANCE;
-use super::ViewMode;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::radii::*;
 use crate::ui::tokens::typography::*;
+use crate::ui::win32::{
+    DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, DrawTextW, FW_BOLD,
+    FW_NORMAL, InvalidateRect, MEASUREITEMSTRUCT, RECT, SelectObject, SetBkMode, SetTextColor,
+    TRANSPARENT, fill_rect_color, round_rect, to_wide,
+};
 use std::ptr::null_mut;
 use std::sync::{Arc, RwLock};
 
@@ -113,7 +113,7 @@ impl SidebarControls {
         let hf_bold = hfont_bold;
         list_profiles.set_item_drawer(move |dis, is_dark| {
             if dis.item_id != u32::MAX {
-                let is_selected = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
+                let is_selected = (dis.item_state & 0x0001/* ODS_SELECTED */) != 0;
                 Self::draw_profile_item_ext(
                     &items_clone,
                     hf_bold,
@@ -162,11 +162,7 @@ impl SidebarControls {
     }
 
     /// Populates profile items into the sidebar ListBox
-    pub fn populate_profiles(
-        &self,
-        profiles: &[ProfileRef<'_>],
-        selected_id: &str,
-    ) {
+    pub fn populate_profiles(&self, profiles: &[ProfileRef<'_>], selected_id: &str) {
         let strings = crate::language::current();
         let mut items = Vec::new();
         let mut sel_idx = 0;
@@ -192,7 +188,11 @@ impl SidebarControls {
             };
             items.push(SidebarProfileItem {
                 id: p.id().to_string(),
-                icon: if icon.is_empty() { "⌨️".to_string() } else { icon.clone() },
+                icon: if icon.is_empty() {
+                    "⌨️".to_string()
+                } else {
+                    icon.clone()
+                },
                 name,
                 desc,
             });
@@ -243,7 +243,8 @@ impl SidebarControls {
 
     pub fn update_language(&self, strings: &crate::language::LanguageStrings) {
         self.lbl_title.set_text(strings.sidebar_profiles_title);
-        self.btn_system_settings.set_text(strings.sidebar_btn_settings);
+        self.btn_system_settings
+            .set_text(strings.sidebar_btn_settings);
         self.btn_about.set_text(strings.sidebar_btn_about);
         if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
             && let Some(ref engine) = *guard
@@ -305,7 +306,13 @@ impl SidebarControls {
 
             // 2. Draw card background (rounded rect if selected)
             if is_selected {
-                round_rect(hdc, &card_rc, RADIUS_MD, palette.tab_active_bg, Some(palette.border));
+                round_rect(
+                    hdc,
+                    &card_rc,
+                    RADIUS_MD,
+                    palette.tab_active_bg,
+                    Some(palette.border),
+                );
             }
 
             SetBkMode(hdc, TRANSPARENT);
@@ -317,7 +324,11 @@ impl SidebarControls {
                 right: card_rc.left + 30,
                 bottom: card_rc.top + 34,
             };
-            let name_color = if is_selected { palette.accent } else { palette.text_primary };
+            let name_color = if is_selected {
+                palette.accent
+            } else {
+                palette.text_primary
+            };
             SetTextColor(hdc, name_color);
             SelectObject(hdc, hfont_bold);
             DrawTextW(
@@ -388,14 +399,26 @@ impl SidebarControls {
                 bottom: dis.rc_item.bottom - 1,
             };
 
-            let is_pressed = (dis.item_state & 0x0001 /* ODS_SELECTED */) != 0;
+            let is_pressed = (dis.item_state & 0x0001/* ODS_SELECTED */) != 0;
             let is_hover = PushButton::is_mouse_hover(dis.hwnd_item);
 
             // 2. Draw card background (rounded rect if active, pressed, or hovered)
             if is_active || is_pressed {
-                round_rect(dis.hdc, &card_rc, RADIUS_MD, palette.tab_active_bg, Some(palette.border));
+                round_rect(
+                    dis.hdc,
+                    &card_rc,
+                    RADIUS_MD,
+                    palette.tab_active_bg,
+                    Some(palette.border),
+                );
             } else if is_hover {
-                round_rect(dis.hdc, &card_rc, RADIUS_MD, palette.tab_hover_bg, Some(palette.border));
+                round_rect(
+                    dis.hdc,
+                    &card_rc,
+                    RADIUS_MD,
+                    palette.tab_hover_bg,
+                    Some(palette.border),
+                );
             }
 
             // 3. Draw text and icon
@@ -433,11 +456,7 @@ impl SidebarControls {
         false
     }
 
-    pub fn handle_profile_selection(
-        &self,
-        controls: &super::ControlPanelControls,
-        hwnd: isize,
-    ) {
+    pub fn handle_profile_selection(&self, controls: &super::ControlPanelControls, hwnd: isize) {
         let sel_idx = self.list_profiles.get_selected_index();
         let current_view_mode = controls.get_view_mode();
 
@@ -472,12 +491,10 @@ impl SidebarControls {
         }
     }
 
-    pub fn switch_to_profile(
-        controls: &super::ControlPanelControls,
-        hwnd: isize,
-        id: &str,
-    ) {
-        if crate::ui::controller::with_engine(|e| e.profile_manager.selected_id = id.to_string()).is_none() {
+    pub fn switch_to_profile(controls: &super::ControlPanelControls, hwnd: isize, id: &str) {
+        if crate::ui::controller::with_engine(|e| e.profile_manager.selected_id = id.to_string())
+            .is_none()
+        {
             return;
         }
         let cur_tab = controls.tab_bar.get_cur_sel();

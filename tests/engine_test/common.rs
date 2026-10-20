@@ -40,4 +40,3 @@ pub fn backspace(eng: &mut VietnameseEngine, scr: &mut String) {
     scr.pop();
     eng.on_backspace();
 }
-

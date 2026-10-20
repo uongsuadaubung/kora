@@ -149,4 +149,3 @@ impl Drop for BackBuffer {
         }
     }
 }
-

@@ -1,7 +1,9 @@
 //! Modal Confirmation Dialog for Kora UI
 //! Generic, reusable Yes/No dialog with customizable title, message, button labels, and danger styling.
 
-use super::{attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state, ModalSpec};
+use super::{
+    ModalSpec, attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state,
+};
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
 use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
@@ -167,14 +169,26 @@ fn paint(hwnd: isize, hdc: isize, st: &ConfirmState) {
     fill_rect_color(hdc, &rc_client, palette.bg_window);
 
     // 2. Footer background and separator line
-    let rc_footer = RECT { top: FOOTER_Y, ..rc_client };
+    let rc_footer = RECT {
+        top: FOOTER_Y,
+        ..rc_client
+    };
     fill_rect_color(hdc, &rc_footer, palette.bg_sidebar);
     draw_line(hdc, 0, FOOTER_Y, rc_client.right, FOOTER_Y, palette.border);
 
     // 3. Vibrant Colored Icon Badge (Warning or Info)
     let badge_size = 40;
-    let rc_badge = RECT { left: 20, top: 24, right: 20 + badge_size, bottom: 24 + badge_size };
-    let badge_color = if is_danger { palette.danger_border } else { palette.accent };
+    let rc_badge = RECT {
+        left: 20,
+        top: 24,
+        right: 20 + badge_size,
+        bottom: 24 + badge_size,
+    };
+    let badge_color = if is_danger {
+        palette.danger_border
+    } else {
+        palette.accent
+    };
     fill_ellipse(hdc, &rc_badge, badge_color);
 
     unsafe {
@@ -182,17 +196,38 @@ fn paint(hwnd: isize, hdc: isize, st: &ConfirmState) {
 
         // Centered glyph: bold pure white "!" for danger, "i" for info
         let mut rc_glyph = rc_badge;
-        let glyph: &[u16] = if is_danger { &[b'!' as u16, 0] } else { &[b'i' as u16, 0] };
+        let glyph: &[u16] = if is_danger {
+            &[b'!' as u16, 0]
+        } else {
+            &[b'i' as u16, 0]
+        };
         let font_glyph = crate::ui::theme::cached_font(if is_danger { 18 } else { 16 }, FW_BOLD);
         let prev_font = SelectObject(hdc, font_glyph);
         SetTextColor(hdc, palette.text_white);
-        DrawTextW(hdc, glyph.as_ptr(), -1, &mut rc_glyph, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        DrawTextW(
+            hdc,
+            glyph.as_ptr(),
+            -1,
+            &mut rc_glyph,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
 
         // 4. Message text (word wrapped)
-        let mut rc_msg = RECT { left: 74, top: 22, right: rc_client.right - 20, bottom: FOOTER_Y - 8 };
+        let mut rc_msg = RECT {
+            left: 74,
+            top: 22,
+            right: rc_client.right - 20,
+            bottom: FOOTER_Y - 8,
+        };
         SelectObject(hdc, get_app_font_normal());
         SetTextColor(hdc, palette.text_primary);
-        DrawTextW(hdc, st.message_w.as_ptr(), -1, &mut rc_msg, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+        DrawTextW(
+            hdc,
+            st.message_w.as_ptr(),
+            -1,
+            &mut rc_msg,
+            DT_LEFT | DT_WORDBREAK | DT_NOPREFIX,
+        );
         SelectObject(hdc, prev_font);
     }
 }
@@ -220,7 +255,9 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
         match msg {
             WM_CREATE => {
                 attach_state::<ConfirmState>(hwnd, lparam);
-                let Some(st) = state::<ConfirmState>(hwnd) else { return -1 };
+                let Some(st) = state::<ConfirmState>(hwnd) else {
+                    return -1;
+                };
                 let is_danger = st.options.is_danger;
                 let palette = ThemePalette::get(is_current_dark());
 

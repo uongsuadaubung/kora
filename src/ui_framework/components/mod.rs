@@ -42,11 +42,7 @@ pub fn next_control_id() -> u32 {
 /// Returns `id` if non-zero, or allocates a fresh runtime ID via [`next_control_id`].
 #[inline]
 pub fn resolve_id(id: u32) -> u32 {
-    if id == 0 {
-        next_control_id()
-    } else {
-        id
-    }
+    if id == 0 { next_control_id() } else { id }
 }
 
 /// Trait implemented by all Win32 UI components so [`CardLayout`] can automatically
@@ -91,5 +87,3 @@ impl_component_handle!(
     ListBox,
     ActionTable,
 );
-
-

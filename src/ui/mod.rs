@@ -32,13 +32,13 @@ impl crate::ui_framework::I18nSource for crate::language::LanguageStrings {
 pub mod prelude {
     pub use crate::ui_framework::dialog::*;
     pub use crate::ui_framework::prelude::{
-        borders, cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,
-        next_control_id, radii, resolve_id, set_hwnds_visible, spacing, to_wide, typography,
         ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
         CellAlign, CheckBox, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
-        InCard, I18nSource, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
-        PillBadge, PopupMenu, PushButton, ScrollView, Slider, StaticText, SurfaceRole, TabBar, TableAction,
-        TableCell, TableRow, TextBox, ThemePalette, TwoState, RECT,
+        I18nSource, InCard, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
+        PillBadge, PopupMenu, PushButton, RECT, ScrollView, Slider, StaticText, SurfaceRole,
+        TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, TwoState, borders,
+        cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,
+        next_control_id, radii, resolve_id, set_hwnds_visible, spacing, to_wide, typography,
     };
 
     pub type CardLayout<S = OutsideCard> =
@@ -51,7 +51,7 @@ pub mod prelude {
 }
 
 use crate::ui::theme::recreate_theme_brushes;
-use crate::ui::tray::{get_small_icon_size, load_icon_from_memory, TrayHandler};
+use crate::ui::tray::{TrayHandler, get_small_icon_size, load_icon_from_memory};
 use crate::ui::views::ControlPanelControls;
 use crate::ui::wnd_proc::{control_panel_wnd_proc, tray_helper_wnd_proc};
 use std::cell::{Cell, RefCell};
@@ -139,13 +139,18 @@ pub fn show_control_panel() {
     // divergence when invoked from a Per-Monitor V2 window or context (e.g. tray menu).
     let panel_dpi_ctx = unsafe { GetWindowDpiAwarenessContext(ui.h_panel) };
     if panel_dpi_ctx != 0 {
-        unsafe { SetThreadDpiAwarenessContext(panel_dpi_ctx); }
+        unsafe {
+            SetThreadDpiAwarenessContext(panel_dpi_ctx);
+        }
     }
 
     let c = &ui.controls;
-    c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(c.tab_bar.get_cur_sel()));
-    let Some(cfg) = c.refresh_from_engine() else { return };
-
+    c.update_view_mode(crate::ui::views::control_panel::ViewMode::Profile(
+        c.tab_bar.get_cur_sel(),
+    ));
+    let Some(cfg) = c.refresh_from_engine() else {
+        return;
+    };
 
     // Language / theme are kept in sync by their own handlers (system tab, defaults,
     // WM_SETTINGCHANGE); only re-apply here if they drifted while hidden.
@@ -365,11 +370,7 @@ pub fn init_ui() -> bool {
             tray: RefCell::new(tray),
             controls,
         }));
-        SetWindowLongPtrW(
-            h_panel,
-            GWLP_USERDATA,
-            &state.controls as *const _ as isize,
-        );
+        SetWindowLongPtrW(h_panel, GWLP_USERDATA, &state.controls as *const _ as isize);
         UI.with(|cell| cell.set(Some(state)));
         HELPER_HWND.store(h_helper, Ordering::Relaxed);
         crate::platform::win32::capture::set_target_capture_notify_hwnd(h_panel);

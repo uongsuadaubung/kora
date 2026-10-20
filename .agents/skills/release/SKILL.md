@@ -21,11 +21,11 @@ Follow these exact steps whenever the user asks to release a new version of Kora
 
 ## 3. Update Version & Build Release Binary
 1. Update `version = "X.Y.Z"` in `Cargo.toml` (if not already updated).
-2. Build the production binary:
+2. Build the production binary into `target/dist` to avoid Windows executable file locking if the user is running `target/release/Kora.exe`:
    ```powershell
-   cargo build --release --bin Kora
+   cargo build --release --bin Kora --target-dir target/dist
    ```
-   Verify that `target/release/Kora.exe` exists and compiled cleanly.
+   Verify that `target/dist/release/Kora.exe` exists and compiled cleanly.
 
 ## 4. Commit, Tag, and Push
 1. Stage all changes and commit (if there are uncommitted changes):
@@ -57,9 +57,9 @@ Follow these exact steps whenever the user asks to release a new version of Kora
      - <Mô tả kỹ thuật ngắn gọn>
    ```
    *(Only include sections that apply to the release.)*
-2. Create the GitHub Release and upload `target/release/Kora.exe`:
+2. Create the GitHub Release and upload `target/dist/release/Kora.exe`:
    ```powershell
-   gh release create vX.Y.Z target/release/Kora.exe --title "Version X.Y.Z" --notes-file "<path/to/release_notes_vX.Y.Z.md>"
+   gh release create vX.Y.Z target/dist/release/Kora.exe --title "Version X.Y.Z" --notes-file "<path/to/release_notes_vX.Y.Z.md>"
    ```
 3. Return the published GitHub Release URL, version, tag, and attached asset confirmation to the user.
 

@@ -20,7 +20,11 @@ pub struct Notification {
 }
 
 impl Notification {
-    pub fn new(title: impl Into<String>, message: impl Into<String>, level: NotificationLevel) -> Self {
+    pub fn new(
+        title: impl Into<String>,
+        message: impl Into<String>,
+        level: NotificationLevel,
+    ) -> Self {
         Self {
             title: title.into(),
             message: message.into(),
@@ -50,8 +54,8 @@ pub fn send_notification(notification: &Notification) -> bool {
 
     use crate::ui::tray::handler::TRAY_ICON_ID;
     use crate::ui::tray::icon::{
-        Shell_NotifyIconW, NIF_INFO, NIIF_ERROR, NIIF_INFO, NIIF_WARNING, NIM_MODIFY,
-        NOTIFYICONDATAW,
+        NIF_INFO, NIIF_ERROR, NIIF_INFO, NIIF_WARNING, NIM_MODIFY, NOTIFYICONDATAW,
+        Shell_NotifyIconW,
     };
 
     let mut nid: NOTIFYICONDATAW = unsafe { std::mem::zeroed() };
@@ -122,4 +126,3 @@ mod tests {
         assert!(!res);
     }
 }
-

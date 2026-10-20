@@ -97,8 +97,13 @@ impl ProfileManager {
     }
 
     /// Finds a mutable child profile matching the executable filename (e.g. "cs2.exe")
-    pub fn find_profile_by_process_mut(&mut self, exe_name: &str) -> Option<&mut AppProfile<Child>> {
-        self.profiles.iter_mut().find(|p| p.matches_process(exe_name))
+    pub fn find_profile_by_process_mut(
+        &mut self,
+        exe_name: &str,
+    ) -> Option<&mut AppProfile<Child>> {
+        self.profiles
+            .iter_mut()
+            .find(|p| p.matches_process(exe_name))
     }
 
     /// Switches active profile based on the foreground application executable name.
@@ -140,6 +145,10 @@ impl ProfileManager {
 
             if let MethodMode::Specific(m) = child.method {
                 cfg.method = m;
+            }
+
+            if let CharsetMode::Specific(c) = child.charset {
+                cfg.charset = c;
             }
 
             if let Some(sw) = child.switch_key {
@@ -296,7 +305,9 @@ impl ProfileManager {
 
         // 1. Global disabled keys unless unmuted by root or unmuted by child
         for &vk in global_disabled {
-            if !self.global_profile.unmuted_disabled.contains(&vk) && !child.unmuted_disabled.contains(&vk) {
+            if !self.global_profile.unmuted_disabled.contains(&vk)
+                && !child.unmuted_disabled.contains(&vk)
+            {
                 result.push(vk);
             }
         }
@@ -316,32 +327,56 @@ impl ProfileManager {
 
     /// Resolves effective macro entries for engine typing
     /// Formula: (Global \ Muted) U Overridden U AppSpecific
-    pub fn resolve_effective_macros(&self, profile_id: &str, global_macros: &[MacroEntry]) -> Vec<MacroEntry> {
+    pub fn resolve_effective_macros(
+        &self,
+        profile_id: &str,
+        global_macros: &[MacroEntry],
+    ) -> Vec<MacroEntry> {
         if profile_id == "global" {
             return global_macros
                 .iter()
-                .filter(|entry| !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)))
+                .filter(|entry| {
+                    !self
+                        .global_profile
+                        .muted_macros
+                        .iter()
+                        .any(|m| m.eq_ignore_ascii_case(&entry.key))
+                })
                 .cloned()
                 .collect();
         }
 
         let child = match self.get_profile(profile_id) {
             Some(c) => c,
-            None => return global_macros
-                .iter()
-                .filter(|entry| !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)))
-                .cloned()
-                .collect(),
+            None => {
+                return global_macros
+                    .iter()
+                    .filter(|entry| {
+                        !self
+                            .global_profile
+                            .muted_macros
+                            .iter()
+                            .any(|m| m.eq_ignore_ascii_case(&entry.key))
+                    })
+                    .cloned()
+                    .collect();
+            }
         };
 
         let mut map: HashMap<String, MacroEntry> = HashMap::new();
 
         // 1. Global macros
         for entry in global_macros {
-            if child.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)) {
+            if child
+                .muted_macros
+                .iter()
+                .any(|m| m.eq_ignore_ascii_case(&entry.key))
+            {
                 continue; // Muted in child
             }
-            if let Some((over_val, over_type)) = child.overridden_macros.get(&entry.key.to_lowercase()) {
+            if let Some((over_val, over_type)) =
+                child.overridden_macros.get(&entry.key.to_lowercase())
+            {
                 map.insert(
                     entry.key.to_lowercase(),
                     MacroEntry {
@@ -350,14 +385,23 @@ impl ProfileManager {
                         macro_type: *over_type,
                     },
                 );
-            } else if !self.global_profile.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)) {
+            } else if !self
+                .global_profile
+                .muted_macros
+                .iter()
+                .any(|m| m.eq_ignore_ascii_case(&entry.key))
+            {
                 map.insert(entry.key.to_lowercase(), entry.clone());
             }
         }
 
         // 2. Child app-specific macros
         for entry in &child.app_macros {
-            if child.muted_macros.iter().any(|m| m.eq_ignore_ascii_case(&entry.key)) {
+            if child
+                .muted_macros
+                .iter()
+                .any(|m| m.eq_ignore_ascii_case(&entry.key))
+            {
                 continue;
             }
             map.insert(entry.key.to_lowercase(), entry.clone());
@@ -410,14 +454,20 @@ impl ProfileManager {
             if child.muted_key_macros.contains(&rule.trigger_vk) {
                 continue; // Tombstone: muted in child
             }
-            if let Some((overridden_name, overridden_actions)) = child.overridden_key_macros.get(&rule.trigger_vk) {
+            if let Some((overridden_name, overridden_actions)) =
+                child.overridden_key_macros.get(&rule.trigger_vk)
+            {
                 result.push(KeyMacroRule::with_trigger_name(
                     rule.trigger_vk,
                     rule.trigger_name.clone(),
                     overridden_name.clone(),
                     overridden_actions.clone(),
                 ));
-            } else if !self.global_profile.muted_key_macros.contains(&rule.trigger_vk) {
+            } else if !self
+                .global_profile
+                .muted_key_macros
+                .contains(&rule.trigger_vk)
+            {
                 result.push(rule.clone());
             }
         }
@@ -524,7 +574,12 @@ impl ProfileManager {
             return Some(rule.to_vk);
         }
         if let Some(&overridden_to_vk) = child.overridden_remaps.get(&vk) {
-            if self.global_profile.app_remaps.iter().any(|r| r.from_vk == vk) {
+            if self
+                .global_profile
+                .app_remaps
+                .iter()
+                .any(|r| r.from_vk == vk)
+            {
                 return Some(overridden_to_vk);
             }
         }
@@ -721,7 +776,9 @@ impl ProfileManager {
             if child.app_disabled.contains(&vk) {
                 continue; // Handled as AppSpecific in step 2
             }
-            if child.unmuted_disabled.contains(&vk) || self.global_profile.unmuted_disabled.contains(&vk) {
+            if child.unmuted_disabled.contains(&vk)
+                || self.global_profile.unmuted_disabled.contains(&vk)
+            {
                 items.push(ResolvedDisableItem {
                     vk,
                     key_name: crate::engine::config::hotkey::vk_to_name(vk).to_string(),
@@ -753,12 +810,20 @@ impl ProfileManager {
     }
 
     /// Builds UI list items for Macro table
-    pub fn resolve_macro_items_for_ui(&self, profile_id: &str, global_macros: &[MacroEntry]) -> Vec<ResolvedMacroItem> {
+    pub fn resolve_macro_items_for_ui(
+        &self,
+        profile_id: &str,
+        global_macros: &[MacroEntry],
+    ) -> Vec<ResolvedMacroItem> {
         if profile_id == "global" {
             return global_macros
                 .iter()
                 .map(|m| {
-                    let is_muted = self.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key));
+                    let is_muted = self
+                        .global_profile
+                        .muted_macros
+                        .iter()
+                        .any(|k| k.eq_ignore_ascii_case(&m.key));
                     ResolvedMacroItem {
                         key: m.key.clone(),
                         value: m.value.clone(),
@@ -779,10 +844,18 @@ impl ProfileManager {
 
         // 1. Global macros with child status
         for m in global_macros {
-            if child.app_macros.iter().any(|am| am.key.eq_ignore_ascii_case(&m.key)) {
+            if child
+                .app_macros
+                .iter()
+                .any(|am| am.key.eq_ignore_ascii_case(&m.key))
+            {
                 continue; // Handled as AppSpecific in step 2
             }
-            if child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key)) {
+            if child
+                .muted_macros
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(&m.key))
+            {
                 items.push(ResolvedMacroItem {
                     key: m.key.clone(),
                     value: m.value.clone(),
@@ -790,7 +863,9 @@ impl ProfileManager {
                     origin: RuleOrigin::MutedGlobal,
                     is_active: false,
                 });
-            } else if let Some((over_val, over_type)) = child.overridden_macros.get(&m.key.to_lowercase()) {
+            } else if let Some((over_val, over_type)) =
+                child.overridden_macros.get(&m.key.to_lowercase())
+            {
                 items.push(ResolvedMacroItem {
                     key: m.key.clone(),
                     value: over_val.clone(),
@@ -798,7 +873,12 @@ impl ProfileManager {
                     origin: RuleOrigin::OverriddenGlobal,
                     is_active: true,
                 });
-            } else if self.global_profile.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key)) {
+            } else if self
+                .global_profile
+                .muted_macros
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(&m.key))
+            {
                 items.push(ResolvedMacroItem {
                     key: m.key.clone(),
                     value: m.value.clone(),
@@ -819,7 +899,10 @@ impl ProfileManager {
 
         // 2. Child app-specific macros
         for m in &child.app_macros {
-            let is_muted = child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&m.key));
+            let is_muted = child
+                .muted_macros
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(&m.key));
             items.push(ResolvedMacroItem {
                 key: m.key.clone(),
                 value: m.value.clone(),
@@ -862,7 +945,11 @@ impl ProfileManager {
 
         // 1. All global items with their child state
         for m in global_macros {
-            if child.app_key_macros.iter().any(|akm| akm.trigger_vk == m.trigger_vk) {
+            if child
+                .app_key_macros
+                .iter()
+                .any(|akm| akm.trigger_vk == m.trigger_vk)
+            {
                 continue; // Handled as AppSpecific in step 2
             }
             if child.muted_key_macros.contains(&m.trigger_vk) {
@@ -874,7 +961,9 @@ impl ProfileManager {
                     origin: RuleOrigin::MutedGlobal,
                     is_active: false,
                 });
-            } else if let Some((over_name, over_actions)) = child.overridden_key_macros.get(&m.trigger_vk) {
+            } else if let Some((over_name, over_actions)) =
+                child.overridden_key_macros.get(&m.trigger_vk)
+            {
                 items.push(ResolvedKeyMacroItem {
                     trigger_vk: m.trigger_vk,
                     trigger_name: m.trigger_name.clone(),
@@ -920,4 +1009,3 @@ impl ProfileManager {
         items
     }
 }
-

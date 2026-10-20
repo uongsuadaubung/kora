@@ -3,7 +3,9 @@
 //! Layout follows mockup_profiles.html: custom header, hint box, icon + name,
 //! .exe field with file browser, searchable running-app list and footer bar.
 
-use super::{attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state, ModalSpec};
+use super::{
+    ModalSpec, attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state,
+};
 use crate::engine::profile::AppProfile;
 use crate::platform::win32::app_detect::get_process_name_for_pid;
 use crate::platform::win32::types::GetWindowThreadProcessId;
@@ -213,7 +215,19 @@ fn mono_font() -> isize {
     static FONT: OnceLock<isize> = OnceLock::new();
     *FONT.get_or_init(|| unsafe {
         CreateFontW(
-            -12, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0,
+            -12,
+            0,
+            0,
+            0,
+            FW_NORMAL,
+            0,
+            0,
+            0,
+            DEFAULT_CHARSET,
+            0,
+            0,
+            CLEARTYPE_QUALITY,
+            0,
             to_wide("Consolas").as_ptr(),
         )
     })
@@ -223,24 +237,50 @@ fn mono_font() -> isize {
 fn app_row(app: &AppWindowEntry) -> TableRow {
     let title = to_wide(&app.title);
     let exe = to_wide(&app.exe_name);
-    TableRow::new().cell(TableCell::Custom(Arc::new(move |hdc: isize, rc: &RECT, palette: &ThemePalette| unsafe {
-        SetBkMode(hdc, TRANSPARENT);
-        let old = SelectObject(hdc, mono_font());
-        let mut calc = *rc;
-        DrawTextW(hdc, exe.as_ptr(), -1, &mut calc, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
-        let exe_w = (calc.right - calc.left).min((rc.right - rc.left) / 2);
-        let mut exe_rc = RECT { left: rc.right - 14 - exe_w, right: rc.right - 14, ..*rc };
-        SetTextColor(hdc, palette.text_secondary);
-        DrawTextW(hdc, exe.as_ptr(), -1, &mut exe_rc,
-            DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    TableRow::new().cell(TableCell::Custom(Arc::new(
+        move |hdc: isize, rc: &RECT, palette: &ThemePalette| unsafe {
+            SetBkMode(hdc, TRANSPARENT);
+            let old = SelectObject(hdc, mono_font());
+            let mut calc = *rc;
+            DrawTextW(
+                hdc,
+                exe.as_ptr(),
+                -1,
+                &mut calc,
+                DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX,
+            );
+            let exe_w = (calc.right - calc.left).min((rc.right - rc.left) / 2);
+            let mut exe_rc = RECT {
+                left: rc.right - 14 - exe_w,
+                right: rc.right - 14,
+                ..*rc
+            };
+            SetTextColor(hdc, palette.text_secondary);
+            DrawTextW(
+                hdc,
+                exe.as_ptr(),
+                -1,
+                &mut exe_rc,
+                DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+            );
 
-        SelectObject(hdc, get_app_font_normal());
-        let mut title_rc = RECT { left: rc.left + 14, right: exe_rc.left - 12, ..*rc };
-        SetTextColor(hdc, palette.text_primary);
-        DrawTextW(hdc, title.as_ptr(), -1, &mut title_rc,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-        SelectObject(hdc, old);
-    })))
+            SelectObject(hdc, get_app_font_normal());
+            let mut title_rc = RECT {
+                left: rc.left + 14,
+                right: exe_rc.left - 12,
+                ..*rc
+            };
+            SetTextColor(hdc, palette.text_primary);
+            DrawTextW(
+                hdc,
+                title.as_ptr(),
+                -1,
+                &mut title_rc,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
+            );
+            SelectObject(hdc, old);
+        },
+    )))
 }
 
 /// Re-enumerates windows (if `rescan`) and refills the list using the search box filter
@@ -348,37 +388,124 @@ unsafe fn paint(hwnd: isize) {
         fill(hdc, &rc, palette.bg_window);
 
         // Header: accent "+" badge, title, bottom divider
-        fill(hdc, &RECT { left: 0, top: 0, right: W, bottom: HEADER_H }, palette.bg_sidebar);
-        fill(hdc, &RECT { left: 0, top: HEADER_H - 1, right: W, bottom: HEADER_H }, palette.border);
-        let badge = RECT { left: PAD, top: 15, right: PAD + 22, bottom: 37 };
+        fill(
+            hdc,
+            &RECT {
+                left: 0,
+                top: 0,
+                right: W,
+                bottom: HEADER_H,
+            },
+            palette.bg_sidebar,
+        );
+        fill(
+            hdc,
+            &RECT {
+                left: 0,
+                top: HEADER_H - 1,
+                right: W,
+                bottom: HEADER_H,
+            },
+            palette.border,
+        );
+        let badge = RECT {
+            left: PAD,
+            top: 15,
+            right: PAD + 22,
+            bottom: 37,
+        };
         round_box(hdc, &badge, palette.accent, palette.accent, 6);
-        draw_text(hdc, "+", &badge, get_app_font_bold(), palette.text_white,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-        draw_text(hdc, strings.dlg_add_prof_title,
-            &RECT { left: PAD + 34, top: 0, right: W - 60, bottom: HEADER_H },
-            crate::ui::theme::cached_font(11, FW_BOLD), palette.text_primary,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        draw_text(
+            hdc,
+            "+",
+            &badge,
+            get_app_font_bold(),
+            palette.text_white,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+        );
+        draw_text(
+            hdc,
+            strings.dlg_add_prof_title,
+            &RECT {
+                left: PAD + 34,
+                top: 0,
+                right: W - 60,
+                bottom: HEADER_H,
+            },
+            crate::ui::theme::cached_font(11, FW_BOLD),
+            palette.text_primary,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
+        );
 
         // Hint box (text vertically centered)
-        let hint = RECT { left: PAD, top: HINT_Y, right: W - PAD, bottom: HINT_Y + HINT_H };
+        let hint = RECT {
+            left: PAD,
+            top: HINT_Y,
+            right: W - PAD,
+            bottom: HINT_Y + HINT_H,
+        };
         round_box(hdc, &hint, palette.bg_card_header, palette.border, 8);
-        let mut inner = RECT { left: hint.left + 12, top: hint.top + 6, right: hint.right - 12, bottom: hint.bottom - 6 };
+        let mut inner = RECT {
+            left: hint.left + 12,
+            top: hint.top + 6,
+            right: hint.right - 12,
+            bottom: hint.bottom - 6,
+        };
         let hint_w = to_wide(strings.dlg_add_prof_hint);
         let old = SelectObject(hdc, get_app_font_normal());
         let mut calc = inner;
-        DrawTextW(hdc, hint_w.as_ptr(), -1, &mut calc, DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX);
+        DrawTextW(
+            hdc,
+            hint_w.as_ptr(),
+            -1,
+            &mut calc,
+            DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX,
+        );
         inner.top += ((inner.bottom - inner.top) - (calc.bottom - calc.top)).max(0) / 2;
         SetTextColor(hdc, palette.text_secondary);
-        DrawTextW(hdc, hint_w.as_ptr(), -1, &mut inner, DT_WORDBREAK | DT_NOPREFIX);
+        DrawTextW(
+            hdc,
+            hint_w.as_ptr(),
+            -1,
+            &mut inner,
+            DT_WORDBREAK | DT_NOPREFIX,
+        );
         SelectObject(hdc, old);
 
         // Footer bar
-        fill(hdc, &RECT { left: 0, top: FOOTER_Y, right: W, bottom: H }, palette.bg_sidebar);
-        fill(hdc, &RECT { left: 0, top: FOOTER_Y, right: W, bottom: FOOTER_Y + 1 }, palette.border);
-        draw_text(hdc, strings.dlg_add_prof_footer,
-            &RECT { left: PAD + 4, top: FOOTER_Y, right: W - PAD - 110 - 8 - 90 - 8, bottom: H },
-            get_app_font_normal(), palette.text_secondary,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        fill(
+            hdc,
+            &RECT {
+                left: 0,
+                top: FOOTER_Y,
+                right: W,
+                bottom: H,
+            },
+            palette.bg_sidebar,
+        );
+        fill(
+            hdc,
+            &RECT {
+                left: 0,
+                top: FOOTER_Y,
+                right: W,
+                bottom: FOOTER_Y + 1,
+            },
+            palette.border,
+        );
+        draw_text(
+            hdc,
+            strings.dlg_add_prof_footer,
+            &RECT {
+                left: PAD + 4,
+                top: FOOTER_Y,
+                right: W - PAD - 110 - 8 - 90 - 8,
+                bottom: H,
+            },
+            get_app_font_normal(),
+            palette.text_secondary,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
+        );
 
         // Window outline
         let br = CreateSolidBrush(palette.border);
@@ -399,8 +526,16 @@ unsafe fn create_controls(hwnd: isize) {
 
         // Header close button
         if let Some(btn) = PushButton::create_with_variant(
-            hwnd, 0, "✕", W - PAD - 32, 10, 32, 32,
-            font_normal, ButtonVariant::Ghost, Some(palette.bg_sidebar),
+            hwnd,
+            0,
+            "✕",
+            W - PAD - 32,
+            10,
+            32,
+            32,
+            font_normal,
+            ButtonVariant::Ghost,
+            Some(palette.bg_sidebar),
         ) {
             btn.on_click(move || {
                 PostMessageW(hwnd, WM_CLOSE, 0, 0);
@@ -408,28 +543,83 @@ unsafe fn create_controls(hwnd: isize) {
         }
 
         // Icon + display name
-        Label::create(hwnd, strings.dlg_add_prof_icon, PAD, NAME_LBL_Y, 56, 18, font_label)
-            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-        Label::create(hwnd, strings.dlg_add_prof_name, PAD + 68, NAME_LBL_Y, 300, 18, font_label)
-            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        Label::create(
+            hwnd,
+            strings.dlg_add_prof_icon,
+            PAD,
+            NAME_LBL_Y,
+            56,
+            18,
+            font_label,
+        )
+        .map(|l| {
+            l.with_tone(LabelTone::Secondary)
+                .on_surface(SurfaceRole::Window)
+        });
+        Label::create(
+            hwnd,
+            strings.dlg_add_prof_name,
+            PAD + 68,
+            NAME_LBL_Y,
+            300,
+            18,
+            font_label,
+        )
+        .map(|l| {
+            l.with_tone(LabelTone::Secondary)
+                .on_surface(SurfaceRole::Window)
+        });
         let btn_icon = PushButton::create_with_variant(
-            hwnd, 0, ICONS[DEFAULT_ICON], PAD, NAME_Y, 56, FIELD_H,
-            font_normal, ButtonVariant::Secondary, Some(palette.bg_window),
+            hwnd,
+            0,
+            ICONS[DEFAULT_ICON],
+            PAD,
+            NAME_Y,
+            56,
+            FIELD_H,
+            font_normal,
+            ButtonVariant::Secondary,
+            Some(palette.bg_window),
         );
         if let Some(ref btn) = btn_icon {
             btn.set_on_click(move || pick_icon(hwnd));
         }
         let txt_name = TextBox::create_with_placeholder(
-            hwnd, 0, strings.dlg_add_prof_name_placeholder,
-            PAD + 68, NAME_Y, cw - 68, FIELD_H, font_normal,
+            hwnd,
+            0,
+            strings.dlg_add_prof_name_placeholder,
+            PAD + 68,
+            NAME_Y,
+            cw - 68,
+            FIELD_H,
+            font_normal,
         );
 
         // Executable + file browser
-        Label::create(hwnd, strings.dlg_add_prof_exe, PAD, EXE_LBL_Y, 300, 18, font_label)
-            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        Label::create(
+            hwnd,
+            strings.dlg_add_prof_exe,
+            PAD,
+            EXE_LBL_Y,
+            300,
+            18,
+            font_label,
+        )
+        .map(|l| {
+            l.with_tone(LabelTone::Secondary)
+                .on_surface(SurfaceRole::Window)
+        });
         if let Some(btn) = PushButton::create_with_variant(
-            hwnd, 0, strings.dlg_add_prof_browse, W - PAD - 150, EXE_LBL_Y - 6, 150, 28,
-            font_normal, ButtonVariant::Secondary, Some(palette.bg_window),
+            hwnd,
+            0,
+            strings.dlg_add_prof_browse,
+            W - PAD - 150,
+            EXE_LBL_Y - 6,
+            150,
+            28,
+            font_normal,
+            ButtonVariant::Secondary,
+            Some(palette.bg_window),
         ) {
             btn.on_click(move || {
                 if let Some(exe) = browse_exe(hwnd)
@@ -451,25 +641,59 @@ unsafe fn create_controls(hwnd: isize) {
             });
         }
         let txt_exe = TextBox::create_with_placeholder(
-            hwnd, 0, strings.dlg_add_prof_exe_placeholder,
-            PAD, EXE_Y, cw, FIELD_H, font_normal,
+            hwnd,
+            0,
+            strings.dlg_add_prof_exe_placeholder,
+            PAD,
+            EXE_Y,
+            cw,
+            FIELD_H,
+            font_normal,
         );
 
         // Running apps: label, rescan link, search box, list
-        Label::create(hwnd, strings.dlg_add_prof_linked_app, PAD, APPS_LBL_Y, 340, 18, font_label)
-            .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+        Label::create(
+            hwnd,
+            strings.dlg_add_prof_linked_app,
+            PAD,
+            APPS_LBL_Y,
+            340,
+            18,
+            font_label,
+        )
+        .map(|l| {
+            l.with_tone(LabelTone::Secondary)
+                .on_surface(SurfaceRole::Window)
+        });
         let lnk_rescan = Label::create_right(
-            hwnd, strings.dlg_add_prof_rescan, W - PAD - 120, APPS_LBL_Y, 120, 18,
+            hwnd,
+            strings.dlg_add_prof_rescan,
+            W - PAD - 120,
+            APPS_LBL_Y,
+            120,
+            18,
             font_normal,
         )
         .map(|l| l.as_link().on_surface(SurfaceRole::Window));
         let txt_search = TextBox::create_with_placeholder(
-            hwnd, 0, strings.dlg_add_prof_search_placeholder,
-            PAD, SEARCH_Y, cw, FIELD_H, font_normal,
+            hwnd,
+            0,
+            strings.dlg_add_prof_search_placeholder,
+            PAD,
+            SEARCH_Y,
+            cw,
+            FIELD_H,
+            font_normal,
         );
 
         let table = ActionTable::create_with_defs(
-            hwnd, 0, PAD, LIST_Y, cw, LIST_H, font_normal,
+            hwnd,
+            0,
+            PAD,
+            LIST_Y,
+            cw,
+            LIST_H,
+            font_normal,
             vec![ColumnDef::flex("", ColumnStyle::Default)],
         );
         if let Some(ref tbl) = table {
@@ -534,8 +758,14 @@ unsafe fn pick_icon(hwnd: isize) {
         if btn_hwnd == 0 {
             return;
         }
-        let Some(mut menu) = PopupMenu::new() else { return };
-        for (i, label) in crate::language::current().profile_icons().iter().enumerate() {
+        let Some(mut menu) = PopupMenu::new() else {
+            return;
+        };
+        for (i, label) in crate::language::current()
+            .profile_icons()
+            .iter()
+            .enumerate()
+        {
             menu.add_checked_item(i as u32 + 1, label, i == current);
         }
         let mut rc = RECT::default();
@@ -603,12 +833,9 @@ unsafe fn create_profile(hwnd: isize) {
             ShowWindow(hwnd, SW_HIDE);
             if parent != 0
                 && let Some(c) = crate::ui::controls().or_else(|| {
-                    let ptr = GetWindowLongPtrW(parent, GWLP_USERDATA) as *const crate::ui::views::ControlPanelControls;
-                    if !ptr.is_null() {
-                        Some(&*ptr)
-                    } else {
-                        None
-                    }
+                    let ptr = GetWindowLongPtrW(parent, GWLP_USERDATA)
+                        as *const crate::ui::views::ControlPanelControls;
+                    if !ptr.is_null() { Some(&*ptr) } else { None }
                 })
             {
                 crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, parent, &id);

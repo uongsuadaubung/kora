@@ -82,13 +82,7 @@ impl TabSound {
 
                 let lbl_volume_val = card.track(
                     Label::create_right(
-                        parent,
-                        "50%",
-                        x_vol_val,
-                        y_vol_lbl,
-                        w_vol_val,
-                        18,
-                        hfont_bold,
+                        parent, "50%", x_vol_val, y_vol_lbl, w_vol_val, 18, hfont_bold,
                     )?
                     .with_tone(LabelTone::Accent),
                 );
@@ -193,7 +187,9 @@ impl TabSound {
 
     fn selected_switch_profile(&self) -> Option<String> {
         let profiles = self.switch_profiles.borrow();
-        profiles.get(self.combo_switch_type.get_selected()?).cloned()
+        profiles
+            .get(self.combo_switch_type.get_selected()?)
+            .cloned()
     }
 
     pub fn load_profile(&self, child: Option<&AppProfile<Child>>, global_config: &EngineConfig) {
@@ -218,7 +214,11 @@ impl TabSound {
     /// Saves controls back into the active target (`Global` config or `Child` profile).
     /// Child: volume is set in `on_hscroll`, switch type only when the combo actually changes
     /// (keeps them inheriting otherwise).
-    fn sync_to_target(&self, mut target: crate::ui::controller::EditTarget<'_>, combo_changed: bool) {
+    fn sync_to_target(
+        &self,
+        mut target: crate::ui::controller::EditTarget<'_>,
+        combo_changed: bool,
+    ) {
         use crate::ui::controller::EditTarget;
         target.sync_checkbox(
             &self.check_sound_enabled,
@@ -242,9 +242,15 @@ impl TabSound {
 
     fn refresh_soundpack_labels(&self, strings: &LanguageStrings) {
         let (btn_txt, note_txt) = if self.sound_available.get() {
-            (strings.btn_update_soundpack, strings.soundpack_note_installed)
+            (
+                strings.btn_update_soundpack,
+                strings.soundpack_note_installed,
+            )
         } else {
-            (strings.btn_download_soundpack, strings.soundpack_note_missing)
+            (
+                strings.btn_download_soundpack,
+                strings.soundpack_note_missing,
+            )
         };
         self.btn_download_soundpack.set_text(btn_txt);
         self.lbl_soundpack_note.set_text(note_txt);
@@ -324,8 +330,9 @@ impl TabSound {
         status: &crate::platform::win32::sound::installer::SoundpackInstallStatus,
     ) {
         let strings = crate::language::current();
-        if let crate::platform::win32::sound::installer::SoundpackInstallStatus::Success { .. } =
-            status
+        if let crate::platform::win32::sound::installer::SoundpackInstallStatus::Success {
+            ..
+        } = status
         {
             let profiles = crate::engine::config_store::list_switch_profiles();
             self.sound_available.set(!profiles.is_empty());
@@ -335,7 +342,8 @@ impl TabSound {
                 self.combo_switch_type.add_item(p);
             }
             if profiles.is_empty() {
-                self.combo_switch_type.add_item(strings.sound_profile_default);
+                self.combo_switch_type
+                    .add_item(strings.sound_profile_default);
             }
             self.combo_switch_type.set_selected(0);
             *self.switch_profiles.borrow_mut() = profiles;

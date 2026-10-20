@@ -4,8 +4,8 @@ use crate::engine::config::EngineConfig;
 use crate::engine::config::hotkey::name_to_vk;
 use crate::engine::macro_table::{MacroEntry, MacroTable, MacroType};
 use crate::engine::profile::{
-    AppProfile, KeyInjectionStrategy, KeyMacroRule, KeyRemapRule, LanguageMode, MacroAction,
-    MethodMode, ProfileManager, TargetRule,
+    AppProfile, CharsetMode, KeyInjectionStrategy, KeyMacroRule, KeyRemapRule, LanguageMode,
+    MacroAction, MethodMode, ProfileManager, TargetRule,
 };
 use std::collections::HashMap;
 
@@ -22,7 +22,8 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
     let mut profiles = ProfileManager::new();
 
     let mut current_section = String::new();
-    let mut child_profiles_map: HashMap<String, AppProfile< crate::engine::profile::Child >> = HashMap::new();
+    let mut child_profiles_map: HashMap<String, AppProfile<crate::engine::profile::Child>> =
+        HashMap::new();
     let mut child_order: Vec<String> = Vec::new();
 
     for line in content.lines() {
@@ -37,10 +38,8 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 let id = p_id.trim().to_string();
                 if !child_profiles_map.contains_key(&id) {
                     child_order.push(id.clone());
-                    child_profiles_map.insert(
-                        id.clone(),
-                        AppProfile::new_child(id.clone(), id, "", "🎮"),
-                    );
+                    child_profiles_map
+                        .insert(id.clone(), AppProfile::new_child(id.clone(), id, "", "🎮"));
                 }
             }
             continue;
@@ -63,7 +62,10 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                                 .iter()
                                 .any(|k| k.eq_ignore_ascii_case(m_trim))
                         {
-                            profiles.global_profile.muted_macros.push(m_trim.to_string());
+                            profiles
+                                .global_profile
+                                .muted_macros
+                                .push(m_trim.to_string());
                         }
                     }
                 } else {
@@ -92,7 +94,12 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 }
             } else if let (Some(f_vk), Some(t_vk)) = (name_to_vk(key), name_to_vk(val)) {
                 let rule = KeyRemapRule::new(f_vk, t_vk);
-                if !profiles.global_profile.app_remaps.iter().any(|r| r.from_vk == f_vk) {
+                if !profiles
+                    .global_profile
+                    .app_remaps
+                    .iter()
+                    .any(|r| r.from_vk == f_vk)
+                {
                     profiles.global_profile.app_remaps.push(rule);
                 }
             }
@@ -171,12 +178,14 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                     "icon" => child.icon = val.trim().to_string(),
                     "mode" => child.mode = LanguageMode::from_str(val),
                     "method" => child.method = MethodMode::from_str(val),
+                    "charset" => child.charset = CharsetMode::from_str(val),
                     "switch_key" => {
                         child.switch_key = Some(crate::engine::config::Hotkey::from_config_str(val))
                     }
                     "switch_key_enabled" => child.switch_key_enabled = Some(val_bool),
                     "target_capture_hotkey" => {
-                        child.target_capture_hotkey = Some(crate::engine::config::Hotkey::from_config_str(val))
+                        child.target_capture_hotkey =
+                            Some(crate::engine::config::Hotkey::from_config_str(val))
                     }
                     "target_capture_enabled" => child.target_capture_enabled = Some(val_bool),
                     "app_strategy" => {
@@ -330,6 +339,9 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 ("general", "method") => {
                     config.method = val_l.parse().unwrap_or_default();
                 }
+                ("general", "charset") => {
+                    config.charset = val_l.parse().unwrap_or_default();
+                }
                 ("general", "enabled") => config.enabled = val_bool,
                 ("general", "switch_key_enabled") => config.switch_key_enabled = val_bool,
                 ("general", "switch_key") => {
@@ -338,20 +350,15 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
                 }
                 ("general", "target_capture_enabled") => config.target_capture_enabled = val_bool,
                 ("general", "target_capture_hotkey") => {
-                    config.target_capture_hotkey = crate::engine::config::Hotkey::from_config_str(val);
+                    config.target_capture_hotkey =
+                        crate::engine::config::Hotkey::from_config_str(val);
                 }
                 ("spelling", "restore_on_wrong") => config.restore_on_wrong_spelling = val_bool,
-                ("spelling", "auto_uppercase_first") => {
-                    config.auto_uppercase_first_char = val_bool
-                }
+                ("spelling", "auto_uppercase_first") => config.auto_uppercase_first_char = val_bool,
                 ("features", "use_macro") => config.use_macro = val_bool,
-                ("features", "use_macro_in_english") => {
-                    config.use_macro_in_english_mode = val_bool
-                }
+                ("features", "use_macro_in_english") => config.use_macro_in_english_mode = val_bool,
                 ("features", "bracket_w") => config.bracket_w = val_bool,
-                ("features", "remember_history") => {
-                    config.remember_history_across_space = val_bool
-                }
+                ("features", "remember_history") => config.remember_history_across_space = val_bool,
                 ("sound", "enabled") => config.sound_enabled = val_bool,
                 ("sound", "switch") => {
                     config.sound_profile = std::sync::Arc::from(val.trim());
@@ -382,4 +389,3 @@ pub fn parse_config_all(content: &str) -> (EngineConfig, MacroTable, ProfileMana
     macros.rebuild_cache();
     (config, macros, profiles)
 }
-

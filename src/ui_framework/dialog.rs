@@ -199,8 +199,8 @@ fn is_dialog_window(hwnd: isize) -> bool {
     }
     let mut buf = [0u16; 64];
     let len = unsafe { GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32) };
-    let is_dialog = len > 0
-        && String::from_utf16_lossy(&buf[..len as usize]).ends_with(DIALOG_CLASS_SUFFIX);
+    let is_dialog =
+        len > 0 && String::from_utf16_lossy(&buf[..len as usize]).ends_with(DIALOG_CLASS_SUFFIX);
     LAST_ACTIVE.store(hwnd, Ordering::Relaxed);
     LAST_ACTIVE_IS_DIALOG.store(is_dialog, Ordering::Relaxed);
     is_dialog
@@ -515,4 +515,3 @@ pub fn draw_key_box(
         }
     }
 }
-

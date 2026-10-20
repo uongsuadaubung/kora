@@ -43,25 +43,26 @@ fn ensure_worker_started() -> std::sync::mpsc::SyncSender<()> {
                         std::thread::sleep(std::time::Duration::from_millis(40));
                         while rx.try_recv().is_ok() {}
 
-                        let (has_rules, app_strat) = if let Ok(guard) = super::ENGINE_INSTANCE.lock() {
-                            if let Some(ref engine) = *guard {
-                                let pid = &engine.profile_manager.active_id;
-                                engine
-                                    .profile_manager
-                                    .get_profile(pid)
-                                    .map(|p| {
-                                        (
-                                            !p.target_rules.is_empty(),
-                                            p.app_strategy.map(|s| s.to_raw_u8()).unwrap_or(0),
-                                        )
-                                    })
-                                    .unwrap_or((false, 0))
+                        let (has_rules, app_strat) =
+                            if let Ok(guard) = super::ENGINE_INSTANCE.lock() {
+                                if let Some(ref engine) = *guard {
+                                    let pid = &engine.profile_manager.active_id;
+                                    engine
+                                        .profile_manager
+                                        .get_profile(pid)
+                                        .map(|p| {
+                                            (
+                                                !p.target_rules.is_empty(),
+                                                p.app_strategy.map(|s| s.to_raw_u8()).unwrap_or(0),
+                                            )
+                                        })
+                                        .unwrap_or((false, 0))
+                                } else {
+                                    (false, 0)
+                                }
                             } else {
                                 (false, 0)
-                            }
-                        } else {
-                            (false, 0)
-                        };
+                            };
 
                         if !has_rules {
                             super::app_detect::set_current_target_strategy_raw(app_strat);
@@ -78,7 +79,9 @@ fn ensure_worker_started() -> std::sync::mpsc::SyncSender<()> {
                                         .and_then(|p| {
                                             p.target_rules
                                                 .iter()
-                                                .find(|r| r.target_id.eq_ignore_ascii_case(&target_id))
+                                                .find(|r| {
+                                                    r.target_id.eq_ignore_ascii_case(&target_id)
+                                                })
                                                 .map(|r| r.strategy.to_raw_u8())
                                         })
                                         .unwrap_or(app_strat)
@@ -150,7 +153,11 @@ pub fn check_and_switch_profile() -> (bool, String) {
         && let Some(ref mut engine) = *guard
     {
         let (changed, new_id) = engine.switch_profile_by_process(&exe);
-        (changed, new_id, changed.then(|| engine.effective_config().clone()))
+        (
+            changed,
+            new_id,
+            changed.then(|| engine.effective_config().clone()),
+        )
     } else {
         return (false, "global".to_string());
     };
@@ -269,5 +276,3 @@ pub fn reinit_app_tracker() {
     shutdown_app_tracker();
     init_app_tracker();
 }
-
-

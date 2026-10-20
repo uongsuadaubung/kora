@@ -25,21 +25,81 @@ const fn pack_3vowels(
 }
 
 // 15 legitimate completed 3-vowel clusters in Vietnamese
-const TRIPHTHONG_IEU: u16 = pack_3vowels((BaseVowel::I, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex), (BaseVowel::U, Diacritic::None));
-const TRIPHTHONG_YEU: u16 = pack_3vowels((BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex), (BaseVowel::U, Diacritic::None));
-const TRIPHTHONG_OAI: u16 = pack_3vowels((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::None), (BaseVowel::I, Diacritic::None));
-const TRIPHTHONG_OAY: u16 = pack_3vowels((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::None), (BaseVowel::Y, Diacritic::None));
-const TRIPHTHONG_OAO: u16 = pack_3vowels((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::None), (BaseVowel::O, Diacritic::None));
-const TRIPHTHONG_OEO: u16 = pack_3vowels((BaseVowel::O, Diacritic::None), (BaseVowel::E, Diacritic::None), (BaseVowel::O, Diacritic::None));
-const TRIPHTHONG_UAI: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::None), (BaseVowel::I, Diacritic::None));
-const TRIPHTHONG_UAY: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::None), (BaseVowel::Y, Diacritic::None));
-const TRIPHTHONG_UOI_CIR: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::Circumflex), (BaseVowel::I, Diacritic::None));
-const TRIPHTHONG_UOI_HORN: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::Horn), (BaseVowel::I, Diacritic::None));
-const TRIPHTHONG_UOI_DOUBLE_HORN: u16 = pack_3vowels((BaseVowel::U, Diacritic::Horn), (BaseVowel::O, Diacritic::Horn), (BaseVowel::I, Diacritic::None));
-const TRIPHTHONG_UOU_DOUBLE_HORN: u16 = pack_3vowels((BaseVowel::U, Diacritic::Horn), (BaseVowel::O, Diacritic::Horn), (BaseVowel::U, Diacritic::None));
-const TRIPHTHONG_UYA: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::Y, Diacritic::None), (BaseVowel::A, Diacritic::None));
-const TRIPHTHONG_UYE: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex));
-const TRIPHTHONG_UYU: u16 = pack_3vowels((BaseVowel::U, Diacritic::None), (BaseVowel::Y, Diacritic::None), (BaseVowel::U, Diacritic::None));
+const TRIPHTHONG_IEU: u16 = pack_3vowels(
+    (BaseVowel::I, Diacritic::None),
+    (BaseVowel::E, Diacritic::Circumflex),
+    (BaseVowel::U, Diacritic::None),
+);
+const TRIPHTHONG_YEU: u16 = pack_3vowels(
+    (BaseVowel::Y, Diacritic::None),
+    (BaseVowel::E, Diacritic::Circumflex),
+    (BaseVowel::U, Diacritic::None),
+);
+const TRIPHTHONG_OAI: u16 = pack_3vowels(
+    (BaseVowel::O, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+    (BaseVowel::I, Diacritic::None),
+);
+const TRIPHTHONG_OAY: u16 = pack_3vowels(
+    (BaseVowel::O, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+    (BaseVowel::Y, Diacritic::None),
+);
+const TRIPHTHONG_OAO: u16 = pack_3vowels(
+    (BaseVowel::O, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+    (BaseVowel::O, Diacritic::None),
+);
+const TRIPHTHONG_OEO: u16 = pack_3vowels(
+    (BaseVowel::O, Diacritic::None),
+    (BaseVowel::E, Diacritic::None),
+    (BaseVowel::O, Diacritic::None),
+);
+const TRIPHTHONG_UAI: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+    (BaseVowel::I, Diacritic::None),
+);
+const TRIPHTHONG_UAY: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+    (BaseVowel::Y, Diacritic::None),
+);
+const TRIPHTHONG_UOI_CIR: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::O, Diacritic::Circumflex),
+    (BaseVowel::I, Diacritic::None),
+);
+const TRIPHTHONG_UOI_HORN: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::O, Diacritic::Horn),
+    (BaseVowel::I, Diacritic::None),
+);
+const TRIPHTHONG_UOI_DOUBLE_HORN: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::Horn),
+    (BaseVowel::O, Diacritic::Horn),
+    (BaseVowel::I, Diacritic::None),
+);
+const TRIPHTHONG_UOU_DOUBLE_HORN: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::Horn),
+    (BaseVowel::O, Diacritic::Horn),
+    (BaseVowel::U, Diacritic::None),
+);
+const TRIPHTHONG_UYA: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::Y, Diacritic::None),
+    (BaseVowel::A, Diacritic::None),
+);
+const TRIPHTHONG_UYE: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::Y, Diacritic::None),
+    (BaseVowel::E, Diacritic::Circumflex),
+);
+const TRIPHTHONG_UYU: u16 = pack_3vowels(
+    (BaseVowel::U, Diacritic::None),
+    (BaseVowel::Y, Diacritic::None),
+    (BaseVowel::U, Diacritic::None),
+);
 
 /// Bitmask lookup table for legitimate completed 2-vowel combinations in Vietnamese.
 /// 24 * 24 = 576 possible pairs mapped to 16 u64 words (1024 bits).
@@ -48,43 +108,136 @@ const VALID_2VOWELS_MASK: [u64; 16] = {
     let mut table = [0u64; 16];
     let valid_pairs: &[((BaseVowel, Diacritic), (BaseVowel, Diacritic))] = &[
         // ai, ao, au, ay, ây, âu
-        ((BaseVowel::A, Diacritic::None), (BaseVowel::I, Diacritic::None)),
-        ((BaseVowel::A, Diacritic::None), (BaseVowel::O, Diacritic::None)),
-        ((BaseVowel::A, Diacritic::None), (BaseVowel::U, Diacritic::None)),
-        ((BaseVowel::A, Diacritic::None), (BaseVowel::Y, Diacritic::None)),
-        ((BaseVowel::A, Diacritic::Circumflex), (BaseVowel::Y, Diacritic::None)),
-        ((BaseVowel::A, Diacritic::Circumflex), (BaseVowel::U, Diacritic::None)),
+        (
+            (BaseVowel::A, Diacritic::None),
+            (BaseVowel::I, Diacritic::None),
+        ),
+        (
+            (BaseVowel::A, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
+        (
+            (BaseVowel::A, Diacritic::None),
+            (BaseVowel::U, Diacritic::None),
+        ),
+        (
+            (BaseVowel::A, Diacritic::None),
+            (BaseVowel::Y, Diacritic::None),
+        ),
+        (
+            (BaseVowel::A, Diacritic::Circumflex),
+            (BaseVowel::Y, Diacritic::None),
+        ),
+        (
+            (BaseVowel::A, Diacritic::Circumflex),
+            (BaseVowel::U, Diacritic::None),
+        ),
         // eo, êu
-        ((BaseVowel::E, Diacritic::None), (BaseVowel::O, Diacritic::None)),
-        ((BaseVowel::E, Diacritic::Circumflex), (BaseVowel::U, Diacritic::None)),
+        (
+            (BaseVowel::E, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
+        (
+            (BaseVowel::E, Diacritic::Circumflex),
+            (BaseVowel::U, Diacritic::None),
+        ),
         // ia, iê, iu
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::U, Diacritic::None)),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::U, Diacritic::None),
+        ),
         // oa, oă, oe, oi, ôi, ơi, oo (xoong, boong)
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::Breve)),
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::I, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::Circumflex), (BaseVowel::I, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::Horn), (BaseVowel::I, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::O, Diacritic::None)),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::A, Diacritic::Breve),
+        ),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::I, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::Circumflex),
+            (BaseVowel::I, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::Horn),
+            (BaseVowel::I, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
         // ua, uâ, uô, uơ, uê, ui, uy
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::Horn)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::I, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::Y, Diacritic::None)),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::A, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::O, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::O, Diacritic::Horn),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::I, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::Y, Diacritic::None),
+        ),
         // ưa, ươ, ưu, ưi
-        ((BaseVowel::U, Diacritic::Horn), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::Horn), (BaseVowel::O, Diacritic::Horn)),
-        ((BaseVowel::U, Diacritic::Horn), (BaseVowel::U, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::Horn), (BaseVowel::I, Diacritic::None)),
+        (
+            (BaseVowel::U, Diacritic::Horn),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::Horn),
+            (BaseVowel::O, Diacritic::Horn),
+        ),
+        (
+            (BaseVowel::U, Diacritic::Horn),
+            (BaseVowel::U, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::Horn),
+            (BaseVowel::I, Diacritic::None),
+        ),
         // ya, yê
-        ((BaseVowel::Y, Diacritic::None), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
+        (
+            (BaseVowel::Y, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::Y, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
     ];
 
     let mut i = 0;
@@ -103,13 +256,34 @@ const VALID_INTERMEDIATE_2VOWELS_MASK: [u64; 16] = {
     let mut table = VALID_2VOWELS_MASK;
     let extra_intermediate: &[((BaseVowel, Diacritic), (BaseVowel, Diacritic))] = &[
         // Intermediate typing bases for iê, yê, uô, ươ, uê, ê, êu, ưu
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::U, Diacritic::None)),
-        ((BaseVowel::E, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::E, Diacritic::None), (BaseVowel::U, Diacritic::None)),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::Y, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::U, Diacritic::None),
+        ),
+        (
+            (BaseVowel::E, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::E, Diacritic::None),
+            (BaseVowel::U, Diacritic::None),
+        ),
     ];
 
     let mut i = 0;
@@ -186,11 +360,16 @@ pub fn is_valid_intermediate_vowel_combination(vowels: &[VowelLetter]) -> bool {
             let base_code = ((vowels[0].base as u16) << 6)
                 | ((vowels[1].base as u16) << 3)
                 | (vowels[2].base as u16);
-            const UYE: u16 = ((BaseVowel::U as u16) << 6) | ((BaseVowel::Y as u16) << 3) | (BaseVowel::E as u16);
-            const IEU: u16 = ((BaseVowel::I as u16) << 6) | ((BaseVowel::E as u16) << 3) | (BaseVowel::U as u16);
-            const YEU: u16 = ((BaseVowel::Y as u16) << 6) | ((BaseVowel::E as u16) << 3) | (BaseVowel::U as u16);
-            const UOI: u16 = ((BaseVowel::U as u16) << 6) | ((BaseVowel::O as u16) << 3) | (BaseVowel::I as u16);
-            const UOU: u16 = ((BaseVowel::U as u16) << 6) | ((BaseVowel::O as u16) << 3) | (BaseVowel::U as u16);
+            const UYE: u16 =
+                ((BaseVowel::U as u16) << 6) | ((BaseVowel::Y as u16) << 3) | (BaseVowel::E as u16);
+            const IEU: u16 =
+                ((BaseVowel::I as u16) << 6) | ((BaseVowel::E as u16) << 3) | (BaseVowel::U as u16);
+            const YEU: u16 =
+                ((BaseVowel::Y as u16) << 6) | ((BaseVowel::E as u16) << 3) | (BaseVowel::U as u16);
+            const UOI: u16 =
+                ((BaseVowel::U as u16) << 6) | ((BaseVowel::O as u16) << 3) | (BaseVowel::I as u16);
+            const UOU: u16 =
+                ((BaseVowel::U as u16) << 6) | ((BaseVowel::O as u16) << 3) | (BaseVowel::U as u16);
             matches!(base_code, UYE | IEU | YEU | UOI | UOU)
         }
         _ => false,
@@ -215,9 +394,16 @@ const SINGLE_ONSET_MASK: u32 = {
 const ONSET_2LETTERS_MASK: [u64; 16] = {
     let mut table = [0u64; 16];
     let pairs: &[(u8, u8)] = &[
-        (b'c', b'h'), (b'g', b'h'), (b'g', b'i'), (b'k', b'h'),
-        (b'n', b'h'), (b'n', b'g'), (b'p', b'h'), (b'q', b'u'),
-        (b't', b'h'), (b't', b'r'),
+        (b'c', b'h'),
+        (b'g', b'h'),
+        (b'g', b'i'),
+        (b'k', b'h'),
+        (b'n', b'h'),
+        (b'n', b'g'),
+        (b'p', b'h'),
+        (b'q', b'u'),
+        (b't', b'h'),
+        (b't', b'r'),
     ];
     let mut i = 0;
     while i < pairs.len() {
@@ -333,9 +519,7 @@ pub fn is_valid_vietnamese_components(
                     return false;
                 }
                 // In completed syllable, front vowel 'i' never takes single 'c' (must be 'ch': thích, lịch, ích).
-                if vowels_to_check.len() == 1
-                    && vowels_to_check[0].base == BaseVowel::I
-                    && c == 'c'
+                if vowels_to_check.len() == 1 && vowels_to_check[0].base == BaseVowel::I && c == 'c'
                 {
                     return false;
                 }
@@ -429,7 +613,8 @@ pub fn is_valid_onset_extension(current_onset: &[(char, bool)], next_ch: char) -
         1 => {
             let first = current_onset[0].0.to_ascii_lowercase();
             if first.is_ascii_lowercase() {
-                let idx = ((first as usize - 'a' as usize) << 5) | (next_lower as usize - 'a' as usize);
+                let idx =
+                    ((first as usize - 'a' as usize) << 5) | (next_lower as usize - 'a' as usize);
                 (ONSET_2LETTERS_MASK[idx >> 6] & (1u64 << (idx & 63))) != 0
             } else {
                 false
@@ -553,27 +738,75 @@ const CODA_ACCEPT_2VOWELS_MASK: [u64; 16] = {
     let mut table = [0u64; 16];
     let valid_pairs: &[((BaseVowel, Diacritic), (BaseVowel, Diacritic))] = &[
         // iê, yê, and intermediate typing bases (ie, ye for liene -> liên, yens -> yến)
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
-        ((BaseVowel::I, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
-        ((BaseVowel::Y, Diacritic::None), (BaseVowel::E, Diacritic::None)),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::I, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::Y, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::Y, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
         // uô, ươ, uo (uo is the typing base for uô/ươ when free_mark is used)
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::Horn), (BaseVowel::O, Diacritic::Horn)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::O, Diacritic::None)),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::O, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::Horn),
+            (BaseVowel::O, Diacritic::Horn),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
         // uâ, ua (ua is the typing base for uâ in xuana -> xuân)
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::A, Diacritic::None)),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::A, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
         // oă
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::Breve)),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::A, Diacritic::Breve),
+        ),
         // oa, oe, uê, uy, and ue (typing base for quene -> quên)
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::A, Diacritic::None)),
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::E, Diacritic::Circumflex)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::E, Diacritic::None)),
-        ((BaseVowel::U, Diacritic::None), (BaseVowel::Y, Diacritic::None)),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::A, Diacritic::None),
+        ),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::E, Diacritic::Circumflex),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::E, Diacritic::None),
+        ),
+        (
+            (BaseVowel::U, Diacritic::None),
+            (BaseVowel::Y, Diacritic::None),
+        ),
         // oo (xoong, boong)
-        ((BaseVowel::O, Diacritic::None), (BaseVowel::O, Diacritic::None)),
+        (
+            (BaseVowel::O, Diacritic::None),
+            (BaseVowel::O, Diacritic::None),
+        ),
     ];
 
     let mut i = 0;
@@ -621,10 +854,10 @@ const VOWEL_MASK_Y: u8 = 1 << (BaseVowel::Y as u8);
 const VOWEL_ALL: u8 = 0b0011_1111;
 const VOWEL_NO_Y: u8 = VOWEL_ALL & !VOWEL_MASK_Y;
 const VOWEL_FRONT: u8 = VOWEL_MASK_I | VOWEL_MASK_Y | VOWEL_MASK_E; // k goes with i, y, e/ê
-const VOWEL_NON_FRONT: u8 = VOWEL_ALL & !VOWEL_FRONT;               // c goes with a, o, u (never i, y, e)
-const VOWEL_G: u8 = VOWEL_ALL & !(VOWEL_MASK_E | VOWEL_MASK_Y);     // g goes with a, o, u, i (never e, y)
-const VOWEL_Q: u8 = VOWEL_MASK_U;                                   // q always requires u
-const VOWEL_GH_NGH: u8 = VOWEL_MASK_I | VOWEL_MASK_E;               // gh, ngh only go with i, e/ê
+const VOWEL_NON_FRONT: u8 = VOWEL_ALL & !VOWEL_FRONT; // c goes with a, o, u (never i, y, e)
+const VOWEL_G: u8 = VOWEL_ALL & !(VOWEL_MASK_E | VOWEL_MASK_Y); // g goes with a, o, u, i (never e, y)
+const VOWEL_Q: u8 = VOWEL_MASK_U; // q always requires u
+const VOWEL_GH_NGH: u8 = VOWEL_MASK_I | VOWEL_MASK_E; // gh, ngh only go with i, e/ê
 const VOWEL_NG: u8 = VOWEL_ALL & !(VOWEL_MASK_I | VOWEL_MASK_E | VOWEL_MASK_Y); // ng never with i, e, y
 
 /// Lookup table of allowed vowels for 1-letter onsets: [u8; 32] (32 bytes, zero bounds checks).
@@ -699,7 +932,8 @@ pub fn is_valid_onset_vowel_orthography(
 }
 
 /// Allowed coda start characters for single 'y' when onset is 'qu' ('t', 'n', 'c'): quýt, quỳnh, quỵch.
-const CODA_START_QU_Y_MASK: u32 = (1u32 << (b't' - b'a')) | (1u32 << (b'n' - b'a')) | (1u32 << (b'c' - b'a'));
+const CODA_START_QU_Y_MASK: u32 =
+    (1u32 << (b't' - b'a')) | (1u32 << (b'n' - b'a')) | (1u32 << (b'c' - b'a'));
 
 /// Lookup table of allowed coda start characters for 2-vowel pairs: [u32; 36] (144 bytes).
 /// Indexed by (v0.base * 6) + v1.base in 0..35.
@@ -713,8 +947,10 @@ const CODA_START_2VOWELS_MASK: [u32; 36] = {
     table[(BaseVowel::O as usize) * 6 + (BaseVowel::E as usize)] =
         (1u32 << (b't' - b'a')) | (1u32 << (b'n' - b'a'));
     // 'uy' accepts 'n' (huynh), 't' (quýt), 'p' (tuýp), 'c' (quỵch)
-    table[(BaseVowel::U as usize) * 6 + (BaseVowel::Y as usize)] =
-        (1u32 << (b'n' - b'a')) | (1u32 << (b't' - b'a')) | (1u32 << (b'p' - b'a')) | (1u32 << (b'c' - b'a'));
+    table[(BaseVowel::U as usize) * 6 + (BaseVowel::Y as usize)] = (1u32 << (b'n' - b'a'))
+        | (1u32 << (b't' - b'a'))
+        | (1u32 << (b'p' - b'a'))
+        | (1u32 << (b'c' - b'a'));
     // 'uê' accepts 'n' (for nh in huênh) or 'c' (for ch in nghuệch)
     table[(BaseVowel::U as usize) * 6 + (BaseVowel::E as usize)] =
         (1u32 << (b'n' - b'a')) | (1u32 << (b'c' - b'a'));

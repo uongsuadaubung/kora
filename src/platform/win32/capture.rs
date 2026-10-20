@@ -7,8 +7,8 @@
 
 use super::sound;
 use super::types::*;
-use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 
 pub const WM_COMBO_CAPTURED: u32 = 0x8000 + 101;
 pub const WM_SINGLE_KEY_CAPTURED: u32 = 0x8000 + 102;
@@ -107,7 +107,10 @@ pub fn trigger_target_capture_async() {
                     PostMessageW(notify_hwnd, WM_INSPECT_TARGET_CAPTURED, 0, 0);
                 }
             } else {
-                crate::ui::controller::capture_target_for_app(&target.process_name, &target.target_id);
+                crate::ui::controller::capture_target_for_app(
+                    &target.process_name,
+                    &target.target_id,
+                );
             }
         }
     });
@@ -124,7 +127,8 @@ pub(crate) static CAPTURE_CTRL: AtomicBool = AtomicBool::new(false);
 pub(crate) static CAPTURE_SHIFT: AtomicBool = AtomicBool::new(false);
 pub(crate) static CAPTURE_ALT: AtomicBool = AtomicBool::new(false);
 pub(crate) static CAPTURE_WIN: AtomicBool = AtomicBool::new(false);
-pub(crate) static PENDING_MODIFIER_HOTKEY: Mutex<Option<crate::engine::config::Hotkey>> = Mutex::new(None);
+pub(crate) static PENDING_MODIFIER_HOTKEY: Mutex<Option<crate::engine::config::Hotkey>> =
+    Mutex::new(None);
 
 pub(crate) static SINGLE_KEY_CAPTURE_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub(crate) static SINGLE_KEY_DIALOG_HWND: AtomicIsize = AtomicIsize::new(0);
@@ -215,9 +219,10 @@ pub fn is_capture_dialog_active() -> bool {
     if fg == 0 {
         return false;
     }
-    fg == dlg || unsafe { GetAncestor(fg, GA_ROOT) } == dlg || unsafe { GetAncestor(fg, GA_ROOTOWNER) } == dlg
+    fg == dlg
+        || unsafe { GetAncestor(fg, GA_ROOT) } == dlg
+        || unsafe { GetAncestor(fg, GA_ROOTOWNER) } == dlg
 }
-
 
 /// Resets all internal modifier and hotkey tracking flags to prevent stuck modifiers
 /// (e.g. after Win+L workstation lock, sleep, session change, or focus switch).

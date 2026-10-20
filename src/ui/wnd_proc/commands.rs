@@ -1,7 +1,6 @@
 //! WM_COMMAND dispatcher for Kora Profile-First Workspace Hub
 //! Delegates command notifications directly to component owners via ControlPanelControls.
 
-
 use crate::ui::win32::*;
 
 pub fn handle_command(
@@ -16,14 +15,7 @@ pub fn handle_command(
 
     // Message Reflection: Forward OCM_COMMAND directly to child control
     if target_hwnd != 0 {
-        let res = unsafe {
-            SendMessageW(
-                target_hwnd,
-                OCM_COMMAND,
-                wparam,
-                lparam,
-            )
-        };
+        let res = unsafe { SendMessageW(target_hwnd, OCM_COMMAND, wparam, lparam) };
         if res != 0 {
             return 0;
         }

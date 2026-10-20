@@ -4,16 +4,16 @@
 //! (Remaps, Disables, Key Macros, and Mode Switch Hotkey), highlighting cross-feature
 //! execution conflicts and allowing 1-click navigation to the respective editor sub-tab.
 
-use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::config::Hotkey;
+use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::profile::{
-    check_profile_conflicts, ConflictFeature, KeyDiagnostics, ResolvedDisableItem,
-    ResolvedKeyMacroItem, ResolvedRemapItem, RuleOrigin,
+    ConflictFeature, KeyDiagnostics, ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem,
+    RuleOrigin, check_profile_conflicts,
 };
+use crate::ui::prelude::*;
 use crate::ui::views::control_panel::tab_keys::{
     TABLE_HEIGHT, TABLE_WIDTH, TABLE_X, TABLE_Y, TITLE_HEIGHT, TITLE_X, TITLE_Y,
 };
-use crate::ui::prelude::*;
 
 pub struct OverviewPanel {
     layout: CardLayout,

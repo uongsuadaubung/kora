@@ -6,4 +6,3 @@ pub mod encoder;
 
 pub use decoder::{parse_config_all, parse_config_and_macros};
 pub use encoder::{serialize_config_all, serialize_config_and_macros};
-

@@ -89,7 +89,8 @@ unsafe extern "system" fn checkbox_subclass_proc(
         return 1;
     }
     if msg == CBM_GET_INHERITED {
-        return (!data_ptr.is_null() && unsafe { (*data_ptr).tri && (*data_ptr).inherited }) as isize;
+        return (!data_ptr.is_null() && unsafe { (*data_ptr).tri && (*data_ptr).inherited })
+            as isize;
     }
     if msg == CBM_SET_ALIGN_RIGHT && !data_ptr.is_null() {
         unsafe {
@@ -182,7 +183,11 @@ unsafe extern "system" fn checkbox_subclass_proc(
                     .filter(|s| !s.is_empty());
 
                 let hfont = SendMessageW(hwnd, WM_GETFONT, 0, 0);
-                let old_font = if hfont != 0 { SelectObject(hdc, hfont) } else { 0 };
+                let old_font = if hfont != 0 {
+                    SelectObject(hdc, hfont)
+                } else {
+                    0
+                };
                 let mut text_buf = [0u16; 256];
                 let text_len = GetWindowTextW(hwnd, text_buf.as_mut_ptr(), 256);
                 let measure = |s: &[u16]| {
@@ -541,7 +546,12 @@ impl<L: I18nSource> CheckBox<Inheritable<L>> {
         Self::create_raw(parent, id, text, x, y, width, height, hfont, None)
     }
 
-    pub fn set_tri_state_with_note(&self, value: Option<bool>, inherited: bool, note: &'static str) {
+    pub fn set_tri_state_with_note(
+        &self,
+        value: Option<bool>,
+        inherited: bool,
+        note: &'static str,
+    ) {
         let state = match value {
             None => BST_INDETERMINATE,
             Some(true) => BST_CHECKED,
@@ -588,5 +598,3 @@ impl<L: I18nSource> CheckBox<Inheritable<L>> {
         }
     }
 }
-
-

@@ -57,4 +57,3 @@ pub fn get_foreground_process_name() -> String {
         get_process_name_for_pid(pid)
     }
 }
-

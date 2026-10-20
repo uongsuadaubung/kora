@@ -2,7 +2,7 @@ use super::{
     action::{CompactString, EngineAction},
     config::EngineConfig,
 };
-use crate::vietnamese::{InlineList, state::SyllableState};
+use crate::vietnamese::{CharsetStrategy, InlineList, state::SyllableState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RawKey {
@@ -129,9 +129,7 @@ impl TypingBuffer {
                 && matches!(next_state, SyllableState::Passthrough(_))
                 && matches!(action, EngineAction::Passthrough)
             {
-                let is_same_as_raw = last_rendered
-                    .chars()
-                    .eq(keys[..idx].iter().map(|k| k.ch));
+                let is_same_as_raw = last_rendered.chars().eq(keys[..idx].iter().map(|k| k.ch));
                 if !is_same_as_raw {
                     let mut raw_list = InlineList::new();
                     let mut output = CompactString::new();
@@ -144,6 +142,12 @@ impl TypingBuffer {
                         backspaces: last_rendered.chars().count(),
                         output,
                     };
+                }
+            }
+
+            if config.charset != crate::vietnamese::Charset::Unicode {
+                if let EngineAction::Replace { ref mut output, .. } = action {
+                    *output = config.charset.encode_text(output.as_str());
                 }
             }
 
@@ -175,7 +179,14 @@ impl TypingBuffer {
             if matches!(state, SyllableState::Passthrough(_)) && !last_rendered.is_empty() {
                 last_rendered
             } else {
-                state.render_compact()
+                {
+                    let s = state.render_compact();
+                    if config.charset != crate::vietnamese::Charset::Unicode {
+                        config.charset.encode_text(s.as_str())
+                    } else {
+                        s
+                    }
+                }
             };
 
         EvaluationResult {
@@ -232,9 +243,12 @@ impl TypingBuffer {
             && matches!(action, EngineAction::Passthrough)
             && !current_state.is_unambiguous_completed_vietnamese()
         {
-            let is_same_as_raw = self.last_rendered
+            let is_same_as_raw = self
+                .last_rendered
                 .chars()
-                .eq(self.raw_keys[..self.raw_keys.len() - 1].iter().map(|k| k.ch));
+                .eq(self.raw_keys[..self.raw_keys.len() - 1]
+                    .iter()
+                    .map(|k| k.ch));
             if !is_same_as_raw {
                 let mut raw_list = InlineList::new();
                 let mut output = CompactString::new();
@@ -250,6 +264,12 @@ impl TypingBuffer {
             }
         }
 
+        if config.charset != crate::vietnamese::Charset::Unicode {
+            if let EngineAction::Replace { ref mut output, .. } = action {
+                *output = config.charset.encode_text(output.as_str());
+            }
+        }
+
         self.state = next_state;
 
         // Common Prefix Optimization:
@@ -257,7 +277,10 @@ impl TypingBuffer {
         // do not backspace and re-emit it. Only backspace the changed suffix ("o") and emit ("õ").
         // This eliminates duplicate characters ("ggõ") on browser address bars (Firefox, Chrome).
         let (action, new_emitted_len) = match action {
-            EngineAction::Replace { backspaces, mut output } => {
+            EngineAction::Replace {
+                backspaces,
+                mut output,
+            } => {
                 // Thuật toán so khớp tiền tố chung một lượt (Single-Pass Common Prefix Optimization):
                 // 1. Duyệt đồng thời chuỗi đã render cũ và chuỗi mới để đếm số ký tự trùng khớp và số byte UTF-8 tương ứng.
                 // 2. Tích lũy trực tiếp common_bytes để cắt ngắn buffer mà không cần duyệt lại char_indices().

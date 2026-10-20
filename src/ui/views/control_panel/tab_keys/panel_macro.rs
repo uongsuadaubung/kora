@@ -2,8 +2,8 @@
 //! Allows mapping a physical trigger key to an automation sequence (press/down/up/delay/text).
 
 use crate::engine::profile::ResolvedKeyMacroItem;
-use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use crate::ui::prelude::*;
+use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
 use std::ops::Deref;
 
 #[repr(transparent)]
@@ -93,4 +93,3 @@ impl MacroPanel {
         });
     }
 }
-

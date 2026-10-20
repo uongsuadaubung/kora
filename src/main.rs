@@ -32,7 +32,9 @@ fn main() {
     // Autostart (Run key) starts us with CWD = System32. Pin the GUI's CWD to the exe directory
     // so relative paths (debug log, ./switches) resolve the same as a normal double-click launch.
     if !is_cli
-        && let Some(dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        && let Some(dir) = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
     {
         let _ = std::env::set_current_dir(dir);
     }
@@ -142,7 +144,9 @@ fn main() {
 
             let show_dialog_on_startup = !is_autostart && engine.config().show_dialog_on_startup;
             kora::platform::win32::set_mode_change_callback(kora::ui::post_mode_change);
-            kora::platform::win32::set_message_filter(kora::ui::views::dialogs::pre_translate_message);
+            kora::platform::win32::set_message_filter(
+                kora::ui::views::dialogs::pre_translate_message,
+            );
             kora::platform::win32::run_hook_loop(engine, move || {
                 kora::ui::init_ui();
                 if show_dialog_on_startup {

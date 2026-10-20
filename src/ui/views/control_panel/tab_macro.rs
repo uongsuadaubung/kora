@@ -4,7 +4,7 @@
 use crate::language::LanguageStrings;
 use crate::ui::prelude::*;
 use crate::ui_framework::win32::{
-    HWND_TOP, InvalidateRect, SetWindowPos, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    HWND_TOP, InvalidateRect, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SetWindowPos,
 };
 
 pub struct TabMacro {
@@ -270,7 +270,11 @@ impl TabMacro {
                 self.update_macro_checkboxes_state();
             }
             crate::ui::controller::edit_selected(|mut target| {
-                target.sync_checkbox(&self.check_use_macro, |c| &mut c.use_macro, |p| &mut p.use_macro);
+                target.sync_checkbox(
+                    &self.check_use_macro,
+                    |c| &mut c.use_macro,
+                    |p| &mut p.use_macro,
+                );
                 target.sync_checkbox(
                     &self.check_macro_in_english,
                     |c| &mut c.use_macro_in_english_mode,

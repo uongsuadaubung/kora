@@ -2,10 +2,12 @@
 //! High-polish native Win32 GDI modal matching modern UI mockups.
 //! Supports physical single-key capture, presets, and active profile assignment.
 
-use super::{attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state};
+use super::{
+    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
+};
 use crate::engine::config::hotkey::vk_to_name;
 use crate::platform::win32::{
-    start_single_key_capture, stop_single_key_capture, WM_SINGLE_KEY_CAPTURED,
+    WM_SINGLE_KEY_CAPTURED, start_single_key_capture, stop_single_key_capture,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -78,7 +80,12 @@ pub fn show_remap_dialog_with_keys(
     );
 }
 
-unsafe fn draw_remap_box(hwnd: isize, target: ActiveCaptureTarget, dis: &DRAWITEMSTRUCT, is_dark: bool) {
+unsafe fn draw_remap_box(
+    hwnd: isize,
+    target: ActiveCaptureTarget,
+    dis: &DRAWITEMSTRUCT,
+    is_dark: bool,
+) {
     let (is_listening, vk_opt, font) = (unsafe { state::<RemapDialogState>(hwnd) })
         .map(|s| {
             let vk = match target {
@@ -100,7 +107,15 @@ unsafe fn draw_remap_box(hwnd: isize, target: ActiveCaptureTarget, dis: &DRAWITE
         (strings.dlg_remap_unassigned, true)
     };
 
-    super::base::draw_key_box(dis, is_dark, is_listening, text, is_placeholder, false, font);
+    super::base::draw_key_box(
+        dis,
+        is_dark,
+        is_listening,
+        text,
+        is_placeholder,
+        false,
+        font,
+    );
 }
 
 unsafe fn toggle_capture(hwnd: isize, target: ActiveCaptureTarget) {
@@ -169,22 +184,18 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
 
                 let strings = crate::language::current();
 
-                Label::create(hwnd, strings.dlg_remap_from, 20, 74, 205, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.dlg_remap_to, 275, 74, 205, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(hwnd, strings.dlg_remap_from, 20, 74, 205, 18, hfont_bold).map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(hwnd, strings.dlg_remap_to, 275, 74, 205, 18, hfont_bold).map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // Interactive Box 1: From Key
-                let btn_from = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    20,
-                    96,
-                    205,
-                    48,
-                    hfont_large,
-                );
+                let btn_from =
+                    PushButton::create_owner_draw(hwnd, 0, "", 20, 96, 205, 48, hfont_large);
                 if let Some(ref btn) = btn_from {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         draw_remap_box(hwnd, ActiveCaptureTarget::From, dis, is_dark);
@@ -194,20 +205,14 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 }
 
                 // Center Arrow: ➜
-                Label::create_centered(hwnd, "➜", 225, 108, 50, 24, hfont_large)
-                    .map(|l| l.with_tone(LabelTone::Accent).on_surface(SurfaceRole::Window));
+                Label::create_centered(hwnd, "➜", 225, 108, 50, 24, hfont_large).map(|l| {
+                    l.with_tone(LabelTone::Accent)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // Interactive Box 2: To Key
-                let btn_to = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    275,
-                    96,
-                    205,
-                    48,
-                    hfont_large,
-                );
+                let btn_to =
+                    PushButton::create_owner_draw(hwnd, 0, "", 275, 96, 205, 48, hfont_large);
                 if let Some(ref btn) = btn_to {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         draw_remap_box(hwnd, ActiveCaptureTarget::To, dis, is_dark);
@@ -216,12 +221,45 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                     btn.set_on_click(move || toggle_capture(hwnd, ActiveCaptureTarget::To));
                 }
 
-                Label::create(hwnd, strings.dlg_remap_click_hint, 20, 150, 205, 18, hfont_normal)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.dlg_remap_click_hint, 275, 150, 205, 18, hfont_normal)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.dlg_remap_presets_title, 20, 182, 460, 20, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.dlg_remap_click_hint,
+                    20,
+                    150,
+                    205,
+                    18,
+                    hfont_normal,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(
+                    hwnd,
+                    strings.dlg_remap_click_hint,
+                    275,
+                    150,
+                    205,
+                    18,
+                    hfont_normal,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(
+                    hwnd,
+                    strings.dlg_remap_presets_title,
+                    20,
+                    182,
+                    460,
+                    20,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 let palette_init = ThemePalette::get(is_current_dark());
 
@@ -253,7 +291,12 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 super::create_dialog_footer_buttons(
                     hwnd,
                     (strings.dlg_remap_btn_cancel, 254, 76),
-                    (strings.dlg_remap_btn_apply, 340, 140, ButtonVariant::Primary),
+                    (
+                        strings.dlg_remap_btn_apply,
+                        340,
+                        140,
+                        ButtonVariant::Primary,
+                    ),
                     280,
                     32,
                     Some(palette_init.bg_window),
@@ -276,7 +319,12 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                     super::base::draw_dialog_callout(
                         hdc,
                         &palette,
-                        RECT { left: 20, top: 14, right: 480, bottom: 58 },
+                        RECT {
+                            left: 20,
+                            top: 14,
+                            right: 480,
+                            bottom: 58,
+                        },
                         strings.dlg_remap_prompt,
                     );
 
@@ -284,7 +332,14 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                     let target_display = state::<RemapDialogState>(hwnd)
                         .map(|s| s.target_display.clone())
                         .unwrap_or(default_root);
-                    super::base::draw_dialog_footer(hdc, &palette, 500, 264, 336, Some(&target_display));
+                    super::base::draw_dialog_footer(
+                        hdc,
+                        &palette,
+                        500,
+                        264,
+                        336,
+                        Some(&target_display),
+                    );
 
                     EndPaint(hwnd, &ps);
                 }

@@ -5,8 +5,8 @@ use crate::language::LanguageStrings;
 use crate::ui::prelude::*;
 use crate::ui_framework::tokens::typography::*;
 use crate::ui_framework::win32::{
-    CreatePen, CreateSolidBrush, DeleteObject, DrawTextW, RoundRect, SelectObject, SetBkMode,
-    SetTextColor, DT_CENTER, DT_SINGLELINE, DT_VCENTER, FW_BOLD, PS_SOLID, TRANSPARENT,
+    CreatePen, CreateSolidBrush, DT_CENTER, DT_SINGLELINE, DT_VCENTER, DeleteObject, DrawTextW,
+    FW_BOLD, PS_SOLID, RoundRect, SelectObject, SetBkMode, SetTextColor, TRANSPARENT,
 };
 
 const HERO_CARD_X: i32 = 246;

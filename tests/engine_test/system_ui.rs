@@ -122,6 +122,3 @@ fn test_dynamic_debug_toggle() {
         "No new logs should be recorded when disabled again"
     );
 }
-
-
-

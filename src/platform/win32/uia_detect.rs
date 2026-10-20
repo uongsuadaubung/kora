@@ -93,29 +93,21 @@ pub struct IUIAutomationElementVtbl {
     pub get_cached_pattern: usize,
     pub get_cached_parent: usize,
     pub get_cached_children: usize,
-    pub get_current_process_id: unsafe extern "system" fn(
-        this: *mut std::ffi::c_void,
-        ret_val: *mut i32,
-    ) -> i32,
+    pub get_current_process_id:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void, ret_val: *mut i32) -> i32,
     pub get_current_control_type: usize,
     pub get_current_localized_control_type: usize,
-    pub get_current_name: unsafe extern "system" fn(
-        this: *mut std::ffi::c_void,
-        ret_val: *mut *mut u16,
-    ) -> i32,
+    pub get_current_name:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void, ret_val: *mut *mut u16) -> i32,
     pub get_current_accelerator_key: usize,
     pub get_current_access_key: usize,
     pub get_current_has_keyboard_focus: usize,
     pub get_current_is_keyboard_focusable: usize,
     pub get_current_is_enabled: usize,
-    pub get_current_automation_id: unsafe extern "system" fn(
-        this: *mut std::ffi::c_void,
-        ret_val: *mut *mut u16,
-    ) -> i32,
-    pub get_current_class_name: unsafe extern "system" fn(
-        this: *mut std::ffi::c_void,
-        ret_val: *mut *mut u16,
-    ) -> i32,
+    pub get_current_automation_id:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void, ret_val: *mut *mut u16) -> i32,
+    pub get_current_class_name:
+        unsafe extern "system" fn(this: *mut std::ffi::c_void, ret_val: *mut *mut u16) -> i32,
 }
 
 pub const CLSID_CUI_AUTOMATION8: GUID = GUID {

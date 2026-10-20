@@ -2,8 +2,8 @@
 
 use kora::engine::config::Hotkey;
 use kora::engine::profile::{
-    check_profile_conflicts, ConflictFeature, ResolvedDisableItem, ResolvedKeyMacroItem,
-    ResolvedRemapItem, RuleOrigin,
+    ConflictFeature, ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem, RuleOrigin,
+    check_profile_conflicts,
 };
 
 #[test]
@@ -128,7 +128,8 @@ fn test_inheritance_cross_conflict_detection() {
 
     // Child profile "cs2" inherits Disable(F1) and adds an AppSpecific Remap F1 -> F2 (0x71)
     let mut cs2 = kora::engine::profile::AppProfile::new_child("cs2", "CS2", "cs2.exe", "🎮");
-    cs2.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
+    cs2.app_remaps
+        .push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
     manager.add_profile(cs2);
 
     let base_cfg = kora::engine::config::EngineConfig::default();
@@ -163,10 +164,18 @@ fn test_inheritance_mute_resolves_conflict() {
 
     // Global has both Disable(F1) and Remap(F1 -> F2) -> Global has conflict!
     manager.global_profile.app_disabled.push(0x70);
-    manager.global_profile.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
+    manager
+        .global_profile
+        .app_remaps
+        .push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
 
     // Child profile "photoshop" unblocks F1 (unmuted_disabled) to use the remap!
-    let mut ps = kora::engine::profile::AppProfile::new_child("photoshop", "Photoshop", "photoshop.exe", "🎨");
+    let mut ps = kora::engine::profile::AppProfile::new_child(
+        "photoshop",
+        "Photoshop",
+        "photoshop.exe",
+        "🎨",
+    );
     ps.unmuted_disabled.push(0x70);
     manager.add_profile(ps);
 
@@ -203,7 +212,8 @@ fn test_child_profile_custom_switch_key_conflict() {
     let base_cfg = kora::engine::config::EngineConfig::default();
 
     // Child profile customizes switch key to Ctrl + Space (0x20)
-    let mut child = kora::engine::profile::AppProfile::new_child("code", "VSCode", "code.exe", "💻");
+    let mut child =
+        kora::engine::profile::AppProfile::new_child("code", "VSCode", "code.exe", "💻");
     child.switch_key = Some(Hotkey::new(true, false, false, false, 0x20));
     manager.add_profile(child);
 
@@ -236,12 +246,18 @@ fn test_child_profile_feature_disabled_suppresses_conflict() {
     manager.global_profile.key_macro_enabled = true;
 
     // Global has Remap(F1 -> F2) and KeyMacro(F1) -> Conflict in Global!
-    manager.global_profile.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
-    manager.global_profile.app_key_macros.push(kora::engine::profile::KeyMacroRule::new(
-        0x70,
-        "Test Macro",
-        Vec::new(),
-    ));
+    manager
+        .global_profile
+        .app_remaps
+        .push(kora::engine::profile::KeyRemapRule::new(0x70, 0x71));
+    manager
+        .global_profile
+        .app_key_macros
+        .push(kora::engine::profile::KeyMacroRule::new(
+            0x70,
+            "Test Macro",
+            Vec::new(),
+        ));
 
     // Child explicitly turns off Remap feature (remap_enabled = Some(false))
     let mut child = kora::engine::profile::AppProfile::new_child("game", "Game", "game.exe", "🎮");
@@ -272,20 +288,38 @@ fn test_child_profile_feature_disabled_suppresses_conflict() {
 
 #[test]
 fn test_conflict_and_diagnostics_i18n() {
-    use kora::language::{get_strings, Language};
+    use kora::language::{Language, get_strings};
 
     let strings_vi = get_strings(Language::Vietnamese);
     let strings_en = get_strings(Language::English);
 
     // Verify ConflictFeature localized_name
-    assert_eq!(ConflictFeature::Disable.localized_name(strings_vi), "Chặn phím");
+    assert_eq!(
+        ConflictFeature::Disable.localized_name(strings_vi),
+        "Chặn phím"
+    );
     assert_eq!(ConflictFeature::Disable.localized_name(strings_en), "Block");
-    assert_eq!(ConflictFeature::Remap.localized_name(strings_vi), "Đổi phím");
+    assert_eq!(
+        ConflictFeature::Remap.localized_name(strings_vi),
+        "Đổi phím"
+    );
     assert_eq!(ConflictFeature::Remap.localized_name(strings_en), "Remap");
-    assert_eq!(ConflictFeature::KeyMacro.localized_name(strings_vi), "Phím Macro");
-    assert_eq!(ConflictFeature::KeyMacro.localized_name(strings_en), "Key Macro");
-    assert_eq!(ConflictFeature::SwitchKey.localized_name(strings_vi), "Chuyển E ⇄ V");
-    assert_eq!(ConflictFeature::SwitchKey.localized_name(strings_en), "Mode Switch");
+    assert_eq!(
+        ConflictFeature::KeyMacro.localized_name(strings_vi),
+        "Phím Macro"
+    );
+    assert_eq!(
+        ConflictFeature::KeyMacro.localized_name(strings_en),
+        "Key Macro"
+    );
+    assert_eq!(
+        ConflictFeature::SwitchKey.localized_name(strings_vi),
+        "Chuyển E ⇄ V"
+    );
+    assert_eq!(
+        ConflictFeature::SwitchKey.localized_name(strings_en),
+        "Mode Switch"
+    );
 
     // Verify format templates
     let warning_vi = strings_vi.overview_conflicts_format.replace("{count}", "3");
@@ -293,13 +327,15 @@ fn test_conflict_and_diagnostics_i18n() {
     let warning_en = strings_en.overview_conflicts_format.replace("{count}", "3");
     assert_eq!(warning_en, "⚠️ Detected 3 key conflict(s)");
 
-    let shadowed_vi = strings_vi
-        .status_shadowed_by
-        .replace("{feature}", ConflictFeature::Disable.localized_name(strings_vi));
+    let shadowed_vi = strings_vi.status_shadowed_by.replace(
+        "{feature}",
+        ConflictFeature::Disable.localized_name(strings_vi),
+    );
     assert_eq!(shadowed_vi, "⚠️ Bị Chặn phím nuốt");
-    let shadowed_en = strings_en
-        .status_shadowed_by
-        .replace("{feature}", ConflictFeature::Disable.localized_name(strings_en));
+    let shadowed_en = strings_en.status_shadowed_by.replace(
+        "{feature}",
+        ConflictFeature::Disable.localized_name(strings_en),
+    );
     assert_eq!(shadowed_en, "⚠️ Shadowed by Block");
 
     assert_eq!(strings_vi.action_toggle_vietnamese, "Bật / Tắt Tiếng Việt");
@@ -321,4 +357,3 @@ fn test_conflict_and_diagnostics_i18n() {
         "2 Remap • 1 Block • 4 Key Macro"
     );
 }
-

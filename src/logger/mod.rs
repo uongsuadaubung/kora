@@ -3,7 +3,7 @@
 //! Provides non-blocking asynchronous file logging to disk on a dedicated worker thread,
 //! ensuring zero I/O disk latency on time-critical threads (Windows low-level hook / UI).
 
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{Sender, channel};
 
 /// Non-blocking asynchronous log worker that writes debug logs to disk on a dedicated thread,
 /// preventing any I/O disk stalls on the Windows low-level hook thread.
@@ -52,7 +52,6 @@ impl Default for AsyncLogWriter {
 }
 
 impl AsyncLogWriter {
-
     pub fn write_line(&self, line: String) {
         if let Some(ref sender) = self.sender {
             let _ = sender.send(line);

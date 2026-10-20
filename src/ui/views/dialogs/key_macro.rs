@@ -8,13 +8,15 @@
 //! - Inline step builder: Type dropdown (press, down, up, delay, text) + input box + [+ Thêm bước]
 //! - Pipeline DSL live preview
 
-use super::{attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state};
+use super::{
+    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
+};
 use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::profile::MacroAction;
 use crate::platform::win32::{
-    get_captured_display_text, get_captured_hotkey, start_combo_capture, start_single_key_capture,
-    stop_combo_capture, stop_single_key_capture, ENGINE_INSTANCE, WM_COMBO_CAPTURED,
-    WM_SINGLE_KEY_CAPTURED,
+    ENGINE_INSTANCE, WM_COMBO_CAPTURED, WM_SINGLE_KEY_CAPTURED, get_captured_display_text,
+    get_captured_hotkey, start_combo_capture, start_single_key_capture, stop_combo_capture,
+    stop_single_key_capture,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::action_table::{
@@ -208,7 +210,9 @@ fn populate_action_table_rows(hwnd_dlg: isize, table: &ActionTable, actions: &[M
                 MacroAction::KeyDown(key) => ("⬇️ Giữ", BadgeVariant::Warning, key.clone()),
                 MacroAction::KeyUp(key) => ("⬆️ Nhả", BadgeVariant::Success, key.clone()),
                 MacroAction::Delay(ms) => ("⏱️ Chờ", BadgeVariant::Purple, format!("{} ms", ms)),
-                MacroAction::Text(txt) => ("🔤 Gõ", BadgeVariant::Secondary, format!("\"{}\"", txt)),
+                MacroAction::Text(txt) => {
+                    ("🔤 Gõ", BadgeVariant::Secondary, format!("\"{}\"", txt))
+                }
             };
 
             let mut order_actions = Vec::new();
@@ -286,22 +290,36 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 let hfont_bold = get_app_font_bold();
                 let strings = crate::language::current();
 
-                Label::create(hwnd, strings.dlg_key_macro_trigger_lbl, 16, 14, 154, 16, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.dlg_key_macro_name_lbl, 176, 14, 404, 16, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.dlg_key_macro_trigger_lbl,
+                    16,
+                    14,
+                    154,
+                    16,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(
+                    hwnd,
+                    strings.dlg_key_macro_name_lbl,
+                    176,
+                    14,
+                    404,
+                    16,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // 1. Trigger Key Box (Button)
-                let btn_trigger = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    16,
-                    32,
-                    150,
-                    34,
-                    hfont_large,
-                );
+                let btn_trigger =
+                    PushButton::create_owner_draw(hwnd, 0, "", 16, 32, 150, 34, hfont_large);
                 if let Some(ref btn) = btn_trigger {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         let (is_listening, trig_vk, trig_disp, font) =
@@ -353,8 +371,19 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 );
 
                 // 3. Action Table header & step count
-                Label::create(hwnd, strings.dlg_key_macro_actions_lbl, 16, 76, 384, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.dlg_key_macro_actions_lbl,
+                    16,
+                    76,
+                    384,
+                    18,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
                 let lbl_step_count = Label::create_right(
                     hwnd,
                     &format!("{} bước", st.actions.len()),
@@ -364,7 +393,10 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                     18,
                     hfont_normal,
                 )
-                .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 let table = ActionTable::create_styled(
                     hwnd,
@@ -386,18 +418,21 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 let arc_table = table.map(Arc::new);
 
                 // 4. Inline builder title & Action Type ComboBox
-                Label::create(hwnd, strings.dlg_key_macro_insert_title, 16, 266, 384, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-
-                let mut cbo_type = ComboBox::create(
+                Label::create(
                     hwnd,
-                    0,
-                    24,
-                    292,
-                    145,
-                    34,
-                    hfont_normal,
-                );
+                    strings.dlg_key_macro_insert_title,
+                    16,
+                    266,
+                    384,
+                    18,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+
+                let mut cbo_type = ComboBox::create(hwnd, 0, 24, 292, 145, 34, hfont_normal);
                 if let Some(ref mut cbo) = cbo_type {
                     cbo.add_item("⚡ Nhấn (press)");
                     cbo.add_item("⬇️ Giữ (down)");
@@ -408,16 +443,8 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 }
 
                 // 5. Value input controls (Key Box, Delay Box, Text Box)
-                let btn_step_key = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    177,
-                    292,
-                    270,
-                    34,
-                    hfont_bold,
-                );
+                let btn_step_key =
+                    PushButton::create_owner_draw(hwnd, 0, "", 177, 292, 270, 34, hfont_bold);
                 if let Some(ref btn) = btn_step_key {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         let (is_listening, key_text) = state::<KeyMacroDialogState>(hwnd)
@@ -503,8 +530,10 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 }
 
                 // DSL title & Footer hint labels
-                Label::create(hwnd, "DSL:", 26, 357, 34, 20, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Card));
+                Label::create(hwnd, "DSL:", 26, 357, 34, 20, hfont_bold).map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Card)
+                });
                 Label::create(
                     hwnd,
                     strings.dlg_key_macro_trigger_hint,
@@ -514,7 +543,10 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                     24,
                     hfont_normal,
                 )
-                .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // 7. Footer buttons
                 super::create_dialog_footer_buttons(
@@ -565,7 +597,15 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 let pen_border = CreatePen(PS_SOLID, 1, palette.border_separator);
                 let ob = SelectObject(hdc, br_card);
                 let op = SelectObject(hdc, pen_border);
-                RoundRect(hdc, rc_builder.left, rc_builder.top, rc_builder.right, rc_builder.bottom, 6, 6);
+                RoundRect(
+                    hdc,
+                    rc_builder.left,
+                    rc_builder.top,
+                    rc_builder.right,
+                    rc_builder.bottom,
+                    6,
+                    6,
+                );
                 SelectObject(hdc, ob);
                 SelectObject(hdc, op);
                 DeleteObject(br_card);
@@ -582,7 +622,15 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 let pen_dsl = CreatePen(PS_SOLID, 1, palette.border);
                 let ob = SelectObject(hdc, br_dsl);
                 let op = SelectObject(hdc, pen_dsl);
-                RoundRect(hdc, rc_dsl.left, rc_dsl.top, rc_dsl.right, rc_dsl.bottom, 6, 6);
+                RoundRect(
+                    hdc,
+                    rc_dsl.left,
+                    rc_dsl.top,
+                    rc_dsl.right,
+                    rc_dsl.bottom,
+                    6,
+                    6,
+                );
                 SelectObject(hdc, ob);
                 SelectObject(hdc, op);
                 DeleteObject(br_dsl);
@@ -937,7 +985,11 @@ unsafe fn submit_key_macro(hwnd: isize) {
 
     let (trigger_vk, name, actions, orig_vk) = {
         if let Some(s) = unsafe { state::<KeyMacroDialogState>(hwnd) } {
-            let mut n = s.txt_name.as_ref().map(|t| t.get_text()).unwrap_or_default();
+            let mut n = s
+                .txt_name
+                .as_ref()
+                .map(|t| t.get_text())
+                .unwrap_or_default();
             if n.trim().is_empty() {
                 n = format!("Macro {}", s.trigger_display);
             }

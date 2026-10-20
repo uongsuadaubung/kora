@@ -7,9 +7,9 @@ pub mod tray;
 pub use tray::{handle_menu_command, tray_helper_wnd_proc};
 
 use crate::platform::win32::ENGINE_INSTANCE;
-use crate::ui::win32::*;
-use crate::ui::views::control_panel::paint_control_panel;
 use crate::ui::theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
+use crate::ui::views::control_panel::paint_control_panel;
+use crate::ui::win32::*;
 
 const WM_PAINT: u32 = 0x000F;
 const WM_CLOSE: u32 = 0x0010;
@@ -63,7 +63,10 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                         .lock()
                         .ok()
                         .and_then(|mut g| g.take());
-                    crate::ui::controller::capture_target_for_app(&target.process_name, &target.target_id);
+                    crate::ui::controller::capture_target_for_app(
+                        &target.process_name,
+                        &target.target_id,
+                    );
                 }
             }
             0
@@ -163,8 +166,7 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             // lparam owns a Box<SoundpackInstallStatus> handed over by the installer worker thread
             let status = unsafe {
                 Box::from_raw(
-                    lparam
-                        as *mut crate::platform::win32::sound::installer::SoundpackInstallStatus,
+                    lparam as *mut crate::platform::win32::sound::installer::SoundpackInstallStatus,
                 )
             };
             if let Some(c) = controls {
@@ -183,7 +185,10 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                     .lock()
                     .ok()
                     .and_then(|mut g| g.take());
-                crate::ui::controller::capture_target_for_app(&target.process_name, &target.target_id);
+                crate::ui::controller::capture_target_for_app(
+                    &target.process_name,
+                    &target.target_id,
+                );
             }
             0
         }

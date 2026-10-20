@@ -4,7 +4,7 @@
 //! - Giải mã file âm thanh PCM WAVE 8/16/24/32-bit (Mono/Stereo) và resample về 48kHz.
 //! - Nạp và quản lý bộ nhớ đệm âm thanh switch bàn phím cơ (`SoundBank`).
 
-use super::tags::{match_file_tag, vk_to_tag, KeyTag, KEY_TAG_COUNT};
+use super::tags::{KEY_TAG_COUNT, KeyTag, match_file_tag, vk_to_tag};
 
 pub struct SoundBank {
     pub(crate) slots: [Vec<Vec<f32>>; KEY_TAG_COUNT],
@@ -250,4 +250,3 @@ pub fn parse_wav(data: &[u8]) -> Option<Vec<f32>> {
         Some(resampled)
     }
 }
-

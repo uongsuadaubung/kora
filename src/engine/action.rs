@@ -302,7 +302,10 @@ pub enum EngineAction {
     /// then emit `output` string into the active input field.
     ///
     /// `output` is stored as `CompactString` (stack-allocated up to 24 bytes, 0 heap churn for 100% of Vietnamese words).
-    Replace { backspaces: usize, output: CompactString },
+    Replace {
+        backspaces: usize,
+        output: CompactString,
+    },
 
     /// Consume (drop) the keystroke entirely. Do not let OS process it.
     Consume,

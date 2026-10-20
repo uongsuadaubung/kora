@@ -142,44 +142,142 @@ fn test_invalid_syllables() {
 
 #[test]
 fn test_onset_vowel_orthography() {
-    use kora::vietnamese::spelling::{is_valid_coda_start_for_vowels, is_valid_onset_vowel_orthography};
+    use kora::vietnamese::spelling::{
+        is_valid_coda_start_for_vowels, is_valid_onset_vowel_orthography,
+    };
 
     // 'c' only allows a, o, u; rejects e, i, y
-    assert!(is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::A));
-    assert!(is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::O));
-    assert!(is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::U));
-    assert!(!is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::E));
-    assert!(!is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::I));
-    assert!(!is_valid_onset_vowel_orthography(&[('c', false)], false, BaseVowel::Y));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::A
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::O
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::U
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::E
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::I
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('c', false)],
+        false,
+        BaseVowel::Y
+    ));
 
     // 'k' only allows e, i, y; rejects a, o, u
-    assert!(is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::E));
-    assert!(is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::I));
-    assert!(is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::Y));
-    assert!(!is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::A));
-    assert!(!is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::O));
-    assert!(!is_valid_onset_vowel_orthography(&[('k', false)], false, BaseVowel::U));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::E
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::I
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::Y
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::A
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::O
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('k', false)],
+        false,
+        BaseVowel::U
+    ));
 
     // 'q' must precede 'u'
-    assert!(is_valid_onset_vowel_orthography(&[('q', false)], false, BaseVowel::U));
-    assert!(!is_valid_onset_vowel_orthography(&[('q', false)], false, BaseVowel::A));
-    assert!(!is_valid_onset_vowel_orthography(&[('q', false)], false, BaseVowel::E));
-    assert!(!is_valid_onset_vowel_orthography(&[('q', false)], false, BaseVowel::I));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('q', false)],
+        false,
+        BaseVowel::U
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('q', false)],
+        false,
+        BaseVowel::A
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('q', false)],
+        false,
+        BaseVowel::E
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('q', false)],
+        false,
+        BaseVowel::I
+    ));
 
     // 'g' rejects 'e' (must use 'gh')
-    assert!(!is_valid_onset_vowel_orthography(&[('g', false)], false, BaseVowel::E));
-    assert!(is_valid_onset_vowel_orthography(&[('g', false)], false, BaseVowel::A));
-    assert!(is_valid_onset_vowel_orthography(&[('g', false)], false, BaseVowel::I));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('g', false)],
+        false,
+        BaseVowel::E
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('g', false)],
+        false,
+        BaseVowel::A
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('g', false)],
+        false,
+        BaseVowel::I
+    ));
 
     // 'gh' only accepts 'e', 'i'
-    assert!(is_valid_onset_vowel_orthography(&[('g', false), ('h', false)], false, BaseVowel::E));
-    assert!(is_valid_onset_vowel_orthography(&[('g', false), ('h', false)], false, BaseVowel::I));
-    assert!(!is_valid_onset_vowel_orthography(&[('g', false), ('h', false)], false, BaseVowel::A));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('g', false), ('h', false)],
+        false,
+        BaseVowel::E
+    ));
+    assert!(is_valid_onset_vowel_orthography(
+        &[('g', false), ('h', false)],
+        false,
+        BaseVowel::I
+    ));
+    assert!(!is_valid_onset_vowel_orthography(
+        &[('g', false), ('h', false)],
+        false,
+        BaseVowel::A
+    ));
 
     // Coda constraints for special vowels:
     let oo_vowels = [
-        VowelLetter { base: BaseVowel::O, diacritic: Diacritic::None, is_upper: false },
-        VowelLetter { base: BaseVowel::O, diacritic: Diacritic::None, is_upper: false },
+        VowelLetter {
+            base: BaseVowel::O,
+            diacritic: Diacritic::None,
+            is_upper: false,
+        },
+        VowelLetter {
+            base: BaseVowel::O,
+            diacritic: Diacritic::None,
+            is_upper: false,
+        },
     ];
     // 'oo' only allows 'n' (to form 'ng' in xoong, boong), rejects 'm', 't', 'p', 'c'
     assert!(is_valid_coda_start_for_vowels(false, &oo_vowels, 'n'));
@@ -188,17 +286,27 @@ fn test_onset_vowel_orthography() {
     assert!(!is_valid_coda_start_for_vowels(false, &oo_vowels, 'p'));
 
     let oe_vowels = [
-        VowelLetter { base: BaseVowel::O, diacritic: Diacritic::None, is_upper: false },
-        VowelLetter { base: BaseVowel::E, diacritic: Diacritic::None, is_upper: false },
+        VowelLetter {
+            base: BaseVowel::O,
+            diacritic: Diacritic::None,
+            is_upper: false,
+        },
+        VowelLetter {
+            base: BaseVowel::E,
+            diacritic: Diacritic::None,
+            is_upper: false,
+        },
     ];
     // 'oe' allows 't' (khoét) and 'n' (hoen), rejects 'm' (poem)
     assert!(is_valid_coda_start_for_vowels(false, &oe_vowels, 't'));
     assert!(is_valid_coda_start_for_vowels(false, &oe_vowels, 'n'));
     assert!(!is_valid_coda_start_for_vowels(false, &oe_vowels, 'm'));
 
-    let y_vowels = [
-        VowelLetter { base: BaseVowel::Y, diacritic: Diacritic::None, is_upper: false },
-    ];
+    let y_vowels = [VowelLetter {
+        base: BaseVowel::Y,
+        diacritic: Diacritic::None,
+        is_upper: false,
+    }];
     // 'y' with onset 'qu' allows 't' (quýt), 'n' (quỳnh), 'c' (quỵch)
     assert!(is_valid_coda_start_for_vowels(true, &y_vowels, 't'));
     assert!(is_valid_coda_start_for_vowels(true, &y_vowels, 'n'));

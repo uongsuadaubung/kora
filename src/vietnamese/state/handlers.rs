@@ -721,11 +721,13 @@ impl State<Coda> {
         ) {
             let coda_copy = self.data.coda;
             let across_coda = self.data.circumflex_across_coda;
-            match self
-                .data
-                .nucleus
-                .apply_modifier(effect, key, Some(&coda_copy), across_coda, config)
-            {
+            match self.data.nucleus.apply_modifier(
+                effect,
+                key,
+                Some(&coda_copy),
+                across_coda,
+                config,
+            ) {
                 ModifierOutcome::Applied => {
                     if let KeyEffect::Circumflex(Some(target_base)) = effect {
                         self.circumflex_across_coda = Some(target_base);

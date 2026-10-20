@@ -399,4 +399,3 @@ fn test_luuw_uu_horn_typing() {
     vni_engine.reset();
     assert_eq!(simulate_typing(&mut vni_engine, "lu7u "), "lưu ");
 }
-

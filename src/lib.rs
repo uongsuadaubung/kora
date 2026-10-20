@@ -26,6 +26,11 @@ pub use engine::{
         serialize_config_and_macros, set_windows_autostart,
     },
     macro_table::MacroTable,
-    profile::{AppProfile, KeyRemapRule, LanguageMode, MethodMode, ProfileManager, RuleOrigin},
+    profile::{
+        AppProfile, CharsetMode, KeyRemapRule, LanguageMode, MethodMode, ProfileManager, RuleOrigin,
+    },
 };
 pub use language::{Language, LanguageStrings, current as current_strings, get_strings};
+pub use vietnamese::{
+    BaseVowel, Charset, CharsetStrategy, Diacritic, Tcvn3Charset, Tone, UnicodeCharset,
+};

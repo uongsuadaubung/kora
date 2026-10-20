@@ -73,8 +73,11 @@ pub fn handle_ctlcolor_static(hwnd: isize, msg: u32, wparam: usize, lparam: isiz
                 SetBkMode(hdc, TRANSPARENT);
             }
 
-            let (tone, surface, _) =
-                Label::style_of(hwnd_ctrl).unwrap_or((LabelTone::Primary, SurfaceRole::Card, false));
+            let (tone, surface, _) = Label::style_of(hwnd_ctrl).unwrap_or((
+                LabelTone::Primary,
+                SurfaceRole::Card,
+                false,
+            ));
 
             let text_color = match tone {
                 LabelTone::Primary => palette.text_primary,
@@ -144,4 +147,3 @@ fn utf16_str_eq_ignore_case(slice: &[u16], ascii_str: &str) -> bool {
         .zip(ascii_str.bytes())
         .all(|(&u, b)| (u as u8).eq_ignore_ascii_case(&b))
 }
-

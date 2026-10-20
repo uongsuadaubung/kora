@@ -40,7 +40,8 @@ unsafe extern "system" {
     pub fn CallNextHookEx(hhk: isize, nCode: i32, wParam: usize, lParam: isize) -> isize;
 
     // --- Vòng lặp thông điệp (Message Loop) ---
-    pub fn GetMessageW(lpMsg: *mut MSG, hWnd: isize, wMsgFilterMin: u32, wMsgFilterMax: u32) -> i32;
+    pub fn GetMessageW(lpMsg: *mut MSG, hWnd: isize, wMsgFilterMin: u32, wMsgFilterMax: u32)
+    -> i32;
     pub fn TranslateMessage(lpMsg: *const MSG) -> i32;
     pub fn DispatchMessageW(lpMsg: *const MSG) -> isize;
 
@@ -138,4 +139,3 @@ unsafe extern "system" {
     /// Đọc ngày giờ hiện tại của hệ thống chính xác đến mili-giây
     pub fn GetLocalTime(lpSystemTime: *mut SystemTime);
 }
-

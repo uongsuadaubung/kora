@@ -290,8 +290,9 @@ pub unsafe extern "system" fn action_table_wndproc(
 
     if msg == WM_MOUSELEAVE {
         let changed = if let Ok(mut g) = state_mutex.lock() {
-            let was =
-                g.hover_row.is_some() || g.hover_action != ActionHover::None || g.is_hover_scrollbar;
+            let was = g.hover_row.is_some()
+                || g.hover_action != ActionHover::None
+                || g.is_hover_scrollbar;
             g.hover_row = None;
             g.hover_action = ActionHover::None;
             g.is_hover_scrollbar = false;
@@ -508,4 +509,3 @@ pub unsafe extern "system" fn action_table_wndproc(
 
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
 }
-

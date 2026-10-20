@@ -48,7 +48,10 @@ fn main() {
     // 1. Pure Engine on_key Throughput (Nanosecond latency per raw keystroke)
     // -------------------------------------------------------------------------
     println!("\n[1] PURE ENGINE ON_KEY LATENCY & THROUGHPUT (No screen allocation):");
-    println!("  {:<42} | {:>16} | {:>18}", "Benchmark Case", "Throughput", "Latency per Key");
+    println!(
+        "  {:<42} | {:>16} | {:>18}",
+        "Benchmark Case", "Throughput", "Latency per Key"
+    );
     println!("  {:-<42}-+-{:-<16}-+-{:-<18}", "", "", "");
 
     // 1.1 Telex
@@ -78,7 +81,11 @@ fn main() {
                 black_box(engine.on_key(ch, ch.is_uppercase(), false));
             }
         }
-        print_result("Simple Telex (on_key raw)", total_paragraph_keys, start.elapsed());
+        print_result(
+            "Simple Telex (on_key raw)",
+            total_paragraph_keys,
+            start.elapsed(),
+        );
     }
 
     // 1.3 English Passthrough
@@ -93,14 +100,21 @@ fn main() {
                 black_box(engine.on_key(ch, ch.is_uppercase(), false));
             }
         }
-        print_result("English Bypass (on_key raw)", total_paragraph_keys, start.elapsed());
+        print_result(
+            "English Bypass (on_key raw)",
+            total_paragraph_keys,
+            start.elapsed(),
+        );
     }
 
     // -------------------------------------------------------------------------
     // 2. Full End-to-End Screen Simulation (Backspace + Replacement EngineAction)
     // -------------------------------------------------------------------------
     println!("\n[2] FULL SCREEN SIMULATION (Handling Backspace & Replacement):");
-    println!("  {:<42} | {:>16} | {:>18}", "Benchmark Case", "Throughput", "Latency per Key");
+    println!(
+        "  {:<42} | {:>16} | {:>18}",
+        "Benchmark Case", "Throughput", "Latency per Key"
+    );
     println!("  {:-<42}-+-{:-<16}-+-{:-<18}", "", "", "");
 
     {
@@ -109,14 +123,21 @@ fn main() {
         for _ in 0..iterations {
             simulate_typing(&mut engine, paragraph);
         }
-        print_result("End-to-End Vietnamese Typing", total_paragraph_keys, start.elapsed());
+        print_result(
+            "End-to-End Vietnamese Typing",
+            total_paragraph_keys,
+            start.elapsed(),
+        );
     }
 
     // -------------------------------------------------------------------------
     // 3. Macro Typing & Row Mute Throughput (Zero-Allocation Verification)
     // -------------------------------------------------------------------------
     println!("\n[3] MACRO EXPANSION & ZERO-ALLOCATION ROW MUTE BENCHMARK:");
-    println!("  {:<42} | {:>16} | {:>18}", "Benchmark Case", "Throughput", "Latency per Key");
+    println!(
+        "  {:<42} | {:>16} | {:>18}",
+        "Benchmark Case", "Throughput", "Latency per Key"
+    );
     println!("  {:-<42}-+-{:-<16}-+-{:-<18}", "", "", "");
 
     let macro_text = "vn dc ko tp_hcm vn dc ko tp_hcm ";
@@ -173,14 +194,21 @@ fn main() {
                 black_box(engine.on_key(ch, ch.is_uppercase(), false));
             }
         }
-        print_result("Macro with Muted Rows (Cached Zero-Alloc)", total_macro_keys, start.elapsed());
+        print_result(
+            "Macro with Muted Rows (Cached Zero-Alloc)",
+            total_macro_keys,
+            start.elapsed(),
+        );
     }
 
     // -------------------------------------------------------------------------
     // 4. Keyboard Management Hook Resolution (Remap, Disable, Key Macro)
     // -------------------------------------------------------------------------
     println!("\n[4] KEYBOARD HOOK RULE RESOLUTION (Remap, Disable, Key Macro):");
-    println!("  {:<42} | {:>16} | {:>18}", "Benchmark Case", "Throughput", "Latency per Key");
+    println!(
+        "  {:<42} | {:>16} | {:>18}",
+        "Benchmark Case", "Throughput", "Latency per Key"
+    );
     println!("  {:-<42}-+-{:-<16}-+-{:-<18}", "", "", "");
 
     {
@@ -194,7 +222,9 @@ fn main() {
         pm.global_profile.remap_enabled = true;
         pm.global_profile.disable_enabled = true;
         pm.global_profile.key_macro_enabled = true;
-        pm.global_profile.app_remaps.push(kora::engine::profile::KeyRemapRule::new(0x14, 0x11));
+        pm.global_profile
+            .app_remaps
+            .push(kora::engine::profile::KeyRemapRule::new(0x14, 0x11));
         pm.global_profile.app_disabled.push(0x2D);
 
         let hook_iterations = 100_000;
@@ -208,11 +238,14 @@ fn main() {
                 let _remap = black_box(engine.lookup_key_remap(vk));
             }
         }
-        print_result("Hook Rule Resolution (4 keys)", total_hook_checks, start.elapsed());
+        print_result(
+            "Hook Rule Resolution (4 keys)",
+            total_hook_checks,
+            start.elapsed(),
+        );
     }
 
     println!("\n================================================================================");
     println!("SUMMARY: ALL BENCHMARKS COMPLETED WITH SUB-MICROSECOND LATENCY PER KEYSTROKE.");
     println!("================================================================================\n");
 }
-

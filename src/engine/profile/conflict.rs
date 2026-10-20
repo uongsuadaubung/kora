@@ -9,8 +9,8 @@
 //! 3. Key Macro (Phím Macro) - Dispatches macro sequence and swallows trigger.
 //! 4. Switch Mode Hotkey (Phím chuyển E ⇄ V) - Toggles typing mode.
 
-use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::config::Hotkey;
+use crate::engine::config::hotkey::vk_to_name;
 use crate::engine::profile::{ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,9 +95,12 @@ impl KeyDiagnostics {
     pub fn localized_summary(&self, s: &crate::language::LanguageStrings) -> String {
         format!(
             "{} {} • {} {} • {} {}",
-            self.active_remap, s.feature_remap,
-            self.active_disable, s.feature_disable,
-            self.active_key_macro, s.feature_key_macro
+            self.active_remap,
+            s.feature_remap,
+            self.active_disable,
+            s.feature_disable,
+            self.active_key_macro,
+            s.feature_key_macro
         )
     }
 
@@ -230,7 +233,11 @@ pub fn check_profile_conflicts(
             let vk = switch_key.vk;
             let key_name = {
                 let s = vk_to_name(vk);
-                if !s.is_empty() { s.to_string() } else { format!("VK {:#04X}", vk) }
+                if !s.is_empty() {
+                    s.to_string()
+                } else {
+                    format!("VK {:#04X}", vk)
+                }
             };
 
             // Check if main VK is in Disable
@@ -322,4 +329,3 @@ pub fn check_profile_conflicts(
         switch_key,
     }
 }
-

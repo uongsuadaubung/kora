@@ -6,11 +6,12 @@ pub mod history;
 pub mod macro_table;
 pub mod profile;
 
+use crate::logger::{AsyncLogWriter, current_timestamp_str};
+use crate::vietnamese::CharsetStrategy;
 pub use action::{CompactString, EngineAction};
 use buffer::{RawKey, TypingBuffer};
 pub use config::EngineConfig;
 use history::{HistoryBackspace, WordHistory};
-use crate::logger::{AsyncLogWriter, current_timestamp_str};
 use macro_table::MacroTable;
 pub use profile::ProfileManager;
 
@@ -86,10 +87,9 @@ impl VietnameseEngine {
                 .profiles
                 .iter()
                 .position(|p| p.id == self.profile_manager.active_id);
-            self.cached_effective_config = self.profile_manager.resolve_effective_config(
-                &self.profile_manager.active_id,
-                &self.config,
-            );
+            self.cached_effective_config = self
+                .profile_manager
+                .resolve_effective_config(&self.profile_manager.active_id, &self.config);
         }
     }
 
@@ -133,15 +133,18 @@ impl VietnameseEngine {
     }
 
     pub fn effective_remaps(&self) -> Vec<profile::KeyRemapRule> {
-        self.profile_manager.resolve_effective_remaps(&self.profile_manager.active_id)
+        self.profile_manager
+            .resolve_effective_remaps(&self.profile_manager.active_id)
     }
 
     pub fn effective_disabled(&self) -> Vec<u32> {
-        self.profile_manager.resolve_effective_disabled(&self.profile_manager.active_id)
+        self.profile_manager
+            .resolve_effective_disabled(&self.profile_manager.active_id)
     }
 
     pub fn effective_key_macros(&self) -> Vec<profile::KeyMacroRule> {
-        self.profile_manager.resolve_effective_key_macros(&self.profile_manager.active_id)
+        self.profile_manager
+            .resolve_effective_key_macros(&self.profile_manager.active_id)
     }
 
     pub fn effective_macros(&self) -> Vec<crate::engine::macro_table::MacroEntry> {
@@ -209,22 +212,19 @@ impl VietnameseEngine {
             return;
         }
 
-        let is_valid = if let Some((
-            ref cached_id,
-            ref cached_global_mutes,
-            cached_global_len,
-            child_sum,
-        )) = self.cached_macro_sig
-        {
-            cached_global_len == self.macro_table.len()
-                && child_sum == current_child_sum
-                && cached_global_mutes.len() == global_mutes_len
-                && (self.is_active_global || *cached_id == self.profile_manager.active_id)
-                && cached_global_mutes.as_slice()
-                    == self.profile_manager.global_profile.muted_macros.as_slice()
-        } else {
-            false
-        };
+        let is_valid =
+            if let Some((ref cached_id, ref cached_global_mutes, cached_global_len, child_sum)) =
+                self.cached_macro_sig
+            {
+                cached_global_len == self.macro_table.len()
+                    && child_sum == current_child_sum
+                    && cached_global_mutes.len() == global_mutes_len
+                    && (self.is_active_global || *cached_id == self.profile_manager.active_id)
+                    && cached_global_mutes.as_slice()
+                        == self.profile_manager.global_profile.muted_macros.as_slice()
+            } else {
+                false
+            };
 
         if !is_valid {
             let mut table = MacroTable::new();
@@ -439,20 +439,19 @@ impl VietnameseEngine {
     }
 
     fn handle_word_break(&mut self, ch: char) -> EngineAction {
-        let (auto_uppercase, use_macro, restore_on_wrong_spelling) =
-            if self.is_active_global {
-                (
-                    self.config.auto_uppercase_first_char,
-                    self.config.use_macro,
-                    self.config.restore_on_wrong_spelling,
-                )
-            } else {
-                (
-                    self.cached_effective_config.auto_uppercase_first_char,
-                    self.cached_effective_config.use_macro,
-                    self.cached_effective_config.restore_on_wrong_spelling,
-                )
-            };
+        let (auto_uppercase, use_macro, restore_on_wrong_spelling) = if self.is_active_global {
+            (
+                self.config.auto_uppercase_first_char,
+                self.config.use_macro,
+                self.config.restore_on_wrong_spelling,
+            )
+        } else {
+            (
+                self.cached_effective_config.auto_uppercase_first_char,
+                self.cached_effective_config.use_macro,
+                self.cached_effective_config.restore_on_wrong_spelling,
+            )
+        };
 
         // Update auto-uppercase trigger
         if auto_uppercase && (ch == '.' || ch == '\n' || ch == '\r') {
@@ -475,7 +474,10 @@ impl VietnameseEngine {
         let is_same = if self.buffer.raw_keys.len() != self.buffer.emitted_len {
             false
         } else {
-            self.buffer.rendered().chars().eq(self.buffer.raw_keys.iter().map(|k| k.ch))
+            self.buffer
+                .rendered()
+                .chars()
+                .eq(self.buffer.raw_keys.iter().map(|k| k.ch))
         };
 
         // Check Macro expansion before clearing buffer
@@ -505,7 +507,8 @@ impl VietnameseEngine {
                     output.push(ch);
 
                     if self.config.debug {
-                        let current_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                        let current_word: String =
+                            self.buffer.raw_keys.iter().map(|k| k.ch).collect();
                         self.log_debug(format!(
                             "[DBG][MACRO] Key: {:?} | Expanded {:?} -> {:?} | Replace(bs={}, output={:?})",
                             ch, current_word, output, backspaces, output
@@ -514,13 +517,23 @@ impl VietnameseEngine {
 
                     self.buffer.clear();
                     if ch == ' ' {
-                        self.history.commit_word(crate::vietnamese::InlineList::new(), false);
+                        self.history
+                            .commit_word(crate::vietnamese::InlineList::new(), false);
                         self.history.add_space();
                     } else {
                         self.history.clear();
                     }
 
-                    return EngineAction::Replace { backspaces, output: output.into() };
+                    let final_output = if self.config.charset != crate::vietnamese::Charset::Unicode
+                    {
+                        self.config.charset.encode_text(&output)
+                    } else {
+                        output.into()
+                    };
+                    return EngineAction::Replace {
+                        backspaces,
+                        output: final_output,
+                    };
                 }
             }
         }
@@ -552,8 +565,7 @@ impl VietnameseEngine {
                 }
 
                 if ch == ' ' {
-                    self.history
-                        .commit_word(self.buffer.raw_keys, true);
+                    self.history.commit_word(self.buffer.raw_keys, true);
                     self.history.add_space();
                 } else {
                     self.history.clear();
@@ -600,10 +612,7 @@ impl VietnameseEngine {
             &self.cached_effective_config
         };
         if !cfg.enabled {
-            if cfg.use_macro
-                && cfg.use_macro_in_english_mode
-                && !self.buffer.is_empty()
-            {
+            if cfg.use_macro && cfg.use_macro_in_english_mode && !self.buffer.is_empty() {
                 self.buffer.raw_keys.pop();
                 if self.buffer.emitted_len > 0 {
                     self.buffer.emitted_len -= 1;

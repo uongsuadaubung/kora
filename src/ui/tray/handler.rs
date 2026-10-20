@@ -1,8 +1,8 @@
 //! System Tray Handler & Popup Context Menu for Kora
 
-use crate::engine::config::InputMethod;
 use super::icon::TrayIcon;
 use super::loader::{get_small_icon_size, load_icon_from_memory, safe_destroy_icon};
+use crate::engine::config::InputMethod;
 use crate::ui::components::PopupMenu;
 use crate::ui::tokens::spacing;
 
@@ -84,12 +84,19 @@ pub fn show_context_menu(hwnd: isize, x: i32, y: i32, method: InputMethod) -> u3
 
     // 1. Input Method Submenu ("Kiểu gõ: Telex ▸")
     if let Some(mut method_menu) = PopupMenu::new() {
-        method_menu.add_checked_item(IDM_TELEX, strings.method_telex, method == InputMethod::Telex);
+        method_menu.add_checked_item(
+            IDM_TELEX,
+            strings.method_telex,
+            method == InputMethod::Telex,
+        );
         method_menu.add_checked_item(IDM_VNI, strings.method_vni, method == InputMethod::Vni);
         method_menu.add_checked_item(
             IDM_SIMPLE_TELEX,
             strings.method_simple_telex,
-            matches!(method, InputMethod::SimpleTelex1 | InputMethod::SimpleTelex2),
+            matches!(
+                method,
+                InputMethod::SimpleTelex1 | InputMethod::SimpleTelex2
+            ),
         );
         let current_method = match method {
             InputMethod::Telex => strings.method_telex,

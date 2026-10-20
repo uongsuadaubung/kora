@@ -121,7 +121,8 @@ pub struct IAudioClientVtbl {
     pub get_stream_latency: usize,
     pub get_current_padding: unsafe extern "system" fn(*mut std::ffi::c_void, *mut u32) -> i32,
     pub is_format_supported: usize,
-    pub get_mix_format: unsafe extern "system" fn(*mut std::ffi::c_void, *mut *mut WAVEFORMATEX) -> i32,
+    pub get_mix_format:
+        unsafe extern "system" fn(*mut std::ffi::c_void, *mut *mut WAVEFORMATEX) -> i32,
     pub get_device_period: usize,
     pub start: unsafe extern "system" fn(*mut std::ffi::c_void) -> i32,
     pub stop: unsafe extern "system" fn(*mut std::ffi::c_void) -> i32,
@@ -272,7 +273,11 @@ impl WasapiSession {
         }
     }
 
-    pub fn render_mix(&mut self, voices: &mut Vec<ActiveVoice>, bank: &SoundBank) -> Result<(), i32> {
+    pub fn render_mix(
+        &mut self,
+        voices: &mut Vec<ActiveVoice>,
+        bank: &SoundBank,
+    ) -> Result<(), i32> {
         unsafe {
             let client_vtbl = *(self.p_client as *mut *mut IAudioClientVtbl);
             let mut padding = 0u32;
@@ -319,9 +324,7 @@ impl WasapiSession {
                     let float_buf =
                         std::slice::from_raw_parts_mut(p_data as *mut f32, frames * self.channels);
                     if self.channels == 2 {
-                        for (pair, &sample) in
-                            float_buf.chunks_exact_mut(2).zip(mix_slice.iter())
-                        {
+                        for (pair, &sample) in float_buf.chunks_exact_mut(2).zip(mix_slice.iter()) {
                             let clamped = sample.clamp(-1.0, 1.0);
                             pair[0] = clamped;
                             pair[1] = clamped;
@@ -339,8 +342,7 @@ impl WasapiSession {
                     let i16_buf =
                         std::slice::from_raw_parts_mut(p_data as *mut i16, frames * self.channels);
                     if self.channels == 2 {
-                        for (pair, &sample) in i16_buf.chunks_exact_mut(2).zip(mix_slice.iter())
-                        {
+                        for (pair, &sample) in i16_buf.chunks_exact_mut(2).zip(mix_slice.iter()) {
                             let clamped = (sample * 32767.0).clamp(-32767.0, 32767.0) as i16;
                             pair[0] = clamped;
                             pair[1] = clamped;
@@ -394,4 +396,3 @@ impl Drop for WasapiSession {
         self.close();
     }
 }
-

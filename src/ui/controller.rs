@@ -144,8 +144,10 @@ pub fn refresh_remap_list() {
 
 /// Re-populates the disabled-key list from the engine (call without holding the engine lock).
 pub fn refresh_disable_list() {
-    if let (Some(items), Some(c)) = (with_engine(|e| selected_disable_items(e)), super::controls())
-    {
+    if let (Some(items), Some(c)) = (
+        with_engine(|e| selected_disable_items(e)),
+        super::controls(),
+    ) {
         c.tab_keys.populate_disabled(&items);
         refresh_keys_overview();
     }
@@ -153,9 +155,10 @@ pub fn refresh_disable_list() {
 
 /// Re-populates the key macro list from the engine (call without holding the engine lock).
 pub fn refresh_key_macro_list() {
-    if let (Some(items), Some(c)) =
-        (with_engine(|e| selected_key_macro_items(e)), super::controls())
-    {
+    if let (Some(items), Some(c)) = (
+        with_engine(|e| selected_key_macro_items(e)),
+        super::controls(),
+    ) {
         c.tab_keys.populate_key_macros(&items);
         refresh_keys_overview();
     }
@@ -212,8 +215,7 @@ pub fn build_rule_actions(
                 (strings.action_unmute, ActionVariant::Primary, false)
             };
             actions.push(
-                TableAction::new(label, variant)
-                    .with_callback(move || on_toggle_mute(mute_val)),
+                TableAction::new(label, variant).with_callback(move || on_toggle_mute(mute_val)),
             );
             actions.push(TableAction::delete(strings.action_delete, on_delete));
         }
@@ -233,11 +235,17 @@ pub fn set_macro_muted(key: String, mute: bool) {
         if sel_id == GLOBAL_PROFILE_ID {
             let target = &mut pm.global_profile;
             if mute {
-                if !target.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&key)) {
+                if !target
+                    .muted_macros
+                    .iter()
+                    .any(|k| k.eq_ignore_ascii_case(&key))
+                {
                     target.muted_macros.push(key);
                 }
             } else {
-                target.muted_macros.retain(|k| !k.eq_ignore_ascii_case(&key));
+                target
+                    .muted_macros
+                    .retain(|k| !k.eq_ignore_ascii_case(&key));
             }
         } else {
             let is_root_muted = pm
@@ -251,14 +259,23 @@ pub fn set_macro_muted(key: String, mute: bool) {
             };
             if mute {
                 child.overridden_macros.remove(&key.to_lowercase());
-                child.app_macros.retain(|m| !m.key.eq_ignore_ascii_case(&key));
-                if !child.muted_macros.iter().any(|k| k.eq_ignore_ascii_case(&key)) {
+                child
+                    .app_macros
+                    .retain(|m| !m.key.eq_ignore_ascii_case(&key));
+                if !child
+                    .muted_macros
+                    .iter()
+                    .any(|k| k.eq_ignore_ascii_case(&key))
+                {
                     child.muted_macros.push(key);
                 }
             } else {
                 child.muted_macros.retain(|k| !k.eq_ignore_ascii_case(&key));
                 if is_root_muted
-                    && !child.app_macros.iter().any(|m| m.key.eq_ignore_ascii_case(&key))
+                    && !child
+                        .app_macros
+                        .iter()
+                        .any(|m| m.key.eq_ignore_ascii_case(&key))
                     && let Some(m) = global_macro
                 {
                     child.app_macros.push(m);
@@ -570,7 +587,10 @@ pub fn set_key_macro_muted(trigger_vk: u32, mute: bool) {
             } else {
                 child.muted_key_macros.retain(|&v| v != trigger_vk);
                 if is_root_muted
-                    && !child.app_key_macros.iter().any(|m| m.trigger_vk == trigger_vk)
+                    && !child
+                        .app_key_macros
+                        .iter()
+                        .any(|m| m.trigger_vk == trigger_vk)
                     && let Some(m) = global_macro
                 {
                     child.app_key_macros.push(m);
@@ -632,9 +652,7 @@ pub fn save_key_macro(orig_vk: Option<u32>, trig_vk: u32, name: String, actions:
                 if let Some(child) = pm.get_profile_mut(&sel_id) {
                     if is_global {
                         child.muted_key_macros.retain(|&v| v != trig_vk);
-                        child
-                            .overridden_key_macros
-                            .insert(trig_vk, (name, actions));
+                        child.overridden_key_macros.insert(trig_vk, (name, actions));
                     } else {
                         if let Some(old_vk) = orig_vk {
                             child.app_key_macros.retain(|m| m.trigger_vk != old_vk);
@@ -735,10 +753,12 @@ pub fn capture_target_for_app(process_name: &str, target_id: &str) {
                 .iter()
                 .any(|r| r.target_id.eq_ignore_ascii_case(&tid));
             if !already {
-                child.target_rules.push(crate::engine::profile::TargetRule::new(
-                    tid.clone(),
-                    crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
-                ));
+                child
+                    .target_rules
+                    .push(crate::engine::profile::TargetRule::new(
+                        tid.clone(),
+                        crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+                    ));
             }
             pm.active_id = prof_id.clone();
             pm.selected_id = prof_id.clone();
@@ -769,11 +789,14 @@ pub fn capture_target_for_app(process_name: &str, target_id: &str) {
                 "App".to_string()
             };
 
-            let mut new_profile = AppProfile::new_child(id.clone(), display_name.clone(), proc.clone(), "💻");
-            new_profile.target_rules.push(crate::engine::profile::TargetRule::new(
-                tid.clone(),
-                crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
-            ));
+            let mut new_profile =
+                AppProfile::new_child(id.clone(), display_name.clone(), proc.clone(), "💻");
+            new_profile
+                .target_rules
+                .push(crate::engine::profile::TargetRule::new(
+                    tid.clone(),
+                    crate::engine::profile::KeyInjectionStrategy::AutocompleteGuard,
+                ));
 
             pm.add_profile(new_profile);
             pm.active_id = id.clone();
@@ -789,7 +812,11 @@ pub fn capture_target_for_app(process_name: &str, target_id: &str) {
 
         if let Some(c) = super::controls() {
             if let Some(ui_st) = super::ui() {
-                crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, ui_st.h_panel, &prof_id);
+                crate::ui::views::control_panel::SidebarControls::switch_to_profile(
+                    c,
+                    ui_st.h_panel,
+                    &prof_id,
+                );
             } else {
                 c.refresh_from_engine();
             }
@@ -907,5 +934,3 @@ pub fn update_app_key_injection_strategy(
         crate::platform::win32::app_tracker::sync_active_target_rules_flag();
     }
 }
-
-

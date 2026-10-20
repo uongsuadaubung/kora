@@ -273,7 +273,10 @@ fn test_macro_with_underscore_expansion() {
 
     // 1. Vietnamese mode: "v_n " -> "Việt Nam "
     assert_eq!(simulate_typing(&mut engine, "v_n "), "Việt Nam ");
-    assert_eq!(simulate_typing(&mut engine, "tp_hcm "), "thành phố Hồ Chí Minh ");
+    assert_eq!(
+        simulate_typing(&mut engine, "tp_hcm "),
+        "thành phố Hồ Chí Minh "
+    );
 
     // 2. Case preservation:
     // "V_n " -> "Việt Nam "
@@ -284,7 +287,10 @@ fn test_macro_with_underscore_expansion() {
     // 3. English mode:
     engine.config_mut().enabled = false;
     assert_eq!(simulate_typing(&mut engine, "v_n "), "Việt Nam ");
-    assert_eq!(simulate_typing(&mut engine, "tp_hcm "), "thành phố Hồ Chí Minh ");
+    assert_eq!(
+        simulate_typing(&mut engine, "tp_hcm "),
+        "thành phố Hồ Chí Minh "
+    );
 
     // 4. Underscore identifier typing without macro:
     assert_eq!(simulate_typing(&mut engine, "user_name "), "user_name ");
@@ -424,5 +430,3 @@ fn test_child_profile_inherits_global_muted_macro() {
     // Child must inherit global mute: "vn " must NOT expand
     assert_eq!(simulate_typing(&mut engine, "vn "), "vn ");
 }
-
-

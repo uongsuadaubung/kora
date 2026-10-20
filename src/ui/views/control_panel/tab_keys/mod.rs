@@ -17,11 +17,11 @@ pub use panel_remap::RemapPanel;
 
 use crate::engine::profile::{ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem};
 use crate::language::LanguageStrings;
-use crate::ui::win32::{
-    HWND_TOP, InvalidateRect, SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
-    SW_HIDE, SW_SHOW,
-};
 use crate::ui::prelude::*;
+use crate::ui::win32::{
+    HWND_TOP, InvalidateRect, SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+    SetWindowPos, ShowWindow,
+};
 
 /// Sub-tab bar geometry
 const SUB_TAB_Y: i32 = layout::CARD_START_Y; // 112
@@ -297,7 +297,11 @@ impl TabKeys {
                 let eff = pm.resolve_effective_config(sel_id, e.config());
                 let origin = if sel_id == crate::ui::GLOBAL_PROFILE_ID {
                     crate::engine::profile::RuleOrigin::Root
-                } else if pm.get_profile(sel_id).map(|p| p.switch_key.is_some()).unwrap_or(false) {
+                } else if pm
+                    .get_profile(sel_id)
+                    .map(|p| p.switch_key.is_some())
+                    .unwrap_or(false)
+                {
                     crate::engine::profile::RuleOrigin::AppSpecific
                 } else {
                     crate::engine::profile::RuleOrigin::InheritedGlobal
@@ -411,4 +415,3 @@ impl TabKeys {
         }
     }
 }
-

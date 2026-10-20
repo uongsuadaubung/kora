@@ -15,6 +15,8 @@ pub use theme::*;
 pub struct EngineConfig {
     // --- 1. Typing Engine Core Settings ---
     pub method: InputMethod,
+    /// Bảng mã tiếng Việt (Unicode, TCVN3...)
+    pub charset: crate::vietnamese::Charset,
     /// Bật/tắt chế độ gõ tiếng Việt (true: bật gõ tiếng Việt, false: tiếng Anh)
     pub enabled: bool,
     /// Tự động khôi phục phím nếu gõ sai chính tả
@@ -77,6 +79,7 @@ impl Default for EngineConfig {
     fn default() -> Self {
         Self {
             method: InputMethod::Telex,
+            charset: crate::vietnamese::Charset::Unicode,
             theme: UiTheme::Auto,
             language: crate::language::Language::default(),
             enabled: true,

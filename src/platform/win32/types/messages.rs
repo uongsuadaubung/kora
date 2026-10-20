@@ -49,4 +49,3 @@ pub const MB_ICONERROR: u32 = 0x00000010;
 pub const IDYES: i32 = 6;
 pub const IDNO: i32 = 7;
 pub const IDOK: i32 = 1;
-

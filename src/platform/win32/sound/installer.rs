@@ -10,10 +10,7 @@ pub const SOUNDPACK_URL: &str =
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SoundpackInstallStatus {
-    Success {
-        switches_count: usize,
-        path: String,
-    },
+    Success { switches_count: usize, path: String },
     Error(String),
 }
 
@@ -158,7 +155,13 @@ fn extract_zip(zip_path: &Path, dest_dir: &Path) -> Result<(), String> {
         dest_dir.to_string_lossy()
     );
     let output = ps_cmd
-        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", &script])
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ])
         .output()
         .map_err(|e| format!("Không thể giải nén file zip: {e}"))?;
 
@@ -228,18 +231,21 @@ pub fn show_soundpack_install_dialog(hwnd: isize, status: &SoundpackInstallStatu
                     hwnd,
                     crate::ui::win32::to_wide(&msg).as_ptr(),
                     crate::ui::win32::to_wide("Kora — Âm thanh phím cơ").as_ptr(),
-                    0x00000040 /* MB_ICONINFORMATION */ | 0x00000000 /* MB_OK */,
+                    0x00000040 /* MB_ICONINFORMATION */ | 0x00000000, /* MB_OK */
                 );
             }
         }
         SoundpackInstallStatus::Error(err) => {
-            let msg = format!("{}\n\nChi tiết lỗi: {}", strings.soundpack_download_error, err);
+            let msg = format!(
+                "{}\n\nChi tiết lỗi: {}",
+                strings.soundpack_download_error, err
+            );
             unsafe {
                 crate::platform::win32::MessageBoxW(
                     hwnd,
                     crate::ui::win32::to_wide(&msg).as_ptr(),
                     crate::ui::win32::to_wide("Kora — Lỗi tải âm thanh").as_ptr(),
-                    0x00000030 /* MB_ICONWARNING */ | 0x00000000 /* MB_OK */,
+                    0x00000030 /* MB_ICONWARNING */ | 0x00000000, /* MB_OK */
                 );
             }
         }

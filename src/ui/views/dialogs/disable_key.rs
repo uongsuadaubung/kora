@@ -2,10 +2,12 @@
 //! High-polish native Win32 GDI modal matching modern UI mockups.
 //! Supports physical single-key capture, quick presets, and active profile assignment.
 
-use super::{attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state};
+use super::{
+    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
+};
 use crate::engine::config::hotkey::vk_to_name;
 use crate::platform::win32::{
-    start_single_key_capture, stop_single_key_capture, WM_SINGLE_KEY_CAPTURED,
+    WM_SINGLE_KEY_CAPTURED, start_single_key_capture, stop_single_key_capture,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -99,20 +101,16 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                 let palette_init = ThemePalette::get(is_current_dark());
                 let strings = crate::language::current();
 
-                Label::create(hwnd, strings.dlg_disable_key, 20, 74, 440, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(hwnd, strings.dlg_disable_key, 20, 74, 440, 18, hfont_bold).map(
+                    |l| {
+                        l.with_tone(LabelTone::Secondary)
+                            .on_surface(SurfaceRole::Window)
+                    },
+                );
 
                 // Interactive Key Capture Box
-                let btn_box = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    20,
-                    96,
-                    440,
-                    44,
-                    hfont_large,
-                );
+                let btn_box =
+                    PushButton::create_owner_draw(hwnd, 0, "", 20, 96, 440, 44, hfont_large);
                 if let Some(ref btn) = btn_box {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         let (is_listening, vk_opt, font) = state::<DisableDialogState>(hwnd)
@@ -158,10 +156,32 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                     });
                 }
 
-                Label::create(hwnd, strings.dlg_disable_click_hint, 20, 145, 440, 18, hfont_normal)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.dlg_disable_presets_title, 20, 172, 440, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.dlg_disable_click_hint,
+                    20,
+                    145,
+                    440,
+                    18,
+                    hfont_normal,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(
+                    hwnd,
+                    strings.dlg_disable_presets_title,
+                    20,
+                    172,
+                    440,
+                    18,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // 6 Presets (Row 1 + Row 2)
                 let presets = [
@@ -220,7 +240,12 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                     super::base::draw_dialog_callout(
                         hdc,
                         &palette,
-                        RECT { left: 20, top: 14, right: 460, bottom: 62 },
+                        RECT {
+                            left: 20,
+                            top: 14,
+                            right: 460,
+                            bottom: 62,
+                        },
                         strings.dlg_disable_prompt,
                     );
 
@@ -228,7 +253,14 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                     let target_display = state::<DisableDialogState>(hwnd)
                         .map(|s| s.target_display.clone())
                         .unwrap_or(default_root);
-                    super::base::draw_dialog_footer(hdc, &palette, 480, 264, 326, Some(&target_display));
+                    super::base::draw_dialog_footer(
+                        hdc,
+                        &palette,
+                        480,
+                        264,
+                        326,
+                        Some(&target_display),
+                    );
 
                     EndPaint(hwnd, &ps);
                 }

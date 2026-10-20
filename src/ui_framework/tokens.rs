@@ -27,11 +27,11 @@ pub mod borders {
 
 /// Corner radius tokens (used with RoundRect for borders and fills)
 pub mod radii {
-    pub const RADIUS_TINY: i32 = 2;       // Small indicators, checkboxes (13x13)
-    pub const RADIUS_MD: i32 = 6;         // Standard buttons, list items, badge pills
-    pub const RADIUS_CARD: i32 = 8;       // Main content cards, tabs
-    pub const RADIUS_LG: i32 = 10;        // Hero logos, dialog containers
-    pub const RADIUS_PILL: i32 = 12;      // Segmented tab bar track, pill badges
+    pub const RADIUS_TINY: i32 = 2; // Small indicators, checkboxes (13x13)
+    pub const RADIUS_MD: i32 = 6; // Standard buttons, list items, badge pills
+    pub const RADIUS_CARD: i32 = 8; // Main content cards, tabs
+    pub const RADIUS_LG: i32 = 10; // Hero logos, dialog containers
+    pub const RADIUS_PILL: i32 = 12; // Segmented tab bar track, pill badges
 }
 
 /// Standard 2-column Sidebar + Card Panel layout metrics
@@ -88,4 +88,3 @@ pub mod layout {
     // Footer dimensions
     pub const FOOTER_Y: i32 = 548;
 }
-

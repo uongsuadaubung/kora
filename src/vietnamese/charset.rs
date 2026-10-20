@@ -1,3 +1,204 @@
+use crate::engine::action::CompactString;
+
+/// Bảng mã tiếng Việt (Character Encoding)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+pub enum Charset {
+    #[default]
+    Unicode,
+    Tcvn3,
+}
+
+impl Charset {
+    pub const ALL: &'static [Charset] = &[Charset::Unicode, Charset::Tcvn3];
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unicode => "unicode",
+            Self::Tcvn3 => "tcvn3",
+        }
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            Self::Unicode => "Unicode Dựng sẵn",
+            Self::Tcvn3 => "TCVN3 (ABC)",
+        }
+    }
+}
+
+impl std::str::FromStr for Charset {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let clean = s.trim().to_lowercase();
+        match clean.as_str() {
+            "unicode" | "utf-8" | "utf8" | "utf-16" | "utf16" => Ok(Self::Unicode),
+            "tcvn3" | "tcvn" | "abc" | "vn" => Ok(Self::Tcvn3),
+            _ => Ok(Self::Unicode),
+        }
+    }
+}
+
+/// Trait Strategy cho các bảng mã tiếng Việt
+pub trait CharsetStrategy: Send + Sync {
+    /// Tên định danh của bảng mã
+    fn name(&self) -> &'static str;
+
+    /// Ghép nguyên âm từ (BaseVowel, Diacritic, Tone, uppercase)
+    fn compose_vowel(
+        &self,
+        base: BaseVowel,
+        diacritic: Diacritic,
+        tone: Tone,
+        uppercase: bool,
+    ) -> char;
+
+    /// Ghép ký tự 'd' hoặc 'đ'
+    fn compose_d(&self, has_stroke: bool, uppercase: bool) -> char;
+
+    /// Chuyển đổi 1 ký tự Unicode sang ký tự của bảng mã đích
+    fn encode_char(&self, c: char) -> char;
+
+    /// Chuyển đổi toàn bộ chuỗi văn bản Unicode sang bảng mã đích
+    fn encode_text(&self, text: &str) -> CompactString;
+}
+
+/// Strategy cho bảng mã Unicode Dựng Sẵn (Precomposed UTF-8 / UTF-16)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UnicodeCharset;
+
+impl CharsetStrategy for UnicodeCharset {
+    #[inline(always)]
+    fn name(&self) -> &'static str {
+        "Unicode"
+    }
+
+    #[inline(always)]
+    fn compose_vowel(
+        &self,
+        base: BaseVowel,
+        diacritic: Diacritic,
+        tone: Tone,
+        uppercase: bool,
+    ) -> char {
+        compose_vowel(base, diacritic, tone, uppercase)
+    }
+
+    #[inline(always)]
+    fn compose_d(&self, has_stroke: bool, uppercase: bool) -> char {
+        compose_d(has_stroke, uppercase)
+    }
+
+    #[inline(always)]
+    fn encode_char(&self, c: char) -> char {
+        c
+    }
+
+    #[inline(always)]
+    fn encode_text(&self, text: &str) -> CompactString {
+        CompactString::from(text)
+    }
+}
+
+/// Strategy cho bảng mã TCVN3 (ABC - tiêu chuẩn TCVN 5712:1993, font .VnTime, .VnArial)
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Tcvn3Charset;
+
+impl CharsetStrategy for Tcvn3Charset {
+    #[inline(always)]
+    fn name(&self) -> &'static str {
+        "TCVN3"
+    }
+
+    #[inline(always)]
+    fn compose_vowel(
+        &self,
+        base: BaseVowel,
+        diacritic: Diacritic,
+        tone: Tone,
+        uppercase: bool,
+    ) -> char {
+        compose_tcvn3_vowel(base, diacritic, tone, uppercase)
+    }
+
+    #[inline(always)]
+    fn compose_d(&self, has_stroke: bool, uppercase: bool) -> char {
+        compose_tcvn3_d(has_stroke, uppercase)
+    }
+
+    #[inline(always)]
+    fn encode_char(&self, c: char) -> char {
+        match c {
+            'đ' => '\u{00AE}',
+            'Đ' => '\u{00A7}',
+            other => {
+                if let Some((vowel, diacritic, tone)) = decompose_vowel(other) {
+                    let uppercase = other.is_uppercase();
+                    compose_tcvn3_vowel(vowel, diacritic, tone, uppercase)
+                } else {
+                    other
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn encode_text(&self, text: &str) -> CompactString {
+        let mut out = CompactString::new();
+        for ch in text.chars() {
+            out.push(self.encode_char(ch));
+        }
+        out
+    }
+}
+
+impl CharsetStrategy for Charset {
+    #[inline(always)]
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Unicode => UnicodeCharset.name(),
+            Self::Tcvn3 => Tcvn3Charset.name(),
+        }
+    }
+
+    #[inline(always)]
+    fn compose_vowel(
+        &self,
+        base: BaseVowel,
+        diacritic: Diacritic,
+        tone: Tone,
+        uppercase: bool,
+    ) -> char {
+        match self {
+            Self::Unicode => UnicodeCharset.compose_vowel(base, diacritic, tone, uppercase),
+            Self::Tcvn3 => Tcvn3Charset.compose_vowel(base, diacritic, tone, uppercase),
+        }
+    }
+
+    #[inline(always)]
+    fn compose_d(&self, has_stroke: bool, uppercase: bool) -> char {
+        match self {
+            Self::Unicode => UnicodeCharset.compose_d(has_stroke, uppercase),
+            Self::Tcvn3 => Tcvn3Charset.compose_d(has_stroke, uppercase),
+        }
+    }
+
+    #[inline(always)]
+    fn encode_char(&self, c: char) -> char {
+        match self {
+            Self::Unicode => UnicodeCharset.encode_char(c),
+            Self::Tcvn3 => Tcvn3Charset.encode_char(c),
+        }
+    }
+
+    #[inline(always)]
+    fn encode_text(&self, text: &str) -> CompactString {
+        match self {
+            Self::Unicode => UnicodeCharset.encode_text(text),
+            Self::Tcvn3 => Tcvn3Charset.encode_text(text),
+        }
+    }
+}
+
 /// Vietnamese Tones (Dấu thanh)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tone {
@@ -248,6 +449,186 @@ pub const fn compose_vowel(
 }
 
 /// Compose the letter 'd' / 'đ'
+/// Compose the letter 'd' / 'đ' in TCVN3 (ABC) encoding
+pub fn compose_tcvn3_d(has_stroke: bool, uppercase: bool) -> char {
+    match (has_stroke, uppercase) {
+        (true, false) => '\u{00AE}', // đ
+        (true, true) => '\u{00A7}',  // Đ
+        (false, false) => 'd',
+        (false, true) => 'D',
+    }
+}
+
+/// Helper computing (lowercase, uppercase) for a given vowel combination in TCVN3
+const fn compute_tcvn3_vowel_pair(
+    base: BaseVowel,
+    diacritic: Diacritic,
+    tone: Tone,
+) -> (char, char) {
+    match (base, diacritic, tone) {
+        // --- A ---
+        (BaseVowel::A, Diacritic::None, Tone::None) => ('a', 'A'),
+        (BaseVowel::A, Diacritic::None, Tone::Acute) => ('\u{00B8}', '\u{00B8}'), // á, Á
+        (BaseVowel::A, Diacritic::None, Tone::Grave) => ('\u{00B5}', '\u{00B5}'), // à, À
+        (BaseVowel::A, Diacritic::None, Tone::HookAbove) => ('\u{00B6}', '\u{00B6}'), // ả, Ả
+        (BaseVowel::A, Diacritic::None, Tone::Tilde) => ('\u{00B7}', '\u{00B7}'), // ã, Ã
+        (BaseVowel::A, Diacritic::None, Tone::DotBelow) => ('\u{00B9}', '\u{00B9}'), // ạ, Ạ
+
+        (BaseVowel::A, Diacritic::Circumflex, Tone::None) => ('\u{00A9}', '\u{00A2}'), // â, Â
+        (BaseVowel::A, Diacritic::Circumflex, Tone::Acute) => ('\u{00CA}', '\u{00CA}'), // ấ, Ấ
+        (BaseVowel::A, Diacritic::Circumflex, Tone::Grave) => ('\u{00C7}', '\u{00C7}'), // ầ, Ầ
+        (BaseVowel::A, Diacritic::Circumflex, Tone::HookAbove) => ('\u{00C8}', '\u{00C8}'), // ẩ, Ẩ
+        (BaseVowel::A, Diacritic::Circumflex, Tone::Tilde) => ('\u{00C9}', '\u{00C9}'), // ẫ, Ẫ
+        (BaseVowel::A, Diacritic::Circumflex, Tone::DotBelow) => ('\u{00CB}', '\u{00CB}'), // ậ, Ậ
+
+        (BaseVowel::A, Diacritic::Breve, Tone::None) => ('\u{00A8}', '\u{00A1}'), // ă, Ă
+        (BaseVowel::A, Diacritic::Breve, Tone::Acute) => ('\u{00BE}', '\u{00BE}'), // ắ, Ắ
+        (BaseVowel::A, Diacritic::Breve, Tone::Grave) => ('\u{00BB}', '\u{00BB}'), // ằ, Ằ
+        (BaseVowel::A, Diacritic::Breve, Tone::HookAbove) => ('\u{00BC}', '\u{00BC}'), // ẳ, Ẳ
+        (BaseVowel::A, Diacritic::Breve, Tone::Tilde) => ('\u{00BD}', '\u{00BD}'), // ẵ, Ẵ
+        (BaseVowel::A, Diacritic::Breve, Tone::DotBelow) => ('\u{00C6}', '\u{00C6}'), // ặ, Ặ
+
+        // --- E ---
+        (BaseVowel::E, Diacritic::None, Tone::None) => ('e', 'E'),
+        (BaseVowel::E, Diacritic::None, Tone::Acute) => ('\u{00D0}', '\u{00D0}'), // é, É
+        (BaseVowel::E, Diacritic::None, Tone::Grave) => ('\u{00CC}', '\u{00CC}'), // è, È
+        (BaseVowel::E, Diacritic::None, Tone::HookAbove) => ('\u{00CE}', '\u{00CE}'), // ẻ, Ẻ
+        (BaseVowel::E, Diacritic::None, Tone::Tilde) => ('\u{00CF}', '\u{00CF}'), // ẽ, Ẽ
+        (BaseVowel::E, Diacritic::None, Tone::DotBelow) => ('\u{00D1}', '\u{00D1}'), // ẹ, Ẹ
+
+        (BaseVowel::E, Diacritic::Circumflex, Tone::None) => ('\u{00AA}', '\u{00A3}'), // ê, Ê
+        (BaseVowel::E, Diacritic::Circumflex, Tone::Acute) => ('\u{00D5}', '\u{00D5}'), // ế, Ế
+        (BaseVowel::E, Diacritic::Circumflex, Tone::Grave) => ('\u{00D2}', '\u{00D2}'), // ề, Ề
+        (BaseVowel::E, Diacritic::Circumflex, Tone::HookAbove) => ('\u{00D3}', '\u{00D3}'), // ể, Ể
+        (BaseVowel::E, Diacritic::Circumflex, Tone::Tilde) => ('\u{00D4}', '\u{00D4}'), // ễ, Ễ
+        (BaseVowel::E, Diacritic::Circumflex, Tone::DotBelow) => ('\u{00D6}', '\u{00D6}'), // ệ, Ệ
+
+        // --- I ---
+        (BaseVowel::I, _, Tone::None) => ('i', 'I'),
+        (BaseVowel::I, _, Tone::Acute) => ('\u{00DD}', '\u{00DD}'), // í, Í
+        (BaseVowel::I, _, Tone::Grave) => ('\u{00D7}', '\u{00D7}'), // ì, Ì
+        (BaseVowel::I, _, Tone::HookAbove) => ('\u{00D8}', '\u{00D8}'), // ỉ, Ỉ
+        (BaseVowel::I, _, Tone::Tilde) => ('\u{00DC}', '\u{00DC}'), // ĩ, Ĩ
+        (BaseVowel::I, _, Tone::DotBelow) => ('\u{00DE}', '\u{00DE}'), // ị, Ị
+
+        // --- O ---
+        (BaseVowel::O, Diacritic::None, Tone::None) => ('o', 'O'),
+        (BaseVowel::O, Diacritic::None, Tone::Acute) => ('\u{00E3}', '\u{00E3}'), // ó, Ó
+        (BaseVowel::O, Diacritic::None, Tone::Grave) => ('\u{00DF}', '\u{00DF}'), // ò, Ò
+        (BaseVowel::O, Diacritic::None, Tone::HookAbove) => ('\u{00E1}', '\u{00E1}'), // ỏ, Ỏ
+        (BaseVowel::O, Diacritic::None, Tone::Tilde) => ('\u{00E2}', '\u{00E2}'), // õ, Õ
+        (BaseVowel::O, Diacritic::None, Tone::DotBelow) => ('\u{00E4}', '\u{00E4}'), // ọ, Ọ
+
+        (BaseVowel::O, Diacritic::Circumflex, Tone::None) => ('\u{00AB}', '\u{00A4}'), // ô, Ô
+        (BaseVowel::O, Diacritic::Circumflex, Tone::Acute) => ('\u{00E8}', '\u{00E8}'), // ố, Ố
+        (BaseVowel::O, Diacritic::Circumflex, Tone::Grave) => ('\u{00E5}', '\u{00E5}'), // ồ, Ồ
+        (BaseVowel::O, Diacritic::Circumflex, Tone::HookAbove) => ('\u{00E6}', '\u{00E6}'), // ổ, Ổ
+        (BaseVowel::O, Diacritic::Circumflex, Tone::Tilde) => ('\u{00E7}', '\u{00E7}'), // ỗ, Ỗ
+        (BaseVowel::O, Diacritic::Circumflex, Tone::DotBelow) => ('\u{00E9}', '\u{00E9}'), // ộ, Ộ
+
+        // --- Ơ ---
+        (BaseVowel::O, Diacritic::Horn, Tone::None) => ('\u{00AC}', '\u{00A5}'), // ơ, Ơ
+        (BaseVowel::O, Diacritic::Horn, Tone::Acute) => ('\u{00ED}', '\u{00ED}'), // ớ, Ớ
+        (BaseVowel::O, Diacritic::Horn, Tone::Grave) => ('\u{00EA}', '\u{00EA}'), // ờ, Ờ
+        (BaseVowel::O, Diacritic::Horn, Tone::HookAbove) => ('\u{00EB}', '\u{00EB}'), // ở, Ở
+        (BaseVowel::O, Diacritic::Horn, Tone::Tilde) => ('\u{00EC}', '\u{00EC}'), // ỡ, Ỡ
+        (BaseVowel::O, Diacritic::Horn, Tone::DotBelow) => ('\u{00EE}', '\u{00EE}'), // ợ, Ợ
+
+        // --- U ---
+        (BaseVowel::U, Diacritic::None, Tone::None) => ('u', 'U'),
+        (BaseVowel::U, Diacritic::None, Tone::Acute) => ('\u{00F3}', '\u{00F3}'), // ú, Ú
+        (BaseVowel::U, Diacritic::None, Tone::Grave) => ('\u{00EF}', '\u{00EF}'), // ù, Ù
+        (BaseVowel::U, Diacritic::None, Tone::HookAbove) => ('\u{00F1}', '\u{00F1}'), // ủ, Ủ
+        (BaseVowel::U, Diacritic::None, Tone::Tilde) => ('\u{00F2}', '\u{00F2}'), // ũ, Ũ
+        (BaseVowel::U, Diacritic::None, Tone::DotBelow) => ('\u{00F4}', '\u{00F4}'), // ụ, Ụ
+
+        // --- Ư ---
+        (BaseVowel::U, Diacritic::Horn, Tone::None) => ('\u{00AD}', '\u{00A6}'), // ư, Ư
+        (BaseVowel::U, Diacritic::Horn, Tone::Acute) => ('\u{00F8}', '\u{00F8}'), // ứ, Ứ
+        (BaseVowel::U, Diacritic::Horn, Tone::Grave) => ('\u{00F5}', '\u{00F5}'), // ừ, Ừ
+        (BaseVowel::U, Diacritic::Horn, Tone::HookAbove) => ('\u{00F6}', '\u{00F6}'), // ử, Ử
+        (BaseVowel::U, Diacritic::Horn, Tone::Tilde) => ('\u{00F7}', '\u{00F7}'), // ữ, Ữ
+        (BaseVowel::U, Diacritic::Horn, Tone::DotBelow) => ('\u{00F9}', '\u{00F9}'), // ự, Ự
+
+        // --- Y ---
+        (BaseVowel::Y, _, Tone::None) => ('y', 'Y'),
+        (BaseVowel::Y, _, Tone::Acute) => ('\u{00FD}', '\u{00FD}'), // ý, Ý
+        (BaseVowel::Y, _, Tone::Grave) => ('\u{00FA}', '\u{00FA}'), // ỳ, Ỳ
+        (BaseVowel::Y, _, Tone::HookAbove) => ('\u{00FB}', '\u{00FB}'), // ỷ, Ỷ
+        (BaseVowel::Y, _, Tone::Tilde) => ('\u{00FC}', '\u{00FC}'), // ỹ, Ỹ
+        (BaseVowel::Y, _, Tone::DotBelow) => ('\u{00FE}', '\u{00FE}'), // ỵ, Ỵ
+
+        // Fallbacks for invalid combinations
+        _ => match base {
+            BaseVowel::A => ('a', 'A'),
+            BaseVowel::E => ('e', 'E'),
+            BaseVowel::I => ('i', 'I'),
+            BaseVowel::O => ('o', 'O'),
+            BaseVowel::U => ('u', 'U'),
+            BaseVowel::Y => ('y', 'Y'),
+        },
+    }
+}
+
+/// Compile-time lookup table mapping (BaseVowel, Diacritic, Tone, uppercase) -> TCVN3 codepoint.
+const TCVN3_COMPOSE_LUT: [u16; 360] = {
+    let bases = [
+        BaseVowel::A,
+        BaseVowel::E,
+        BaseVowel::I,
+        BaseVowel::O,
+        BaseVowel::U,
+        BaseVowel::Y,
+    ];
+    let diacritics = [
+        Diacritic::None,
+        Diacritic::Circumflex,
+        Diacritic::Breve,
+        Diacritic::Horn,
+        Diacritic::DStroke,
+    ];
+    let tones = [
+        Tone::None,
+        Tone::Acute,
+        Tone::Grave,
+        Tone::HookAbove,
+        Tone::Tilde,
+        Tone::DotBelow,
+    ];
+
+    let mut lut = [0u16; 360];
+    let mut b = 0;
+    while b < 6 {
+        let mut d = 0;
+        while d < 5 {
+            let mut t = 0;
+            while t < 6 {
+                let (lower, upper) = compute_tcvn3_vowel_pair(bases[b], diacritics[d], tones[t]);
+                let base_idx = ((b * 5 + d) * 6 + t) << 1;
+                lut[base_idx] = lower as u16;
+                lut[base_idx | 1] = upper as u16;
+                t += 1;
+            }
+            d += 1;
+        }
+        b += 1;
+    }
+    lut
+};
+
+/// Builds a TCVN3 character from base vowel, diacritic, tone, and uppercase flag.
+#[inline(always)]
+pub const fn compose_tcvn3_vowel(
+    base: BaseVowel,
+    diacritic: Diacritic,
+    tone: Tone,
+    uppercase: bool,
+) -> char {
+    let idx = (((base as usize * 5 + diacritic as usize) * 6 + tone as usize) << 1)
+        | (uppercase as usize);
+    unsafe { char::from_u32_unchecked(TCVN3_COMPOSE_LUT[idx] as u32) }
+}
+
 pub fn compose_d(has_stroke: bool, uppercase: bool) -> char {
     match (has_stroke, uppercase) {
         (true, false) => 'đ',

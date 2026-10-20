@@ -3,9 +3,7 @@
 
 use kora::engine::config::{EngineConfig, InputMethod};
 use kora::engine::macro_table::{MacroEntry, MacroTable, MacroType};
-use kora::engine::profile::{
-    AppProfile, KeyRemapRule, LanguageMode, ProfileManager, RuleOrigin,
-};
+use kora::engine::profile::{AppProfile, KeyRemapRule, LanguageMode, ProfileManager, RuleOrigin};
 use kora::{parse_config_all, serialize_config_all};
 
 #[test]
@@ -16,8 +14,14 @@ fn test_live_inheritance_remap() {
     // 1. Setup Global Remaps:
     // CapsLock (0x14) -> Ctrl (0x11)
     // ScrollLock (0x91) -> Mute (0xAD)
-    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
-    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x91, 0xAD));
+    manager
+        .global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x14, 0x11));
+    manager
+        .global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x91, 0xAD));
 
     // 2. Setup Child Profile "cs2":
     // - Mutes ScrollLock (0x91)
@@ -34,14 +38,20 @@ fn test_live_inheritance_remap() {
     assert_eq!(effective.len(), 2);
 
     // CapsLock must be remapped to Escape (0x1B), NOT Ctrl (0x11)
-    let caps_rule = effective.iter().find(|r| r.from_vk == 0x14).expect("CapsLock rule present");
+    let caps_rule = effective
+        .iter()
+        .find(|r| r.from_vk == 0x14)
+        .expect("CapsLock rule present");
     assert_eq!(caps_rule.to_vk, 0x1B);
 
     // ScrollLock was muted, so it must NOT be in effective rules
     assert!(effective.iter().all(|r| r.from_vk != 0x91));
 
     // App-specific rule F1 -> F5 must be present
-    let f1_rule = effective.iter().find(|r| r.from_vk == 0x70).expect("F1 rule present");
+    let f1_rule = effective
+        .iter()
+        .find(|r| r.from_vk == 0x70)
+        .expect("F1 rule present");
     assert_eq!(f1_rule.to_vk, 0x74);
 
     // 4. UI resolution check
@@ -192,7 +202,10 @@ fn test_profile_ini_roundtrip() {
     macros.insert_typed_no_cache("vn", "Việt Nam", MacroType::Normal);
 
     let mut manager = ProfileManager::new();
-    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11)); // Caps Lock = Ctrl
+    manager
+        .global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x14, 0x11)); // Caps Lock = Ctrl
     manager.global_profile.app_disabled.push(0x2D); // Insert
 
     let mut cs2 = AppProfile::new_child("cs2", "Counter-Strike 2", "cs2.exe", "🎮");
@@ -227,7 +240,9 @@ fn test_profile_ini_roundtrip() {
 
     assert_eq!(parsed_manager.global_profile.app_disabled, vec![0x2D]);
 
-    let parsed_cs2 = parsed_manager.get_profile("cs2").expect("cs2 profile exists");
+    let parsed_cs2 = parsed_manager
+        .get_profile("cs2")
+        .expect("cs2 profile exists");
     assert_eq!(parsed_cs2.mode, LanguageMode::English);
     assert_eq!(parsed_cs2.app_disabled, vec![0x5B]);
     assert_eq!(parsed_cs2.remap_enabled, Some(false));
@@ -270,7 +285,10 @@ fn test_engine_types_with_active_child_profile() {
     // Toggle inside a child with a pinned mode flips the child, not global
     assert!(engine.toggle_enabled());
     assert!(engine.config().enabled);
-    assert_eq!(engine.profile_manager.get_profile("notepad").unwrap().mode, LanguageMode::Vietnamese);
+    assert_eq!(
+        engine.profile_manager.get_profile("notepad").unwrap().mode,
+        LanguageMode::Vietnamese
+    );
     engine.reset();
     assert!(type_word(&mut engine));
 }
@@ -308,24 +326,30 @@ fn test_live_inheritance_key_macro() {
     // Global Key Macros:
     // F1 -> "Bunny Hop" | down(Space) + delay(15) + up(Space)
     // F2 -> "Buy AK" | press(B) + delay(50) + press(4)
-    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
-        0x70,
-        "Bunny Hop",
-        vec![
-            MacroAction::KeyDown("Space".into()),
-            MacroAction::Delay(15),
-            MacroAction::KeyUp("Space".into()),
-        ],
-    ));
-    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
-        0x71,
-        "Buy AK",
-        vec![
-            MacroAction::Press("B".into()),
-            MacroAction::Delay(50),
-            MacroAction::Press("4".into()),
-        ],
-    ));
+    manager
+        .global_profile
+        .app_key_macros
+        .push(KeyMacroRule::new(
+            0x70,
+            "Bunny Hop",
+            vec![
+                MacroAction::KeyDown("Space".into()),
+                MacroAction::Delay(15),
+                MacroAction::KeyUp("Space".into()),
+            ],
+        ));
+    manager
+        .global_profile
+        .app_key_macros
+        .push(KeyMacroRule::new(
+            0x71,
+            "Buy AK",
+            vec![
+                MacroAction::Press("B".into()),
+                MacroAction::Delay(50),
+                MacroAction::Press("4".into()),
+            ],
+        ));
 
     // Child Profile "cs2":
     // - Mutes F1 (0x70)
@@ -406,15 +430,18 @@ fn test_key_macro_ini_roundtrip() {
     let mut profiles = ProfileManager::new();
     profiles.global_profile.key_macro_enabled = true;
 
-    profiles.global_profile.app_key_macros.push(KeyMacroRule::new(
-        0x70, // F1
-        "BHop",
-        vec![
-            MacroAction::KeyDown("Space".into()),
-            MacroAction::Delay(20),
-            MacroAction::KeyUp("Space".into()),
-        ],
-    ));
+    profiles
+        .global_profile
+        .app_key_macros
+        .push(KeyMacroRule::new(
+            0x70, // F1
+            "BHop",
+            vec![
+                MacroAction::KeyDown("Space".into()),
+                MacroAction::Delay(20),
+                MacroAction::KeyUp("Space".into()),
+            ],
+        ));
 
     let mut child = AppProfile::new_child("game", "Game", "game.exe", "🎮");
     child.key_macro_enabled = Some(true);
@@ -438,9 +465,20 @@ fn test_key_macro_ini_roundtrip() {
     let (parsed_cfg, _, parsed_profiles) = parse_config_all(&ini_str);
     assert!(parsed_cfg.key_macro_enabled);
     assert_eq!(parsed_profiles.global_profile.app_key_macros.len(), 1);
-    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].trigger_vk, 0x70);
-    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].name, "BHop");
-    assert_eq!(parsed_profiles.global_profile.app_key_macros[0].actions.len(), 3);
+    assert_eq!(
+        parsed_profiles.global_profile.app_key_macros[0].trigger_vk,
+        0x70
+    );
+    assert_eq!(
+        parsed_profiles.global_profile.app_key_macros[0].name,
+        "BHop"
+    );
+    assert_eq!(
+        parsed_profiles.global_profile.app_key_macros[0]
+            .actions
+            .len(),
+        3
+    );
 
     let parsed_child = parsed_profiles.get_profile("game").unwrap();
     assert_eq!(parsed_child.app_key_macros.len(), 1);
@@ -459,8 +497,14 @@ fn test_child_inherits_root_muted_state() {
     manager.global_profile.key_macro_enabled = true;
 
     // 1. Remap: Root has 0x14 (CapsLock) and 0x91 (ScrollLock)
-    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
-    manager.global_profile.app_remaps.push(KeyRemapRule::new(0x91, 0xAD));
+    manager
+        .global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x14, 0x11));
+    manager
+        .global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x91, 0xAD));
     // Root mutes 0x14
     manager.global_profile.muted_remaps.push(0x14);
 
@@ -487,16 +531,22 @@ fn test_child_inherits_root_muted_state() {
     manager.global_profile.muted_macros.push("btw".into());
 
     // 4. Key Macro: Root has 0x70 (F1) and 0x71 (F2)
-    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
-        0x70,
-        "F1 Macro",
-        vec![MacroAction::Press("Space".into())],
-    ));
-    manager.global_profile.app_key_macros.push(KeyMacroRule::new(
-        0x71,
-        "F2 Macro",
-        vec![MacroAction::Press("Enter".into())],
-    ));
+    manager
+        .global_profile
+        .app_key_macros
+        .push(KeyMacroRule::new(
+            0x70,
+            "F1 Macro",
+            vec![MacroAction::Press("Space".into())],
+        ));
+    manager
+        .global_profile
+        .app_key_macros
+        .push(KeyMacroRule::new(
+            0x71,
+            "F2 Macro",
+            vec![MacroAction::Press("Enter".into())],
+        ));
     // Root mutes 0x70
     manager.global_profile.muted_key_macros.push(0x70);
 
@@ -558,7 +608,12 @@ fn test_child_inherits_root_muted_state() {
     assert!(eff_disable2.contains(&0x2D));
 
     // Global profile is STILL muted!
-    assert!(manager.resolve_effective_remaps("global").iter().all(|r| r.from_vk != 0x14));
+    assert!(
+        manager
+            .resolve_effective_remaps("global")
+            .iter()
+            .all(|r| r.from_vk != 0x14)
+    );
     assert!(!manager.resolve_effective_disabled("global").contains(&0x2D));
 
     // UI in app1 displays 0x14 as AppSpecific and active!
@@ -570,8 +625,8 @@ fn test_child_inherits_root_muted_state() {
 
 #[test]
 fn test_key_management_row_toggle_remap_disable_key_macro() {
-    use kora::engine::profile::{KeyMacroRule, MacroAction};
     use kora::VietnameseEngine;
+    use kora::engine::profile::{KeyMacroRule, MacroAction};
 
     let mut engine = VietnameseEngine::new(EngineConfig {
         remap_enabled: true,
@@ -586,8 +641,12 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     pm.global_profile.key_macro_enabled = true;
 
     // 1. Remap: CapsLock (0x14) -> Ctrl (0x11), ScrollLock (0x91) -> Mute (0xAD)
-    pm.global_profile.app_remaps.push(KeyRemapRule::new(0x14, 0x11));
-    pm.global_profile.app_remaps.push(KeyRemapRule::new(0x91, 0xAD));
+    pm.global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x14, 0x11));
+    pm.global_profile
+        .app_remaps
+        .push(KeyRemapRule::new(0x91, 0xAD));
 
     // 2. Disable: Insert (0x2D), Pause (0x13)
     pm.global_profile.app_disabled.push(0x2D);
@@ -615,16 +674,38 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     assert!(engine.effective_disabled().contains(&0x13));
 
     assert_eq!(engine.effective_key_macros().len(), 2);
-    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x70));
-    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x71));
+    assert!(
+        engine
+            .effective_key_macros()
+            .iter()
+            .any(|m| m.trigger_vk == 0x70)
+    );
+    assert!(
+        engine
+            .effective_key_macros()
+            .iter()
+            .any(|m| m.trigger_vk == 0x71)
+    );
 
     // --- TOGGLE OFF (Mute each row in Global Profile) ---
     // Remap: Mute CapsLock (0x14)
-    engine.profile_manager.global_profile.muted_remaps.push(0x14);
+    engine
+        .profile_manager
+        .global_profile
+        .muted_remaps
+        .push(0x14);
     // Disable: Mute disable (unblock) Insert (0x2D)
-    engine.profile_manager.global_profile.unmuted_disabled.push(0x2D);
+    engine
+        .profile_manager
+        .global_profile
+        .unmuted_disabled
+        .push(0x2D);
     // Key Macro: Mute F1 (0x70)
-    engine.profile_manager.global_profile.muted_key_macros.push(0x70);
+    engine
+        .profile_manager
+        .global_profile
+        .muted_key_macros
+        .push(0x70);
 
     // Verify Effective: Muted rules must NOT be in effective lists!
     let eff_remap = engine.effective_remaps();
@@ -647,18 +728,34 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     let ui_14 = ui_remaps.iter().find(|r| r.from_vk == 0x14).unwrap();
     assert!(!ui_14.is_active);
 
-    let ui_disabled = engine.profile_manager.resolve_disable_items_for_ui("global");
+    let ui_disabled = engine
+        .profile_manager
+        .resolve_disable_items_for_ui("global");
     let ui_2d = ui_disabled.iter().find(|d| d.vk == 0x2D).unwrap();
     assert!(!ui_2d.is_active);
 
-    let ui_km = engine.profile_manager.resolve_key_macro_items_for_ui("global");
+    let ui_km = engine
+        .profile_manager
+        .resolve_key_macro_items_for_ui("global");
     let ui_70 = ui_km.iter().find(|k| k.trigger_vk == 0x70).unwrap();
     assert!(!ui_70.is_active);
 
     // --- TOGGLE ON (Unmute each row in Global Profile) ---
-    engine.profile_manager.global_profile.muted_remaps.retain(|&v| v != 0x14);
-    engine.profile_manager.global_profile.unmuted_disabled.retain(|&v| v != 0x2D);
-    engine.profile_manager.global_profile.muted_key_macros.retain(|&v| v != 0x70);
+    engine
+        .profile_manager
+        .global_profile
+        .muted_remaps
+        .retain(|&v| v != 0x14);
+    engine
+        .profile_manager
+        .global_profile
+        .unmuted_disabled
+        .retain(|&v| v != 0x2D);
+    engine
+        .profile_manager
+        .global_profile
+        .muted_key_macros
+        .retain(|&v| v != 0x70);
 
     // Verify Effective: All rules are restored and effective again!
     assert_eq!(engine.effective_remaps().len(), 2);
@@ -668,13 +765,18 @@ fn test_key_management_row_toggle_remap_disable_key_macro() {
     assert!(engine.effective_disabled().contains(&0x2D));
 
     assert_eq!(engine.effective_key_macros().len(), 2);
-    assert!(engine.effective_key_macros().iter().any(|m| m.trigger_vk == 0x70));
+    assert!(
+        engine
+            .effective_key_macros()
+            .iter()
+            .any(|m| m.trigger_vk == 0x70)
+    );
 }
 
 #[test]
 fn test_child_profile_target_rules_serialization() {
-    use kora::engine::profile::{AppProfile, KeyInjectionStrategy, TargetRule};
     use kora::VietnameseEngine;
+    use kora::engine::profile::{AppProfile, KeyInjectionStrategy, TargetRule};
 
     let mut engine = VietnameseEngine::new(EngineConfig::default());
     let mut child = AppProfile::new_child("firefox", "Mozilla Firefox", "firefox.exe", "🦊");
@@ -708,7 +810,9 @@ fn test_child_profile_target_rules_serialization() {
     assert!(ini.contains("app_strategy = autocomplete_guard"));
 
     let (_, _, restored_pm) = parse_config_all(&ini);
-    let restored_child = restored_pm.get_profile("firefox").expect("firefox profile must exist");
+    let restored_child = restored_pm
+        .get_profile("firefox")
+        .expect("firefox profile must exist");
     assert_eq!(restored_child.app_strategy, None);
     assert_eq!(restored_child.target_rules.len(), 2);
     assert_eq!(restored_child.target_rules[0].target_id, "urlbar-input");
@@ -722,14 +826,18 @@ fn test_child_profile_target_rules_serialization() {
         KeyInjectionStrategy::ClipboardPaste
     );
 
-    let restored_cs2 = restored_pm.get_profile("cs2").expect("cs2 profile must exist");
+    let restored_cs2 = restored_pm
+        .get_profile("cs2")
+        .expect("cs2 profile must exist");
     assert_eq!(
         restored_cs2.app_strategy,
         Some(KeyInjectionStrategy::ClipboardPaste)
     );
     assert!(restored_cs2.target_rules.is_empty());
 
-    let restored_excel = restored_pm.get_profile("excel").expect("excel profile must exist");
+    let restored_excel = restored_pm
+        .get_profile("excel")
+        .expect("excel profile must exist");
     assert_eq!(
         restored_excel.app_strategy,
         Some(KeyInjectionStrategy::AutocompleteGuard)
@@ -826,7 +934,3 @@ fn test_auto_create_profile_on_target_capture() {
     assert_eq!(ff_updated.target_rules.len(), 2);
     assert_eq!(ff_updated.target_rules[1].target_id, "searchbar");
 }
-
-
-
-

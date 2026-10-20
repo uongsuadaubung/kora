@@ -4,6 +4,7 @@
 //! repetitive `parent`/`hfont` arguments, manual `hwnd()` visibility arrays,
 //! and manual per-label `update_language` calls.
 
+use crate::ui_framework::I18nSource;
 use crate::ui_framework::components::action_table::ActionTable;
 use crate::ui_framework::components::{
     ButtonVariant, CheckBox, ComboBox, ComponentHandle, Inheritable, Label, LabelTone, PushButton,
@@ -12,9 +13,8 @@ use crate::ui_framework::components::{
 use crate::ui_framework::theme::cached_font;
 use crate::ui_framework::tokens::{layout, radii, spacing, typography};
 use crate::ui_framework::win32::{
-    set_hwnds_visible, to_wide, FW_BOLD, InvalidateRect, RoundRect, SetWindowTextW,
+    FW_BOLD, InvalidateRect, RoundRect, SetWindowTextW, set_hwnds_visible, to_wide,
 };
-use crate::ui_framework::I18nSource;
 use std::marker::PhantomData;
 use std::ptr::null;
 
@@ -343,7 +343,11 @@ impl<L: I18nSource> CardLayout<OutsideCard, L> {
 
     /// Creates the standard two-line page header (`HEADER_X`, title + secondary subtitle on `SurfaceRole::Window`),
     /// tracking both labels for visibility and language switching. Only valid outside of a card.
-    pub fn page_header(&mut self, title_fn: TextFn<L>, sub_fn: TextFn<L>) -> Option<(Label, Label)> {
+    pub fn page_header(
+        &mut self,
+        title_fn: TextFn<L>,
+        sub_fn: TextFn<L>,
+    ) -> Option<(Label, Label)> {
         let strings = L::current();
         let hfont_title = cached_font(typography::FONT_SIZE_TITLE, FW_BOLD);
         let lbl_title = Label::create(
@@ -634,6 +638,45 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         Some(((lbl1, cmb1), (lbl2, cmb2)))
     }
 
+    /// Creates a 1-column `(Label, ComboBox)` taking up the first half of a 2-column grid,
+    /// automatically tracking the label (`track_i18n`) and combobox (`track_combo_i18n`).
+    pub fn single_col_combo(
+        &mut self,
+        gap_after: i32,
+        label_bold: bool,
+        item: (TextFn<L>, TextListFn<L>),
+    ) -> Option<(Label, ComboBox)> {
+        let strings = L::current();
+        let ((x1, w1), _) = self.cols_2(20);
+        let y_lbl = self.row(18, 4);
+        let lbl_font = if label_bold {
+            self.hfont_bold
+        } else {
+            self.hfont_normal
+        };
+        let mut lbl = Label::create(self.parent, (item.0)(strings), x1, y_lbl, w1, 18, lbl_font)?;
+        if !label_bold {
+            lbl = lbl.with_tone(LabelTone::Secondary);
+        }
+        let lbl = self.track_i18n(lbl, item.0);
+
+        let y_cmb = self.row(28, gap_after);
+        let items = (item.1)(strings);
+        let cmb = ComboBox::create_with_items(
+            self.parent,
+            0,
+            x1,
+            y_cmb,
+            w1,
+            160,
+            self.hfont_normal,
+            &items,
+            0,
+        )?;
+        let cmb = self.track_combo_i18n(cmb, item.1);
+        Some((lbl, cmb))
+    }
+
     /// Closes the current card with custom bottom padding and transitions back to [`OutsideCard`].
     #[inline]
     fn end_card_with_pad(mut self, pad_bottom: i32) -> CardLayout<OutsideCard, L> {
@@ -652,5 +695,3 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         self.into_state(())
     }
 }
-
-

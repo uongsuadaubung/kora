@@ -1,12 +1,14 @@
 //! Modal Dialog for capturing and customizing typing mode switch hotkey
 //! Pixel-perfect native Win32 GDI implementation matching modern mockup.
 
-use super::{attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state};
+use super::{
+    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
+};
 use crate::engine::config::Hotkey;
 use crate::platform::win32::{
-    get_captured_display_text, get_captured_hotkey, get_pending_modifier_hotkey,
-    set_captured_hotkey, start_combo_capture, stop_combo_capture, ENGINE_INSTANCE,
-    WM_COMBO_CANCELLED, WM_COMBO_CAPTURED,
+    ENGINE_INSTANCE, WM_COMBO_CANCELLED, WM_COMBO_CAPTURED, get_captured_display_text,
+    get_captured_hotkey, get_pending_modifier_hotkey, set_captured_hotkey, start_combo_capture,
+    stop_combo_capture,
 };
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
@@ -47,21 +49,46 @@ pub fn show_hotkey_dialog(parent: isize) {
             let global_hk = engine.config().switch_key;
             let sel_id = engine.profile_manager.selected_id.clone();
             if sel_id == "global" {
-                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
+                (
+                    true,
+                    "global".to_string(),
+                    default_root_name.clone(),
+                    Some(global_hk),
+                    global_hk,
+                )
             } else if let Some(child) = engine.profile_manager.get_profile(&sel_id) {
-                let name = format!("{} {} {}", strings.hotkey_apply_prefix, child.icon, child.name);
+                let name = format!(
+                    "{} {} {}",
+                    strings.hotkey_apply_prefix, child.icon, child.name
+                );
                 (false, sel_id, name, child.switch_key, global_hk)
             } else {
-                (true, "global".to_string(), default_root_name.clone(), Some(global_hk), global_hk)
+                (
+                    true,
+                    "global".to_string(),
+                    default_root_name.clone(),
+                    Some(global_hk),
+                    global_hk,
+                )
             }
         } else {
-            (true, "global".to_string(), default_root_name.clone(), Some(Hotkey::default()), Hotkey::default())
+            (
+                true,
+                "global".to_string(),
+                default_root_name.clone(),
+                Some(Hotkey::default()),
+                Hotkey::default(),
+            )
         }
     };
 
     let is_inherit = !is_root && current_hotkey.is_none();
     let display_text = if is_inherit {
-        format!("{} ({})", strings.typing_inherit_prefix, global_hotkey.display_text())
+        format!(
+            "{} ({})",
+            strings.typing_inherit_prefix,
+            global_hotkey.display_text()
+        )
     } else {
         current_hotkey.unwrap_or(global_hotkey).display_text()
     };
@@ -241,27 +268,38 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
 
                 let strings = crate::language::current();
 
-                Label::create(hwnd, strings.hotkey_selected_title, 20, 66, 400, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.hotkey_selected_title,
+                    20,
+                    66,
+                    400,
+                    18,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // Interactive Hotkey Display Box
-                let btn_display = PushButton::create_owner_draw(
-                    hwnd,
-                    0,
-                    "",
-                    20,
-                    86,
-                    400,
-                    46,
-                    hfont_large,
-                );
+                let btn_display =
+                    PushButton::create_owner_draw(hwnd, 0, "", 20, 86, 400, 46, hfont_large);
                 if let Some(ref btn) = btn_display {
                     btn.set_custom_drawer(move |dis, is_dark| {
                         let (is_listening, text, font) = state::<HotkeyDialogState>(hwnd)
                             .map(|s| (s.is_listening, s.display_text.clone(), s.display_font))
                             .unwrap_or((false, "Ctrl + Shift".to_string(), 0));
 
-                        super::base::draw_key_box(dis, is_dark, is_listening, &text, false, false, font);
+                        super::base::draw_key_box(
+                            dis,
+                            is_dark,
+                            is_listening,
+                            &text,
+                            false,
+                            false,
+                            font,
+                        );
                         true
                     });
                     btn.set_on_click(move || {
@@ -279,10 +317,32 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     });
                 }
 
-                Label::create(hwnd, strings.hotkey_click_hint, 20, 136, 400, 18, hfont_normal)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
-                Label::create(hwnd, strings.hotkey_presets_title, 20, 160, 400, 18, hfont_bold)
-                    .map(|l| l.with_tone(LabelTone::Secondary).on_surface(SurfaceRole::Window));
+                Label::create(
+                    hwnd,
+                    strings.hotkey_click_hint,
+                    20,
+                    136,
+                    400,
+                    18,
+                    hfont_normal,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
+                Label::create(
+                    hwnd,
+                    strings.hotkey_presets_title,
+                    20,
+                    160,
+                    400,
+                    18,
+                    hfont_bold,
+                )
+                .map(|l| {
+                    l.with_tone(LabelTone::Secondary)
+                        .on_surface(SurfaceRole::Window)
+                });
 
                 // Preset buttons (Row 1 + Row 2)
                 if st.is_target_capture {
@@ -471,7 +531,14 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     let target_display = state::<HotkeyDialogState>(hwnd)
                         .map(|s| s.target_display.clone())
                         .unwrap_or(default_root);
-                    super::base::draw_dialog_footer(hdc, &palette, 440, 264, 336, Some(&target_display));
+                    super::base::draw_dialog_footer(
+                        hdc,
+                        &palette,
+                        440,
+                        264,
+                        336,
+                        Some(&target_display),
+                    );
 
                     EndPaint(hwnd, &ps);
                 }
@@ -505,9 +572,15 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                 if let Some(st) = state::<HotkeyDialogState>(hwnd) {
                     st.is_listening = false;
                     st.display_text = if st.is_inherit {
-                        format!("{} ({})", crate::language::current().typing_inherit_prefix, st.global_hotkey.display_text())
+                        format!(
+                            "{} ({})",
+                            crate::language::current().typing_inherit_prefix,
+                            st.global_hotkey.display_text()
+                        )
                     } else {
-                        st.current_hotkey.map(|h| h.display_text()).unwrap_or_default()
+                        st.current_hotkey
+                            .map(|h| h.display_text())
+                            .unwrap_or_default()
                     };
                     disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
                 }
@@ -525,9 +598,15 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
                     {
                         st.is_listening = false;
                         st.display_text = if st.is_inherit {
-                            format!("{} ({})", crate::language::current().typing_inherit_prefix, st.global_hotkey.display_text())
+                            format!(
+                                "{} ({})",
+                                crate::language::current().typing_inherit_prefix,
+                                st.global_hotkey.display_text()
+                            )
                         } else {
-                            st.current_hotkey.map(|h| h.display_text()).unwrap_or_default()
+                            st.current_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default()
                         };
                         disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
                     }
