@@ -3,12 +3,15 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 
 use crate::vietnamese::{
-    charset::{BaseVowel, Diacritic, Tone},
+    charset::Tone,
     coda::CodaState,
     inline_list::InlineList,
     nucleus::NucleusState,
     onset::OnsetState,
-    spelling::{is_valid_onset, is_valid_vietnamese_components},
+    spelling::{
+        is_unambiguous_completed_vietnamese_syllable, is_valid_onset,
+        is_valid_vietnamese_components, is_valid_vietnamese_shorthand,
+    },
     syllable::Syllable,
 };
 
@@ -205,7 +208,9 @@ impl SyllableState {
                     &coda.coda,
                 )
             }
-            SyllableState::Passthrough(raw) => raw.iter().all(|c| c.is_ascii()),
+            SyllableState::Passthrough(raw) => {
+                raw.iter().all(|c| c.is_ascii()) || is_valid_vietnamese_shorthand(raw)
+            }
         }
     }
 
@@ -222,99 +227,15 @@ impl SyllableState {
             _ => return false,
         };
 
-        let onset = nucleus.onset.as_ref();
-        let vowels = &nucleus.vowels;
-        let tone = nucleus.tone;
-
-        // 1. D-stroke ('đ'): purely Vietnamese, impossible in English.
-        if onset.is_some_and(|o| o.is_d_stroke) {
-            return true;
-        }
-
-        // 2. Horn ('ơ', 'ư') or Breve ('ă'): purely Vietnamese diacritics.
-        if vowels
-            .iter()
-            .any(|v| matches!(v.diacritic, Diacritic::Horn | Diacritic::Breve))
-        {
-            if onset.is_none()
-                && vowels[0].base == BaseVowel::U
-                && vowels[0].diacritic == Diacritic::Horn
-            {
-                if coda.is_empty() {
-                    let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
-                    let is_valid_standalone_u =
-                        vowels.len() == 1 && matches!(tone, Tone::Grave | Tone::Acute);
-                    if !is_ua && !is_valid_standalone_u {
-                        return false;
-                    }
-                }
-            } else {
-                let is_bare_uo_horn = vowels.len() == 2
-                    && vowels[0].base == BaseVowel::U
-                    && vowels[0].diacritic == Diacritic::Horn
-                    && vowels[1].base == BaseVowel::O
-                    && vowels[1].diacritic == Diacritic::Horn;
-
-                if is_bare_uo_horn && coda.is_empty() {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        // 3. Circumflex on 'A' ('â' from Telex 'aa' / VNI '6'): purely Vietnamese.
-        if vowels
-            .iter()
-            .any(|v| v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex)
-        {
-            return true;
-        }
-
-        // 4. Tone DotBelow (nặng / Telex 'j' / VNI '5'): purely Vietnamese.
-        if tone == Tone::DotBelow {
-            return true;
-        }
-
-        // 5. Circumflex on 'E' or 'O' ('ê', 'ô') with tone or coda:
-        if vowels.iter().any(|v| {
-            matches!(v.base, BaseVowel::E | BaseVowel::O) && v.diacritic == Diacritic::Circumflex
-        }) && (tone != Tone::None || !coda.is_empty())
-        {
-            return true;
-        }
-
-        // 6. Vietnamese Diphthong / Triphthong with Tone:
-        if vowels.len() >= 2 && tone != Tone::None {
-            if onset.is_none()
-                && vowels[0].base == BaseVowel::U
-                && coda.is_empty()
-                && vowels[1].base != BaseVowel::A
-            {
-                return false;
-            }
-            let is_bare_uo = vowels.len() == 2
-                && vowels[0].base == BaseVowel::U
-                && vowels[1].base == BaseVowel::O;
-
-            if !(is_bare_uo && coda.is_empty()) {
-                return true;
-            }
-        }
-
-        // 7. Completed Coda with Tone (excluding English '-st' pattern):
-        if !coda.is_empty() && tone != Tone::None {
-            let is_english_st_pattern = vowels.len() == 1
-                && vowels[0].diacritic == Diacritic::None
-                && tone == Tone::Acute
-                && coda.len() == 1
-                && coda[0].0.eq_ignore_ascii_case(&'t');
-
-            if !is_english_st_pattern {
-                return true;
-            }
-        }
-
-        false
+        let has_d_stroke = nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke);
+        let has_onset = nucleus.onset.is_some();
+        is_unambiguous_completed_vietnamese_syllable(
+            has_d_stroke,
+            has_onset,
+            &nucleus.vowels,
+            nucleus.tone,
+            coda,
+        )
     }
 
     /// Converts this state into a Syllable for validation, if it is a structured syllable state

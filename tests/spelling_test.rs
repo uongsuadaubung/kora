@@ -3,7 +3,7 @@ use kora::vietnamese::{
     charset::{BaseVowel, Diacritic, Tone},
     spelling::{
         is_valid_coda_pair, is_valid_coda_start, is_valid_onset, is_valid_onset_extension,
-        is_valid_vietnamese_syllable,
+        is_valid_vietnamese_shorthand, is_valid_vietnamese_syllable,
     },
     syllable::Syllable,
 };
@@ -314,4 +314,18 @@ fn test_onset_vowel_orthography() {
     // 'y' without 'qu' (mỹ, lý, tỷ) rejects all codas
     assert!(!is_valid_coda_start_for_vowels(false, &y_vowels, 't'));
     assert!(!is_valid_coda_start_for_vowels(false, &y_vowels, 'n'));
+}
+
+#[test]
+fn test_vietnamese_shorthand() {
+    assert!(is_valid_vietnamese_shorthand(&['đ', 'c']));
+    assert!(is_valid_vietnamese_shorthand(&['Đ', 'c']));
+    assert!(is_valid_vietnamese_shorthand(&['Đ', 'C']));
+    assert!(is_valid_vietnamese_shorthand(&['đ', 'C']));
+
+    assert!(!is_valid_vietnamese_shorthand(&['đ']));
+    assert!(!is_valid_vietnamese_shorthand(&['c']));
+    assert!(!is_valid_vietnamese_shorthand(&['d', 'c']));
+    assert!(!is_valid_vietnamese_shorthand(&['đ', 'c', 's']));
+    assert!(!is_valid_vietnamese_shorthand(&['đ', 'k']));
 }

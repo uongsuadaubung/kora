@@ -990,3 +990,120 @@ pub fn is_valid_coda_start_for_vowels(
         _ => true,
     }
 }
+
+/// Validates whether a sequence of characters forms a commonly accepted Vietnamese colloquial shorthand
+/// (e.g. "đc", "Đc", "ĐC", "đC" as an abbreviation for "được").
+///
+/// While these shorthands do not conform to classical Vietnamese phonotactic syllable structure
+/// (onset without vowel nucleus), they are universally recognized in modern communication and
+/// must be protected from destructive raw-key rollback during word-break / spelling checks.
+#[inline]
+pub fn is_valid_vietnamese_shorthand(chars: &[char]) -> bool {
+    chars.len() == 2
+        && matches!(chars[0], 'đ' | 'Đ')
+        && matches!(chars[1], 'c' | 'C')
+}
+
+/// Checks whether a combination of onset, vowels, tone, and coda represents an unambiguous,
+/// completed Vietnamese syllable that must NEVER be destructively rolled back into raw keys
+/// when an invalid key arrives.
+#[inline]
+pub fn is_unambiguous_completed_vietnamese_syllable(
+    has_d_stroke: bool,
+    has_onset: bool,
+    vowels: &[VowelLetter],
+    tone: Tone,
+    coda: &[(char, bool)],
+) -> bool {
+    // 1. D-stroke ('đ'): purely Vietnamese, impossible in English.
+    if has_d_stroke {
+        return true;
+    }
+
+    // 2. Horn ('ơ', 'ư') or Breve ('ă'): purely Vietnamese diacritics.
+    if vowels
+        .iter()
+        .any(|v| matches!(v.diacritic, Diacritic::Horn | Diacritic::Breve))
+    {
+        if !has_onset
+            && vowels[0].base == BaseVowel::U
+            && vowels[0].diacritic == Diacritic::Horn
+        {
+            if coda.is_empty() {
+                let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
+                let is_valid_standalone_u =
+                    vowels.len() == 1 && matches!(tone, Tone::Grave | Tone::Acute);
+                if !is_ua && !is_valid_standalone_u {
+                    return false;
+                }
+            }
+        } else {
+            let is_bare_uo_horn = vowels.len() == 2
+                && vowels[0].base == BaseVowel::U
+                && vowels[0].diacritic == Diacritic::Horn
+                && vowels[1].base == BaseVowel::O
+                && vowels[1].diacritic == Diacritic::Horn;
+
+            if is_bare_uo_horn && coda.is_empty() {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // 3. Circumflex on 'A' ('â' from Telex 'aa' / VNI '6'): purely Vietnamese.
+    if vowels
+        .iter()
+        .any(|v| v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex)
+    {
+        return true;
+    }
+
+    // 4. Tone DotBelow (nặng / Telex 'j' / VNI '5'): purely Vietnamese.
+    if tone == Tone::DotBelow {
+        return true;
+    }
+
+    // 5. Circumflex on 'E' or 'O' ('ê', 'ô') with tone or coda:
+    if vowels.iter().any(|v| {
+        matches!(v.base, BaseVowel::E | BaseVowel::O) && v.diacritic == Diacritic::Circumflex
+    }) && (tone != Tone::None || !coda.is_empty())
+    {
+        return true;
+    }
+
+    // 6. Vietnamese Diphthong / Triphthong with Tone:
+    if vowels.len() >= 2 && tone != Tone::None {
+        if !has_onset
+            && vowels[0].base == BaseVowel::U
+            && coda.is_empty()
+            && vowels[1].base != BaseVowel::A
+        {
+            return false;
+        }
+        let is_bare_uo = vowels.len() == 2
+            && vowels[0].base == BaseVowel::U
+            && vowels[1].base == BaseVowel::O;
+
+        if !(is_bare_uo && coda.is_empty()) {
+            return true;
+        }
+    }
+
+    // 7. Completed Coda with Tone (excluding English '-st' pattern):
+    if !coda.is_empty() && tone != Tone::None {
+        let is_english_st_pattern = vowels.len() == 1
+            && vowels[0].diacritic == Diacritic::None
+            && tone == Tone::Acute
+            && coda.len() == 1
+            && coda[0].0.eq_ignore_ascii_case(&'t');
+
+        if !is_english_st_pattern {
+            return true;
+        }
+    }
+
+    false
+}
+
+

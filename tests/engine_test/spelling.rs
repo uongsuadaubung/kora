@@ -133,6 +133,35 @@ fn test_duoc_typing_variations() {
 
     // 5. giari -> giải (tone on 'a', not on 'i' -> "giải", never "giaỉ")
     assert_eq!(simulate_typing(&mut engine, "giari "), "giải ");
+
+    // 6. Chữ "đc" là trường hợp đặc biệt hợp lệ (viết tắt của "được") không bị khôi phục thành "ddc"
+    assert_eq!(simulate_typing(&mut engine, "ddc "), "đc ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "DDc "), "Đc ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "DDC "), "ĐC ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ddC "), "đC ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ddc."), "đc.");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ddc,"), "đc,");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ddc!"), "đc!");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "ddcs "), "ddcs ");
+    engine.reset();
+
+    // VNI: d9c -> đc
+    let mut vni_engine = VietnameseEngine::new(EngineConfig {
+        method: InputMethod::Vni,
+        ..Default::default()
+    });
+    assert_eq!(simulate_typing(&mut vni_engine, "d9c "), "đc ");
+    vni_engine.reset();
+    assert_eq!(simulate_typing(&mut vni_engine, "D9c "), "Đc ");
+    vni_engine.reset();
+    assert_eq!(simulate_typing(&mut vni_engine, "D9C "), "ĐC ");
 }
 
 #[test]

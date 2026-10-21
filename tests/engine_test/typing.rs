@@ -277,3 +277,21 @@ fn test_diacritic_switching() {
         );
     }
 }
+
+#[test]
+fn test_word_break_characters() {
+    let mut engine = VietnameseEngine::new(EngineConfig::default());
+    assert_eq!(simulate_typing(&mut engine, "tooi."), "tôi.");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi,"), "tôi,");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi!"), "tôi!");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi?"), "tôi?");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi;"), "tôi;");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi:"), "tôi:");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "tooi/"), "tôi/");
+}

@@ -330,7 +330,7 @@ impl VietnameseEngine {
         // Letter Fast-Path: Hơn 95% thao tác gõ phím là chữ cái thông thường ('a'..'z', 'A'..'Z').
         // Nhờ điều kiện `!is_letter`, toàn bộ các chữ cái bỏ qua kiểm tra whitespace và bitmask ngắt từ
         // ngay trong đúng 1 chu kỳ CPU mà không tốn lệnh rẽ nhánh phụ.
-        if !is_letter && (ch.is_whitespace() || is_word_break(ch, bracket_w)) {
+        if !is_letter && (ch.is_whitespace() || TypingBuffer::is_word_break(ch, bracket_w)) {
             return self.handle_word_break(ch);
         }
 
@@ -365,14 +365,7 @@ impl VietnameseEngine {
 
         // If the incoming key begins a new CamelCase boundary, save preceding word into history
         if self.buffer.is_boundary(&raw_key) {
-            let rendered = self.buffer.rendered();
-            let is_same_as_raw = if self.buffer.raw_keys.len() != self.buffer.emitted_len {
-                false
-            } else {
-                rendered
-                    .chars()
-                    .eq(self.buffer.raw_keys.iter().map(|k| k.ch))
-            };
+            let is_same_as_raw = self.buffer.is_rendered_identical_to_raw();
             let should_restore = cfg.restore_on_wrong_spelling
                 && !is_same_as_raw
                 && !self.buffer.state.is_valid_spelling();
@@ -471,14 +464,7 @@ impl VietnameseEngine {
         // O(1) Length Fast-Path: Với mọi từ tiếng Việt có dấu phụ hoặc dấu thanh (tiếng, việt, được, rất),
         // số phím thô (raw_keys: "t-i-e-e-n-g-s") luôn khác số ký tự phát ra màn hình (emitted_len: 5 ký tự "tiếng").
         // Ta kết luận ngay `is_same = false` chỉ trong 1 lệnh so sánh số nguyên O(1), tránh việc duyệt UTF-8 lặp.
-        let is_same = if self.buffer.raw_keys.len() != self.buffer.emitted_len {
-            false
-        } else {
-            self.buffer
-                .rendered()
-                .chars()
-                .eq(self.buffer.raw_keys.iter().map(|k| k.ch))
-        };
+        let is_same = self.buffer.is_rendered_identical_to_raw();
 
         // Check Macro expansion before clearing buffer
         if use_macro {
@@ -680,38 +666,3 @@ impl VietnameseEngine {
     }
 }
 
-/// Tạo mặt nạ bit 128-bit (u128) tại compile-time chứa toàn bộ các ký tự ngắt câu trong bảng mã ASCII (0..127).
-/// Triệt tiêu hoàn toàn 31 nhánh so khớp pattern (`matches!`), cho phép kiểm tra ngắt từ trong đúng 1 phép dịch bit và 1 phép AND.
-const fn make_word_break_mask(include_brackets: bool) -> u128 {
-    let chars: &[u8] = if include_brackets {
-        b".,;:!?\"'()[]{}/\\+=*<>@#$%^&`~|-"
-    } else {
-        b".,;:!?\"'(){}/\\+=*<>@#$%^&`~|-"
-    };
-    let mut mask = 0u128;
-    let mut i = 0;
-    while i < chars.len() {
-        mask |= 1u128 << chars[i];
-        i += 1;
-    }
-    mask
-}
-
-const WORD_BREAK_MASK: u128 = make_word_break_mask(true);
-const WORD_BREAK_NO_BRACKETS_MASK: u128 = make_word_break_mask(false);
-
-/// Kiểm tra ký tự ngắt từ O(1) qua bitmask 128-bit không rẽ nhánh (zero-branching).
-#[inline(always)]
-fn is_word_break(c: char, bracket_w: bool) -> bool {
-    let cp = c as u32;
-    if cp < 128 {
-        let mask = if bracket_w {
-            WORD_BREAK_NO_BRACKETS_MASK
-        } else {
-            WORD_BREAK_MASK
-        };
-        (mask & (1u128 << cp)) != 0
-    } else {
-        false
-    }
-}

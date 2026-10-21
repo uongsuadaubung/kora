@@ -58,9 +58,44 @@ impl Default for TypingBuffer {
     }
 }
 
+const fn make_word_break_mask(include_brackets: bool) -> u128 {
+    let chars: &[u8] = if include_brackets {
+        b".,;:!?\"'()[]{}/\\+=*<>@#$%^&`~|-"
+    } else {
+        b".,;:!?\"'(){}/\\+=*<>@#$%^&`~|-"
+    };
+    let mut mask = 0u128;
+    let mut i = 0;
+    while i < chars.len() {
+        mask |= 1u128 << chars[i];
+        i += 1;
+    }
+    mask
+}
+
+const WORD_BREAK_MASK: u128 = make_word_break_mask(true);
+const WORD_BREAK_NO_BRACKETS_MASK: u128 = make_word_break_mask(false);
+
 impl TypingBuffer {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Checks whether `c` is a word break character (punctuation, symbols) in O(1) time
+    /// via a zero-branching 128-bit bitmask lookup.
+    #[inline(always)]
+    pub fn is_word_break(c: char, bracket_w: bool) -> bool {
+        let cp = c as u32;
+        if cp < 128 {
+            let mask = if bracket_w {
+                WORD_BREAK_NO_BRACKETS_MASK
+            } else {
+                WORD_BREAK_MASK
+            };
+            (mask & (1u128 << cp)) != 0
+        } else {
+            false
+        }
     }
 
     #[inline(always)]
@@ -101,6 +136,59 @@ impl TypingBuffer {
         self.raw_keys.is_empty()
     }
 
+    /// Returns true if the rendered string on screen matches the sequence of raw keys exactly.
+    ///
+    /// Evaluated in O(1) via length check fast-path when lengths differ, avoiding repeated UTF-8 iteration.
+    #[inline]
+    pub fn is_rendered_identical_to_raw(&self) -> bool {
+        if self.raw_keys.len() != self.emitted_len {
+            false
+        } else {
+            self.rendered()
+                .chars()
+                .eq(self.raw_keys.iter().map(|k| k.ch))
+        }
+    }
+
+    /// Checks if a transition into Passthrough should trigger an instant raw-key rollback
+    /// for English words (Smart English Word Bypass), and returns the rolled back state and action if so.
+    #[inline]
+    fn try_smart_english_rollback(
+        config: &EngineConfig,
+        was_nucleus_or_coda: bool,
+        was_unambiguous_vi: bool,
+        next_state: &SyllableState,
+        action: &EngineAction,
+        last_rendered: &str,
+        raw_keys_prefix: &[RawKey],
+        all_raw_keys: &[RawKey],
+    ) -> Option<(SyllableState, EngineAction)> {
+        if config.restore_on_wrong_spelling
+            && was_nucleus_or_coda
+            && !was_unambiguous_vi
+            && matches!(next_state, SyllableState::Passthrough(_))
+            && matches!(action, EngineAction::Passthrough)
+        {
+            let is_same_as_raw = last_rendered.chars().eq(raw_keys_prefix.iter().map(|k| k.ch));
+            if !is_same_as_raw {
+                let mut raw_list = InlineList::new();
+                let mut output = CompactString::new();
+                for k in all_raw_keys {
+                    raw_list.push(k.ch);
+                    output.push(k.ch);
+                }
+                return Some((
+                    SyllableState::passthrough(raw_list),
+                    EngineAction::Replace {
+                        backspaces: last_rendered.chars().count(),
+                        output,
+                    },
+                ));
+            }
+        }
+        None
+    }
+
     /// Evaluates a sequence of RawKeys deterministically and returns an `EvaluationResult`.
     pub fn evaluate_keys(keys: &[RawKey], config: &EngineConfig) -> EvaluationResult {
         let mut state = SyllableState::Empty;
@@ -118,31 +206,18 @@ impl TypingBuffer {
             let (mut next_state, mut action) = state.feed_key(key, current_len, config);
 
             // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-            // If the state machine transitioned from a structured Vietnamese state into Passthrough,
-            // and the syllable was NOT an unambiguous completed Vietnamese syllable,
-            // rollback immediately to raw keys!
-            // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
-            // preserve the word as passthrough for immediate backspace recovery!
-            if config.restore_on_wrong_spelling
-                && was_nucleus_or_coda
-                && !was_unambiguous_vi
-                && matches!(next_state, SyllableState::Passthrough(_))
-                && matches!(action, EngineAction::Passthrough)
-            {
-                let is_same_as_raw = last_rendered.chars().eq(keys[..idx].iter().map(|k| k.ch));
-                if !is_same_as_raw {
-                    let mut raw_list = InlineList::new();
-                    let mut output = CompactString::new();
-                    for k in &keys[..=idx] {
-                        raw_list.push(k.ch);
-                        output.push(k.ch);
-                    }
-                    next_state = SyllableState::passthrough(raw_list);
-                    action = EngineAction::Replace {
-                        backspaces: last_rendered.chars().count(),
-                        output,
-                    };
-                }
+            if let Some((rollback_state, rollback_action)) = Self::try_smart_english_rollback(
+                config,
+                was_nucleus_or_coda,
+                was_unambiguous_vi,
+                &next_state,
+                &action,
+                &last_rendered,
+                &keys[..idx],
+                &keys[..=idx],
+            ) {
+                next_state = rollback_state;
+                action = rollback_action;
             }
 
             if config.charset != crate::vietnamese::Charset::Unicode {
@@ -232,36 +307,19 @@ impl TypingBuffer {
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
 
         // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-        // If the state machine transitioned from a structured Vietnamese state into Passthrough,
-        // and the syllable was NOT an unambiguous completed Vietnamese syllable,
-        // rollback immediately to raw keys!
-        // If it WAS an unambiguous completed Vietnamese syllable (e.g. "nấu", "hiện", "được", "bạn"),
-        // preserve the word as passthrough for immediate backspace recovery!
-        if config.restore_on_wrong_spelling
-            && was_nucleus_or_coda
-            && matches!(next_state, SyllableState::Passthrough(_))
-            && matches!(action, EngineAction::Passthrough)
-            && !current_state.is_unambiguous_completed_vietnamese()
-        {
-            let is_same_as_raw = self
-                .last_rendered
-                .chars()
-                .eq(self.raw_keys[..self.raw_keys.len() - 1]
-                    .iter()
-                    .map(|k| k.ch));
-            if !is_same_as_raw {
-                let mut raw_list = InlineList::new();
-                let mut output = CompactString::new();
-                for k in &self.raw_keys {
-                    raw_list.push(k.ch);
-                    output.push(k.ch);
-                }
-                next_state = SyllableState::passthrough(raw_list);
-                action = EngineAction::Replace {
-                    backspaces: self.last_rendered.chars().count(),
-                    output,
-                };
-            }
+        let was_unambiguous_vi = current_state.is_unambiguous_completed_vietnamese();
+        if let Some((rollback_state, rollback_action)) = Self::try_smart_english_rollback(
+            config,
+            was_nucleus_or_coda,
+            was_unambiguous_vi,
+            &next_state,
+            &action,
+            &self.last_rendered,
+            &self.raw_keys[..self.raw_keys.len() - 1],
+            &self.raw_keys,
+        ) {
+            next_state = rollback_state;
+            action = rollback_action;
         }
 
         if config.charset != crate::vietnamese::Charset::Unicode {
