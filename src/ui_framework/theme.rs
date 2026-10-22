@@ -21,21 +21,26 @@ pub fn is_current_dark() -> bool {
     CURRENT_IS_DARK.load(Ordering::Relaxed)
 }
 
+/// Process-lifetime font cache keyed by (point size, weight, dpi).
+pub fn cached_font_for_dpi(point_size: i32, weight: i32, dpi: i32) -> isize {
+    static CACHE: Mutex<Vec<(i32, i32, i32, isize)>> = Mutex::new(Vec::new());
+    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(&(_, _, _, f)) = cache
+        .iter()
+        .find(|&&(s, w, d, _)| s == point_size && w == weight && d == dpi)
+    {
+        return f;
+    }
+    let f = create_app_font_for_dpi(point_size, weight, dpi);
+    cache.push((point_size, weight, dpi, f));
+    f
+}
+
 /// Process-lifetime font cache keyed by (point size, weight). Only a handful of sizes are used,
 /// so fonts are created once and never freed: no per-paint CreateFontW/DeleteObject churn and
 /// no per-dialog leaks.
 pub fn cached_font(point_size: i32, weight: i32) -> isize {
-    static CACHE: Mutex<Vec<(i32, i32, isize)>> = Mutex::new(Vec::new());
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(&(_, _, f)) = cache
-        .iter()
-        .find(|&&(s, w, _)| s == point_size && w == weight)
-    {
-        return f;
-    }
-    let f = create_app_font(point_size, weight);
-    cache.push((point_size, weight, f));
-    f
+    cached_font_for_dpi(point_size, weight, 96)
 }
 
 pub fn get_app_font_normal() -> isize {

@@ -8,7 +8,7 @@ pub mod tray;
 pub mod views;
 pub mod wnd_proc;
 
-pub use crate::ui_framework::{colors, components, dialog, tokens, win32};
+pub use crate::ui_framework::{colors, components, dialog, layout, tokens, win32};
 pub use win32::*;
 
 pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
@@ -31,10 +31,11 @@ impl crate::ui_framework::I18nSource for crate::language::LanguageStrings {
 /// Application-level UI prelude specializing `CardLayout`, `Inheritable`, `TextFn`, and `TextListFn` to [`crate::language::LanguageStrings`].
 pub mod prelude {
     pub use crate::ui_framework::dialog::*;
+    pub use crate::ui_framework::layout::*;
     pub use crate::ui_framework::prelude::{
         ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
         CellAlign, CheckBox, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
-        I18nSource, InCard, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
+        DependsOnExt, I18nSource, InCard, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
         PillBadge, PopupMenu, PushButton, RECT, ScrollView, Slider, StaticText, SurfaceRole,
         TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, TwoState, borders,
         cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,

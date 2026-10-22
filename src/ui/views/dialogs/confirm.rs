@@ -7,6 +7,7 @@ use super::{
 use crate::ui::colors::ThemePalette;
 use crate::ui::components::button::{ButtonVariant, PushButton};
 use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
+use crate::ui_framework::layout::{CrossAlign, HStack};
 use crate::ui::win32::*;
 use std::sync::Once;
 
@@ -268,32 +269,35 @@ pub unsafe extern "system" fn confirm_dialog_wnd_proc(
                 };
 
                 // Cancel / No Button (Auto-ID = 0)
-                let btn_no = PushButton::create_with_variant(
+                let btn_no = PushButton::new_with_bg(
                     hwnd,
-                    0,
                     &st.options.no_text,
-                    210,
-                    110,
-                    92,
-                    32,
                     get_app_font_normal(),
                     ButtonVariant::Secondary,
                     Some(palette.bg_sidebar),
                 );
 
                 // Confirm / Yes Button (Auto-ID = 0)
-                let btn_yes = PushButton::create_with_variant(
+                let btn_yes = PushButton::new_with_bg(
                     hwnd,
-                    0,
                     &st.options.yes_text,
-                    310,
-                    110,
-                    94,
-                    32,
                     get_app_font_bold(),
                     yes_variant,
                     Some(palette.bg_sidebar),
                 );
+
+                // Auto-layout footer buttons aligned to right
+                let mut row = HStack::at(0, 110, DIALOG_W - 26, 32);
+                row.align(CrossAlign::Center);
+                row.add_spacer();
+                if let Some(ref b) = btn_no {
+                    row.add_fixed(92, Some(b.hwnd()));
+                }
+                row.add_fixed(8, None);
+                if let Some(ref b) = btn_yes {
+                    row.add_fixed(94, Some(b.hwnd()));
+                }
+                row.apply();
 
                 // Default focus: focus No on danger actions to prevent accidental deletion
                 let focus_hwnd = if is_danger {

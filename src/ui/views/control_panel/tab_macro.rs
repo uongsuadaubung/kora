@@ -22,44 +22,31 @@ impl TabMacro {
 
         // --- Card 1: Master Options ---
         let (check_use_macro, check_macro_in_english) = ly.card_with_pad(12, 12, |card| {
-            let y_chk = card.row(24, 0);
-            let chk1_w = 220;
-            let chk_gap = spacing::SPACE_10;
-            let chk2_x = card.x() + chk1_w + chk_gap;
-            let chk2_w = card.width() - chk1_w - chk_gap;
-
-            let check_use_macro = card.inheritable_checkbox_at(
-                |s| s.check_use_macro,
-                card.x(),
-                y_chk,
-                chk1_w,
-                24,
-                false,
-            )?;
-            let check_macro_in_english = card.inheritable_checkbox_at(
-                |s| s.check_macro_in_english,
-                chk2_x,
-                y_chk,
-                chk2_w,
-                24,
-                false,
-            )?;
+            let check_use_macro = card.inheritable_checkbox(|s| s.check_use_macro, false)?;
+            let check_macro_in_english = card.inheritable_checkbox(|s| s.check_macro_in_english, false)?;
             check_macro_in_english.set_align_right(true);
+
+            card.horizontal(24, 0, |row| {
+                row.align(CrossAlign::Center);
+                row.add_fixed(220, Some(check_use_macro.hwnd()));
+                row.add_spacer();
+                row.add_stretch(1, Some(check_macro_in_english.hwnd()));
+            });
+
             Some((check_use_macro, check_macro_in_english))
         })?;
 
         // --- Card 2: Action Bar (Only "+ Thêm" button) ---
         let btn_add_macro = ly.card_with_pad(10, 10, |card| {
-            let y_btn = card.row(28, 0);
-            card.button_at(
+            let btn = card.button(
                 |s| s.btn_add_macro,
-                card.x(),
-                y_btn,
-                104,
-                28,
                 true,
                 ButtonVariant::Primary,
-            )
+            )?;
+            card.horizontal(28, 0, |row| {
+                row.add_fixed(104, Some(btn.hwnd()));
+            });
+            Some(btn)
         })?;
 
         // --- Card 3: 5-Column ActionTable Component ---
@@ -100,6 +87,8 @@ impl TabMacro {
             ))
         })?;
 
+        check_use_macro.add_dependents(&[&check_macro_in_english, &btn_add_macro]);
+
         let tab = Self {
             layout: ly,
             parent_hwnd: parent,
@@ -108,7 +97,6 @@ impl TabMacro {
             btn_add_macro,
             list_macro,
         };
-        tab.update_macro_checkboxes_state();
         Some(tab)
     }
 
@@ -134,13 +122,6 @@ impl TabMacro {
         crate::ui::views::dialogs::show_delete_confirm(parent, message, move || {
             crate::ui::controller::delete_macro(&key_to_del);
         });
-    }
-
-    /// Dynamically enables or disables child macro checkbox based on whether `check_use_macro` is checked
-    pub fn update_macro_checkboxes_state(&self) {
-        let is_enabled = self.check_use_macro.is_checked();
-        self.check_macro_in_english.set_enabled(is_enabled);
-        self.btn_add_macro.set_enabled(is_enabled);
     }
 
     pub fn update_visibility(&self, visible: bool) {
@@ -186,7 +167,6 @@ impl TabMacro {
             child.and_then(|c| c.use_macro_in_english_mode),
             global_config.use_macro_in_english_mode,
         );
-        self.update_macro_checkboxes_state();
     }
 
     /// Populates Macro ListView with resolved Live Inheritance items
@@ -266,9 +246,6 @@ impl TabMacro {
         let is_use_toggled = self.check_use_macro.is_toggled(ctl_id, notify_code);
         let is_en_toggled = self.check_macro_in_english.is_toggled(ctl_id, notify_code);
         if is_use_toggled || is_en_toggled {
-            if is_use_toggled {
-                self.update_macro_checkboxes_state();
-            }
             crate::ui::controller::edit_selected(|mut target| {
                 target.sync_checkbox(
                     &self.check_use_macro,

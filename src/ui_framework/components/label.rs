@@ -364,6 +364,21 @@ impl Label<StaticText> {
         }
     }
 
+    /// Creates a label for auto-layout engines without requiring manual (x, y, w, h) coordinates.
+    pub fn new(parent: isize, text: &str, hfont: isize) -> Option<Self> {
+        Self::create_raw(parent, text, 0, 0, 0, 0, hfont, SS_LEFT)
+    }
+
+    /// Creates a centered label for auto-layout engines without requiring manual coordinates.
+    pub fn new_centered(parent: isize, text: &str, hfont: isize) -> Option<Self> {
+        Self::create_raw(parent, text, 0, 0, 0, 0, hfont, SS_CENTER)
+    }
+
+    /// Creates a right-aligned label for auto-layout engines without requiring manual coordinates.
+    pub fn new_right(parent: isize, text: &str, hfont: isize) -> Option<Self> {
+        Self::create_raw(parent, text, 0, 0, 0, 0, hfont, SS_RIGHT)
+    }
+
     pub fn create(
         parent: isize,
         text: &str,

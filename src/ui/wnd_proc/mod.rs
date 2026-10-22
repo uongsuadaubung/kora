@@ -25,6 +25,7 @@ const WM_HSCROLL: u32 = 0x0114;
 const WM_CTLCOLOREDIT: u32 = 0x0133;
 const WM_CTLCOLORLISTBOX: u32 = 0x0134;
 const WM_CTLCOLORSTATIC: u32 = 0x0138;
+const WM_DPICHANGED: u32 = 0x02E0;
 
 /// Control Panel Dialog window procedure
 #[allow(clippy::missing_safety_doc)]
@@ -132,6 +133,29 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                     if is_dark != is_current_dark() {
                         apply_ui_theme(hwnd, c, is_dark);
                     }
+                }
+            }
+            0
+        }
+        WM_DPICHANGED => {
+            if lparam != 0 {
+                let prc = unsafe { &*(lparam as *const RECT) };
+                unsafe {
+                    SetWindowPos(
+                        hwnd,
+                        0,
+                        prc.left,
+                        prc.top,
+                        prc.right - prc.left,
+                        prc.bottom - prc.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE,
+                    );
+                    RedrawWindow(
+                        hwnd,
+                        std::ptr::null(),
+                        0,
+                        RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME,
+                    );
                 }
             }
             0

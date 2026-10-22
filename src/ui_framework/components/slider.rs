@@ -81,6 +81,22 @@ impl Slider {
         Some(slider)
     }
 
+    /// Creates a zero-coordinate Slider for use with auto-layout engines.
+    pub fn new(parent: isize, id: u32, min: u32, max: u32) -> Option<Self> {
+        Self::create(parent, id, 0, 0, 0, 0, min, max)
+    }
+
+    /// Creates a zero-coordinate Slider with an initial position value for auto-layout engines.
+    pub fn new_with_value(
+        parent: isize,
+        id: u32,
+        min: u32,
+        max: u32,
+        initial_value: u32,
+    ) -> Option<Self> {
+        Self::create_with_value(parent, id, 0, 0, 0, 0, min, max, initial_value)
+    }
+
     #[inline]
     pub fn hwnd(&self) -> isize {
         self.hwnd

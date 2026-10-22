@@ -723,17 +723,16 @@ unsafe fn create_controls(hwnd: isize) {
 
         // Footer buttons
         let btn_y = FOOTER_Y + (FOOTER_H - 32) / 2;
-        super::create_dialog_footer_buttons(
+        super::create_dialog_footer_layout(
             hwnd,
-            (strings.dlg_btn_cancel, W - PAD - 110 - 8 - 90, 90),
-            (
-                strings.dlg_add_prof_btn_create,
-                W - PAD - 110,
-                110,
-                ButtonVariant::Primary,
-            ),
+            strings.dlg_btn_cancel,
+            90,
+            strings.dlg_add_prof_btn_create,
+            110,
+            ButtonVariant::Primary,
             btn_y,
             32,
+            PAD,
             Some(palette.bg_sidebar),
             move || create_profile(hwnd),
         );

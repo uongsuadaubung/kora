@@ -67,17 +67,21 @@ ly.section_title(|s| s.section_general, 8)?;
 // 3. Tạo dòng CheckBox tự động gắn i18n và tự động track HWND:
 let chk_enable = ly.checkbox_row(|s| s.chk_spell_check, 22, 6, false, true)?;
 
-// 4. Chia đôi 2 cột bằng nhau (mỗi cột 255px, cách nhau 20px):
-let ((c1_x, c1_w), (c2_x, c2_w)) = ly.cols_2(20);
-let y_combos = ly.row(26, 6);
-let cmb_left = ly.track(ComboBox::create_with_items(parent, 0, c1_x, y_combos, c1_w, 120, hfont_normal, &["A", "B"], 0)?);
-let cmb_right = ly.track(ComboBox::create_with_items(parent, 0, c2_x, y_combos, c2_w, 120, hfont_normal, &["X", "Y"], 0)?);
+// 4. Chia hàng tự động bằng Layout Engine (HStack, GridLayout, FormLayout, SplitLayout):
+card.horizontal(28, 10, |row| {
+    row.align(CrossAlign::Center);
+    row.add_stretch(1, Some(cmb_left.hwnd()));
+    row.add_fixed(20, None);
+    row.add_stretch(1, Some(cmb_right.hwnd()));
+});
 
-// 5. Tách cột nút bấm cố định bên phải (nút rộng 110px, cách chữ bên trái 12px) và tạo bằng label_at / button_at:
-let ((left_x, left_w), (btn_x, btn_w)) = ly.split_right(110, 12);
-let y_row = ly.row(28, 0);
-ly.label_at(|s| s.lbl_description, left_x, y_row + 4, left_w, 20, false)?;
-let btn_act = ly.button_at(|s| s.btn_apply, btn_x, y_row, btn_w, 28, false, ButtonVariant::Secondary)?;
+// 5. Căn gióng tự động nhãn và nút bấm:
+card.horizontal(28, 0, |row| {
+    row.align(CrossAlign::Center);
+    row.add_stretch(1, Some(lbl_desc.hwnd()));
+    row.add_fixed(12, None);
+    row.add_fixed(110, Some(btn_act.hwnd()));
+});
 let ly = ly.end_card();
 ```
 
@@ -96,16 +100,22 @@ let ly = ly.end_card();
 | `ly.checkbox_row(text_fn, height, gap, bold, checked)` | `InCard` | Tạo 1 dòng `CheckBox<TwoState>` trải rộng hết chiều ngang Card và tự động đăng ký `track_i18n`. |
 | `ly.inheritable_checkbox_row(text_fn, height, gap, bold)` | `InCard` | Tạo 1 dòng `CheckBox<Inheritable>` (hỗ trợ kế thừa Hồ sơ) trải rộng hết chiều ngang Card và tự động đăng ký `track_i18n`. |
 | `ly.two_col_combos(...)` | `InCard` | Tạo 1 hàng 2 cột (mỗi cột gồm 1 `Label` tiêu đề tự động `track_i18n` + 1 `ComboBox` bên dưới) chỉ với 1 lệnh. |
-| `ly.label_at(text_fn, x, y, w, h, bold)` | Mọi `S` | Tạo `Label` tại toạ độ `(x, y, w, h)` và tự động đăng ký `track_i18n` (không cần truyền lặp chuỗi 2 lần). |
-| `ly.button_at(text_fn, x, y, w, h, bold, variant)` | Mọi `S` | Tạo `PushButton` tại toạ độ `(x, y, w, h)` với `ButtonVariant` và tự động đăng ký `track_i18n`. |
-| `ly.checkbox_at(text_fn, x, y, w, h, bold)` | Mọi `S` | Tạo `CheckBox<TwoState>` tại toạ độ `(x, y, w, h)` và tự động đăng ký `track_i18n`. |
-| `ly.inheritable_checkbox_at(text_fn, x, y, w, h, bold)` | Mọi `S` | Tạo `CheckBox<Inheritable>` tại toạ độ `(x, y, w, h)` và tự động đăng ký `track_i18n`. |
+| `card.label(text_fn, bold)` | Mọi `S` | Tạo `Label` (zero-coordinate) tự động đăng ký `track_i18n`. Dùng kết hợp với các bộ bố cục layout. |
+| `card.button(text_fn, bold, variant)` | Mọi `S` | Tạo `PushButton` (zero-coordinate) với `ButtonVariant` và tự động đăng ký `track_i18n`. |
+| `card.checkbox(text_fn, bold, checked)` | Mọi `S` | Tạo `CheckBox<TwoState>` (zero-coordinate) tự động đăng ký `track_i18n`. |
+| `card.inheritable_checkbox(text_fn, bold)` | Mọi `S` | Tạo `CheckBox<Inheritable>` (zero-coordinate) tự động đăng ký `track_i18n`. |
+| `card.combo(items_fn)` | Mọi `S` | Tạo `ComboBox` (zero-coordinate) tự động đăng ký `track_combo_i18n`. |
 | `ly.track(comp) -> C` | Mọi `S` | Đăng ký `HWND` của component vào danh sách quản lý ẩn/hiện tự động và trả về chính `comp`. |
 | `ly.track_i18n(comp, text_fn) -> C` | Mọi `S` | Đăng ký `HWND` vào danh sách ẩn/hiện kèm hàm chọn chuỗi `TextFn` (`fn(&LanguageStrings) -> &'static str`). |
 | `ly.track_combo_i18n(cmb, items_fn) -> ComboBox` | Mọi `S` | Vừa đăng ký ẩn/hiện cho `ComboBox`, vừa tự động nạp lại danh sách mục chọn và giữ nguyên mục đang chọn khi đổi ngôn ngữ. |
 | `ly.track_table_i18n(tbl, cols_fn) -> ActionTable` | Mọi `S` | Vừa đăng ký ẩn/hiện cho `ActionTable`, vừa tự động dịch lại tiêu đề các cột khi đổi ngôn ngữ. |
 | `ly.row(height, gap_after) -> i32` | Mọi `S` | Trả về toạ độ `Y` của dòng hiện tại, sau đó tiến con trỏ xuống `height + gap_after`. |
-| `ly.cols_2(gap)` / `ly.split_right(right_w, gap)` | Mọi `S` | Chia đôi 2 cột bằng nhau hoặc tách khu vực nút bấm cố định bên phải. |
+| `card.horizontal(h, gap, \|row\| ...)` | `InCard` | Bố cục hàng ngang tự động co giãn (`HStack`), hỗ trợ `add_stretch`, `add_fixed`, `add_spacer`. |
+| `card.vertical(h, gap, \|col\| ...)` | `InCard` | Bố cục cột dọc tự động co giãn (`VStack`). |
+| `card.grid(h, gap, cols, rows, \|grid\| ...)` | `InCard` | Bố cục ma trận lưới 2 chiều $M \times N$ (`GridLayout`). |
+| `card.form(h, gap, \|form\| ...)` | `InCard` | Bố cục biểu mẫu chuẩn baseline `[Label] : [Control] : [Value]` (`FormLayout`). |
+| `card.split(h, gap, dir, rule, \|split\| ...)` | `InCard` | Bố cục chia 2 vùng (`SplitLayout`) với kích thước cố định hoặc tỷ lệ. |
+| `card.hotkey_row(...)` | `InCard` | Tạo hàng phím tắt chuẩn `[Label] --- [PillBadge] --- [Button]` chỉ với 1 dòng. |
 | `ly.set_visible(visible)` | `OutsideCard` | Ẩn hoặc hiện toàn bộ các component đã được `track` / `track_*_i18n` trong layout này. |
 | `ly.update_language(strings)` | `OutsideCard` | Tự động cập nhật văn bản đa ngôn ngữ cho mọi `Label`, `PushButton`, `CheckBox`, `ComboBox` và `ActionTable` đã đăng ký. |
 | `ly.paint_cards(hdc, left, right)` | `OutsideCard` | Tự động vẽ toàn bộ các khung thẻ Card đã khai báo trong layout lên `hdc`. |
@@ -172,15 +182,14 @@ Nút bấm bo góc chống nháy (double-buffered), tự xử lý hiệu ứng h
 
 #### API Khởi tạo & Bắt sự kiện:
 ```rust
-// Cách 1: Khởi tạo trong CardLayout bằng button_at (tự gắn HWND + i18n):
-let btn_save = ly.button_at(
-    |s| s.btn_save,
-    x, y, 120, 30,
-    true, ButtonVariant::Primary,
-)?;
+// Cách 1: Khởi tạo trong CardLayout không cần toạ độ (tự gắn HWND + i18n) và bố cục bằng HStack / GridLayout:
+let btn_save = card.button(|s| s.btn_save, true, ButtonVariant::Primary)?;
+card.horizontal(30, 0, |row| {
+    row.add_fixed(120, Some(btn_save.hwnd()));
+});
 
 // Cách 2: Gắn trực tiếp hàm closure .on_click(...) ngay lúc tạo (tự chạy qua OCM_COMMAND):
-let btn_open = PushButton::create(parent, 0, "Mở thư mục", x, y, 110, 28, hfont_normal)?;
+let btn_open = PushButton::new(parent, 0, "Mở thư mục", hfont_normal)?;
 btn_open.on_click(|| {
     // Tự động thực thi khi người dùng bấm nút!
 });
@@ -358,16 +367,10 @@ impl TabTools {
         ly.section_title(|s| s.section_general, 8)?;
         let chk_option = ly.checkbox_row(|s| s.chk_spell_check, 22, 8, false, false)?;
 
-        let y_btn = ly.row(30, 0);
-        let btn_action = ly.button_at(
-            |s| s.btn_save,
-            ly.x(),
-            y_btn,
-            120,
-            30,
-            true,
-            ButtonVariant::Primary,
-        )?;
+        let btn_action = ly.button(|s| s.btn_save, true, ButtonVariant::Primary)?;
+        ly.horizontal(30, 0, |row| {
+            row.add_fixed(120, Some(btn_action.hwnd()));
+        });
         let ly = ly.end_card();
 
         Some(Self {
@@ -414,12 +417,12 @@ Phân hệ [`src/ui_framework/dialog.rs`](file:///c:/Users/kien.hm/Desktop/OpenK
 | `open_client_modal::<T>(parent, title, cw, ch, class_name, wnd_proc, once, Box::new(state))` | Đăng ký class 1 lần (`Once`), tự tính kích thước khung viền để vùng Client Area rộng đúng `(cw, ch)`, truyền `Box<T>` vào `WM_CREATE` và khoá cửa sổ cha (`EnableWindow(parent, 0)`). |
 | `attach_state::<T>(hwnd, lparam)` | Đặt ở đầu nhánh `WM_CREATE` để gắn `Box<T>` từ `CREATESTRUCTW::lp_create_params` vào `GWLP_USERDATA` của `hwnd`. |
 | `state::<T>(hwnd) -> Option<&'static mut T>` | Lấy tham chiếu `&mut T` trực tiếp từ `GWLP_USERDATA` của Dialog trong `wnd_proc` ($O(1)$, không cần lock). |
-| `create_dialog_footer_buttons(hwnd, (cancel_txt, cx, cw), (submit_txt, sx, sw, variant), y, h, bg, on_submit)` | Tạo cặp nút Hủy (`ButtonVariant::Secondary`, tự đóng hộp thoại khi bấm) và Lưu/Áp dụng ở đáy Dialog chỉ với 1 lời gọi. |
+| `create_dialog_footer_layout(hwnd, cancel_txt, cw, submit_txt, sw, variant, y, h, right_margin, bg, on_submit)` | Tạo cặp nút Hủy (`ButtonVariant::Secondary`, tự đóng hộp thoại khi bấm) và Lưu/Áp dụng ở đáy Dialog tự động căn phải bằng auto-layout `HStack`. |
 | `show_delete_confirm(parent, msg, on_confirm)` / `show_danger_confirm(parent, title, msg, on_confirm)` | Hiển thị hộp thoại xác nhận nguy hiểm (Xóa / Khôi phục mặc định) trong 1 dòng lệnh, tự động điền nút Có/Không theo ngôn ngữ hiện tại. |
 | `close_modal(hwnd, parent)` | Bật lại cửa sổ cha (`EnableWindow(parent, 1)`), trả focus về `parent` và đóng Dialog (`DestroyWindow(hwnd)`). |
 | `detach_state::<T>(hwnd) -> Option<Box<T>>` | Đặt trong nhánh `WM_NCDESTROY` để giải phóng `Box<T>` an toàn khi cửa sổ đóng. |
 | `reflect_dialog_messages(hwnd, msg, wparam, lparam)` | Đặt ở đầu `wnd_proc` để tự động kích hoạt `OCM_DRAWITEM`, `OCM_COMMAND`, `OCM_NOTIFY`, màu nền `Label`/`TextBox` và con trỏ bàn tay `IDC_HAND`. |
-| `fill_dialog_bg` / `draw_dialog_callout` / `draw_dialog_label` / `draw_dialog_footer` | Các hàm vẽ nền, hộp hướng dẫn bo góc, nhãn tĩnh và chân trang Dialog chuẩn theo `ThemePalette`. |
+| `fill_dialog_bg` / `draw_dialog_callout` / `draw_dialog_footer` | Các hàm vẽ nền, hộp hướng dẫn bo góc và chân trang Dialog chuẩn theo `ThemePalette`. |
 
 ```rust
 static REGISTERED: std::sync::Once = std::sync::Once::new();
@@ -468,12 +471,16 @@ pub unsafe extern "system" fn my_dialog_wnd_proc(
                 st.txt_name = TextBox::create_with_placeholder(
                     hwnd, 0, "Nhập tên...", 20, 90, 360, 30, get_app_font_normal(),
                 );
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.btn_cancel, 196, 84),
-                    (strings.btn_save, 288, 92, ButtonVariant::Primary),
+                    strings.btn_cancel,
+                    84,
+                    strings.btn_save,
+                    92,
+                    ButtonVariant::Primary,
                     192,
                     32,
+                    20,
                     Some(palette.bg_sidebar),
                     move || submit_my_dialog(hwnd),
                 );

@@ -11,11 +11,13 @@
 pub mod colors;
 pub mod components;
 pub mod dialog;
+pub mod layout;
 pub mod theme;
 pub mod tokens;
 pub mod win32;
 
 pub use colors::ThemePalette;
+pub use layout::*;
 pub use theme::{
     apply_window_theme, cached_font, get_app_font_bold, get_app_font_normal, is_current_dark,
     recreate_theme_brushes,
@@ -46,6 +48,7 @@ pub mod prelude {
     pub use crate::ui_framework::colors::ThemePalette;
     pub use crate::ui_framework::components::*;
     pub use crate::ui_framework::dialog::*;
+    pub use crate::ui_framework::layout::*;
     pub use crate::ui_framework::theme::{
         cached_font, get_app_font_bold, get_app_font_normal, is_current_dark,
     };

@@ -485,12 +485,16 @@ pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
 
                 // Footer Buttons
                 let palette_init = ThemePalette::get(is_current_dark());
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.btn_cancel, 236, 84),
-                    (strings.hotkey_btn_save, 328, 92, ButtonVariant::Primary),
+                    strings.btn_cancel,
+                    84,
+                    strings.hotkey_btn_save,
+                    92,
+                    ButtonVariant::Primary,
                     280,
                     32,
+                    20,
                     Some(palette_init.bg_sidebar),
                     move || submit_hotkey(hwnd),
                 );

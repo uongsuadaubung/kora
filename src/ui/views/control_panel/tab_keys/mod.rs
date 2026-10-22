@@ -32,15 +32,11 @@ const SUB_TAB_HEIGHT: i32 = 30;
 pub const SUB_CARD_Y: i32 = SUB_TAB_Y + SUB_TAB_HEIGHT + spacing::SPACE_10; // 152
 
 // Shared sub-panel geometry (all sub-tabs use identical slots)
-pub const TITLE_X: i32 = layout::CARD_CONTENT_X; // 260
 pub const TITLE_Y: i32 = SUB_CARD_Y + spacing::SPACE_12; // 164
-pub const TITLE_WIDTH: i32 = 380;
 pub const TITLE_HEIGHT: i32 = 24;
 
 pub const BTN_WIDTH: i32 = 104;
 pub const BTN_HEIGHT: i32 = 28;
-pub const BTN_X: i32 = layout::CARD_X + layout::CARD_WIDTH - spacing::SPACE_16 - BTN_WIDTH; // 686
-pub const BTN_Y: i32 = SUB_CARD_Y + spacing::SPACE_8 + 1; // 161
 
 pub const TABLE_X: i32 = layout::CARD_CONTENT_X; // 260
 pub const TABLE_WIDTH: i32 = layout::CARD_CONTENT_WIDTH; // 530
@@ -66,23 +62,15 @@ impl RuleSubPanel {
         cols_i18n_fn: TextListFn,
     ) -> Option<Self> {
         let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
-        let check_enabled = ly.inheritable_checkbox_at(
-            title_fn,
-            TITLE_X,
-            TITLE_Y,
-            TITLE_WIDTH,
-            TITLE_HEIGHT,
-            true,
-        )?;
-        let btn_add = ly.button_at(
-            add_btn_fn,
-            BTN_X,
-            BTN_Y,
-            BTN_WIDTH,
-            BTN_HEIGHT,
-            true,
-            ButtonVariant::Primary,
-        )?;
+        let check_enabled = ly.inheritable_checkbox(title_fn, true)?;
+        let btn_add = ly.button(add_btn_fn, true, ButtonVariant::Primary)?;
+
+        // Auto layout top row: Checkbox on left, stretch, Add button on right
+        let mut top_row = HStack::at(TABLE_X, SUB_CARD_Y + spacing::SPACE_8, TABLE_WIDTH, BTN_HEIGHT);
+        top_row.align(CrossAlign::Center);
+        top_row.add_stretch(1, Some(check_enabled.hwnd()));
+        top_row.add_fixed(BTN_WIDTH, Some(btn_add.hwnd()));
+        top_row.apply();
         let list = ly.track_table_i18n(
             ActionTable::create_styled(
                 parent,
@@ -96,20 +84,15 @@ impl RuleSubPanel {
             )?,
             cols_i18n_fn,
         );
+        check_enabled.add_dependents(&[&btn_add, &list]);
+
         let panel = Self {
             layout: ly,
             check_enabled,
             btn_add,
             list,
         };
-        panel.update_controls_state();
         Some(panel)
-    }
-
-    pub fn update_controls_state(&self) {
-        let is_enabled = self.check_enabled.is_checked();
-        self.btn_add.set_enabled(is_enabled);
-        self.list.set_enabled(is_enabled);
     }
 
     pub fn hwnds(&self) -> &[isize] {
@@ -189,21 +172,18 @@ impl TabKeys {
             child.and_then(|c| c.remap_enabled),
             global_config.remap_enabled,
         );
-        self.remap.update_controls_state();
 
         self.disable.check_enabled.set_inherited(
             is_root,
             child.and_then(|c| c.disable_enabled),
             global_config.disable_enabled,
         );
-        self.disable.update_controls_state();
 
         self.key_macro.check_enabled.set_inherited(
             is_root,
             child.and_then(|c| c.key_macro_enabled),
             global_config.key_macro_enabled,
         );
-        self.key_macro.update_controls_state();
     }
 
     pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
@@ -217,10 +197,6 @@ impl TabKeys {
         let is_macro_toggle = self.key_macro.check_enabled.is_toggled(ctl_id, notify_code);
 
         if is_remap_toggle || is_disable_toggle || is_macro_toggle {
-            self.remap.update_controls_state();
-            self.disable.update_controls_state();
-            self.key_macro.update_controls_state();
-
             let remap_on = self.remap.check_enabled.is_checked();
             let disable_on = self.disable.check_enabled.is_checked();
             let macro_on = self.key_macro.check_enabled.is_checked();

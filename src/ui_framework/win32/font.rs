@@ -6,11 +6,11 @@ use super::ffi::*;
 use super::styling::to_wide;
 use super::types::*;
 
-/// Creates modern Segoe UI font matching Windows 10/11 standards
-pub fn create_app_font(point_size: i32, weight: i32) -> isize {
+/// Creates modern Segoe UI font matching Windows 10/11 standards at a specific DPI
+pub fn create_app_font_for_dpi(point_size: i32, weight: i32, dpi: i32) -> isize {
     let font_name = to_wide("Segoe UI");
-    // Standard 96 DPI: 1 pt ≈ 1.33 px -> height = - MulDiv(point_size, 96, 72)
-    let height = -((point_size * 96 + 36) / 72);
+    let dpi = if dpi <= 0 { 96 } else { dpi };
+    let height = -((point_size * dpi + 36) / 72);
     unsafe {
         CreateFontW(
             height,
@@ -29,4 +29,9 @@ pub fn create_app_font(point_size: i32, weight: i32) -> isize {
             font_name.as_ptr(),
         )
     }
+}
+
+/// Creates modern Segoe UI font matching Windows 10/11 standards
+pub fn create_app_font(point_size: i32, weight: i32) -> isize {
+    create_app_font_for_dpi(point_size, weight, 96)
 }

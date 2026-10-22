@@ -87,3 +87,15 @@ impl_component_handle!(
     ListBox,
     ActionTable,
 );
+
+pub trait DependsOnExt: ComponentHandle + Sized {
+    /// Declares that this component's enabled state depends on the checked state of a parent CheckBox.
+    /// It is automatically enabled when the parent is checked, and disabled when unchecked.
+    #[inline]
+    fn depends_on<M>(self, parent: &CheckBox<M>) -> Self {
+        parent.add_dependent(&self);
+        self
+    }
+}
+
+impl<T: ComponentHandle> DependsOnExt for T {}

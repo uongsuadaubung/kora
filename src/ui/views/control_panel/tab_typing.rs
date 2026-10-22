@@ -252,43 +252,11 @@ impl TabTyping {
             ly.card_with_pad(6, 10, |card| {
                 let check_switch_key =
                     card.inheritable_checkbox_row(|s| s.typing_group_switch, 24, 4, true)?;
-
-                let y_sw_row = card.row(28, 0);
-                card.label_at(
+                let (_, lbl_switch_badge, btn_switch_key) = card.hotkey_row(
                     |s| s.typing_lbl_current_key,
-                    card.x(),
-                    y_sw_row + 4,
-                    124,
-                    20,
-                    true,
-                )?;
-
-                let btn_w = 86;
-                let btn_x = card.right() - btn_w - 4;
-                let badge_x = card.x() + 130;
-                let badge_max_w = btn_x - badge_x - 10;
-
-                let lbl_switch_badge = card.track(
-                    Label::create_centered(
-                        h_content,
-                        "Ctrl + Shift",
-                        badge_x,
-                        y_sw_row,
-                        120,
-                        28,
-                        hfont_bold,
-                    )?
-                    .as_pill_badge(120, badge_max_w),
-                );
-
-                let btn_switch_key = card.button_at(
+                    "Ctrl + Shift",
                     |s| s.typing_btn_change_key,
-                    btn_x,
-                    y_sw_row,
-                    btn_w,
-                    28,
-                    true,
-                    ButtonVariant::Primary,
+                    0,
                 )?;
                 Some((check_switch_key, lbl_switch_badge, btn_switch_key))
             })?;
@@ -342,19 +310,22 @@ impl TabTyping {
 
         // Khối 1: App-level Strategy Box (y_card4 + 82, h: 110)
         let y_app_box = Self::card4_y_app_box(y_card4);
-        let lbl_app_strat_title = Label::create(
+        let lbl_app_strat_title = Label::new(
             h_content,
             strings.typing_app_strategy_label,
-            28,
-            y_app_box + 12,
-            220,
-            22,
             hfont_bold,
         )?
         .on_surface(SurfaceRole::Window);
 
-        let combo_app_strategy =
-            ComboBox::create(h_content, 0, 254, y_app_box + 10, 280, 160, hfont_normal)?;
+        let combo_app_strategy = ComboBox::new(h_content, hfont_normal)?;
+
+        // Auto-layout app strategy label + combobox row
+        let mut strat_row = HStack::at(28, y_app_box + 10, 506, 28);
+        strat_row.align(CrossAlign::Center);
+        strat_row.add_fixed(220, Some(lbl_app_strat_title.hwnd()));
+        strat_row.add_fixed(6, None);
+        strat_row.add_stretch(1, Some(combo_app_strategy.hwnd()));
+        strat_row.apply();
 
         let lbl_app_strat_sub =
             Label::create(h_content, "", 28, y_app_box + 38, 506, 18, hfont_normal)?
@@ -375,21 +346,23 @@ impl TabTyping {
 
         // Khối 2: Ngoại lệ theo từng ô text
         let y_exc = Self::card4_y_exc(y_card4);
-        let lbl_exceptions_title = Label::create(
+        let lbl_exceptions_title = Label::new(
             h_content,
             strings.typing_exceptions_title,
-            28,
-            y_exc,
-            410,
-            22,
             hfont_bold,
         )?
         .with_tone(LabelTone::Accent);
 
         // Pill badge trên tiêu đề: "{count} ngoại lệ"
         let lbl_target_subtitle =
-            Label::create_centered(h_content, "", 446, y_exc - 2, 88, 24, hfont_bold)?
+            Label::new_centered(h_content, "", hfont_bold)?
                 .as_pill_badge(70, 96);
+
+        let mut exc_header = HStack::at(28, y_exc, 506, 24);
+        exc_header.align(CrossAlign::Center);
+        exc_header.add_stretch(1, Some(lbl_exceptions_title.hwnd()));
+        exc_header.add_fixed(88, Some(lbl_target_subtitle.hwnd()));
+        exc_header.apply();
 
         let lbl_exceptions_desc = Label::create(
             h_content,
@@ -404,34 +377,33 @@ impl TabTyping {
 
         // Capture Hotkey Box (left: 16, top: y_box, right: 546, bottom: y_box + 80)
         let y_box = Self::card4_y_box(y_card4);
-        let lbl_capture_title = Label::create(
+        let lbl_capture_title = Label::new(
             h_content,
             strings.typing_lbl_current_key,
-            28,
-            y_box + 14,
-            124,
-            20,
             hfont_bold,
         )?
         .on_surface(SurfaceRole::Window);
 
         let lbl_capture_badge =
-            Label::create_centered(h_content, "", 158, y_box + 10, 120, 28, hfont_bold)?
+            Label::new_centered(h_content, "", hfont_bold)?
                 .as_pill_badge(120, 276)
                 .on_surface(SurfaceRole::Window);
 
-        let btn_capture_change = PushButton::create_with_variant(
+        let btn_capture_change = PushButton::new(
             h_content,
-            0,
             strings.typing_btn_change_key,
-            446,
-            y_box + 10,
-            88,
-            28,
             hfont_bold,
             ButtonVariant::Primary,
-            None,
         )?;
+
+        let mut capture_row = HStack::at(28, y_box + 10, 506, 28);
+        capture_row.align(CrossAlign::Center);
+        capture_row.add_fixed(124, Some(lbl_capture_title.hwnd()));
+        capture_row.add_fixed(10, None);
+        capture_row.add_fixed(120, Some(lbl_capture_badge.hwnd()));
+        capture_row.add_spacer();
+        capture_row.add_fixed(88, Some(btn_capture_change.hwnd()));
+        capture_row.apply();
 
         let lbl_capture_guide = Label::create(
             h_content,
@@ -764,13 +736,9 @@ impl TabTyping {
                     kind: SubBoxKind::RuleControls,
                 });
 
-                let lbl_index = Label::create(
+                let lbl_index = Label::new(
                     self.h_content,
                     &format!("#{}", i + 1),
-                    28,
-                    y_item + 10,
-                    32,
-                    24,
                     self.hfont_bold,
                 )
                 .map(|l| {
@@ -778,37 +746,35 @@ impl TabTyping {
                         .on_surface(SurfaceRole::Window)
                 });
 
-                let lbl_badge = Label::create_centered(
+                let lbl_badge = Label::new_centered(
                     self.h_content,
                     &r.target_id,
-                    64,
-                    y_item + 8,
-                    240,
-                    28,
                     self.hfont_bold,
                 )
                 .map(|l| l.as_pill_badge(80, 240).on_surface(SurfaceRole::Window));
 
-                let btn_delete = PushButton::create_with_variant(
+                let btn_delete = PushButton::new(
                     self.h_content,
-                    0,
                     "✕",
-                    504,
-                    y_item + 10,
-                    30,
-                    24,
                     self.hfont_normal,
                     ButtonVariant::Danger,
-                    None,
                 );
 
-                let lbl_strategy = Label::create(
+                // Auto-layout item header: Index badge + Target Pill + Delete button
+                if let (Some(idx), Some(badge), Some(del)) = (&lbl_index, &lbl_badge, &btn_delete) {
+                    let mut item_header = HStack::at(28, y_item + 8, 506, 28);
+                    item_header.align(CrossAlign::Center);
+                    item_header.add_fixed(32, Some(idx.hwnd()));
+                    item_header.add_fixed(8, None);
+                    item_header.add_fixed(240, Some(badge.hwnd()));
+                    item_header.add_spacer();
+                    item_header.add_fixed(30, Some(del.hwnd()));
+                    item_header.apply();
+                }
+
+                let lbl_strategy = Label::new(
                     self.h_content,
                     strings.typing_target_method_label,
-                    36,
-                    y_item + 52,
-                    110,
-                    22,
                     self.hfont_normal,
                 )
                 .map(|l| {
@@ -816,19 +782,21 @@ impl TabTyping {
                         .on_surface(SurfaceRole::Card)
                 });
 
-                let combo_strategy = ComboBox::create(
-                    self.h_content,
-                    0,
-                    150,
-                    y_item + 50,
-                    376,
-                    160,
-                    self.hfont_normal,
-                );
+                let combo_strategy = ComboBox::new(self.h_content, self.hfont_normal);
 
                 if let Some(ref combo) = combo_strategy {
                     let sel_idx = strategy_to_index(r.strategy);
                     combo.reset_items(&strategy_items, Some(sel_idx));
+                }
+
+                // Auto-layout strategy row: Label + ComboBox
+                if let (Some(strat_lbl), Some(combo)) = (&lbl_strategy, &combo_strategy) {
+                    let mut strat_row = HStack::at(36, y_item + 50, 492, 28);
+                    strat_row.align(CrossAlign::Center);
+                    strat_row.add_fixed(110, Some(strat_lbl.hwnd()));
+                    strat_row.add_fixed(8, None);
+                    strat_row.add_stretch(1, Some(combo.hwnd()));
+                    strat_row.apply();
                 }
 
                 let desc_text = strategy_description(r.strategy, strings);

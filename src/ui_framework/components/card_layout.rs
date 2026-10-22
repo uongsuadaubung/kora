@@ -7,8 +7,8 @@
 use crate::ui_framework::I18nSource;
 use crate::ui_framework::components::action_table::ActionTable;
 use crate::ui_framework::components::{
-    ButtonVariant, CheckBox, ComboBox, ComponentHandle, Inheritable, Label, LabelTone, PushButton,
-    SurfaceRole, TwoState,
+    ButtonVariant, CheckBox, ComboBox, ComponentHandle, Inheritable, Label, LabelTone, PillBadge,
+    PushButton, Slider, SurfaceRole, TwoState,
 };
 use crate::ui_framework::theme::cached_font;
 use crate::ui_framework::tokens::{layout, radii, spacing, typography};
@@ -108,26 +108,6 @@ impl<S: LayoutState, L: I18nSource> CardLayout<S, L> {
         self.content_x + self.content_w
     }
 
-    /// Splits the card content width into 2 equal columns separated by `col_gap`.
-    /// Returns `((col1_x, col_w), (col2_x, col_w))`.
-    #[inline]
-    pub const fn cols_2(&self, col_gap: i32) -> ((i32, i32), (i32, i32)) {
-        let w = (self.content_w - col_gap) / 2;
-        let x1 = self.content_x;
-        let x2 = x1 + w + col_gap;
-        ((x1, w), (x2, w))
-    }
-
-    /// Splits a row into a left flexible column and a right fixed-width column separated by `gap`.
-    /// Returns `((left_x, left_w), (right_x, right_w))`.
-    #[inline]
-    pub const fn split_right(&self, right_w: i32, gap: i32) -> ((i32, i32), (i32, i32)) {
-        let left_x = self.content_x;
-        let left_w = self.content_w - right_w - gap;
-        let right_x = left_x + left_w + gap;
-        ((left_x, left_w), (right_x, right_w))
-    }
-
     /// Returns the current Y cursor position without advancing it.
     #[inline]
     pub const fn y(&self) -> i32 {
@@ -214,78 +194,61 @@ impl<S: LayoutState, L: I18nSource> CardLayout<S, L> {
         }
     }
 
-    /// Creates a localized `Label` at explicit `(x, y, w, h)` and registers it via [`Self::track_i18n`].
-    pub fn label_at(
-        &mut self,
-        text_fn: TextFn<L>,
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32,
-        bold: bool,
-    ) -> Option<Label> {
+    /// Creates a localized `Label` for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track_i18n`].
+    pub fn label(&mut self, text_fn: TextFn<L>, bold: bool) -> Option<Label> {
         let text = text_fn(L::current());
-        let lbl = Label::create(self.parent, text, x, y, w, h, self.font_for(bold))?;
+        let lbl = Label::new(self.parent, text, self.font_for(bold))?;
         Some(self.track_i18n(lbl, text_fn))
     }
 
-    /// Creates a localized `PushButton` at explicit `(x, y, w, h)` and registers it via [`Self::track_i18n`].
-    #[allow(clippy::too_many_arguments)]
-    pub fn button_at(
+    /// Creates a localized `PushButton` for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track_i18n`].
+    pub fn button(
         &mut self,
         text_fn: TextFn<L>,
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32,
         bold: bool,
         variant: ButtonVariant,
     ) -> Option<PushButton> {
         let text = text_fn(L::current());
-        let btn = PushButton::create_with_variant(
-            self.parent,
-            0,
-            text,
-            x,
-            y,
-            w,
-            h,
-            self.font_for(bold),
-            variant,
-            None,
-        )?;
+        let btn = PushButton::new(self.parent, text, self.font_for(bold), variant)?;
         Some(self.track_i18n(btn, text_fn))
     }
 
-    /// Creates a localized 2-state `CheckBox<TwoState>` at explicit `(x, y, w, h)` and registers it via [`Self::track_i18n`].
-    pub fn checkbox_at(
-        &mut self,
-        text_fn: TextFn<L>,
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32,
-        bold: bool,
-    ) -> Option<CheckBox<TwoState>> {
+    /// Creates a localized 2-state `CheckBox<TwoState>` for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track_i18n`].
+    pub fn checkbox(&mut self, text_fn: TextFn<L>, bold: bool) -> Option<CheckBox<TwoState>> {
         let text = text_fn(L::current());
-        let chk = CheckBox::create(self.parent, 0, text, x, y, w, h, self.font_for(bold))?;
+        let chk = CheckBox::new(self.parent, text, self.font_for(bold))?;
         Some(self.track_i18n(chk, text_fn))
     }
 
-    /// Creates a localized 3-state `CheckBox<Inheritable<L>>` at explicit `(x, y, w, h)` and registers it via [`Self::track_i18n`].
-    pub fn inheritable_checkbox_at(
+    /// Creates a localized 3-state `CheckBox<Inheritable<L>>` for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track_i18n`].
+    pub fn inheritable_checkbox(
         &mut self,
         text_fn: TextFn<L>,
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32,
         bold: bool,
     ) -> Option<CheckBox<Inheritable<L>>> {
         let text = text_fn(L::current());
-        let chk =
-            CheckBox::create_inheritable(self.parent, 0, text, x, y, w, h, self.font_for(bold))?;
+        let chk = CheckBox::new_inheritable(self.parent, text, self.font_for(bold))?;
         Some(self.track_i18n(chk, text_fn))
+    }
+
+    /// Creates a ComboBox with localized items for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track_combo_i18n`].
+    pub fn combo(&mut self, items_fn: TextListFn<L>) -> Option<ComboBox> {
+        let strings = L::current();
+        let items = items_fn(strings);
+        let cmb = ComboBox::new_with_items(self.parent, self.hfont_normal, &items, 0)?;
+        Some(self.track_combo_i18n(cmb, items_fn))
+    }
+
+    /// Creates a Slider for auto-layout engines (without manual x, y, w, h)
+    /// and registers it via [`Self::track`].
+    pub fn slider(&mut self, min: u32, max: u32, initial_value: u32) -> Option<Slider> {
+        let sl = Slider::new_with_value(self.parent, 0, min, max, initial_value)?;
+        Some(self.track(sl))
     }
 }
 
@@ -581,7 +544,7 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         Some(self.track_i18n(chk, text_fn))
     }
 
-    /// Creates a 2-column pair of `(Label, ComboBox)` side by side, automatically tracking
+    /// Creates a 2-column pair of `(Label, ComboBox)` side by side using `GridLayout`, automatically tracking
     /// both labels (`track_i18n`) and both comboboxes (`track_combo_i18n`).
     pub fn two_col_combos(
         &mut self,
@@ -592,15 +555,14 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         right: (TextFn<L>, TextListFn<L>),
     ) -> Option<((Label, ComboBox), (Label, ComboBox))> {
         let strings = L::current();
-        let ((x1, w1), (x2, w2)) = self.cols_2(col_gap);
         let y_lbl = self.row(18, 4);
         let lbl_font = if label_bold {
             self.hfont_bold
         } else {
             self.hfont_normal
         };
-        let mut lbl1 = Label::create(self.parent, (left.0)(strings), x1, y_lbl, w1, 18, lbl_font)?;
-        let mut lbl2 = Label::create(self.parent, (right.0)(strings), x2, y_lbl, w2, 18, lbl_font)?;
+        let mut lbl1 = Label::new(self.parent, (left.0)(strings), lbl_font)?;
+        let mut lbl2 = Label::new(self.parent, (right.0)(strings), lbl_font)?;
         if !label_bold {
             lbl1 = lbl1.with_tone(LabelTone::Secondary);
             lbl2 = lbl2.with_tone(LabelTone::Secondary);
@@ -611,34 +573,32 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         let y_cmb = self.row(28, gap_after);
         let items1 = (left.1)(strings);
         let items2 = (right.1)(strings);
-        let cmb1 = ComboBox::create_with_items(
-            self.parent,
-            0,
-            x1,
-            y_cmb,
-            w1,
-            160,
-            self.hfont_normal,
-            &items1,
-            0,
-        )?;
-        let cmb2 = ComboBox::create_with_items(
-            self.parent,
-            0,
-            x2,
-            y_cmb,
-            w2,
-            160,
-            self.hfont_normal,
-            &items2,
-            0,
-        )?;
+        let cmb1 = ComboBox::new_with_items(self.parent, self.hfont_normal, &items1, 0)?;
+        let cmb2 = ComboBox::new_with_items(self.parent, self.hfont_normal, &items2, 0)?;
         let cmb1 = self.track_combo_i18n(cmb1, left.1);
         let cmb2 = self.track_combo_i18n(cmb2, right.1);
+
+        // 2x2 Declarative GridLayout
+        let total_h = (y_cmb + 28) - y_lbl;
+        let mut grid = crate::ui_framework::layout::GridLayout::at(
+            self.content_x,
+            y_lbl,
+            self.content_w,
+            total_h,
+            2,
+            2,
+        );
+        grid.gap(col_gap, 4);
+        grid.cell(0, 0, Some(lbl1.hwnd()));
+        grid.cell(0, 1, Some(lbl2.hwnd()));
+        grid.cell(1, 0, Some(cmb1.hwnd()));
+        grid.cell(1, 1, Some(cmb2.hwnd()));
+        grid.apply();
+
         Some(((lbl1, cmb1), (lbl2, cmb2)))
     }
 
-    /// Creates a 1-column `(Label, ComboBox)` taking up the first half of a 2-column grid,
+    /// Creates a 1-column `(Label, ComboBox)` taking up the first half of a 2-column grid using `GridLayout`,
     /// automatically tracking the label (`track_i18n`) and combobox (`track_combo_i18n`).
     pub fn single_col_combo(
         &mut self,
@@ -647,14 +607,13 @@ impl<L: I18nSource> CardLayout<InCard, L> {
         item: (TextFn<L>, TextListFn<L>),
     ) -> Option<(Label, ComboBox)> {
         let strings = L::current();
-        let ((x1, w1), _) = self.cols_2(20);
         let y_lbl = self.row(18, 4);
         let lbl_font = if label_bold {
             self.hfont_bold
         } else {
             self.hfont_normal
         };
-        let mut lbl = Label::create(self.parent, (item.0)(strings), x1, y_lbl, w1, 18, lbl_font)?;
+        let mut lbl = Label::new(self.parent, (item.0)(strings), lbl_font)?;
         if !label_bold {
             lbl = lbl.with_tone(LabelTone::Secondary);
         }
@@ -662,19 +621,134 @@ impl<L: I18nSource> CardLayout<InCard, L> {
 
         let y_cmb = self.row(28, gap_after);
         let items = (item.1)(strings);
-        let cmb = ComboBox::create_with_items(
-            self.parent,
-            0,
-            x1,
-            y_cmb,
-            w1,
-            160,
-            self.hfont_normal,
-            &items,
-            0,
-        )?;
+        let cmb = ComboBox::new_with_items(self.parent, self.hfont_normal, &items, 0)?;
         let cmb = self.track_combo_i18n(cmb, item.1);
+
+        // Place in column 0 of a 2-column grid
+        let total_h = (y_cmb + 28) - y_lbl;
+        let mut grid = crate::ui_framework::layout::GridLayout::at(
+            self.content_x,
+            y_lbl,
+            self.content_w,
+            total_h,
+            2,
+            2,
+        );
+        grid.gap(20, 4);
+        grid.cell(0, 0, Some(lbl.hwnd()));
+        grid.cell(1, 0, Some(cmb.hwnd()));
+        grid.apply();
+
         Some((lbl, cmb))
+    }
+
+    /// Runs a horizontal layout inside this card row with auto-positioning.
+    /// Allocates `height` pixels on the Y axis, then passes an `HStack` (HorizontalLayout) builder to `f`.
+    pub fn horizontal<R, F>(&mut self, height: i32, gap_after: i32, f: F) -> R
+    where
+        F: FnOnce(&mut crate::ui_framework::layout::HStack) -> R,
+    {
+        let y = self.row(height, gap_after);
+        let mut hstack = crate::ui_framework::layout::HStack::at(self.content_x, y, self.content_w, height);
+        let ret = f(&mut hstack);
+        hstack.apply();
+        ret
+    }
+
+    /// Runs a vertical layout inside this card row with auto-positioning.
+    /// Allocates `height` pixels on the Y axis, then passes a `VStack` (VerticalLayout) builder to `f`.
+    pub fn vertical<R, F>(&mut self, height: i32, gap_after: i32, f: F) -> R
+    where
+        F: FnOnce(&mut crate::ui_framework::layout::VStack) -> R,
+    {
+        let y = self.row(height, gap_after);
+        let mut vstack = crate::ui_framework::layout::VStack::at(self.content_x, y, self.content_w, height);
+        let ret = f(&mut vstack);
+        vstack.apply();
+        ret
+    }
+
+    /// Runs a 2D grid layout inside this card row with auto-positioning.
+    /// Allocates `height` pixels on the Y axis, then passes a `GridLayout` builder to `f`.
+    pub fn grid<R, F>(&mut self, height: i32, gap_after: i32, cols: usize, rows: usize, f: F) -> R
+    where
+        F: FnOnce(&mut crate::ui_framework::layout::GridLayout) -> R,
+    {
+        let y = self.row(height, gap_after);
+        let mut grid = crate::ui_framework::layout::GridLayout::at(self.content_x, y, self.content_w, height, cols, rows);
+        let ret = f(&mut grid);
+        grid.apply();
+        ret
+    }
+
+    /// Runs a form layout inside this card row with auto-positioning.
+    /// Allocates `height` pixels on the Y axis, then passes a `FormLayout` builder to `f`.
+    pub fn form<R, F>(&mut self, height: i32, gap_after: i32, f: F) -> R
+    where
+        F: FnOnce(&mut crate::ui_framework::layout::FormLayout) -> R,
+    {
+        let y = self.row(height, gap_after);
+        let mut form = crate::ui_framework::layout::FormLayout::at(self.content_x, y, self.content_w, height);
+        let ret = f(&mut form);
+        form.apply();
+        ret
+    }
+
+    /// Runs a two-pane split layout inside this card row with auto-positioning.
+    /// Allocates `height` pixels on the Y axis, then passes a `SplitLayout` builder to `f`.
+    pub fn split<R, F>(
+        &mut self,
+        height: i32,
+        gap_after: i32,
+        direction: crate::ui_framework::layout::SplitDirection,
+        rule: crate::ui_framework::layout::SplitRule,
+        f: F,
+    ) -> R
+    where
+        F: FnOnce(&mut crate::ui_framework::layout::SplitLayout) -> R,
+    {
+        let y = self.row(height, gap_after);
+        let mut splitter = crate::ui_framework::layout::SplitLayout::at(
+            self.content_x,
+            y,
+            self.content_w,
+            height,
+            direction,
+            rule,
+        );
+        let ret = f(&mut splitter);
+        splitter.apply();
+        ret
+    }
+
+    /// Creates a standard hotkey row:
+    /// - Left: Label with `lbl_text_fn`
+    /// - Center: PillBadge showing `current_combo`
+    /// - Right: PushButton with `btn_text_fn` (Primary variant)
+    pub fn hotkey_row(
+        &mut self,
+        lbl_text_fn: TextFn<L>,
+        current_combo: &str,
+        btn_text_fn: TextFn<L>,
+        gap_after: i32,
+    ) -> Option<(Label, Label<PillBadge>, PushButton)> {
+        let lbl = self.label(lbl_text_fn, true)?;
+        let badge = self.track(
+            Label::new_centered(self.parent, current_combo, self.hfont_bold)?
+                .as_pill_badge(120, 300),
+        );
+        let btn = self.button(btn_text_fn, true, ButtonVariant::Primary)?;
+
+        self.horizontal(28, gap_after, |row| {
+            row.align(crate::ui_framework::layout::CrossAlign::Center);
+            row.add_fixed(124, Some(lbl.hwnd()));
+            row.add_fixed(10, None);
+            row.add_fixed(120, Some(badge.hwnd()));
+            row.add_spacer();
+            row.add_fixed(86, Some(btn.hwnd()));
+        });
+
+        Some((lbl, badge, btn))
     }
 
     /// Closes the current card with custom bottom padding and transitions back to [`OutsideCard`].

@@ -36,70 +36,52 @@ impl TabAbout {
         let (label_about_author, btn_check_update, btn_github) =
             ly.card_with_pad(88, 38, |card| {
                 // Reserve space at top for painted K logo (LOGO_TOP..LOGO_TOP+LOGO_SIZE)
-                let y_title = card.row(26, 4);
-                card.track_i18n(
-                    Label::create_centered(
-                        parent,
-                        strings.about_title,
-                        card.x(),
-                        y_title,
-                        card.width(),
-                        26,
-                        hfont_title,
-                    )?,
+                let lbl_title = card.track_i18n(
+                    Label::new_centered(parent, strings.about_title, hfont_title)?,
                     |s| s.about_title,
                 );
+                card.horizontal(26, 4, |row| {
+                    row.add_stretch(1, Some(lbl_title.hwnd()));
+                });
 
-                let y_author = card.row(20, 4);
                 let label_about_author = card.track_i18n(
-                    Label::create_centered(
-                        parent,
-                        strings.about_author,
-                        card.x(),
-                        y_author,
-                        card.width(),
-                        20,
-                        hfont_normal,
-                    )?
-                    .as_link()
-                    .with_tone(LabelTone::Secondary),
+                    Label::new_centered(parent, strings.about_author, hfont_normal)?
+                        .as_link()
+                        .with_tone(LabelTone::Secondary),
                     |s| s.about_author,
                 );
+                card.horizontal(20, 4, |row| {
+                    row.add_stretch(1, Some(label_about_author.hwnd()));
+                });
 
-                let y_engine = card.row(20, 18);
-                card.track_i18n(
-                    Label::create_centered(
-                        parent,
-                        strings.about_engine_desc,
-                        card.x(),
-                        y_engine,
-                        card.width(),
-                        20,
-                        hfont_normal,
-                    )?
-                    .with_tone(LabelTone::Secondary),
+                let lbl_engine = card.track_i18n(
+                    Label::new_centered(parent, strings.about_engine_desc, hfont_normal)?
+                        .with_tone(LabelTone::Secondary),
                     |s| s.about_engine_desc,
                 );
+                card.horizontal(20, 18, |row| {
+                    row.add_stretch(1, Some(lbl_engine.hwnd()));
+                });
 
-                let y_btns = card.row(32, 0);
-                let btn_check_update = card.button_at(
+                let btn_check_update = card.button(
                     |s| s.btn_check_update,
-                    362,
-                    y_btns,
-                    156,
-                    32,
                     true,
                     ButtonVariant::Primary,
                 )?;
-                let btn_github = card.button_at(
+                let btn_github = card.button(
                     |s| s.about_github_btn,
-                    534,
-                    y_btns,
-                    156,
-                    32,
                     true,
                     ButtonVariant::Secondary,
                 )?;
+
+                card.horizontal(32, 0, |row| {
+                    row.align(CrossAlign::Center);
+                    row.add_spacer();
+                    row.add_fixed(156, Some(btn_check_update.hwnd()));
+                    row.add_fixed(16, None);
+                    row.add_fixed(156, Some(btn_github.hwnd()));
+                    row.add_spacer();
+                });
                 Some((label_about_author, btn_check_update, btn_github))
             })?;
 

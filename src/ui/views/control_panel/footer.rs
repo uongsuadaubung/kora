@@ -16,36 +16,22 @@ impl FooterControls {
         let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
 
         let btn_exit = ly.track_i18n(
-            PushButton::create_with_variant(
-                parent,
-                0,
-                strings.btn_exit,
-                244,
-                542,
-                114,
-                30,
-                hfont_normal,
-                ButtonVariant::Danger,
-                None,
-            )?,
+            PushButton::new(parent, strings.btn_exit, hfont_normal, ButtonVariant::Danger)?,
             |s| s.btn_exit,
         );
 
         let btn_close = ly.track_i18n(
-            PushButton::create_with_variant(
-                parent,
-                0,
-                strings.btn_close,
-                694,
-                542,
-                112,
-                30,
-                hfont_bold,
-                ButtonVariant::Primary,
-                None,
-            )?,
+            PushButton::new(parent, strings.btn_close, hfont_bold, ButtonVariant::Primary)?,
             |s| s.btn_close,
         );
+
+        // Declarative auto-layout: Exit button on left, spacer, Close button on right
+        let mut row = HStack::at(244, 542, 562, 30);
+        row.align(CrossAlign::Center);
+        row.add_fixed(114, Some(btn_exit.hwnd()));
+        row.add_spacer();
+        row.add_fixed(112, Some(btn_close.hwnd()));
+        row.apply();
 
         Some(Self {
             layout: ly,

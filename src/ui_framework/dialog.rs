@@ -4,7 +4,7 @@
 //! - Quản lý vòng đời cửa sổ và state (`open_modal`, `open_client_modal`, `attach_state`, `state`, `detach_state`, `close_modal`).
 //! - Phản xạ thông điệp tự động cho các component con (`reflect_dialog_messages`, `forward_draw_item`).
 //! - Điều hướng bàn phím chuẩn Dialog (`pre_translate_message`, `resolve_enter_command`).
-//! - Các hàm vẽ GDI và nút Footer chuẩn hóa (`create_dialog_footer_buttons`, `fill_dialog_bg`, `draw_dialog_callout`, `draw_dialog_label`, `draw_dialog_footer`, `draw_key_box`).
+//! - Các hàm vẽ GDI và layout nút Footer chuẩn hóa (`create_dialog_footer_layout`, `fill_dialog_bg`, `draw_dialog_callout`, `draw_dialog_footer`, `draw_key_box`).
 
 use crate::ui_framework::colors::ThemePalette;
 use crate::ui_framework::components::button::{ButtonVariant, PushButton};
@@ -155,9 +155,31 @@ pub unsafe fn reflect_dialog_messages(
     const WM_CTLCOLOREDIT: u32 = 0x0133;
     const WM_CTLCOLORLISTBOX: u32 = 0x0134;
     const WM_CTLCOLORSTATIC: u32 = 0x0138;
+    const WM_DPICHANGED: u32 = 0x02E0;
 
     unsafe {
         match msg {
+            WM_DPICHANGED => {
+                if lparam != 0 {
+                    let prc = &*(lparam as *const RECT);
+                    SetWindowPos(
+                        hwnd,
+                        0,
+                        prc.left,
+                        prc.top,
+                        prc.right - prc.left,
+                        prc.bottom - prc.top,
+                        SWP_NOZORDER | SWP_NOACTIVATE,
+                    );
+                    RedrawWindow(
+                        hwnd,
+                        std::ptr::null(),
+                        0,
+                        RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN | RDW_FRAME,
+                    );
+                }
+                Some(0)
+            }
             WM_DRAWITEM => Some(forward_draw_item(wparam, lparam)),
             WM_NOTIFY => {
                 let nmhdr = &*(lparam as *const NMHDR);
@@ -287,47 +309,66 @@ pub fn open_client_modal<T>(
     )
 }
 
-/// Tạo cặp nút Hủy (`ButtonVariant::Secondary`, tự đóng hộp thoại khi bấm) và Lưu/Áp dụng ở đáy Dialog.
-pub fn create_dialog_footer_buttons<F>(
+/// Tạo cặp nút Hủy và Lưu/Áp dụng ở đáy Dialog tự động căn lề phải bằng auto-layout [`HStack`].
+pub fn create_dialog_footer_layout<F>(
     hwnd: isize,
-    (cancel_text, cancel_x, cancel_w): (&str, i32, i32),
-    (submit_text, submit_x, submit_w, submit_variant): (&str, i32, i32, ButtonVariant),
+    cancel_text: &str,
+    cancel_w: i32,
+    submit_text: &str,
+    submit_w: i32,
+    submit_variant: ButtonVariant,
     y: i32,
     h: i32,
+    right_margin: i32,
     bg_erase: Option<u32>,
     on_submit: F,
 ) where
     F: Fn() + Send + Sync + 'static,
 {
-    if let Some(btn) = PushButton::create_with_variant(
+    let cancel_btn = PushButton::new_with_bg(
         hwnd,
-        0,
         cancel_text,
-        cancel_x,
-        y,
-        cancel_w,
-        h,
         get_app_font_normal(),
         ButtonVariant::Secondary,
         bg_erase,
-    ) {
+    );
+    if let Some(ref btn) = cancel_btn {
         btn.set_on_click(move || unsafe {
             PostMessageW(hwnd, WM_CLOSE, 0, 0);
         });
     }
-    if let Some(btn) = PushButton::create_with_variant(
+
+    let submit_btn = PushButton::new_with_bg(
         hwnd,
-        0,
         submit_text,
-        submit_x,
-        y,
-        submit_w,
-        h,
         get_app_font_bold(),
         submit_variant,
         bg_erase,
-    ) {
+    );
+    if let Some(ref btn) = submit_btn {
         btn.set_on_click(on_submit);
+    }
+
+    unsafe {
+        let mut rc: RECT = std::mem::zeroed();
+        GetClientRect(hwnd, &mut rc);
+        let client_w = (rc.right - rc.left).max(0);
+        let mut row = crate::ui_framework::layout::HStack::at(
+            0,
+            y,
+            (client_w - right_margin).max(0),
+            h,
+        );
+        row.align(crate::ui_framework::layout::CrossAlign::Center);
+        row.add_spacer();
+        if let Some(ref btn) = cancel_btn {
+            row.add_fixed(cancel_w, Some(btn.hwnd()));
+        }
+        row.add_fixed(8, None);
+        if let Some(ref btn) = submit_btn {
+            row.add_fixed(submit_w, Some(btn.hwnd()));
+        }
+        row.apply();
     }
 }
 

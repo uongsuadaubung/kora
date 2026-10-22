@@ -210,17 +210,16 @@ pub unsafe extern "system" fn disable_dialog_wnd_proc(
                 }
 
                 // Footer Buttons
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.dlg_disable_btn_cancel, 264, 82),
-                    (
-                        strings.dlg_disable_btn_apply,
-                        354,
-                        106,
-                        ButtonVariant::DangerSolid,
-                    ),
+                    strings.dlg_disable_btn_cancel,
+                    82,
+                    strings.dlg_disable_btn_apply,
+                    106,
+                    ButtonVariant::DangerSolid,
                     280,
                     32,
+                    20,
                     Some(palette_init.bg_sidebar),
                     move || submit_disable(hwnd),
                 );

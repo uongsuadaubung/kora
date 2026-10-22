@@ -3,10 +3,14 @@
 //! crisp primary text color, custom Fluent 18x18 checkbox, and exact vertical centering.
 
 use crate::ui_framework::colors::ThemePalette;
+use crate::ui_framework::components::ComponentHandle;
 use crate::ui_framework::theme::is_current_dark;
 use crate::ui_framework::tokens::{borders, radii};
 use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
+use std::sync::{Arc, Mutex};
+
+pub type CheckBoxToggleCallback = Arc<dyn Fn(bool) + Send + Sync>;
 
 const CHECKBOX_SUBCLASS_ID: usize = 0x408;
 
@@ -25,6 +29,8 @@ const WM_SETFONT: u32 = 0x0030;
 const CBM_SET_TRI: u32 = 0x0400 + 0x60;
 const CBM_GET_INHERITED: u32 = 0x0400 + 0x61;
 const CBM_SET_ALIGN_RIGHT: u32 = 0x0400 + 0x62;
+const CBM_ADD_DEPENDENT: u32 = 0x0400 + 0x63;
+const CBM_SYNC_DEPENDENTS: u32 = 0x0400 + 0x64;
 
 struct CheckBoxData {
     is_hover: bool,
@@ -33,6 +39,8 @@ struct CheckBoxData {
     inherited: bool,
     inherit_note: &'static str,
     align_right: bool,
+    on_toggle: Arc<Mutex<Option<CheckBoxToggleCallback>>>,
+    dependents: Vec<isize>,
 }
 
 unsafe extern "system" fn checkbox_subclass_proc(
@@ -99,23 +107,63 @@ unsafe extern "system" fn checkbox_subclass_proc(
         }
         return 1;
     }
-    if msg == OCM_COMMAND
-        && (wparam >> 16) & 0xFFFF == 0
-        && !data_ptr.is_null()
-        && unsafe { (*data_ptr).tri }
-    {
-        let inherited = unsafe { (*data_ptr).inherited };
-        let cur = unsafe { SendMessageW(hwnd, BM_GETCHECK, 0, 0) } as usize;
-        let as_state = |v: bool| if v { BST_CHECKED } else { BST_UNCHECKED };
-        let next = if cur == BST_INDETERMINATE {
-            as_state(!inherited)
-        } else if cur == as_state(inherited) {
-            BST_INDETERMINATE
-        } else {
-            as_state(inherited)
-        };
-        unsafe { SendMessageW(hwnd, BM_SETCHECK, next, 0) };
-        return 0;
+    if msg == CBM_ADD_DEPENDENT && !data_ptr.is_null() {
+        let data = unsafe { &mut *data_ptr };
+        let dep = wparam as isize;
+        if dep != 0 {
+            if !data.dependents.contains(&dep) {
+                data.dependents.push(dep);
+            }
+            let is_checked = unsafe { SendMessageW(hwnd, BM_GETCHECK, 0, 0) } == BST_CHECKED as isize;
+            unsafe {
+                EnableWindow(dep, if is_checked { 1 } else { 0 });
+                InvalidateRect(dep, null_mut(), 1);
+            }
+        }
+        return 1;
+    }
+    if msg == CBM_SYNC_DEPENDENTS && !data_ptr.is_null() {
+        let data = unsafe { &*data_ptr };
+        let is_checked = wparam != 0;
+        for &dep in &data.dependents {
+            if dep != 0 {
+                unsafe {
+                    EnableWindow(dep, if is_checked { 1 } else { 0 });
+                    InvalidateRect(dep, null_mut(), 1);
+                }
+            }
+        }
+        return 1;
+    }
+    if msg == OCM_COMMAND && !data_ptr.is_null() && (wparam >> 16) & 0xFFFF == 0 {
+        let data = unsafe { &mut *data_ptr };
+        if data.tri {
+            let inherited = data.inherited;
+            let cur = unsafe { SendMessageW(hwnd, BM_GETCHECK, 0, 0) } as usize;
+            let as_state = |v: bool| if v { BST_CHECKED } else { BST_UNCHECKED };
+            let next = if cur == BST_INDETERMINATE {
+                as_state(!inherited)
+            } else if cur == as_state(inherited) {
+                BST_INDETERMINATE
+            } else {
+                as_state(inherited)
+            };
+            unsafe { SendMessageW(hwnd, BM_SETCHECK, next, 0) };
+        }
+        let is_checked = unsafe { SendMessageW(hwnd, BM_GETCHECK, 0, 0) } == BST_CHECKED as isize;
+        for &dep in &data.dependents {
+            if dep != 0 {
+                unsafe {
+                    EnableWindow(dep, if is_checked { 1 } else { 0 });
+                    InvalidateRect(dep, null_mut(), 1);
+                }
+            }
+        }
+        let cb = data.on_toggle.lock().ok().and_then(|guard| guard.clone());
+        if let Some(cb) = cb {
+            cb(is_checked);
+        }
+        return 1;
     }
 
     if msg == WM_MOUSEMOVE && !data_ptr.is_null() {
@@ -346,6 +394,7 @@ pub struct Inheritable<L: I18nSource = ()>(PhantomData<L>);
 pub struct CheckBox<M = TwoState> {
     hwnd: isize,
     id: u32,
+    on_toggle: Arc<Mutex<Option<CheckBoxToggleCallback>>>,
     _mode: PhantomData<M>,
 }
 
@@ -389,6 +438,7 @@ impl<M> CheckBox<M> {
                     SendMessageW(hwnd, WM_SETFONT, hfont as usize, 1);
                 }
             }
+            let on_toggle = Arc::new(Mutex::new(None));
             let data = Box::into_raw(Box::new(CheckBoxData {
                 is_hover: false,
                 bg_color,
@@ -396,6 +446,8 @@ impl<M> CheckBox<M> {
                 inherited: false,
                 inherit_note: "",
                 align_right: false,
+                on_toggle: on_toggle.clone(),
+                dependents: Vec::new(),
             }));
             unsafe {
                 SetWindowSubclass(
@@ -408,10 +460,28 @@ impl<M> CheckBox<M> {
             Some(Self {
                 hwnd,
                 id,
+                on_toggle,
                 _mode: PhantomData,
             })
         } else {
             None
+        }
+    }
+
+    pub fn on_toggle<F>(self, callback: F) -> Self
+    where
+        F: Fn(bool) + Send + Sync + 'static,
+    {
+        self.set_on_toggle(callback);
+        self
+    }
+
+    pub fn set_on_toggle<F>(&self, callback: F)
+    where
+        F: Fn(bool) + Send + Sync + 'static,
+    {
+        if let Ok(mut guard) = self.on_toggle.lock() {
+            *guard = Some(Arc::new(callback));
         }
     }
 
@@ -460,9 +530,52 @@ impl<M> CheckBox<M> {
             ShowWindow(self.hwnd, if visible { SW_SHOW } else { SW_HIDE });
         }
     }
+
+    /// Registers a dependent child component whose enabled state tracks this checkbox's state.
+    pub fn add_dependent<C: ComponentHandle + ?Sized>(&self, target: &C) -> &Self {
+        let hwnd = target.hwnd();
+        if hwnd != 0 {
+            unsafe {
+                SendMessageW(self.hwnd, CBM_ADD_DEPENDENT, hwnd as usize, 0);
+            }
+        }
+        self
+    }
+
+    /// Registers multiple dependent child components.
+    pub fn add_dependents(&self, targets: &[&dyn ComponentHandle]) -> &Self {
+        for target in targets {
+            self.add_dependent(*target);
+        }
+        self
+    }
+
+    /// Binds an auto-sync callback to this checkbox, executed whenever the checkbox state changes.
+    pub fn bind<F>(&self, sync: F) -> &Self
+    where
+        F: FnMut(bool) + Send + Sync + 'static,
+    {
+        let sync_cell = std::sync::Mutex::new(sync);
+        self.set_on_toggle(move |checked| {
+            if let Ok(mut s) = sync_cell.lock() {
+                s(checked);
+            }
+        });
+        self
+    }
 }
 
 impl CheckBox<TwoState> {
+    /// Creates a 2-state CheckBox for auto-layout engines without requiring manual (x, y, w, h) coordinates.
+    pub fn new(parent: isize, text: &str, hfont: isize) -> Option<Self> {
+        Self::create(parent, 0, text, 0, 0, 0, 0, hfont)
+    }
+
+    /// Creates a 2-state CheckBox with initial state for auto-layout engines.
+    pub fn new_with_state(parent: isize, text: &str, hfont: isize, checked: bool) -> Option<Self> {
+        Self::create_with_state(parent, 0, text, 0, 0, 0, 0, hfont, checked)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         parent: isize,
@@ -475,21 +588,6 @@ impl CheckBox<TwoState> {
         hfont: isize,
     ) -> Option<Self> {
         Self::create_raw(parent, id, text, x, y, width, height, hfont, None)
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn create_ext(
-        parent: isize,
-        id: u32,
-        text: &str,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
-        hfont: isize,
-        bg_color: Option<u32>,
-    ) -> Option<Self> {
-        Self::create_raw(parent, id, text, x, y, width, height, hfont, bg_color)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -516,6 +614,7 @@ impl CheckBox<TwoState> {
         unsafe {
             SendMessageW(self.hwnd, CBM_SET_TRI, 0, 0);
             SendMessageW(self.hwnd, BM_SETCHECK, state, 0);
+            SendMessageW(self.hwnd, CBM_SYNC_DEPENDENTS, checked as usize, 0);
             InvalidateRect(self.hwnd, null_mut(), 0);
         }
     }
@@ -526,12 +625,18 @@ impl CheckBox<TwoState> {
         CheckBox {
             hwnd: self.hwnd,
             id: self.id,
+            on_toggle: self.on_toggle,
             _mode: PhantomData,
         }
     }
 }
 
 impl<L: I18nSource> CheckBox<Inheritable<L>> {
+    /// Creates an inheritable CheckBox for auto-layout engines without requiring manual (x, y, w, h) coordinates.
+    pub fn new_inheritable(parent: isize, text: &str, hfont: isize) -> Option<Self> {
+        Self::create_inheritable(parent, 0, text, 0, 0, 0, 0, hfont)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create_inheritable(
         parent: isize,
@@ -588,6 +693,10 @@ impl<L: I18nSource> CheckBox<Inheritable<L>> {
             }
         } else {
             self.set_tri_state(child_value, global_value);
+        }
+        let is_active = self.is_checked();
+        unsafe {
+            SendMessageW(self.hwnd, CBM_SYNC_DEPENDENTS, is_active as usize, 0);
         }
     }
 

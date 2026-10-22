@@ -5,6 +5,9 @@ use crate::ui_framework::theme::{get_app_font_normal, is_current_dark};
 use crate::ui_framework::tokens::spacing;
 use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
+use std::sync::{Arc, Mutex};
+
+pub type ComboBoxChangeCallback = Arc<dyn Fn(usize) + Send + Sync>;
 
 const CBS_DROPDOWNLIST: u32 = 0x0003;
 const CBS_OWNERDRAWFIXED: u32 = 0x0010;
@@ -25,14 +28,32 @@ unsafe extern "system" fn combobox_self_subclass(
     wparam: usize,
     lparam: isize,
     uid_subclass: usize,
-    _ref_data: usize,
+    ref_data: usize,
 ) -> isize {
     const WM_NCDESTROY: u32 = 0x0082;
     if msg == WM_NCDESTROY {
         unsafe {
             RemoveWindowSubclass(hwnd, combobox_self_subclass, uid_subclass);
+            if ref_data != 0 {
+                drop(Arc::from_raw(ref_data as *const Mutex<Option<ComboBoxChangeCallback>>));
+            }
         }
         return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
+    }
+
+    if msg == OCM_COMMAND {
+        let notify_code = ((wparam >> 16) & 0xFFFF) as u32;
+        if notify_code == 1 /* CBN_SELCHANGE */ && ref_data != 0 {
+            let data_ptr = ref_data as *const Mutex<Option<ComboBoxChangeCallback>>;
+            let cb = unsafe { &*data_ptr }.lock().ok().and_then(|guard| guard.clone());
+            if let Some(cb) = cb {
+                let cur = unsafe { SendMessageW(hwnd, CB_GETCURSEL, 0, 0) };
+                if cur >= 0 {
+                    cb(cur as usize);
+                }
+            }
+            return 1;
+        }
     }
 
     const WM_MOUSEWHEEL: u32 = 0x020A;
@@ -68,9 +89,20 @@ unsafe extern "system" fn combobox_self_subclass(
 pub struct ComboBox {
     hwnd: isize,
     id: u32,
+    on_change: Arc<Mutex<Option<ComboBoxChangeCallback>>>,
 }
 
 impl ComboBox {
+    /// Creates a ComboBox for auto-layout engines without requiring manual (x, y, w, h) coordinates.
+    pub fn new(parent: isize, hfont: isize) -> Option<Self> {
+        Self::create(parent, 0, 0, 0, 0, 160, hfont)
+    }
+
+    /// Creates a ComboBox with items for auto-layout engines without requiring manual coordinates.
+    pub fn new_with_items(parent: isize, hfont: isize, items: &[&str], selected: usize) -> Option<Self> {
+        Self::create_with_items(parent, 0, 0, 0, 0, 160, hfont, items, selected)
+    }
+
     pub fn create(
         parent: isize,
         id: u32,
@@ -107,6 +139,7 @@ impl ComboBox {
         };
 
         if hwnd != 0 {
+            let on_change = Arc::new(Mutex::new(None));
             unsafe {
                 if hfont != 0 {
                     SendMessageW(hwnd, WM_SETFONT, hfont as usize, 1);
@@ -116,13 +149,49 @@ impl ComboBox {
                 SendMessageW(hwnd, CB_SETITEMHEIGHT, usize::MAX, COMBO_SELECTION_HEIGHT);
                 SendMessageW(hwnd, CB_SETITEMHEIGHT, 0, COMBO_LIST_ITEM_HEIGHT);
 
-                SetWindowSubclass(hwnd, combobox_self_subclass, id as usize, 0);
+                SetWindowSubclass(
+                    hwnd,
+                    combobox_self_subclass,
+                    id as usize,
+                    Arc::into_raw(on_change.clone()) as usize,
+                );
             }
             Self::apply_theme(hwnd, is_current_dark());
-            Some(Self { hwnd, id })
+            Some(Self { hwnd, id, on_change })
         } else {
             None
         }
+    }
+
+    pub fn on_change<F>(self, callback: F) -> Self
+    where
+        F: Fn(usize) + Send + Sync + 'static,
+    {
+        self.set_on_change(callback);
+        self
+    }
+
+    pub fn set_on_change<F>(&self, callback: F)
+    where
+        F: Fn(usize) + Send + Sync + 'static,
+    {
+        if let Ok(mut guard) = self.on_change.lock() {
+            *guard = Some(Arc::new(callback));
+        }
+    }
+
+    /// Binds an auto-sync callback to this combobox, executed whenever the selected index changes.
+    pub fn bind<F>(&self, sync: F) -> &Self
+    where
+        F: FnMut(usize) + Send + Sync + 'static,
+    {
+        let sync_cell = std::sync::Mutex::new(sync);
+        self.set_on_change(move |idx| {
+            if let Ok(mut s) = sync_cell.lock() {
+                s(idx);
+            }
+        });
+        self
     }
 
     /// Applies Dark Mode CFD / Explorer theme to a ComboBox HWND

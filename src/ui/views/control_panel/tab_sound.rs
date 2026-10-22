@@ -31,33 +31,19 @@ impl TabSound {
         // --- Card 1: Thiết lập Âm thanh gõ phím cơ ---
         let (check_sound_enabled, combo_switch_type, btn_test_sound, lbl_volume_val, slider_volume) =
             ly.card_with_pad(spacing::SPACE_14, 16, |card| {
-                let ((x_title, w_title), (x_chk, w_chk)) = card.split_right(290, 5);
-                let y_title = card.row(22, 8);
-                card.label_at(|s| s.sound_title, x_title, y_title + 1, w_title, 20, true)?;
-
-                let check_sound_enabled = card.inheritable_checkbox_at(
-                    |s| s.check_sound_enabled,
-                    x_chk,
-                    y_title,
-                    w_chk,
-                    22,
-                    true,
-                )?;
+                let lbl_title = card.label(|s| s.sound_title, true)?;
+                let check_sound_enabled = card.inheritable_checkbox(|s| s.check_sound_enabled, true)?;
                 check_sound_enabled.set_align_right(true);
+
+                card.horizontal(22, 8, |row| {
+                    row.align(CrossAlign::Center);
+                    row.add_stretch(1, Some(lbl_title.hwnd()));
+                    row.add_fixed(290, Some(check_sound_enabled.hwnd()));
+                });
 
                 card.label_row(|s| s.label_switch_type, 18, 4, true)?;
 
-                let ((x_cmb, w_cmb), (x_btn, w_btn)) = card.split_right(110, 10);
-                let y_cmb_sw = card.row(28, 14);
-                let combo_switch_type = card.track(ComboBox::create(
-                    parent,
-                    0,
-                    x_cmb,
-                    y_cmb_sw,
-                    w_cmb,
-                    180,
-                    hfont_normal,
-                )?);
+                let combo_switch_type = card.track(ComboBox::new(parent, hfont_normal)?);
                 for p in &switch_profiles {
                     combo_switch_type.add_item(p);
                 }
@@ -66,39 +52,45 @@ impl TabSound {
                 }
                 combo_switch_type.set_selected(0);
 
-                let btn_test_sound = card.button_at(
+                let btn_test_sound = card.button(
                     |s| s.btn_test_sound,
-                    x_btn,
-                    y_cmb_sw,
-                    w_btn,
-                    28,
                     false,
                     ButtonVariant::Secondary,
                 )?;
 
-                let ((x_vol_lbl, _), (x_vol_val, w_vol_val)) = card.split_right(60, 10);
-                let y_vol_lbl = card.row(18, 4);
-                card.label_at(|s| s.label_volume, x_vol_lbl, y_vol_lbl, 120, 18, true)?;
+                card.horizontal(28, 14, |row| {
+                    row.align(CrossAlign::Center);
+                    row.add_stretch(1, Some(combo_switch_type.hwnd()));
+                    row.add_fixed(10, None);
+                    row.add_fixed(110, Some(btn_test_sound.hwnd()));
+                });
 
+                let lbl_vol = card.label(|s| s.label_volume, true)?;
                 let lbl_volume_val = card.track(
-                    Label::create_right(
-                        parent, "50%", x_vol_val, y_vol_lbl, w_vol_val, 18, hfont_bold,
-                    )?
-                    .with_tone(LabelTone::Accent),
+                    Label::new_right(parent, "50%", hfont_bold)?
+                        .with_tone(LabelTone::Accent),
                 );
 
-                let y_slider = card.row(26, 0);
-                let slider_volume = card.track(Slider::create_with_value(
-                    parent,
-                    0,
-                    card.x(),
-                    y_slider,
-                    card.width(),
-                    26,
-                    0,
-                    100,
-                    50,
-                )?);
+                card.horizontal(18, 4, |row| {
+                    row.align(CrossAlign::Center);
+                    row.add_fixed(120, Some(lbl_vol.hwnd()));
+                    row.add_spacer();
+                    row.add_fixed(60, Some(lbl_volume_val.hwnd()));
+                });
+
+                let slider_volume = card.slider(0, 100, 50)?;
+                card.horizontal(26, 0, |row| {
+                    row.add_stretch(1, Some(slider_volume.hwnd()));
+                });
+
+                if sound_available {
+                    check_sound_enabled.add_dependents(&[&combo_switch_type, &btn_test_sound, &slider_volume]);
+                } else {
+                    combo_switch_type.set_enabled(false);
+                    btn_test_sound.set_enabled(false);
+                    slider_volume.set_enabled(false);
+                }
+
                 Some((
                     check_sound_enabled,
                     combo_switch_type,
@@ -113,37 +105,29 @@ impl TabSound {
             ly.card_with_pad(spacing::SPACE_14, 20, |card| {
                 card.label_row(|s| s.soundpack_card_title, 18, 4, true)?;
 
-                let y_sp_note = card.row(18, 10);
                 let lbl_soundpack_note = card.track(
-                    Label::create(
+                    Label::new(
                         parent,
                         if sound_available {
                             strings.soundpack_note_installed
                         } else {
                             strings.soundpack_note_missing
                         },
-                        card.x(),
-                        y_sp_note,
-                        card.width(),
-                        18,
                         hfont_normal,
                     )?
                     .with_tone(LabelTone::Secondary),
                 );
+                card.horizontal(18, 10, |row| {
+                    row.add_stretch(1, Some(lbl_soundpack_note.hwnd()));
+                });
 
-                let y_sp_btn = card.row(32, 0);
-                let btn_download_soundpack = card.track(PushButton::create_with_variant(
+                let btn_download_soundpack = card.track(PushButton::new_with_bg(
                     parent,
-                    0,
                     if sound_available {
                         strings.btn_update_soundpack
                     } else {
                         strings.btn_download_soundpack
                     },
-                    card.x(),
-                    y_sp_btn,
-                    260,
-                    32,
                     hfont_normal,
                     if sound_available {
                         ButtonVariant::Secondary
@@ -152,6 +136,10 @@ impl TabSound {
                     },
                     None,
                 )?);
+                card.horizontal(32, 0, |row| {
+                    row.add_fixed(260, Some(btn_download_soundpack.hwnd()));
+                    row.add_spacer();
+                });
                 Some((lbl_soundpack_note, btn_download_soundpack))
             })?;
 
@@ -167,15 +155,7 @@ impl TabSound {
             sound_available: Cell::new(sound_available),
             switch_profiles: RefCell::new(switch_profiles),
         };
-        tab.update_sound_controls_state();
         Some(tab)
-    }
-
-    pub fn update_sound_controls_state(&self) {
-        let is_enabled = self.check_sound_enabled.is_checked() && self.sound_available.get();
-        self.combo_switch_type.set_enabled(is_enabled);
-        self.slider_volume.set_enabled(is_enabled);
-        self.btn_test_sound.set_enabled(is_enabled);
     }
 
     fn select_switch_profile(&self, name: &str) {
@@ -208,7 +188,6 @@ impl TabSound {
         self.slider_volume.set_pos(vol as u32);
         self.lbl_volume_val.set_text(&format!("{}%", vol));
         self.select_switch_profile(prof_name);
-        self.update_sound_controls_state();
     }
 
     /// Saves controls back into the active target (`Global` config or `Child` profile).
@@ -308,9 +287,6 @@ impl TabSound {
         let is_combo = self.combo_switch_type.is_changed(ctl_id, notify_code);
 
         if is_check || is_combo {
-            if is_check {
-                self.update_sound_controls_state();
-            }
             controller::edit_selected_then(
                 |target| self.sync_to_target(target, is_combo),
                 |engine| controller::reconfigure_sound(engine),
@@ -347,7 +323,11 @@ impl TabSound {
             }
             self.combo_switch_type.set_selected(0);
             *self.switch_profiles.borrow_mut() = profiles;
-            self.update_sound_controls_state();
+            self.check_sound_enabled.add_dependents(&[
+                &self.combo_switch_type,
+                &self.btn_test_sound,
+                &self.slider_volume,
+            ]);
 
             if let Some(first_name) = self.switch_profiles.borrow().first() {
                 let name_arc = std::sync::Arc::from(first_name.as_str());

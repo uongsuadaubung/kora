@@ -39,20 +39,19 @@ impl TabSystem {
                 let check_show_dialog =
                     card.checkbox_row(|s| s.check_show_dialog, 24, 6, false, false)?;
 
-                let ((x_dbg, w_dbg), (x_btn_log, w_btn_log)) = card.split_right(144, 16);
-                let y_chk3 = card.row(24, 0);
-                let check_debug_log =
-                    card.checkbox_at(|s| s.check_debug_log, x_dbg, y_chk3, w_dbg, 24, false)?;
-
-                let btn_open_log = card.button_at(
+                let check_debug_log = card.checkbox(|s| s.check_debug_log, false)?;
+                let btn_open_log = card.button(
                     |s| s.btn_open_log,
-                    x_btn_log,
-                    y_chk3 - 1,
-                    w_btn_log,
-                    26,
                     false,
                     ButtonVariant::Secondary,
                 )?;
+                card.horizontal(26, 0, |row| {
+                    row.align(CrossAlign::Center);
+                    row.add_stretch(1, Some(check_debug_log.hwnd()));
+                    row.add_fixed(16, None);
+                    row.add_fixed(144, Some(btn_open_log.hwnd()));
+                });
+
                 Some((
                     check_autostart,
                     check_show_dialog,
@@ -81,30 +80,35 @@ impl TabSystem {
         // --- Card 3: Restore Defaults ---
         ly.skip(4);
         let btn_restore_defaults = ly.card_with_pad(16, 12, |card| {
-            let ((x_def, w_def), (x_btn_def, w_btn_def)) = card.split_right(144, 16);
-            let y_def_title = card.row(20, 4);
-            card.label_at(
-                |s| s.sys_defaults_title,
-                x_def,
-                y_def_title,
-                w_def,
-                20,
-                true,
-            )?;
-
-            let y_def_desc = card.row(36, 0);
-            card.label_at(|s| s.sys_defaults_desc, x_def, y_def_desc, w_def, 36, false)?
+            let lbl_title = card.label(|s| s.sys_defaults_title, true)?;
+            let lbl_desc = card.label(|s| s.sys_defaults_desc, false)?
                 .with_tone(LabelTone::Secondary);
-
-            card.button_at(
+            let btn = card.button(
                 |s| s.btn_restore_defaults,
-                x_btn_def,
-                y_def_title + 12,
-                w_btn_def,
-                32,
                 false,
                 ButtonVariant::Secondary,
-            )
+            )?;
+
+            // Two-pane split: left info stack, right vertically centered button
+            card.split(56, 0, SplitDirection::Horizontal, SplitRule::FixedSecond(144), |split| {
+                split.gap(16);
+                let (r_left, r_right) = split.compute();
+
+                let mut left_stack = VStack::new(r_left);
+                left_stack.add_fixed(20, Some(lbl_title.hwnd()));
+                left_stack.add_fixed(4, None);
+                left_stack.add_fixed(36, Some(lbl_desc.hwnd()));
+                left_stack.apply();
+
+                let mut right_stack = VStack::new(r_right);
+                right_stack.align(CrossAlign::Stretch);
+                right_stack.add_spacer();
+                right_stack.add_fixed(32, Some(btn.hwnd()));
+                right_stack.add_spacer();
+                right_stack.apply();
+            });
+
+            Some(btn)
         })?;
 
         Some(Self {

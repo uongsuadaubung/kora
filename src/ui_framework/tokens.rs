@@ -55,13 +55,13 @@ pub mod layout {
     pub const SIDEBAR_BTN_HEIGHT: i32 = 32;
 
     // Unified Header Section
-    pub const HEADER_X: i32 = 246;
+    pub const HEADER_X: i32 = TAB_BAR_X; // 244
     pub const HEADER_TITLE_Y: i32 = spacing::SPACE_14;
-    pub const HEADER_TITLE_WIDTH: i32 = 500;
-    pub const HEADER_TITLE_HEIGHT: i32 = 26;
+    pub const HEADER_TITLE_WIDTH: i32 = TAB_BAR_WIDTH; // 562 (flush with right margin: 244 + 562 = 806)
+    pub const HEADER_TITLE_HEIGHT: i32 = 28;
 
-    pub const HEADER_SUB_Y: i32 = 42;
-    pub const HEADER_SUB_WIDTH: i32 = 500;
+    pub const HEADER_SUB_Y: i32 = 44;
+    pub const HEADER_SUB_WIDTH: i32 = TAB_BAR_WIDTH; // 562
     pub const HEADER_SUB_HEIGHT: i32 = 20;
 
     pub const HEADER_DIVIDER_Y: i32 = 72;

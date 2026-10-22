@@ -288,17 +288,16 @@ pub unsafe extern "system" fn remap_dialog_wnd_proc(
                 }
 
                 // Footer Buttons
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.dlg_remap_btn_cancel, 254, 76),
-                    (
-                        strings.dlg_remap_btn_apply,
-                        340,
-                        140,
-                        ButtonVariant::Primary,
-                    ),
+                    strings.dlg_remap_btn_cancel,
+                    76,
+                    strings.dlg_remap_btn_apply,
+                    140,
+                    ButtonVariant::Primary,
                     280,
                     32,
+                    20,
                     Some(palette_init.bg_window),
                     move || submit_remap(hwnd),
                 );

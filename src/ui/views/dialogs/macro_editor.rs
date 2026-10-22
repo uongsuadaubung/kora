@@ -197,12 +197,16 @@ pub unsafe extern "system" fn macro_dialog_wnd_proc(
                 }
 
                 // 4. Action Buttons
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.btn_cancel, 215, 90),
-                    (strings.btn_save, 311, 99, ButtonVariant::Primary),
+                    strings.btn_cancel,
+                    90,
+                    strings.btn_save,
+                    99,
+                    ButtonVariant::Primary,
                     144,
                     30,
+                    20,
                     None,
                     move || submit_macro(hwnd),
                 );

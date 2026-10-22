@@ -36,12 +36,12 @@
     </application>
   </compatibility>
 
-  <!-- High-DPI GDI Scaling (Windows 10 1703+ and Windows 11) -->
+  <!-- High-DPI Support (Windows 10 1703+ and Windows 11 Per-Monitor V2) -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">false</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
       <gdiScaling xmlns="http://schemas.microsoft.com/SMI/2017/WindowsSettings">true</gdiScaling>
     </windowsSettings>
   </application>
 </assembly>
-

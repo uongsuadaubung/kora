@@ -549,12 +549,16 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 });
 
                 // 7. Footer buttons
-                super::create_dialog_footer_buttons(
+                super::create_dialog_footer_layout(
                     hwnd,
-                    (strings.dlg_btn_cancel, 380, 90),
-                    (strings.btn_save, 480, 104, ButtonVariant::Primary),
+                    strings.dlg_btn_cancel,
+                    90,
+                    strings.btn_save,
+                    104,
+                    ButtonVariant::Primary,
                     422,
                     32,
+                    16,
                     None,
                     move || submit_key_macro(hwnd),
                 );

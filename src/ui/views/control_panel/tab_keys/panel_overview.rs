@@ -12,7 +12,7 @@ use crate::engine::profile::{
 };
 use crate::ui::prelude::*;
 use crate::ui::views::control_panel::tab_keys::{
-    TABLE_HEIGHT, TABLE_WIDTH, TABLE_X, TABLE_Y, TITLE_HEIGHT, TITLE_X, TITLE_Y,
+    TABLE_HEIGHT, TABLE_WIDTH, TABLE_X, TABLE_Y, TITLE_HEIGHT, TITLE_Y,
 };
 
 pub struct OverviewPanel {
@@ -26,28 +26,23 @@ impl OverviewPanel {
         let strings = crate::language::current();
         let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
 
-        ly.track_i18n(
-            Label::create(
-                parent,
-                strings.overview_title,
-                TITLE_X,
-                TITLE_Y,
-                240,
-                TITLE_HEIGHT,
-                hfont_bold,
-            )?,
+        let lbl_title = ly.track_i18n(
+            Label::new(parent, strings.overview_title, hfont_bold)?,
             |s| s.overview_title,
         );
 
-        let lbl_status = ly.track(Label::create_right(
+        let lbl_status = ly.track(Label::new_right(
             parent,
             strings.overview_healthy,
-            TITLE_X + 245,
-            TITLE_Y + 2,
-            TABLE_WIDTH - 245,
-            TITLE_HEIGHT,
             hfont_normal,
         )?);
+
+        let mut header = HStack::at(TABLE_X, TITLE_Y, TABLE_WIDTH, TITLE_HEIGHT);
+        header.align(CrossAlign::Center);
+        header.add_fixed(230, Some(lbl_title.hwnd()));
+        header.add_spacer();
+        header.add_fixed(280, Some(lbl_status.hwnd()));
+        header.apply();
 
         let list = ly.track_table_i18n(
             ActionTable::create_styled(

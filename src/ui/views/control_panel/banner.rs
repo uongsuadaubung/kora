@@ -7,9 +7,8 @@ use crate::ui::theme::cached_font;
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::typography::*;
 use crate::ui::win32::{EnableWindow, FW_BOLD, SW_HIDE, SW_SHOW, ShowWindow, set_hwnds_visible};
+use crate::ui_framework::layout::{CrossAlign, HStack};
 use std::sync::atomic::{AtomicBool, Ordering};
-
-const DELETE_BTN_X: i32 = 690;
 
 pub struct ProfileBanner {
     pub lbl_name: Label,
@@ -24,41 +23,32 @@ impl ProfileBanner {
         let hfont_title = cached_font(FONT_SIZE_TITLE, FW_BOLD);
 
         let initial_title = format!("🌐 {}", strings.banner_root_title);
-        let lbl_name = Label::create(
-            parent,
-            &initial_title,
-            HEADER_X,
-            HEADER_TITLE_Y,
-            DELETE_BTN_X - HEADER_X - 8, // end before the delete button so it doesn't cover it
-            HEADER_TITLE_HEIGHT,
-            hfont_title,
-        )?
-        .on_surface(SurfaceRole::Window);
+        let lbl_name = Label::new(parent, &initial_title, hfont_title)?
+            .on_surface(SurfaceRole::Window);
 
-        let lbl_status = Label::create(
-            parent,
-            strings.banner_root_desc,
-            HEADER_X,
-            HEADER_SUB_Y,
-            HEADER_SUB_WIDTH,
-            HEADER_SUB_HEIGHT,
-            hfont_normal,
-        )?
-        .with_tone(LabelTone::Secondary)
-        .on_surface(SurfaceRole::Window);
+        let lbl_status = Label::new(parent, strings.banner_root_desc, hfont_normal)?
+            .with_tone(LabelTone::Secondary)
+            .on_surface(SurfaceRole::Window);
 
-        let btn_delete = PushButton::create_with_variant(
+        let btn_delete = PushButton::new(
             parent,
-            0,
             strings.banner_btn_delete,
-            DELETE_BTN_X,
-            HEADER_TITLE_Y,
-            114,
-            28,
             hfont_normal,
             ButtonVariant::Danger,
-            None,
         )?;
+
+        // Auto layout header title + delete button
+        let mut title_row = HStack::at(HEADER_X, HEADER_TITLE_Y, HEADER_TITLE_WIDTH, HEADER_TITLE_HEIGHT);
+        title_row.align(CrossAlign::Center);
+        title_row.add_stretch(1, Some(lbl_name.hwnd()));
+        title_row.add_fixed(8, None);
+        title_row.add_fixed(114, Some(btn_delete.hwnd()));
+        title_row.apply();
+
+        // Auto layout subtitle
+        let mut sub_row = HStack::at(HEADER_X, HEADER_SUB_Y, HEADER_SUB_WIDTH, HEADER_SUB_HEIGHT);
+        sub_row.add_stretch(1, Some(lbl_status.hwnd()));
+        sub_row.apply();
 
         // Hide delete button initially because root profile is active on startup
         unsafe {

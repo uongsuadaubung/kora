@@ -184,6 +184,22 @@ pub struct PushButton {
 }
 
 impl PushButton {
+    /// Creates a PushButton for auto-layout engines without requiring manual (x, y, w, h) coordinates.
+    pub fn new(parent: isize, text: &str, hfont: isize, variant: ButtonVariant) -> Option<Self> {
+        Self::create_with_variant(parent, 0, text, 0, 0, 0, 0, hfont, variant, None)
+    }
+
+    /// Creates a PushButton with custom background color for auto-layout engines.
+    pub fn new_with_bg(
+        parent: isize,
+        text: &str,
+        hfont: isize,
+        variant: ButtonVariant,
+        bg_erase: Option<u32>,
+    ) -> Option<Self> {
+        Self::create_with_variant(parent, 0, text, 0, 0, 0, 0, hfont, variant, bg_erase)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         parent: isize,

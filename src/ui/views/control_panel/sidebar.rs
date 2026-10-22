@@ -10,6 +10,7 @@ use crate::ui::components::{ButtonVariant, Label, PushButton, SurfaceRole};
 use crate::ui::tokens::layout::*;
 use crate::ui::tokens::radii::*;
 use crate::ui::tokens::typography::*;
+use crate::ui_framework::layout::{CrossAlign, HStack};
 use crate::ui::win32::{
     DRAWITEMSTRUCT, DT_CENTER, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, DrawTextW, FW_BOLD,
     FW_NORMAL, InvalidateRect, MEASUREITEMSTRUCT, RECT, SelectObject, SetBkMode, SetTextColor,
@@ -45,30 +46,17 @@ impl SidebarControls {
             crate::ui::tokens::typography::FONT_SIZE_SIDEBAR_TITLE,
             FW_BOLD,
         );
-        let lbl_title = Label::create(
-            parent,
-            strings.sidebar_profiles_title,
-            12,
-            14,
-            175,
-            24,
-            hfont_title,
-        )?
-        .on_surface(SurfaceRole::Sidebar);
+        let lbl_title = Label::new(parent, strings.sidebar_profiles_title, hfont_title)?
+            .on_surface(SurfaceRole::Sidebar);
 
-        let btn_add_profile = PushButton::create_with_variant(
-            parent,
-            0,
-            "+",
-            194,
-            14,
-            22,
-            22,
-            hfont_bold,
-            ButtonVariant::Primary,
-            None,
-        )?;
+        let btn_add_profile = PushButton::new(parent, "+", hfont_bold, ButtonVariant::Primary)?;
         btn_add_profile.set_corner_radius(4);
+
+        let mut header = HStack::at(12, 14, 204, 24);
+        header.align(CrossAlign::Center);
+        header.add_stretch(1, Some(lbl_title.hwnd()));
+        header.add_fixed(22, Some(btn_add_profile.hwnd()));
+        header.apply();
 
         let list_profiles = ListBox::create_owner_draw(
             parent,
