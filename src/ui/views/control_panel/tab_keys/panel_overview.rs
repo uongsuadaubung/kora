@@ -207,8 +207,8 @@ impl OverviewPanel {
             (strings.status_disabled.to_string(), Variant::Secondary)
         };
 
-        let group1_header = row(vec![
-            row(vec![
+        let group1_header = row(elements![
+            row(elements![
                 text(format!("⌨️ {}", strings.feature_switch_key)).bold(),
                 badge("1", Variant::Primary),
             ])
@@ -257,8 +257,8 @@ impl OverviewPanel {
         sections.push(card_grouped(group1_header, vec![switch_row]));
 
         // 3. Group 2: Key Remap (Đổi phím)
-        let group2_header = row(vec![
-            row(vec![
+        let group2_header = row(elements![
+            row(elements![
                 text(format!("🔄 {}", strings.feature_remap)).bold(),
                 badge(remaps.len().to_string(), Variant::Primary),
             ])
@@ -278,7 +278,7 @@ impl OverviewPanel {
         let mut remap_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if remaps.is_empty() {
             remap_rows.push(
-                row(vec![text(strings.status_disabled).muted().size(Size::Sm)])
+                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
                     .px(3)
                     .py(2),
             );
@@ -330,8 +330,8 @@ impl OverviewPanel {
         sections.push(card_grouped(group2_header, remap_rows));
 
         // 4. Group 3: Key Disabling (Khóa phím)
-        let group3_header = row(vec![
-            row(vec![
+        let group3_header = row(elements![
+            row(elements![
                 text(format!("🚫 {}", strings.feature_disable)).bold(),
                 badge(disabled.len().to_string(), Variant::Primary),
             ])
@@ -351,7 +351,7 @@ impl OverviewPanel {
         let mut disable_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if disabled.is_empty() {
             disable_rows.push(
-                row(vec![text(strings.status_disabled).muted().size(Size::Sm)])
+                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
                     .px(3)
                     .py(2),
             );
@@ -391,8 +391,8 @@ impl OverviewPanel {
         sections.push(card_grouped(group3_header, disable_rows));
 
         // 5. Group 4: Key Macros (Phím Macro)
-        let group4_header = row(vec![
-            row(vec![
+        let group4_header = row(elements![
+            row(elements![
                 text(format!("⚡ {}", strings.feature_key_macro)).bold(),
                 badge(key_macros.len().to_string(), Variant::Primary),
             ])
@@ -412,7 +412,7 @@ impl OverviewPanel {
         let mut macro_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if key_macros.is_empty() {
             macro_rows.push(
-                row(vec![text(strings.status_disabled).muted().size(Size::Sm)])
+                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
                     .px(3)
                     .py(2),
             );

@@ -182,7 +182,7 @@ impl TabSound {
             .position(|p| p.eq_ignore_ascii_case(&st.selected_profile))
             .unwrap_or(0);
 
-        let card1 = card(vec![
+        let card1 = card(elements![
             inheritable_switch_row(
                 strings.sound_title,
                 Some(strings.check_sound_enabled.to_string()),
@@ -193,9 +193,9 @@ impl TabSound {
                 SoundMsg::ToggleSoundEnabled,
             ),
             divider(),
-            col(vec![
+            col(elements![
                 text(strings.label_switch_type).bold(),
-                row(vec![
+                row(elements![
                     select(switch_options, sel_idx, SoundMsg::SelectSwitchProfile)
                         .enabled(controls_enabled)
                         .flex_1(),
@@ -210,8 +210,8 @@ impl TabSound {
                 .gap(3),
             ])
             .gap(1),
-            col(vec![
-                row(vec![
+            col(elements![
+                row(elements![
                     text(strings.label_volume).bold().flex_1(),
                     text(format!("{}%", st.volume)).bold().accent(),
                 ])
@@ -237,10 +237,10 @@ impl TabSound {
             strings.btn_download_soundpack
         };
 
-        let card2 = card(vec![
+        let card2 = card(elements![
             section_header(strings.soundpack_card_title),
             text(note_txt).muted().size(Size::Sm),
-            row(vec![
+            row(elements![
                 button(
                     btn_txt,
                     if sound_available {
@@ -256,7 +256,7 @@ impl TabSound {
             .pt(1),
         ]);
 
-        col(vec![card1, card2]).gap(3).pb(3)
+        col(elements![card1, card2]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, _surface: &Surface<SoundMsg>, msg: SoundMsg) {

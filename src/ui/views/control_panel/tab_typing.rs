@@ -219,9 +219,9 @@ impl TabTyping {
             Some(CharsetMode::Specific(c)) => 1 + charset_idx_of(c),
         };
 
-        let card1 = card(vec![
+        let card1 = card(elements![
             section_header(strings.typing_group_main),
-            row(vec![
+            row(elements![
                 form_group(
                     strings.typing_lbl_mode,
                     select(mode_options, mode_idx, TypingMsg::SelectMode).w_full(),
@@ -256,7 +256,7 @@ impl TabTyping {
             },
         };
 
-        let card2 = card(vec![
+        let card2 = card(elements![
             inheritable_switch_row(
                 strings.typing_group_switch,
                 None,
@@ -266,9 +266,9 @@ impl TabTyping {
                 strings,
                 TypingMsg::ToggleSwitchKey,
             ),
-            row(vec![
+            row(elements![
                 label(strings.typing_lbl_current_key).muted().flex_1(),
-                row(vec![
+                row(elements![
                     badge(
                         switch_badge_text,
                         if switch_effective {
@@ -297,7 +297,7 @@ impl TabTyping {
         ]);
 
         // --- Card 3: Tính năng hỗ trợ gõ & kiểm tra chính tả ---
-        let card3 = card(vec![
+        let card3 = card(elements![
             section_header(strings.typing_group_features),
             inheritable_switch_row(
                 strings.check_restore_wrong,
@@ -348,7 +348,7 @@ impl TabTyping {
                         .typing_target_empty_paste_format
                         .replace("{app}", &c.name),
                 };
-                col(vec![text(empty_text).muted().size(Size::Sm)])
+                col(elements![text(empty_text).muted().size(Size::Sm)])
                     .p(3)
                     .bg_window()
                     .border()
@@ -373,11 +373,11 @@ impl TabTyping {
                 col(cards).gap(2)
             };
 
-            card(vec![
+            card(elements![
                 section_header(strings.typing_group_target),
                 text(strings.typing_target_desc).muted().size(Size::Sm),
-                col(vec![
-                    row(vec![
+                col(elements![
+                    row(elements![
                         text(strings.typing_app_strategy_label).bold().w(200),
                         select(app_strat_items, sel_app_idx, TypingMsg::ChangeAppStrategy).flex_1(),
                     ])
@@ -393,7 +393,7 @@ impl TabTyping {
                 .border()
                 .rounded_card(),
                 divider(),
-                row(vec![
+                row(elements![
                     text(strings.typing_exceptions_title).bold().accent().flex_1(),
                     badge(count_text, Variant::Primary),
                 ])
@@ -406,8 +406,8 @@ impl TabTyping {
             let cap_enabled = global_config.target_capture_enabled;
             let cap_hotkey_txt = global_config.target_capture_hotkey.display_text();
 
-            card(vec![
-                row(vec![
+            card(elements![
+                row(elements![
                     checkbox("", cap_enabled, TypingMsg::ToggleTargetCapture),
                     text(strings.typing_group_target_hotkey)
                         .bold()
@@ -415,10 +415,10 @@ impl TabTyping {
                 ])
                 .items_center()
                 .gap(2),
-                col(vec![
-                    row(vec![
+                col(elements![
+                    row(elements![
                         text(strings.typing_lbl_current_key).bold().flex_1(),
-                        row(vec![
+                        row(elements![
                             badge(
                                 cap_hotkey_txt,
                                 if cap_enabled {
@@ -440,7 +440,7 @@ impl TabTyping {
                     ])
                     .items_center()
                     .justify_between(),
-                    col(vec![
+                    col(elements![
                         text(strings.typing_target_step_guide)
                             .muted()
                             .size(Size::Sm),
@@ -458,7 +458,7 @@ impl TabTyping {
             ])
         };
 
-        col(vec![card1, card2, card3, card4]).gap(3).pb(3)
+        col(elements![card1, card2, card3, card4]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, surface: &Surface<TypingMsg>, msg: TypingMsg) {

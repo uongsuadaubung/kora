@@ -4,9 +4,7 @@
 //! to render a clean, tight, 3-section confirmation dialog without empty footer dead space.
 
 use std::sync::{Arc, Mutex};
-use crate::ui_framework::core::{
-    button, col, modal_dialog, modal_footer, open_modal, text, Element, ModalConfig, Variant,
-};
+use crate::ui_framework::core::*;
 
 /// Configuration options for confirmation dialogs.
 #[derive(Debug, Clone)]
@@ -51,13 +49,13 @@ pub fn render_confirm_view(options: &ConfirmDialogOptions, height: i32) -> Eleme
 
     let el = modal_dialog()
         .body(
-            col([
+            col(elements![
                 text(&options.message),
             ])
             .h_flex(1)
             .justify_center(),
         )
-        .footer(modal_footer([
+        .footer(modal_footer(elements![
             button(&options.no_text, Variant::Secondary, false).w(84),
             button(
                 &options.yes_text,

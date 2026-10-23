@@ -43,8 +43,8 @@ impl ProfileBanner {
     }
 
     pub fn view(title: &str, subtitle: &str, is_child: bool, strings: &LanguageStrings) -> Element<BannerMsg> {
-        row(vec![
-            col(vec![
+        row(elements![
+            col(elements![
                 text(title).bold().size(Size::Lg),
                 text(subtitle).muted().size(Size::Sm),
             ])
@@ -52,7 +52,7 @@ impl ProfileBanner {
             .flex_1(),
 
             if is_child {
-                button(strings.banner_btn_delete, Variant::Danger, BannerMsg::DeleteProfile).w(114)
+                button(strings.banner_btn_delete, Variant::Danger, BannerMsg::DeleteProfile).w(114).into()
             } else {
                 empty()
             },

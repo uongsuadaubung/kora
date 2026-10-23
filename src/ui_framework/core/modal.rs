@@ -8,7 +8,7 @@
 //! - Zero domain logic or hardcoded content: an empty floating shell for UI dialogs to fill.
 
 use super::containers::{col, row, spacer};
-use super::element::{Element, Length};
+use super::element::{Element, IntoElement, Length};
 use super::surface::Surface;
 use crate::ui_framework::theme::is_current_dark;
 use crate::ui_framework::win32::*;
@@ -194,20 +194,20 @@ impl<M: Clone + Send + Sync + 'static> ModalDialog<M> {
     }
 
     /// Sets the optional modal header bar.
-    pub fn header(mut self, header: Element<M>) -> Self {
-        self.header = Some(header);
+    pub fn header(mut self, header: impl IntoElement<M>) -> Self {
+        self.header = Some(header.into_element());
         self
     }
 
     /// Sets the main modal body content.
-    pub fn body(mut self, body: Element<M>) -> Self {
-        self.body = Some(body);
+    pub fn body(mut self, body: impl IntoElement<M>) -> Self {
+        self.body = Some(body.into_element());
         self
     }
 
     /// Sets the optional modal footer bar.
-    pub fn footer(mut self, footer: Element<M>) -> Self {
-        self.footer = Some(footer);
+    pub fn footer(mut self, footer: impl IntoElement<M>) -> Self {
+        self.footer = Some(footer.into_element());
         self
     }
 
@@ -251,12 +251,21 @@ impl<M: Clone + Send + Sync + 'static> ModalDialog<M> {
     }
 }
 
+impl<M: Clone + Send + Sync + 'static> IntoElement<M> for ModalDialog<M> {
+    #[inline]
+    fn into_element(self) -> Element<M> {
+        self.build()
+    }
+}
+
 /// Helper to construct a standard modal footer action bar with right-aligned buttons.
-pub fn modal_footer<M: Clone + Send + Sync + 'static>(
-    actions: impl IntoIterator<Item = Element<M>>,
-) -> Element<M> {
+pub fn modal_footer<M: Clone + Send + Sync + 'static, I, E>(actions: I) -> Element<M>
+where
+    I: IntoIterator<Item = E>,
+    E: IntoElement<M>,
+{
     let mut items = vec![spacer()];
-    items.extend(actions);
+    items.extend(actions.into_iter().map(IntoElement::into_element));
     row(items).gap(2).items_center()
 }
 

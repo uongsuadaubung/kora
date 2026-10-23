@@ -11,7 +11,7 @@ pub mod types;
 
 pub use types::*;
 
-use crate::ui_framework::core::element::Element;
+use crate::ui_framework::core::element::IntoElement;
 use crate::ui_framework::core::layout_engine::compute_layout;
 use crate::ui_framework::core::style::BgStyle;
 use crate::ui_framework::win32::*;
@@ -143,7 +143,8 @@ impl<M: Clone + Send + Sync + 'static> Surface<M> {
     }
 
     /// Mounts and lays out a new [`Element<M>`] tree, clamping scroll bounds and scheduling a 120 FPS repaint.
-    pub fn render(&self, root: Element<M>) {
+    pub fn render(&self, root: impl IntoElement<M>) {
+        let root = root.into_element();
         let hwnd = {
             let mut guard = match self.state.lock() {
                 Ok(g) => g,

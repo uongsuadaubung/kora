@@ -9,7 +9,7 @@ use crate::ui_framework::core::*;
 
 /// Renders a bold accent section header title inside a card.
 pub fn section_header<M: Clone + 'static>(title: impl Into<String>) -> Element<M> {
-    text(title).bold().accent()
+    text(title).bold().accent().into()
 }
 
 /// Renders a top-of-page header block (Title + Subtitle) for global views (`System`, `About`).
@@ -17,7 +17,7 @@ pub fn page_header<M: Clone + 'static>(
     title: impl Into<String>,
     subtitle: impl Into<String>,
 ) -> Element<M> {
-    col(vec![
+    col(elements![
         text(title).bold().size(Size::Lg),
         text(subtitle).muted(),
     ])
@@ -29,9 +29,9 @@ pub fn page_header<M: Clone + 'static>(
 /// Completely un-opinionated: does not enforce width or flex on either label or control.
 pub fn form_group<M: Clone + 'static>(
     lbl: impl Into<String>,
-    control: Element<M>,
+    control: impl IntoElement<M>,
 ) -> Element<M> {
-    col(vec![
+    col(elements![
         label(lbl).bold(),
         control,
     ])
@@ -85,8 +85,9 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
 
     let mut title_row = vec![
         checkbox("", effective, move |_| msg.clone())
-            .indeterminate(is_inherited),
-        text(label).bold(),
+            .indeterminate(is_inherited)
+            .into_element(),
+        text(label).bold().into_element(),
     ];
     if !is_root {
         let (badge_txt, badge_var) = match override_val {
@@ -100,7 +101,7 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
             ),
             Some(_) => (strings.origin_app_specific, Variant::Purple),
         };
-        title_row.push(badge(badge_txt, badge_var));
+        title_row.push(badge(badge_txt, badge_var).into());
     }
 
     let mut left_col = vec![row(title_row).items_center().gap(2)];
@@ -108,7 +109,7 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
         && !d.is_empty()
     {
         left_col.push(
-            row(vec![
+            row(elements![
                 spacer().w(23),
                 text(d).muted().size(Size::Sm),
             ])
@@ -150,31 +151,31 @@ pub fn shortcut_row<M: Clone + Send + Sync + 'static>(props: ShortcutRowProps<M>
     let mut header_items: Vec<Element<M>> = Vec::new();
 
     if let Some((is_on, toggle_msg)) = props.checked {
-        header_items.push(checkbox(props.title, is_on, move |_| toggle_msg.clone()));
+        header_items.push(checkbox(props.title, is_on, move |_| toggle_msg.clone()).into());
     } else {
-        header_items.push(text(props.title).bold());
+        header_items.push(text(props.title).bold().into());
     }
 
     if let Some((b_txt, b_var)) = props.origin_badge {
-        header_items.push(badge(b_txt, b_var));
+        header_items.push(badge(b_txt, b_var).into());
     }
     if let Some((s_txt, s_var)) = props.status_badge {
-        header_items.push(badge(s_txt, s_var));
+        header_items.push(badge(s_txt, s_var).into());
     }
 
-    let desc_el = if props.is_conflict {
-        text(props.desc).warning().size(Size::Sm)
+    let desc_el: Element<M> = if props.is_conflict {
+        text(props.desc).warning().size(Size::Sm).into()
     } else {
-        text(props.desc).muted().size(Size::Sm)
+        text(props.desc).muted().size(Size::Sm).into()
     };
 
-    let mut right_items: Vec<Element<M>> = vec![badge(props.key_pill, props.key_variant)];
+    let mut right_items: Vec<Element<M>> = vec![badge(props.key_pill, props.key_variant).into()];
     if let Some((btn_label, btn_var, btn_msg)) = props.action_btn {
-        right_items.push(button(btn_label, btn_var, btn_msg).size(Size::Sm));
+        right_items.push(button(btn_label, btn_var, btn_msg).size(Size::Sm).into());
     }
 
-    let r = row(vec![
-        col(vec![
+    let r = row(elements![
+        col(elements![
             row(header_items).items_center().gap(2),
             desc_el,
         ])
@@ -216,9 +217,9 @@ pub fn target_rule_card<M: Clone + Send + Sync + 'static>(
         strings.strategy_clipboard_paste.to_string(),
     ];
 
-    col(vec![
-        row(vec![
-            row(vec![
+    col(elements![
+        row(elements![
+            row(elements![
                 text(format!("#{}", index + 1)).bold().accent(),
                 badge(rule.target_id.clone(), Variant::Primary),
             ])
@@ -229,8 +230,8 @@ pub fn target_rule_card<M: Clone + Send + Sync + 'static>(
         ])
         .items_center()
         .justify_between(),
-        col(vec![
-            row(vec![
+        col(elements![
+            row(elements![
                 text(strings.typing_target_method_label).muted().w(115),
                 select(strategy_options, strategy_idx, on_strategy).flex_1(),
             ])
@@ -250,4 +251,3 @@ pub fn target_rule_card<M: Clone + Send + Sync + 'static>(
     .border()
     .rounded_card()
 }
-

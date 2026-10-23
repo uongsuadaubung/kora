@@ -100,11 +100,11 @@ impl TabAbout {
             UpdateBtnState::Updating => (strings.btn_updating, true),
         };
 
-        let hero_card = card(vec![
+        let hero_card = card(elements![
             // Row 1: App identity & Update check button
-            row(vec![
-                col(vec![
-                    row(vec![
+            row(elements![
+                col(elements![
+                    row(elements![
                         text("Kora").bold().size(Size::Lg),
                         badge(concat!("v", env!("CARGO_PKG_VERSION")), Variant::Primary),
                     ])
@@ -122,8 +122,8 @@ impl TabAbout {
             .gap(3),
             divider(),
             // Row 2: Author info & Email button
-            row(vec![
-                col(vec![
+            row(elements![
+                col(elements![
                     text(strings.about_author).bold(),
                     text(strings.about_email).muted().size(Size::Sm),
                 ])
@@ -136,8 +136,8 @@ impl TabAbout {
             .gap(3),
             divider(),
             // Row 3: GitHub repository & Open button
-            row(vec![
-                col(vec![
+            row(elements![
+                col(elements![
                     text("GitHub Repository").bold(),
                     text(strings.about_github).muted().size(Size::Sm),
                 ])
@@ -152,7 +152,7 @@ impl TabAbout {
         .p(4)
         .gap(3);
 
-        col(vec![header, divider(), hero_card]).gap(3).pb(3)
+        col(elements![header, divider(), hero_card]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, msg: AboutMsg) {

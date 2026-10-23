@@ -84,9 +84,9 @@ pub fn measure_text_rect(hdc: isize, text: &str, font: FontScale, max_width: i32
 }
 
 /// Resolves an [`Element<M>`] tree into a positioned [`LayoutNode<M>`] tree within `avail_w`.
-pub fn compute_layout<M>(hdc: isize, root: Element<M>, x: i32, y: i32, avail_w: i32) -> LayoutNode<M> {
+pub fn compute_layout<M>(hdc: isize, root: impl IntoElement<M>, x: i32, y: i32, avail_w: i32) -> LayoutNode<M> {
     let mut next_id = 1usize;
-    layout_node(hdc, root, x, y, avail_w, &mut next_id)
+    layout_node(hdc, root.into_element(), x, y, avail_w, &mut next_id)
 }
 
 /// Pure size measurement pass (does not consume `Element<M>`).

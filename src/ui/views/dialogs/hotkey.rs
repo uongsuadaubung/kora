@@ -11,9 +11,7 @@ use crate::platform::win32::{
     get_captured_hotkey, get_pending_modifier_hotkey, set_captured_hotkey, start_combo_capture,
     stop_combo_capture,
 };
-use crate::ui_framework::core::{
-    button, col, modal_dialog, open_modal_with_wndproc, row, Element, ModalConfig, Variant,
-};
+use crate::ui_framework::core::*;
 use crate::ui_framework::win32::{WM_ACTIVATE, WM_KEYDOWN, WM_SYSKEYDOWN};
 
 /// A common / suggested shortcut preset that can be clicked to quickly populate the hotkey.
@@ -179,7 +177,7 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
         for preset in chunk {
             let p_idx = idx;
             row_btns.push(
-                button(&preset.label, Variant::Secondary, HotkeyMsg::SetPreset(p_idx)).flex_1(),
+                button(&preset.label, Variant::Secondary, HotkeyMsg::SetPreset(p_idx)).flex_1().into(),
             );
             idx += 1;
         }
@@ -192,7 +190,7 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
             strings.typing_inherit_global,
             inherit_hk.display_text()
         );
-        preset_rows.push(row([button(
+        preset_rows.push(row(elements![button(
             inherit_label,
             Variant::Secondary,
             HotkeyMsg::SetInherit,
@@ -207,8 +205,8 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
     modal_dialog()
         .header(dialog_callout(&state.prompt))
         .body(
-            col([
-                col([
+            col(elements![
+                col(elements![
                     crate::ui_framework::core::text(strings.hotkey_selected_title)
                         .secondary()
                         .bold(),
@@ -224,7 +222,7 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
                 ])
                 .gap(1),
                 if !preset_rows.is_empty() {
-                    col([
+                    col(elements![
                         crate::ui_framework::core::text(strings.hotkey_presets_title)
                             .secondary()
                             .bold(),

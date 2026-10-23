@@ -7,7 +7,7 @@ pub use crate::ui_framework::dialog::*;
 
 use crate::platform::win32::ENGINE_INSTANCE;
 use crate::ui_framework::core::{
-    button, col, row, spacer, text, BgStyle, BorderStyle, Element, Variant,
+    button, col, elements, row, spacer, text, BgStyle, BorderStyle, Element, Styleable, Variant,
 };
 use crate::ui_framework::tokens::radii;
 
@@ -34,7 +34,7 @@ pub fn active_profile_display_name() -> String {
 
 /// Khối Callout hướng dẫn / giới thiệu ở đầu hộp thoại Modal
 pub fn dialog_callout<M: Clone + Send + Sync + 'static>(prompt: &str) -> Element<M> {
-    col([text(prompt).secondary().small()])
+    col(elements![text(prompt).secondary().small()])
         .bg_card()
         .border()
         .rounded(radii::RADIUS_MD)
@@ -69,7 +69,7 @@ pub fn key_capture_box<M: Clone + Send + Sync + 'static>(
         )
     };
 
-    col([text_elem.text_center().w_full().nowrap()])
+    col(elements![text_elem.text_center().w_full().nowrap()])
         .bg(bg_kind)
         .border_style(border_kind)
         .rounded(radii::RADIUS_MD)
@@ -90,7 +90,7 @@ pub fn dialog_footer<M: Clone + Send + Sync + 'static>(
     apply_variant: Variant,
     apply_disabled: bool,
 ) -> Element<M> {
-    row([
+    row(elements![
         text(profile_name).secondary().small(),
         spacer(),
         button(cancel_text, Variant::Secondary, cancel_msg),

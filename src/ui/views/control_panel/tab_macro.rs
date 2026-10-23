@@ -173,14 +173,14 @@ impl TabMacro {
             .disabled(!effective_use_macro)
             .w(104);
 
-        col(vec![
-            card(vec![row(vec![
+        col(elements![
+            card(elements![row(elements![
                 sw_use_macro.flex_1(),
                 sw_en.flex_1(),
             ])
             .gap(16)
             .items_center()]),
-            row(vec![add_btn]),
+            row(elements![add_btn]),
         ])
         .gap(8)
         .w_full()

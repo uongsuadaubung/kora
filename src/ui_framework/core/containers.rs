@@ -1,6 +1,6 @@
 //! Declarative Layout & Container Primitives (`row`, `col`, `grid`, `card`, `alert`, `divider`, `spacer`, `empty`)
 
-use super::element::{Element, Length, WidgetKind};
+use super::element::{elements, Element, IntoElement, Length, WidgetKind};
 use super::style::Variant;
 use super::text::text;
 
@@ -28,15 +28,13 @@ pub fn divider<M>() -> Element<M> {
 /// Horizontal flex container (`display: flex; flex-direction: row`).
 #[inline]
 pub fn row<M>(children: impl IntoIterator<Item = Element<M>>) -> Element<M> {
-    Element::new(WidgetKind::Row(Vec::new())).children(children)
+    Element::new(WidgetKind::Row(children.into_iter().collect()))
 }
 
 /// Vertical flex container (`display: flex; flex-direction: column`).
 #[inline]
 pub fn col<M>(children: impl IntoIterator<Item = Element<M>>) -> Element<M> {
-    Element::new(WidgetKind::Col(Vec::new()))
-        .w_full()
-        .children(children)
+    Element::new(WidgetKind::Col(children.into_iter().collect())).w_full()
 }
 
 /// Equal-width N-column grid container (`display: grid; grid-template-columns: repeat(cols, 1fr)`).
@@ -44,11 +42,10 @@ pub fn col<M>(children: impl IntoIterator<Item = Element<M>>) -> Element<M> {
 pub fn grid<M>(cols: usize, children: impl IntoIterator<Item = Element<M>>) -> Element<M> {
     Element::new(WidgetKind::Grid {
         cols: cols.max(1),
-        children: Vec::new(),
+        children: children.into_iter().collect(),
     })
     .w_full()
     .gap(3)
-    .children(children)
 }
 
 /// Standard Bootstrap Card container (`bg_card + border + rounded_card + padding`).
@@ -59,11 +56,11 @@ pub fn card<M>(children: impl IntoIterator<Item = Element<M>>) -> Element<M> {
 
 /// Bootstrap Card with distinct header bar and body section (`.card-header` + `.card-body`).
 pub fn card_grouped<M>(
-    header: Element<M>,
+    header: impl IntoElement<M>,
     body_children: impl IntoIterator<Item = Element<M>>,
 ) -> Element<M> {
-    col([
-        row([header])
+    col(elements![
+        row(elements![header.into_element()])
             .bg_header()
             .px(3)
             .py(2)
@@ -81,14 +78,14 @@ pub fn card_grouped<M>(
 pub fn alert<M>(variant: Variant, title: impl Into<String>, desc: impl Into<String>) -> Element<M> {
     let title_str = title.into();
     let desc_str = desc.into();
-    col([
+    col(elements![
         if !title_str.is_empty() {
-            text(title_str).bold().tone_variant(variant)
+            text(title_str).bold().tone_variant(variant).into_element()
         } else {
             empty()
         },
         if !desc_str.is_empty() {
-            text(desc_str).secondary()
+            text(desc_str).secondary().into_element()
         } else {
             empty()
         },
@@ -101,4 +98,3 @@ pub fn alert<M>(variant: Variant, title: impl Into<String>, desc: impl Into<Stri
     .py(2)
     .gap(1)
 }
-

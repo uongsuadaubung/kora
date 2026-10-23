@@ -8,10 +8,7 @@ use crate::engine::config::hotkey::vk_to_name;
 use crate::platform::win32::{
     WM_SINGLE_KEY_CAPTURED, start_single_key_capture, stop_single_key_capture,
 };
-use crate::ui_framework::core::{
-    button, col, modal_dialog, open_modal_with_wndproc, row, spacer, text, Element, ModalConfig,
-    Variant,
-};
+use crate::ui_framework::core::*;
 use crate::ui_framework::win32::{WM_ACTIVATE, WM_KEYDOWN, WM_SYSKEYDOWN};
 
 #[derive(Clone, Debug)]
@@ -64,8 +61,8 @@ fn render_view(state: &DisableState) -> Element<DisableMsg> {
     modal_dialog()
         .header(dialog_callout(strings.dlg_disable_prompt))
         .body(
-            col([
-                col([
+            col(elements![
+                col(elements![
                     text(strings.dlg_disable_key).secondary().bold(),
                     key_capture_box(
                         &box_text,
@@ -76,14 +73,14 @@ fn render_view(state: &DisableState) -> Element<DisableMsg> {
                     text(strings.dlg_disable_click_hint).secondary().small(),
                 ])
                 .gap(1),
-                col([
+                col(elements![
                     text(strings.dlg_disable_presets_title).secondary().bold(),
                     row(presets_row1.map(|(label, vk)| {
-                        button(label, Variant::Secondary, DisableMsg::SetPreset(vk))
+                        button(label, Variant::Secondary, DisableMsg::SetPreset(vk)).into()
                     }))
                     .gap(2),
                     row(presets_row2.map(|(label, vk)| {
-                        button(label, Variant::Secondary, DisableMsg::SetPreset(vk))
+                        button(label, Variant::Secondary, DisableMsg::SetPreset(vk)).into()
                     }))
                     .gap(2),
                 ])
@@ -92,7 +89,7 @@ fn render_view(state: &DisableState) -> Element<DisableMsg> {
             .gap(3),
         )
         .footer(
-            row([
+            row(elements![
                 text(&state.target_display).secondary().small(),
                 spacer(),
                 button(strings.dlg_disable_btn_cancel, Variant::Secondary, DisableMsg::Cancel),

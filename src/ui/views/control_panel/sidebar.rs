@@ -96,7 +96,7 @@ impl SidebarControls {
         let is_about = matches!(view_mode, ViewMode::About);
 
         // Header
-        let header = row(vec![
+        let header = row(elements![
             text(strings.sidebar_profiles_title)
                 .bold()
                 .size(Size::Sm)
@@ -114,9 +114,9 @@ impl SidebarControls {
         let mut profile_elements = Vec::with_capacity(items.len());
         for item in items {
             let is_selected = is_in_profile_mode && item.id == selected_id;
-            let card = row(vec![
+            let card = row(elements![
                 text(&item.icon).bold().w(20).text_center(),
-                col(vec![
+                col(elements![
                     text(&item.name)
                         .bold()
                         .tone(if is_selected { TextTone::Accent } else { TextTone::Primary }),
@@ -140,7 +140,7 @@ impl SidebarControls {
         }
 
         // Footer buttons
-        let btn_settings = row(vec![
+        let btn_settings = row(elements![
             text(strings.sidebar_btn_settings)
                 .tone(if is_settings { TextTone::Primary } else { TextTone::Secondary }),
         ])
@@ -153,7 +153,7 @@ impl SidebarControls {
         .border_style(if is_settings { BorderStyle::Normal } else { BorderStyle::None })
         .on_click(SidebarMsg::SystemSettings);
 
-        let btn_about = row(vec![
+        let btn_about = row(elements![
             text(strings.sidebar_btn_about)
                 .tone(if is_about { TextTone::Primary } else { TextTone::Secondary }),
         ])
@@ -166,12 +166,12 @@ impl SidebarControls {
         .border_style(if is_about { BorderStyle::Normal } else { BorderStyle::None })
         .on_click(SidebarMsg::About);
 
-        col(vec![
+        col(elements![
             header,
             col(profile_elements).gap(2).w_full(),
             spacer().flex_1(),
             divider(),
-            col(vec![btn_settings, btn_about]).gap(1).w_full(),
+            col(elements![btn_settings, btn_about]).gap(1).w_full(),
         ])
         .gap(2)
         .w_full()

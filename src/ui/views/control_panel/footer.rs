@@ -40,7 +40,7 @@ impl FooterControls {
     }
 
     pub fn view(strings: &LanguageStrings) -> Element<FooterMsg> {
-        row(vec![
+        row(elements![
             button(strings.btn_exit, Variant::Danger, FooterMsg::Exit).w(114),
             spacer(),
             button(strings.btn_close, Variant::Primary, FooterMsg::Close).w(112),

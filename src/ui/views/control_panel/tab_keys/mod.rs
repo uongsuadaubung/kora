@@ -186,7 +186,7 @@ impl RuleSubPanel {
             .disabled(!effective)
             .w(BTN_WIDTH);
 
-        row(vec![
+        row(elements![
             sw.flex_1(),
             btn,
         ])

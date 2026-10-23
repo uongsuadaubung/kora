@@ -8,10 +8,7 @@ use crate::engine::config::hotkey::vk_to_name;
 use crate::platform::win32::{
     WM_SINGLE_KEY_CAPTURED, start_single_key_capture, stop_single_key_capture,
 };
-use crate::ui_framework::core::{
-    button, col, modal_dialog, open_modal_with_wndproc, row, spacer, text, Element, ModalConfig,
-    Variant,
-};
+use crate::ui_framework::core::*;
 use crate::ui_framework::win32::{WM_ACTIVATE, WM_KEYDOWN, WM_SYSKEYDOWN};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -89,9 +86,9 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
     modal_dialog()
         .header(dialog_callout(strings.dlg_remap_prompt))
         .body(
-            col([
-                row([
-                    col([
+            col(elements![
+                row(elements![
+                    col(elements![
                         text(strings.dlg_remap_from).secondary().bold(),
                         key_capture_box(
                             &box_from_text,
@@ -103,12 +100,12 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
                     ])
                     .flex_1()
                     .gap(1),
-                    col([text("➜").accent().title_font()])
+                    col(elements![text("➜").accent().title_font()])
                         .w(48)
                         .items_center()
                         .justify_center()
                         .pad_xy(2, 0),
-                    col([
+                    col(elements![
                         text(strings.dlg_remap_to).secondary().bold(),
                         key_capture_box(
                             &box_to_text,
@@ -122,10 +119,10 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
                     .gap(1),
                 ])
                 .items_center(),
-                col([
+                col(elements![
                     text(strings.dlg_remap_presets_title).secondary().bold(),
                     row(presets.map(|(label, from_vk, to_vk)| {
-                        button(label, Variant::Secondary, RemapMsg::SetPreset(from_vk, to_vk))
+                        button(label, Variant::Secondary, RemapMsg::SetPreset(from_vk, to_vk)).into()
                     }))
                     .gap(2),
                 ])
@@ -134,7 +131,7 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
             .gap(3),
         )
         .footer(
-            row([
+            row(elements![
                 text(&state.target_display).secondary().small(),
                 spacer(),
                 button(strings.dlg_remap_btn_cancel, Variant::Secondary, RemapMsg::Cancel),

@@ -40,14 +40,14 @@ fn test_hstack_spacing_and_padding() {
 fn test_declarative_core_flex_row_and_col() {
     use kora::ui_framework::core::*;
 
-    let tree: Element<()> = col(vec![
-        row(vec![
+    let tree: Element<()> = col(elements![
+        row(elements![
             button("Left", Variant::Primary, ()).w(100),
             spacer(),
             button("Right", Variant::Secondary, ()).w(80),
         ])
         .items_center(),
-        card(vec![
+        card(elements![
             text("Header").bold(),
             text("A long paragraph of text that wraps across multiple lines when constrained to a narrow width so we can verify automatic height calculation."),
         ]),
@@ -77,18 +77,18 @@ fn test_declarative_core_flex_row_and_col() {
 fn test_declarative_core_dynamic_alert_insertion_shifts_cards() {
     use kora::ui_framework::core::*;
 
-    let without_alert: Element<()> = col(vec![card(vec![text("Group 1").bold()])]).gap(3);
+    let without_alert: Element<()> = col(elements![card(elements![text("Group 1").bold()])]).gap(3);
     let layout_clean = compute_layout(0, without_alert, 0, 0, 500);
     let group1_top_clean = layout_clean.children[0].rect.top;
     assert_eq!(group1_top_clean, 0);
 
-    let with_alert: Element<()> = col(vec![
+    let with_alert: Element<()> = col(elements![
         alert(
             Variant::Warning,
             "Conflict Detected",
             "Key F1 is assigned to both Disable and Macro.",
         ),
-        card(vec![text("Group 1").bold()]),
+        card(elements![text("Group 1").bold()]),
     ])
     .gap(3);
     let layout_conflict = compute_layout(0, with_alert, 0, 0, 500);
@@ -105,9 +105,9 @@ fn test_declarative_core_grid_equal_columns() {
 
     let tree: Element<()> = grid(
         2,
-        vec![
-            card(vec![text("Col 1")]),
-            card(vec![text("Col 2")]),
+        elements![
+            card(elements![text("Col 1")]),
+            card(elements![text("Col 2")]),
         ],
     );
     let root = compute_layout(0, tree, 0, 0, 512);
@@ -125,9 +125,9 @@ fn test_declarative_core_bootstrap_col_proportions() {
 
     // row width = 600px, gap(0) = 0px
     // col_8 (8/12 = 400px) + col_4 (4/12 = 200px)
-    let tree: Element<()> = row(vec![
-        col(vec![text("Main Content")]).col_8(),
-        col(vec![text("Sidebar")]).col_4(),
+    let tree: Element<()> = row(elements![
+        col(elements![text("Main Content")]).col_8(),
+        col(elements![text("Sidebar")]).col_4(),
     ])
     .gap(0);
 
@@ -144,16 +144,16 @@ fn test_declarative_core_select_full_column_width() {
     use kora::ui_framework::core::*;
 
     // 3 equal columns in a 480px row with gap(0) -> each col is exactly 160px
-    let tree: Element<()> = row(vec![
-        col(vec![
+    let tree: Element<()> = row(elements![
+        col(elements![
             text("Col 1").bold(),
             select(vec!["Option A", "Option B"], 0, |_| ()).w_full(),
         ]).flex_1(),
-        col(vec![
+        col(elements![
             text("Col 2").bold(),
             select(vec!["Opt 1", "Opt 2"], 0, |_| ()).w_full(),
         ]).flex_1(),
-        col(vec![
+        col(elements![
             text("Col 3").bold(),
             select(vec!["Unicode", "TCVN3"], 0, |_| ()).w_full(),
         ]).flex_1(),
@@ -180,16 +180,16 @@ fn test_declarative_core_select_full_column_width() {
 fn test_switch_row_button_alignment() {
     use kora::ui_framework::core::*;
 
-    let tree: Element<()> = card(vec![
-        row(vec![
-            col(vec![text("Phím chuyển đổi E ⇄ V").bold()]).flex_1(),
+    let tree: Element<()> = card(elements![
+        row(elements![
+            col(elements![text("Phím chuyển đổi E ⇄ V").bold()]).flex_1(),
             switch("", true, |_| ()),
         ])
         .items_center()
         .justify_between(),
-        row(vec![
+        row(elements![
             text("Phím tắt hiện tại:").muted().flex_1(),
-            row(vec![
+            row(elements![
                 badge("Ctrl + Shift", Variant::Primary),
                 button("Đổi phím", Variant::Primary, ()).size(Size::Sm),
             ])
@@ -226,7 +226,7 @@ fn test_footer_surface_layout() {
         Close,
     }
 
-    let tree: Element<FooterMsg> = row(vec![
+    let tree: Element<FooterMsg> = row(elements![
         button("Thoát Kora", Variant::Danger, FooterMsg::Exit).w(114),
         spacer(),
         button("Đóng", Variant::Primary, FooterMsg::Close).w(112),
@@ -248,11 +248,11 @@ fn test_footer_surface_layout() {
 fn test_sidebar_column_flex_layout() {
     use kora::ui_framework::core::*;
 
-    let tree: Element<()> = col(vec![
-        row(vec![text("Header")]).h(28),
-        col(vec![text("Item 1").h(48), text("Item 2").h(48)]),
+    let tree: Element<()> = col(elements![
+        row(elements![text("Header")]).h(28),
+        col(elements![text("Item 1").h(48), text("Item 2").h(48)]),
         spacer().flex_1(),
-        row(vec![text("Footer")]).h(32),
+        row(elements![text("Footer")]).h(32),
     ])
     .h(500);
 
@@ -276,7 +276,7 @@ fn test_sidebar_column_flex_layout() {
 fn test_declarative_label_layout_and_modifiers() {
     use kora::ui_framework::core::*;
 
-    let tree: Element<i32> = row(vec![
+    let tree: Element<i32> = row(elements![
         label("Bảng mã").bold(),
         label("Tùy chỉnh nâng cao").accent().on_click(42),
     ])
@@ -299,7 +299,7 @@ fn test_declarative_tab_group_layout_and_item_hit_targets() {
         vec!["Phím gõ", "Phím bấm", "Âm thanh", "Gõ tắt"],
         1,
         |idx| idx,
-    );
+    ).into();
 
     let root = compute_layout(0, tree, 0, 0, 562);
     assert_eq!(root.rect.left, 0);
@@ -369,7 +369,7 @@ fn test_modal_dialog_3_sections_optional() {
     let full_dialog: Element<()> = modal_dialog()
         .header(text("Tiêu đề").bold())
         .body(text("Nội dung"))
-        .footer(modal_footer([button("Đóng", Variant::Secondary, ())]))
+        .footer(modal_footer(elements![button("Đóng", Variant::Secondary, ())]))
         .build();
     let root3 = compute_layout(0, full_dialog, 0, 0, 400);
     assert_eq!(root3.children.len(), 3);
@@ -406,12 +406,12 @@ fn test_modal_disable_key_declarative_layout() {
     let view: Element<TestMsg> = modal_dialog()
         .header(dialog_callout("Chọn phím bạn muốn vô hiệu hóa"))
         .body(
-            col([
-                col([
+            col(elements![
+                col(elements![
                     key_capture_box("Caps Lock", false, false, TestMsg::Toggle),
                 ])
                 .gap(1),
-                row([
+                row(elements![
                     button("🚫 Win", Variant::Secondary, TestMsg::Preset(0x5B)),
                     button("🚫 Caps", Variant::Secondary, TestMsg::Preset(0x14)),
                 ])
@@ -420,7 +420,7 @@ fn test_modal_disable_key_declarative_layout() {
             .gap(3),
         )
         .footer(
-            row([
+            row(elements![
                 text("Áp dụng cho: 🌐 Mặc định").secondary().small(),
                 spacer(),
                 button("Hủy", Variant::Secondary, TestMsg::Cancel),
@@ -482,18 +482,18 @@ fn test_modal_remap_key_declarative_layout() {
     let view: Element<TestMsg> = modal_dialog()
         .header(dialog_callout("Chọn phím bạn muốn đổi"))
         .body(
-            row([
-                col([
+            row(elements![
+                col(elements![
                     key_capture_box("Caps Lock", false, false, TestMsg::CaptureFrom),
                 ]).flex_1(),
-                col([text("➜").accent().title_font()]).w(48).pad_xy(2, 0),
-                col([
+                col(elements![text("➜").accent().title_font()]).w(48).pad_xy(2, 0),
+                col(elements![
                     key_capture_box("Chưa gán", false, true, TestMsg::CaptureTo),
                 ]).flex_1(),
             ]).items_center(),
         )
         .footer(
-            row([
+            row(elements![
                 text("Áp dụng cho: 🌐 Mặc định").secondary().small(),
                 spacer(),
                 button("Hủy", Variant::Secondary, TestMsg::Cancel),
@@ -562,7 +562,7 @@ fn test_declarative_input_layout_and_attributes() {
         PassChanged(String),
     }
 
-    let view: Element<TestMsg> = col(vec![
+    let view: Element<TestMsg> = col(elements![
         input("hello", "Enter your name...", TestMsg::NameChanged),
         input("custom width", "Search...", TestMsg::NameChanged).w(240),
         password_input("secret", "Password...", TestMsg::PassChanged)

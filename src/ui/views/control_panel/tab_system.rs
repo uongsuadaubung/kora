@@ -94,7 +94,7 @@ impl TabSystem {
     ) -> Element<SystemMsg> {
         let header = page_header(strings.sys_header_title, strings.sys_header_sub);
 
-        let card1 = card(vec![
+        let card1 = card(elements![
             section_header(strings.sys_title),
             switch(strings.check_autostart, autostart, SystemMsg::ToggleAutostart),
             divider(),
@@ -104,7 +104,7 @@ impl TabSystem {
                 SystemMsg::ToggleShowDialog,
             ),
             divider(),
-            row(vec![
+            row(elements![
                 switch(
                     strings.check_debug_log,
                     config.debug,
@@ -125,9 +125,9 @@ impl TabSystem {
 
         let theme_idx: usize = config.theme.into();
         let lang_idx: usize = config.language.into();
-        let card2 = card(vec![
+        let card2 = card(elements![
             section_header(strings.label_theme_title),
-            row(vec![
+            row(elements![
                 form_group(
                     strings.label_theme,
                     select(
@@ -156,9 +156,9 @@ impl TabSystem {
             .gap(3),
         ]);
 
-        let card3 = card(vec![
-            row(vec![
-                col(vec![
+        let card3 = card(elements![
+            row(elements![
+                col(elements![
                     text(strings.sys_defaults_title).bold(),
                     text(strings.sys_defaults_desc).muted().size(Size::Sm),
                 ])
@@ -175,7 +175,7 @@ impl TabSystem {
             .gap(3),
         ]);
 
-        col(vec![header, divider(), card1, card2, card3]).gap(3).pb(3)
+        col(elements![header, divider(), card1, card2, card3]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, surface: &Surface<SystemMsg>, msg: SystemMsg) {
