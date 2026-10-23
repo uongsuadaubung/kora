@@ -563,6 +563,19 @@ impl State<Nucleus> {
                     diacritic = Diacritic::Horn;
                 }
 
+                // Upgrade "uơ" to "ươ" when an additional vowel arrives to form a triphthong (e.g. "huơ" + "u" -> "hươu", "huơ" + "i" -> "hươi")
+                let mut upgraded_u_horn = false;
+                if self.vowels.len() == 2
+                    && self.vowels[0].base == BaseVowel::U
+                    && self.vowels[0].diacritic == Diacritic::None
+                    && self.vowels[1].base == BaseVowel::O
+                    && self.vowels[1].diacritic == Diacritic::Horn
+                    && matches!(base_vowel, BaseVowel::U | BaseVowel::I)
+                {
+                    self.vowels[0].diacritic = Diacritic::Horn;
+                    upgraded_u_horn = true;
+                }
+
                 let mut candidate_vowels = self.vowels;
                 candidate_vowels.push(VowelLetter {
                     base: base_vowel,
@@ -577,6 +590,9 @@ impl State<Nucleus> {
                 };
 
                 if !is_valid {
+                    if upgraded_u_horn {
+                        self.vowels[0].diacritic = Diacritic::None;
+                    }
                     return (
                         self.into_passthrough(key.ch).into(),
                         EngineAction::Passthrough,
@@ -593,8 +609,8 @@ impl State<Nucleus> {
                     self.tone = tone;
                 }
 
-                // Fast path: plain vowel with no tone shift
-                if diacritic == Diacritic::None && !prev_has_tone && tone == Tone::None {
+                // Fast path: plain vowel with no tone shift and no u horn upgrade
+                if !upgraded_u_horn && diacritic == Diacritic::None && !prev_has_tone && tone == Tone::None {
                     return (self.into(), EngineAction::Passthrough);
                 }
 

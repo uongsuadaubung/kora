@@ -428,3 +428,73 @@ fn test_luuw_uu_horn_typing() {
     vni_engine.reset();
     assert_eq!(simulate_typing(&mut vni_engine, "lu7u "), "lưu ");
 }
+
+#[test]
+fn test_huowu_and_thuo_orthography() {
+    let mut engine = VietnameseEngine::new(EngineConfig::default());
+
+    // 1. "huowu" -> "hươu" (ngay khi gõ xong phím 'u' cuối và kèm khoảng trắng)
+    assert_eq!(simulate_typing(&mut engine, "huowu"), "hươu");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huowu "), "hươu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "con huowu "), "con hươu ");
+    engine.reset();
+
+    // 2. Bảo toàn chữ hoa chữ thường
+    assert_eq!(simulate_typing(&mut engine, "Huowu "), "Hươu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "HUOWU "), "HƯƠU ");
+    engine.reset();
+
+    // 3. Các dấu thanh với "hươu":
+    assert_eq!(simulate_typing(&mut engine, "huowus "), "hướu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huowuj "), "hượu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huowuf "), "hườu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huowur "), "hưởu ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huowux "), "hưỡu ");
+    engine.reset();
+
+    // 4. Nguyên âm ba với 'i': "huowi" -> "hươi" (cười hươi hươi)
+    assert_eq!(simulate_typing(&mut engine, "huowi "), "hươi ");
+    engine.reset();
+
+    // 5. Bảo toàn trường hợp đặc biệt không có coda: "huow " -> "huơ " (huơ tay)
+    assert_eq!(simulate_typing(&mut engine, "huow "), "huơ ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "huow tay "), "huơ tay ");
+    engine.reset();
+
+    // 6. Bảo toàn "thuowr " -> "thuở " (thuở bé)
+    assert_eq!(simulate_typing(&mut engine, "thuowr "), "thuở ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "thuowr bes "), "thuở bé ");
+    engine.reset();
+
+    // 7. Bảo toàn nâng cấp khi có phụ âm cuối: "huowng" -> "hương", "thuowng" -> "thương"
+    assert_eq!(simulate_typing(&mut engine, "huowng "), "hương ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "thuowng "), "thương ");
+    engine.reset();
+    assert_eq!(simulate_typing(&mut engine, "thuowcs "), "thước ");
+    engine.reset();
+
+    // 8. Cách gõ thứ 2: "huouw" -> "hươu"
+    assert_eq!(simulate_typing(&mut engine, "huouw "), "hươu ");
+    engine.reset();
+
+    // 9. VNI method: "huo7u" -> "hươu"
+    let mut vni_engine = VietnameseEngine::new(EngineConfig {
+        method: InputMethod::Vni,
+        ..Default::default()
+    });
+    assert_eq!(simulate_typing(&mut vni_engine, "huo7u "), "hươu ");
+    vni_engine.reset();
+    assert_eq!(simulate_typing(&mut vni_engine, "huou7 "), "hươu ");
+    vni_engine.reset();
+    assert_eq!(simulate_typing(&mut vni_engine, "huo7 "), "huơ ");
+}
