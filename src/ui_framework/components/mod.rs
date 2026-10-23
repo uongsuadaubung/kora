@@ -64,10 +64,4 @@ macro_rules! impl_component_handle {
     };
 }
 
-impl_component_handle!(
-    PushButton,
-    ComboBox,
-    TextBox,
-    TabBar,
-    ActionTable,
-);
+impl_component_handle!(PushButton, ComboBox, TextBox, TabBar, ActionTable,);

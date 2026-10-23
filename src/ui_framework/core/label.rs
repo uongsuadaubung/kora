@@ -147,4 +147,3 @@ impl<M> From<Label<M>> for Element<M> {
         l.into_element()
     }
 }
-

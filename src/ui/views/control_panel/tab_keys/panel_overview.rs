@@ -15,7 +15,9 @@ use crate::ui::views::control_panel::components::{ShortcutRowProps, shortcut_row
 use crate::ui::views::control_panel::tab_keys::SUB_CARD_Y;
 use crate::ui_framework::core::*;
 use crate::ui_framework::tokens::layout;
-use crate::ui_framework::win32::{InvalidateRect, SW_HIDE, SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER};
+use crate::ui_framework::win32::{
+    InvalidateRect, SW_HIDE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowPos, ShowWindow,
+};
 use std::ptr::null_mut;
 
 #[derive(Clone, Debug)]
@@ -278,9 +280,11 @@ impl OverviewPanel {
         let mut remap_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if remaps.is_empty() {
             remap_rows.push(
-                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
-                    .px(3)
-                    .py(2),
+                row(elements![
+                    text(strings.status_disabled).muted().size(Size::Sm)
+                ])
+                .px(3)
+                .py(2),
             );
         } else {
             for (idx, r) in remaps.iter().enumerate() {
@@ -351,9 +355,11 @@ impl OverviewPanel {
         let mut disable_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if disabled.is_empty() {
             disable_rows.push(
-                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
-                    .px(3)
-                    .py(2),
+                row(elements![
+                    text(strings.status_disabled).muted().size(Size::Sm)
+                ])
+                .px(3)
+                .py(2),
             );
         } else {
             for (idx, d) in disabled.iter().enumerate() {
@@ -412,9 +418,11 @@ impl OverviewPanel {
         let mut macro_rows: Vec<Element<OverviewMsg>> = Vec::new();
         if key_macros.is_empty() {
             macro_rows.push(
-                row(elements![text(strings.status_disabled).muted().size(Size::Sm)])
-                    .px(3)
-                    .py(2),
+                row(elements![
+                    text(strings.status_disabled).muted().size(Size::Sm)
+                ])
+                .px(3)
+                .py(2),
             );
         } else {
             for (idx, m) in key_macros.iter().enumerate() {

@@ -2,8 +2,8 @@
 
 use super::element::{Element, IntoElement, Styleable, WidgetKind};
 use super::style::Style;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 static NEXT_SELECT_KEY: AtomicU32 = AtomicU32::new(1);
 

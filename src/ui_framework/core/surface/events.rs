@@ -26,21 +26,29 @@ pub(crate) fn hit_test_node<'a, M>(
     }
     let is_interactive = node.element.on_click.is_some()
         || match &node.element.kind {
-            WidgetKind::Button { disabled, on_click, .. } => !*disabled && on_click.is_some(),
-            WidgetKind::Badge { disabled, on_click, .. } => !*disabled && on_click.is_some(),
+            WidgetKind::Button {
+                disabled, on_click, ..
+            } => !*disabled && on_click.is_some(),
+            WidgetKind::Badge {
+                disabled, on_click, ..
+            } => !*disabled && on_click.is_some(),
             WidgetKind::Text { on_click, .. } => on_click.is_some(),
-            WidgetKind::Switch { disabled, on_toggle, .. } => !*disabled && on_toggle.is_some(),
-            WidgetKind::Checkbox { disabled, on_toggle, .. } => !*disabled && on_toggle.is_some(),
+            WidgetKind::Switch {
+                disabled,
+                on_toggle,
+                ..
+            } => !*disabled && on_toggle.is_some(),
+            WidgetKind::Checkbox {
+                disabled,
+                on_toggle,
+                ..
+            } => !*disabled && on_toggle.is_some(),
             WidgetKind::Select { disabled, .. } => !*disabled,
             WidgetKind::Slider { disabled, .. } => !*disabled,
             WidgetKind::Input { disabled, .. } => !*disabled,
             _ => false,
         };
-    if is_interactive {
-        Some(node)
-    } else {
-        None
-    }
+    if is_interactive { Some(node) } else { None }
 }
 
 pub(crate) fn update_slider_in_tree<M>(
@@ -103,10 +111,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                 .ok()
                 .map(|g| {
                     g.hover_node_id.is_some()
-                        || g.open_select
-                            .as_ref()
-                            .and_then(|s| s.hover_idx)
-                            .is_some()
+                        || g.open_select.as_ref().and_then(|s| s.hover_idx).is_some()
                 })
                 .unwrap_or(false);
             unsafe {
@@ -191,7 +196,8 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     let delta_y = y - guard.drag_start_y;
                     let scroll_delta =
                         ((delta_y as f32 / travel as f32) * guard.max_scroll as f32) as i32;
-                    let target = (guard.drag_start_scroll + scroll_delta).clamp(0, guard.max_scroll);
+                    let target =
+                        (guard.drag_start_scroll + scroll_delta).clamp(0, guard.max_scroll);
                     if target != guard.scroll_y {
                         guard.scroll_y = target;
                         needs_repaint = true;
@@ -305,7 +311,14 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                         .layout_root
                         .as_ref()
                         .and_then(|root| hit_test_node(root, x, doc_y))
-                        .map(|node| (node.id, node.rect, &node.element.kind, node.element.on_click.clone()));
+                        .map(|node| {
+                            (
+                                node.id,
+                                node.rect,
+                                &node.element.kind,
+                                node.element.on_click.clone(),
+                            )
+                        });
 
                     if let Some((node_id, node_rect, kind, elem_click)) = hit_action {
                         if let Some(m) = elem_click {
@@ -317,13 +330,17 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                                 WidgetKind::Button { on_click, .. }
                                 | WidgetKind::Badge { on_click, .. }
                                 | WidgetKind::Text { on_click, .. } => {
-                                    if let (Some(m), Some(h)) = (on_click.clone(), guard.on_msg.clone()) {
+                                    if let (Some(m), Some(h)) =
+                                        (on_click.clone(), guard.on_msg.clone())
+                                    {
                                         pending_msg = Some((h, m));
                                     }
                                 }
                                 WidgetKind::Switch { on_toggle, .. }
                                 | WidgetKind::Checkbox { on_toggle, .. } => {
-                                    if let (Some(m), Some(h)) = (on_toggle.clone(), guard.on_msg.clone()) {
+                                    if let (Some(m), Some(h)) =
+                                        (on_toggle.clone(), guard.on_msg.clone())
+                                    {
                                         pending_msg = Some((h, m));
                                     }
                                 }
@@ -357,7 +374,9 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                                     if let Some(ref mut root) = guard.layout_root {
                                         update_slider_in_tree(root, node_id, new_val);
                                     }
-                                    if let (Some(cb), Some(h)) = (cb_clone.as_ref(), guard.on_msg.clone()) {
+                                    if let (Some(cb), Some(h)) =
+                                        (cb_clone.as_ref(), guard.on_msg.clone())
+                                    {
                                         pending_msg = Some((h, cb(new_val, false)));
                                     }
                                     guard.active_slider = Some(ActiveSliderDrag {
@@ -372,18 +391,18 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                                     needs_repaint = true;
                                 }
                                 WidgetKind::Input { .. } => {
-                                    if let Some(inp) = guard.inputs.iter().find(|i| i.node_id == node_id) {
+                                    if let Some(inp) =
+                                        guard.inputs.iter().find(|i| i.node_id == node_id)
+                                    {
                                         let edit_hwnd = inp.hwnd;
                                         unsafe {
                                             SetFocus(edit_hwnd);
                                         }
                                     }
                                 }
-                                _ => {
-                                    unsafe {
-                                        SetFocus(hwnd);
-                                    }
-                                }
+                                _ => unsafe {
+                                    SetFocus(hwnd);
+                                },
                             }
                         }
                     } else {
@@ -458,7 +477,9 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
         WM_COMMAND => {
             let notify = (wparam >> 16) as u16;
             let edit_hwnd = lparam;
-            if notify == 0x0300 /* EN_CHANGE */ {
+            if notify == 0x0300
+            /* EN_CHANGE */
+            {
                 let mut pending: Option<(Arc<dyn Fn(M) + Send + Sync>, M)> = None;
                 if let Ok(mut guard) = state_arc.lock() {
                     let on_msg = guard.on_msg.clone();
@@ -466,7 +487,9 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                         if input.hwnd == edit_hwnd {
                             let len = unsafe { GetWindowTextLengthW(edit_hwnd) };
                             let mut buf = vec![0u16; (len + 1) as usize];
-                            unsafe { GetWindowTextW(edit_hwnd, buf.as_mut_ptr(), buf.len() as i32) };
+                            unsafe {
+                                GetWindowTextW(edit_hwnd, buf.as_mut_ptr(), buf.len() as i32)
+                            };
                             let text = String::from_utf16_lossy(&buf[..len as usize]);
                             input.last_val = text.clone();
                             if let (Some(cb), Some(h)) = (&input.on_change, on_msg) {
@@ -480,7 +503,9 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     h(m);
                 }
                 return 0;
-            } else if notify == 0x0100 /* EN_SETFOCUS */ {
+            } else if notify == 0x0100
+            /* EN_SETFOCUS */
+            {
                 if let Ok(mut guard) = state_arc.lock() {
                     for input in &guard.inputs {
                         if input.hwnd == edit_hwnd {
@@ -493,7 +518,9 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     InvalidateRect(hwnd, null_mut(), 0);
                 }
                 return 0;
-            } else if notify == 0x0200 /* EN_KILLFOCUS */ {
+            } else if notify == 0x0200
+            /* EN_KILLFOCUS */
+            {
                 if let Ok(mut guard) = state_arc.lock() {
                     if let Some(focused) = guard.focused_node_id {
                         for input in &guard.inputs {
@@ -520,7 +547,11 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     let cur_idx = guard.inputs.iter().position(|inp| inp.hwnd == current_hwnd);
                     if let Some(idx) = cur_idx {
                         let target_idx = if is_shift {
-                            if idx == 0 { guard.inputs.len() - 1 } else { idx - 1 }
+                            if idx == 0 {
+                                guard.inputs.len() - 1
+                            } else {
+                                idx - 1
+                            }
                         } else {
                             (idx + 1) % guard.inputs.len()
                         };
@@ -540,4 +571,3 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
-

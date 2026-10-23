@@ -12,7 +12,12 @@ pub struct Rect {
 impl Rect {
     #[inline]
     pub const fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     #[inline]
@@ -68,7 +73,12 @@ pub struct Padding {
 }
 
 impl Padding {
-    pub const ZERO: Self = Self { left: 0, top: 0, right: 0, bottom: 0 };
+    pub const ZERO: Self = Self {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
 
     #[inline]
     pub const fn all(val: i32) -> Self {
@@ -92,7 +102,12 @@ impl Padding {
 
     #[inline]
     pub const fn new(left: i32, top: i32, right: i32, bottom: i32) -> Self {
-        Self { left, top, right, bottom }
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
     }
 
     #[inline]
@@ -105,4 +120,3 @@ impl Padding {
         self.top + self.bottom
     }
 }
-

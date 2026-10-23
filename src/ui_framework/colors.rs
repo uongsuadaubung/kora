@@ -101,46 +101,46 @@ const fn rgb(r: u8, g: u8, b: u8) -> u32 {
 /// Balances soft charcoal slate backgrounds with distinct elevated card surfaces,
 /// eliminating the oppressive, murky pitch-black feel while remaining soothing on the eyes.
 pub const DARK_PALETTE: ThemePalette = ThemePalette {
-    bg_window: rgb(34, 39, 46),          // #22272E - Soothing deep slate canvas
-    bg_sidebar: rgb(28, 33, 40),         // #1C2128 - Subtle inset sidebar
-    bg_card: rgb(45, 51, 59),            // #2D333B - Clearly elevated card layer
-    bg_card_header: rgb(37, 42, 49),     // #252A31 - Distinct header for cards/tables
-    bg_input: rgb(28, 33, 40),           // #1C2128 - Inset text input with crisp border
-    text_primary: rgb(230, 237, 243),    // #E6EDF3 - Soft crisp off-white, anti-glare
-    text_secondary: rgb(139, 148, 158),  // #8B949E - Balanced muted text
-    text_input: rgb(240, 246, 252),      // #F0F6FC - High-clarity input text
-    border: rgb(68, 76, 86),             // #444C56 - Crisp 1px boundary
-    border_separator: rgb(55, 62, 71),   // #373E47 - Subtle divider
-    tab_track_bg: rgb(28, 33, 40),       // #1C2128 - Inset pill track
-    tab_track_border: rgb(55, 62, 71),   // #373E47 - Track border
-    tab_active_bg: rgb(55, 62, 71),      // #373E47 - Active elevated tab pill
+    bg_window: rgb(34, 39, 46),         // #22272E - Soothing deep slate canvas
+    bg_sidebar: rgb(28, 33, 40),        // #1C2128 - Subtle inset sidebar
+    bg_card: rgb(45, 51, 59),           // #2D333B - Clearly elevated card layer
+    bg_card_header: rgb(37, 42, 49),    // #252A31 - Distinct header for cards/tables
+    bg_input: rgb(28, 33, 40),          // #1C2128 - Inset text input with crisp border
+    text_primary: rgb(230, 237, 243),   // #E6EDF3 - Soft crisp off-white, anti-glare
+    text_secondary: rgb(139, 148, 158), // #8B949E - Balanced muted text
+    text_input: rgb(240, 246, 252),     // #F0F6FC - High-clarity input text
+    border: rgb(68, 76, 86),            // #444C56 - Crisp 1px boundary
+    border_separator: rgb(55, 62, 71),  // #373E47 - Subtle divider
+    tab_track_bg: rgb(28, 33, 40),      // #1C2128 - Inset pill track
+    tab_track_border: rgb(55, 62, 71),  // #373E47 - Track border
+    tab_active_bg: rgb(55, 62, 71),     // #373E47 - Active elevated tab pill
     tab_active_border: rgb(84, 93, 105), // #545D69 - Subtle tab border
-    tab_hover_bg: rgb(45, 51, 59),       // #2D333B - Hover highlight
-    text_link: rgb(88, 166, 255),        // #58A6FF - Fluent link blue
-    accent: rgb(47, 129, 247),           // #2F81F7 - Radiant electric blue
-    accent_hover: rgb(56, 139, 253),     // #388BFD - Vibrant blue hover
-    badge_root_bg: rgb(30, 50, 80),      // Inset blue badge for root
+    tab_hover_bg: rgb(45, 51, 59),      // #2D333B - Hover highlight
+    text_link: rgb(88, 166, 255),       // #58A6FF - Fluent link blue
+    accent: rgb(47, 129, 247),          // #2F81F7 - Radiant electric blue
+    accent_hover: rgb(56, 139, 253),    // #388BFD - Vibrant blue hover
+    badge_root_bg: rgb(30, 50, 80),     // Inset blue badge for root
     text_white: rgb(255, 255, 255),
-    indicator_active: rgb(63, 185, 80),  // #3FB950 - Modern vibrant green
-    border_hover: rgb(118, 131, 144),    // #768390 - Highlighted border on hover
-    row_hover_bg: rgb(55, 62, 71),       // #373E47
-    row_selected_bg: rgb(34, 68, 115),   // Highlighted row selection
+    indicator_active: rgb(63, 185, 80), // #3FB950 - Modern vibrant green
+    border_hover: rgb(118, 131, 144),   // #768390 - Highlighted border on hover
+    row_hover_bg: rgb(55, 62, 71),      // #373E47
+    row_selected_bg: rgb(34, 68, 115),  // Highlighted row selection
     row_selected_text: rgb(255, 255, 255),
-    danger_bg: rgb(73, 27, 29),          // Rich wine red
+    danger_bg: rgb(73, 27, 29), // Rich wine red
     danger_bg_hover: rgb(90, 32, 35),
-    danger_border: rgb(248, 81, 73),     // Vibrant danger border
-    danger_text: rgb(255, 123, 114),     // Crisp danger text
+    danger_border: rgb(248, 81, 73), // Vibrant danger border
+    danger_text: rgb(255, 123, 114), // Crisp danger text
     danger_text_hover: rgb(255, 161, 155),
-    info_bg: rgb(27, 60, 104),           // Deep navy
+    info_bg: rgb(27, 60, 104), // Deep navy
     info_border: rgb(56, 139, 253),
     info_text: rgb(121, 192, 255),
-    warning_bg: rgb(77, 56, 0),          // Warm amber
+    warning_bg: rgb(77, 56, 0), // Warm amber
     warning_border: rgb(210, 153, 34),
     warning_text: rgb(227, 179, 65),
-    success_bg: rgb(22, 59, 38),         // Forest emerald
+    success_bg: rgb(22, 59, 38), // Forest emerald
     success_border: rgb(46, 160, 67),
     success_text: rgb(86, 211, 100),
-    purple_bg: rgb(56, 35, 84),          // Royal violet
+    purple_bg: rgb(56, 35, 84), // Royal violet
     purple_border: rgb(163, 113, 247),
     purple_text: rgb(210, 168, 255),
 };
@@ -149,32 +149,32 @@ pub const DARK_PALETTE: ThemePalette = ThemePalette {
 /// Features a subtle cool-gray backdrop (#F6F8FA) that makes crisp white (#FFFFFF)
 /// cards and containers pop with clean, professional depth and zero eye strain.
 pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
-    bg_window: rgb(246, 248, 250),       // #F6F8FA - Subtle off-white canvas
-    bg_sidebar: rgb(238, 242, 246),      // #EEF2F6 - Soft gray sidebar
-    bg_card: rgb(255, 255, 255),         // #FFFFFF - Crisp elevated white card
-    bg_card_header: rgb(246, 248, 250),  // #F6F8FA - Soft header
-    bg_input: rgb(255, 255, 255),        // #FFFFFF - Pure white input
-    text_primary: rgb(31, 35, 40),       // #1F2328 - Deep slate ink, easy on eyes
-    text_secondary: rgb(101, 109, 118),  // #656D76 - High legibility muted text
-    text_input: rgb(31, 35, 40),         // #1F2328
-    border: rgb(208, 215, 222),          // #D0D7DE - Crisp modern border
-    border_separator: rgb(216, 222, 228),// #D8DEE4 - Subtle divider
-    tab_track_bg: rgb(234, 238, 242),    // #EAEEF2 - Track container
-    tab_track_border: rgb(208, 215, 222),// #D0D7DE
-    tab_active_bg: rgb(255, 255, 255),   // #FFFFFF - Elevated active tab
+    bg_window: rgb(246, 248, 250),      // #F6F8FA - Subtle off-white canvas
+    bg_sidebar: rgb(238, 242, 246),     // #EEF2F6 - Soft gray sidebar
+    bg_card: rgb(255, 255, 255),        // #FFFFFF - Crisp elevated white card
+    bg_card_header: rgb(246, 248, 250), // #F6F8FA - Soft header
+    bg_input: rgb(255, 255, 255),       // #FFFFFF - Pure white input
+    text_primary: rgb(31, 35, 40),      // #1F2328 - Deep slate ink, easy on eyes
+    text_secondary: rgb(101, 109, 118), // #656D76 - High legibility muted text
+    text_input: rgb(31, 35, 40),        // #1F2328
+    border: rgb(208, 215, 222),         // #D0D7DE - Crisp modern border
+    border_separator: rgb(216, 222, 228), // #D8DEE4 - Subtle divider
+    tab_track_bg: rgb(234, 238, 242),   // #EAEEF2 - Track container
+    tab_track_border: rgb(208, 215, 222), // #D0D7DE
+    tab_active_bg: rgb(255, 255, 255),  // #FFFFFF - Elevated active tab
     tab_active_border: rgb(208, 215, 222),
-    tab_hover_bg: rgb(243, 244, 246),    // #F3F4F6
-    text_link: rgb(9, 105, 218),         // #0969DA
-    accent: rgb(9, 105, 218),            // #0969DA - Modern brand blue
-    accent_hover: rgb(8, 96, 202),       // #0860CA
-    badge_root_bg: rgb(221, 244, 255),   // #DDF4FF
+    tab_hover_bg: rgb(243, 244, 246),  // #F3F4F6
+    text_link: rgb(9, 105, 218),       // #0969DA
+    accent: rgb(9, 105, 218),          // #0969DA - Modern brand blue
+    accent_hover: rgb(8, 96, 202),     // #0860CA
+    badge_root_bg: rgb(221, 244, 255), // #DDF4FF
     text_white: rgb(255, 255, 255),
-    indicator_active: rgb(26, 127, 55),  // #1A7F37
-    border_hover: rgb(140, 149, 159),    // #8C959F
+    indicator_active: rgb(26, 127, 55), // #1A7F37
+    border_hover: rgb(140, 149, 159),   // #8C959F
     row_hover_bg: rgb(243, 245, 248),
     row_selected_bg: rgb(221, 244, 255),
     row_selected_text: rgb(9, 105, 218),
-    danger_bg: rgb(255, 235, 233),       // Soft pink-red
+    danger_bg: rgb(255, 235, 233), // Soft pink-red
     danger_bg_hover: rgb(255, 220, 217),
     danger_border: rgb(255, 129, 130),
     danger_text: rgb(207, 34, 46),

@@ -174,12 +174,11 @@ impl TabMacro {
             .w(104);
 
         col(elements![
-            card(elements![row(elements![
-                sw_use_macro.flex_1(),
-                sw_en.flex_1(),
-            ])
-            .gap(16)
-            .items_center()]),
+            card(elements![
+                row(elements![sw_use_macro.flex_1(), sw_en.flex_1(),])
+                    .gap(16)
+                    .items_center()
+            ]),
             row(elements![add_btn]),
         ])
         .gap(8)

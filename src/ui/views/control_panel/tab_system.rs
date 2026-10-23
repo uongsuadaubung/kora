@@ -72,8 +72,7 @@ impl TabSystem {
     }
 
     pub fn update_language(&self, _lang: Language, _strings: &LanguageStrings) {
-        let cfg = crate::ui::controller::with_engine(|e| e.config().clone())
-            .unwrap_or_default();
+        let cfg = crate::ui::controller::with_engine(|e| e.config().clone()).unwrap_or_default();
         self.load_config(&cfg);
     }
 
@@ -96,7 +95,11 @@ impl TabSystem {
 
         let card1 = card(elements![
             section_header(strings.sys_title),
-            switch(strings.check_autostart, autostart, SystemMsg::ToggleAutostart),
+            switch(
+                strings.check_autostart,
+                autostart,
+                SystemMsg::ToggleAutostart
+            ),
             divider(),
             switch(
                 strings.check_show_dialog,
@@ -175,15 +178,17 @@ impl TabSystem {
             .gap(3),
         ]);
 
-        col(elements![header, divider(), card1, card2, card3]).gap(3).pb(3)
+        col(elements![header, divider(), card1, card2, card3])
+            .gap(3)
+            .pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, surface: &Surface<SystemMsg>, msg: SystemMsg) {
         match msg {
             SystemMsg::ToggleAutostart(enabled) => {
                 crate::platform::set_windows_autostart(enabled);
-                let cfg = crate::ui::controller::with_engine(|e| e.config().clone())
-                    .unwrap_or_default();
+                let cfg =
+                    crate::ui::controller::with_engine(|e| e.config().clone()).unwrap_or_default();
                 let strings = crate::language::current();
                 surface.render(Self::view(&cfg, enabled, strings));
             }
@@ -227,10 +232,7 @@ impl TabSystem {
             }
             SystemMsg::OpenDebugLog => {
                 let log_file = crate::ui::controller::with_engine(|e| {
-                    e.config()
-                        .debug_file_path
-                        .as_deref()
-                        .map(|s| s.to_string())
+                    e.config().debug_file_path.as_deref().map(|s| s.to_string())
                 })
                 .flatten()
                 .unwrap_or_else(|| "kora_debug.log".to_string());

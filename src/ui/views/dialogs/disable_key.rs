@@ -53,10 +53,7 @@ fn render_view(state: &DisableState) -> Element<DisableMsg> {
         ("🚫 Insert", 0x2D),
         ("🚫 Caps Lock", 0x14),
     ];
-    let presets_row2 = [
-        ("🚫 F1 (Trợ giúp)", 0x70),
-        ("🚫 Scroll Lock", 0x91),
-    ];
+    let presets_row2 = [("🚫 F1 (Trợ giúp)", 0x70), ("🚫 Scroll Lock", 0x91)];
 
     modal_dialog()
         .header(dialog_callout(strings.dlg_disable_prompt))
@@ -92,7 +89,11 @@ fn render_view(state: &DisableState) -> Element<DisableMsg> {
             row(elements![
                 text(&state.target_display).secondary().small(),
                 spacer(),
-                button(strings.dlg_disable_btn_cancel, Variant::Secondary, DisableMsg::Cancel),
+                button(
+                    strings.dlg_disable_btn_cancel,
+                    Variant::Secondary,
+                    DisableMsg::Cancel
+                ),
                 button(
                     strings.dlg_disable_btn_apply,
                     Variant::Danger,
@@ -198,7 +199,9 @@ pub fn show_disable_dialog(parent: isize) {
                 None
             }
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                if wparam == 0x1B /* VK_ESCAPE */ {
+                if wparam == 0x1B
+                /* VK_ESCAPE */
+                {
                     let was_listening = state_for_raw
                         .try_lock()
                         .map(|st| st.is_listening)

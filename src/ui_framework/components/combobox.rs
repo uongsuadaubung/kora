@@ -35,7 +35,9 @@ unsafe extern "system" fn combobox_self_subclass(
         unsafe {
             RemoveWindowSubclass(hwnd, combobox_self_subclass, uid_subclass);
             if ref_data != 0 {
-                drop(Arc::from_raw(ref_data as *const Mutex<Option<ComboBoxChangeCallback>>));
+                drop(Arc::from_raw(
+                    ref_data as *const Mutex<Option<ComboBoxChangeCallback>>,
+                ));
             }
         }
         return unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) };
@@ -45,7 +47,10 @@ unsafe extern "system" fn combobox_self_subclass(
         let notify_code = ((wparam >> 16) & 0xFFFF) as u32;
         if notify_code == 1 /* CBN_SELCHANGE */ && ref_data != 0 {
             let data_ptr = ref_data as *const Mutex<Option<ComboBoxChangeCallback>>;
-            let cb = unsafe { &*data_ptr }.lock().ok().and_then(|guard| guard.clone());
+            let cb = unsafe { &*data_ptr }
+                .lock()
+                .ok()
+                .and_then(|guard| guard.clone());
             if let Some(cb) = cb {
                 let cur = unsafe { SendMessageW(hwnd, CB_GETCURSEL, 0, 0) };
                 if cur >= 0 {
@@ -99,7 +104,12 @@ impl ComboBox {
     }
 
     /// Creates a ComboBox with items for auto-layout engines without requiring manual coordinates.
-    pub fn new_with_items(parent: isize, hfont: isize, items: &[&str], selected: usize) -> Option<Self> {
+    pub fn new_with_items(
+        parent: isize,
+        hfont: isize,
+        items: &[&str],
+        selected: usize,
+    ) -> Option<Self> {
         Self::create_with_items(parent, 0, 0, 0, 0, 160, hfont, items, selected)
     }
 
@@ -157,7 +167,11 @@ impl ComboBox {
                 );
             }
             Self::apply_theme(hwnd, is_current_dark());
-            Some(Self { hwnd, id, on_change })
+            Some(Self {
+                hwnd,
+                id,
+                on_change,
+            })
         } else {
             None
         }

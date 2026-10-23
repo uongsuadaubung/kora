@@ -394,7 +394,10 @@ impl TabTyping {
                 .rounded_card(),
                 divider(),
                 row(elements![
-                    text(strings.typing_exceptions_title).bold().accent().flex_1(),
+                    text(strings.typing_exceptions_title)
+                        .bold()
+                        .accent()
+                        .flex_1(),
                     badge(count_text, Variant::Primary),
                 ])
                 .items_center()
@@ -409,9 +412,7 @@ impl TabTyping {
             card(elements![
                 row(elements![
                     checkbox("", cap_enabled, TypingMsg::ToggleTargetCapture),
-                    text(strings.typing_group_target_hotkey)
-                        .bold()
-                        .accent(),
+                    text(strings.typing_group_target_hotkey).bold().accent(),
                 ])
                 .items_center()
                 .gap(2),

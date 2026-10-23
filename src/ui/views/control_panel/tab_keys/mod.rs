@@ -157,7 +157,8 @@ impl RuleSubPanel {
     pub fn render(&self) {
         let strings = crate::language::current();
         if let Ok(st) = self.state.read() {
-            self.surface.render(Self::view(&st, self.title_fn, self.add_btn_fn, strings));
+            self.surface
+                .render(Self::view(&st, self.title_fn, self.add_btn_fn, strings));
         }
     }
 
@@ -186,12 +187,7 @@ impl RuleSubPanel {
             .disabled(!effective)
             .w(BTN_WIDTH);
 
-        row(elements![
-            sw.flex_1(),
-            btn,
-        ])
-        .items_center()
-        .w_full()
+        row(elements![sw.flex_1(), btn,]).items_center().w_full()
     }
 
     pub fn set_inherited(&self, is_root: bool, override_val: Option<bool>, global_val: bool) {

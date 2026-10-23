@@ -3,8 +3,8 @@
 //! Uses [`crate::ui_framework::core::modal::{open_modal, modal_dialog, modal_footer}`]
 //! to render a clean, tight, 3-section confirmation dialog without empty footer dead space.
 
-use std::sync::{Arc, Mutex};
 use crate::ui_framework::core::*;
+use std::sync::{Arc, Mutex};
 
 /// Configuration options for confirmation dialogs.
 #[derive(Debug, Clone)]
@@ -49,11 +49,9 @@ pub fn render_confirm_view(options: &ConfirmDialogOptions, height: i32) -> Eleme
 
     let el = modal_dialog()
         .body(
-            col(elements![
-                text(&options.message),
-            ])
-            .h_flex(1)
-            .justify_center(),
+            col(elements![text(&options.message),])
+                .h_flex(1)
+                .justify_center(),
         )
         .footer(modal_footer(elements![
             button(&options.no_text, Variant::Secondary, false).w(84),
@@ -70,19 +68,12 @@ pub fn render_confirm_view(options: &ConfirmDialogOptions, height: i32) -> Eleme
         ]))
         .build();
 
-    if height > 0 {
-        el.h(height)
-    } else {
-        el
-    }
+    if height > 0 { el.h(height) } else { el }
 }
 
 /// Displays a modern, web-style modal confirmation dialog with Yes / No actions.
-pub fn show_confirm_dialog<F>(
-    parent: isize,
-    options: ConfirmDialogOptions,
-    on_confirm: F,
-) where
+pub fn show_confirm_dialog<F>(parent: isize, options: ConfirmDialogOptions, on_confirm: F)
+where
     F: FnOnce() + Send + 'static,
 {
     let cb = Arc::new(Mutex::new(Some(on_confirm)));
@@ -119,11 +110,8 @@ pub fn show_danger_confirm<F>(
 }
 
 /// Displays a standard danger-styled delete confirmation dialog.
-pub fn show_delete_confirm<F>(
-    parent: isize,
-    message: impl Into<String>,
-    on_confirm: F,
-) where
+pub fn show_delete_confirm<F>(parent: isize, message: impl Into<String>, on_confirm: F)
+where
     F: FnOnce() + Send + 'static,
 {
     let strings = crate::language::current();

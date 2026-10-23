@@ -116,10 +116,7 @@ pub fn target_capture_presets(strings: &LanguageStrings) -> Vec<HotkeyPreset> {
             "Ctrl + Shift + K",
             Hotkey::new(true, true, false, false, 0x4B),
         ),
-        HotkeyPreset::new(
-            "Alt + ~",
-            Hotkey::new(false, false, true, false, 0xC0),
-        ),
+        HotkeyPreset::new("Alt + ~", Hotkey::new(false, false, true, false, 0xC0)),
     ]
 }
 
@@ -177,7 +174,13 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
         for preset in chunk {
             let p_idx = idx;
             row_btns.push(
-                button(&preset.label, Variant::Secondary, HotkeyMsg::SetPreset(p_idx)).flex_1().into(),
+                button(
+                    &preset.label,
+                    Variant::Secondary,
+                    HotkeyMsg::SetPreset(p_idx),
+                )
+                .flex_1()
+                .into(),
             );
             idx += 1;
         }
@@ -190,12 +193,9 @@ pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
             strings.typing_inherit_global,
             inherit_hk.display_text()
         );
-        preset_rows.push(row(elements![button(
-            inherit_label,
-            Variant::Secondary,
-            HotkeyMsg::SetInherit,
-        )
-        .flex_1()]));
+        preset_rows.push(row(elements![
+            button(inherit_label, Variant::Secondary, HotkeyMsg::SetInherit,).flex_1()
+        ]));
     }
 
     let can_submit = state.is_inherit
@@ -465,7 +465,9 @@ pub fn show_hotkey_modal(parent: isize, config: HotkeyModalConfig) {
                 None
             }
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                if wparam == 0x1B /* VK_ESCAPE */ {
+                if wparam == 0x1B
+                /* VK_ESCAPE */
+                {
                     handle.dispatch(HotkeyMsg::EscapePressed);
                     return Some(0);
                 }

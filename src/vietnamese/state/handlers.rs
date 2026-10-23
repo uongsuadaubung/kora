@@ -610,7 +610,11 @@ impl State<Nucleus> {
                 }
 
                 // Fast path: plain vowel with no tone shift and no u horn upgrade
-                if !upgraded_u_horn && diacritic == Diacritic::None && !prev_has_tone && tone == Tone::None {
+                if !upgraded_u_horn
+                    && diacritic == Diacritic::None
+                    && !prev_has_tone
+                    && tone == Tone::None
+                {
                     return (self.into(), EngineAction::Passthrough);
                 }
 

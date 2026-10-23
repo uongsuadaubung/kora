@@ -114,8 +114,7 @@ impl TabAbout {
                 ])
                 .gap(1)
                 .flex_1(),
-                button(btn_update_txt, Variant::Primary, AboutMsg::CheckUpdate)
-                    .enabled(!is_busy),
+                button(btn_update_txt, Variant::Primary, AboutMsg::CheckUpdate).enabled(!is_busy),
             ])
             .items_center()
             .justify_between()
@@ -143,7 +142,12 @@ impl TabAbout {
                 ])
                 .gap(1)
                 .flex_1(),
-                button(strings.about_github_btn, Variant::Secondary, AboutMsg::OpenGithub).size(Size::Sm),
+                button(
+                    strings.about_github_btn,
+                    Variant::Secondary,
+                    AboutMsg::OpenGithub
+                )
+                .size(Size::Sm),
             ])
             .items_center()
             .justify_between()

@@ -34,17 +34,12 @@ pub mod prelude {
     pub use crate::ui_framework::layout::*;
     pub use crate::ui_framework::prelude::{
         ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
-        CellAlign, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
-        I18nSource, Label, LabelKind, LabelTone, Link, PillBadge, StaticText, SurfaceRole,
-        PopupMenu, PushButton, RECT,
-        TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, borders,
+        CellAlign, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle, I18nSource,
+        Label, LabelKind, LabelTone, Link, PillBadge, PopupMenu, PushButton, RECT, StaticText,
+        SurfaceRole, TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, borders,
         cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,
         next_control_id, radii, resolve_id, set_hwnds_visible, spacing, to_wide, typography,
     };
-
-
-
-
 
     pub type TextFn = crate::ui_framework::components::TextFn<crate::language::LanguageStrings>;
     pub type TextListFn =
@@ -194,8 +189,8 @@ pub fn update_tray_icon(is_vietnamese: bool) {
     if let Some(ui) = ui() {
         ui.tray.borrow_mut().set_vietnamese_mode(is_vietnamese);
         if let Some(idx) = combo_idx {
-        let _ = idx;
-        ui.controls.tab_typing.refresh_from_engine();
+            let _ = idx;
+            ui.controls.tab_typing.refresh_from_engine();
         }
     }
 }

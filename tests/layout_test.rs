@@ -148,15 +148,18 @@ fn test_declarative_core_select_full_column_width() {
         col(elements![
             text("Col 1").bold(),
             select(vec!["Option A", "Option B"], 0, |_| ()).w_full(),
-        ]).flex_1(),
+        ])
+        .flex_1(),
         col(elements![
             text("Col 2").bold(),
             select(vec!["Opt 1", "Opt 2"], 0, |_| ()).w_full(),
-        ]).flex_1(),
+        ])
+        .flex_1(),
         col(elements![
             text("Col 3").bold(),
             select(vec!["Unicode", "TCVN3"], 0, |_| ()).w_full(),
-        ]).flex_1(),
+        ])
+        .flex_1(),
     ])
     .gap(0);
 
@@ -299,7 +302,8 @@ fn test_declarative_tab_group_layout_and_item_hit_targets() {
         vec!["Phím gõ", "Phím bấm", "Âm thanh", "Gõ tắt"],
         1,
         |idx| idx,
-    ).into();
+    )
+    .into();
 
     let root = compute_layout(0, tree, 0, 0, 562);
     assert_eq!(root.rect.left, 0);
@@ -318,7 +322,7 @@ fn test_declarative_tab_group_layout_and_item_hit_targets() {
 
 #[test]
 fn test_modal_confirm_declarative_layout() {
-    use kora::ui::views::dialogs::confirm::{render_confirm_view, ConfirmDialogOptions};
+    use kora::ui::views::dialogs::confirm::{ConfirmDialogOptions, render_confirm_view};
     use kora::ui_framework::core::*;
 
     let options = ConfirmDialogOptions {
@@ -369,15 +373,17 @@ fn test_modal_dialog_3_sections_optional() {
     let full_dialog: Element<()> = modal_dialog()
         .header(text("Tiêu đề").bold())
         .body(text("Nội dung"))
-        .footer(modal_footer(elements![button("Đóng", Variant::Secondary, ())]))
+        .footer(modal_footer(elements![button(
+            "Đóng",
+            Variant::Secondary,
+            ()
+        )]))
         .build();
     let root3 = compute_layout(0, full_dialog, 0, 0, 400);
     assert_eq!(root3.children.len(), 3);
 
     // 2. Only body: no header, no footer
-    let body_only: Element<()> = modal_dialog()
-        .body(text("Chỉ có nội dung"))
-        .build();
+    let body_only: Element<()> = modal_dialog().body(text("Chỉ có nội dung")).build();
     let root1 = compute_layout(0, body_only, 0, 0, 400);
     assert_eq!(root1.children.len(), 1);
 
@@ -407,9 +413,12 @@ fn test_modal_disable_key_declarative_layout() {
         .header(dialog_callout("Chọn phím bạn muốn vô hiệu hóa"))
         .body(
             col(elements![
-                col(elements![
-                    key_capture_box("Caps Lock", false, false, TestMsg::Toggle),
-                ])
+                col(elements![key_capture_box(
+                    "Caps Lock",
+                    false,
+                    false,
+                    TestMsg::Toggle
+                ),])
                 .gap(1),
                 row(elements![
                     button("🚫 Win", Variant::Secondary, TestMsg::Preset(0x5B)),
@@ -458,7 +467,10 @@ fn test_modal_disable_key_declarative_layout() {
     let apply_btn = &footer_row.children[3];
     assert_eq!(apply_btn.rect.left - cancel_btn.rect.right, 8); // 8px margin between buttons
 
-    if let WidgetKind::Button { on_click, disabled, .. } = &apply_btn.element.kind {
+    if let WidgetKind::Button {
+        on_click, disabled, ..
+    } = &apply_btn.element.kind
+    {
         assert_eq!(*on_click, Some(TestMsg::Submit));
         assert_eq!(*disabled, false);
     } else {
@@ -483,14 +495,25 @@ fn test_modal_remap_key_declarative_layout() {
         .header(dialog_callout("Chọn phím bạn muốn đổi"))
         .body(
             row(elements![
-                col(elements![
-                    key_capture_box("Caps Lock", false, false, TestMsg::CaptureFrom),
-                ]).flex_1(),
-                col(elements![text("➜").accent().title_font()]).w(48).pad_xy(2, 0),
-                col(elements![
-                    key_capture_box("Chưa gán", false, true, TestMsg::CaptureTo),
-                ]).flex_1(),
-            ]).items_center(),
+                col(elements![key_capture_box(
+                    "Caps Lock",
+                    false,
+                    false,
+                    TestMsg::CaptureFrom
+                ),])
+                .flex_1(),
+                col(elements![text("➜").accent().title_font()])
+                    .w(48)
+                    .pad_xy(2, 0),
+                col(elements![key_capture_box(
+                    "Chưa gán",
+                    false,
+                    true,
+                    TestMsg::CaptureTo
+                ),])
+                .flex_1(),
+            ])
+            .items_center(),
         )
         .footer(
             row(elements![
@@ -580,7 +603,16 @@ fn test_declarative_input_layout_and_attributes() {
     assert_eq!(inp1.rect.left, 0);
     assert_eq!(inp1.rect.right, 500);
     assert_eq!(inp1.rect.bottom - inp1.rect.top, 32);
-    if let WidgetKind::Input { value, placeholder, password, disabled, auto_focus, key, .. } = &inp1.element.kind {
+    if let WidgetKind::Input {
+        value,
+        placeholder,
+        password,
+        disabled,
+        auto_focus,
+        key,
+        ..
+    } = &inp1.element.kind
+    {
         assert_eq!(value, "hello");
         assert_eq!(placeholder, "Enter your name...");
         assert!(!*password);
@@ -604,7 +636,16 @@ fn test_declarative_input_layout_and_attributes() {
     assert_eq!(inp3.rect.right, 500);
     assert_eq!(inp3.rect.top, 80);
     assert_eq!(inp3.rect.bottom - inp3.rect.top, 32);
-    if let WidgetKind::Input { value, placeholder, password, disabled, auto_focus, key, .. } = &inp3.element.kind {
+    if let WidgetKind::Input {
+        value,
+        placeholder,
+        password,
+        disabled,
+        auto_focus,
+        key,
+        ..
+    } = &inp3.element.kind
+    {
         assert_eq!(value, "secret");
         assert_eq!(placeholder, "Password...");
         assert!(*password);
@@ -637,7 +678,12 @@ fn test_inheritable_check_row_tri_state() {
     // Col -> Row(title_row) -> Checkbox
     let title_row = &root_layout.children[0];
     let cb_node = &title_row.children[0];
-    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_node.element.kind {
+    if let WidgetKind::Checkbox {
+        checked,
+        indeterminate,
+        ..
+    } = &cb_node.element.kind
+    {
         assert_eq!(*checked, true);
         assert_eq!(*indeterminate, false);
     } else {
@@ -657,7 +703,12 @@ fn test_inheritable_check_row_tri_state() {
     let child_layout = compute_layout(0, child_inherited, 0, 0, 400);
     let title_row_child = &child_layout.children[0];
     let cb_child = &title_row_child.children[0];
-    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_child.element.kind {
+    if let WidgetKind::Checkbox {
+        checked,
+        indeterminate,
+        ..
+    } = &cb_child.element.kind
+    {
         assert_eq!(*checked, true);
         assert_eq!(*indeterminate, true); // 3-state inherited!
     } else {
@@ -677,7 +728,12 @@ fn test_inheritable_check_row_tri_state() {
     let child_ovr_layout = compute_layout(0, child_override, 0, 0, 400);
     let title_row_ovr = &child_ovr_layout.children[0];
     let cb_ovr = &title_row_ovr.children[0];
-    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_ovr.element.kind {
+    if let WidgetKind::Checkbox {
+        checked,
+        indeterminate,
+        ..
+    } = &cb_ovr.element.kind
+    {
         assert_eq!(*checked, false);
         assert_eq!(*indeterminate, false);
     } else {
@@ -747,7 +803,10 @@ fn test_modal_hotkey_declarative_layout() {
         HotkeyPreset::new("Ctrl + Shift", Hotkey::new(true, true, false, false, 0)),
         HotkeyPreset::new("Alt + Z", Hotkey::new(false, false, true, false, 0x5A)),
         HotkeyPreset::new("Win + Space", Hotkey::new(false, false, false, true, 0x20)),
-        HotkeyPreset::new("Shift + Space", Hotkey::new(false, true, false, false, 0x20)),
+        HotkeyPreset::new(
+            "Shift + Space",
+            Hotkey::new(false, true, false, false, 0x20),
+        ),
     ];
 
     let state = HotkeyState {

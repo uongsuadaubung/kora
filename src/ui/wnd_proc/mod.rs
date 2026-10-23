@@ -183,9 +183,7 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                     crate::ui::views::control_panel::ViewMode::SystemSettings => {
                         c.tab_system.viewport_hwnd()
                     }
-                    crate::ui::views::control_panel::ViewMode::About => {
-                        c.tab_about.viewport_hwnd()
-                    }
+                    crate::ui::views::control_panel::ViewMode::About => c.tab_about.viewport_hwnd(),
                     _ => 0,
                 };
                 if vhwnd != 0 {

@@ -1,6 +1,6 @@
 //! Declarative Layout & Container Primitives (`row`, `col`, `grid`, `card`, `alert`, `divider`, `spacer`, `empty`)
 
-use super::element::{elements, Element, IntoElement, Length, WidgetKind};
+use super::element::{Element, IntoElement, Length, WidgetKind, elements};
 use super::style::Variant;
 use super::text::text;
 

@@ -7,7 +7,7 @@ pub use crate::ui_framework::dialog::*;
 
 use crate::platform::win32::ENGINE_INSTANCE;
 use crate::ui_framework::core::{
-    button, col, elements, row, spacer, text, BgStyle, BorderStyle, Element, Styleable, Variant,
+    BgStyle, BorderStyle, Element, Styleable, Variant, button, col, elements, row, spacer, text,
 };
 use crate::ui_framework::tokens::radii;
 
@@ -56,17 +56,9 @@ pub fn key_capture_box<M: Clone + Send + Sync + 'static>(
             text(label).accent().bold(),
         )
     } else if is_placeholder {
-        (
-            BgStyle::Input,
-            BorderStyle::Dashed,
-            text(label).secondary(),
-        )
+        (BgStyle::Input, BorderStyle::Dashed, text(label).secondary())
     } else {
-        (
-            BgStyle::Card,
-            BorderStyle::Normal,
-            text(label).bold(),
-        )
+        (BgStyle::Card, BorderStyle::Normal, text(label).bold())
     };
 
     col(elements![text_elem.text_center().w_full().nowrap()])

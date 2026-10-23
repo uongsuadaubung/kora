@@ -21,8 +21,12 @@ pub(crate) unsafe extern "system" fn input_subclass_proc(
 ) -> isize {
     match msg {
         WM_KEYDOWN => {
-            if wparam == 0x09 /* VK_TAB */ {
-                let shift_down = unsafe { (GetKeyState(0x10 /* VK_SHIFT */) as i16) < 0 };
+            if wparam == 0x09
+            /* VK_TAB */
+            {
+                let shift_down = unsafe {
+                    (GetKeyState(0x10 /* VK_SHIFT */) as i16) < 0
+                };
                 let parent = unsafe { GetParent(hwnd) };
                 if parent != 0 {
                     unsafe {
@@ -36,7 +40,9 @@ pub(crate) unsafe extern "system" fn input_subclass_proc(
                 }
                 return 0;
             }
-            if wparam == 0x0D /* VK_RETURN */ {
+            if wparam == 0x0D
+            /* VK_RETURN */
+            {
                 return 0;
             }
         }
@@ -45,11 +51,9 @@ pub(crate) unsafe extern "system" fn input_subclass_proc(
                 return 0;
             }
         }
-        WM_NCDESTROY => {
-            unsafe {
-                RemoveWindowSubclass(hwnd, input_subclass_proc, uid_subclass);
-            }
-        }
+        WM_NCDESTROY => unsafe {
+            RemoveWindowSubclass(hwnd, input_subclass_proc, uid_subclass);
+        },
         _ => {}
     }
     unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
@@ -126,7 +130,11 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
             let inner_w = (item.rect.right - item.rect.left - 20).max(10);
             let is_visible = inner_y + inner_h > 0 && inner_y < self.height;
 
-            if let Some(existing) = self.inputs.iter_mut().find(|inp| inp.slot_key == item.slot_key) {
+            if let Some(existing) = self
+                .inputs
+                .iter_mut()
+                .find(|inp| inp.slot_key == item.slot_key)
+            {
                 existing.node_id = item.node_id;
                 existing.rect = item.rect;
                 existing.on_change = item.on_change;

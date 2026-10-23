@@ -353,12 +353,8 @@ pub fn create_dialog_footer_layout<F>(
         let mut rc: RECT = std::mem::zeroed();
         GetClientRect(hwnd, &mut rc);
         let client_w = (rc.right - rc.left).max(0);
-        let mut row = crate::ui_framework::layout::HStack::at(
-            0,
-            y,
-            (client_w - right_margin).max(0),
-            h,
-        );
+        let mut row =
+            crate::ui_framework::layout::HStack::at(0, y, (client_w - right_margin).max(0), h);
         row.align(crate::ui_framework::layout::CrossAlign::Center);
         row.add_spacer();
         if let Some(ref btn) = cancel_btn {

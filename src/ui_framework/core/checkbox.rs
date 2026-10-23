@@ -92,4 +92,3 @@ impl<M> From<Checkbox<M>> for Element<M> {
         c.into_element()
     }
 }
-

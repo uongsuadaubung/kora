@@ -340,7 +340,11 @@ pub(crate) fn paint_node<M>(
                 let (bg, border, fg) = match variant {
                     Variant::Primary => (
                         palette.bg_input,
-                        if is_hover { palette.accent } else { palette.border },
+                        if is_hover {
+                            palette.accent
+                        } else {
+                            palette.border
+                        },
                         if *disabled {
                             palette.text_secondary
                         } else {
@@ -357,7 +361,14 @@ pub(crate) fn paint_node<M>(
                 round_rect(hdc, &rc, rad, bg, Some(border));
                 let hf = resolve_font_handle(FontScale::Bold);
                 let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
-                SetTextColor(hdc, if *disabled { palette.text_secondary } else { fg });
+                SetTextColor(
+                    hdc,
+                    if *disabled {
+                        palette.text_secondary
+                    } else {
+                        fg
+                    },
+                );
                 let mut trc = rc;
                 let wide = to_wide(text);
                 DrawTextW(
@@ -378,7 +389,11 @@ pub(crate) fn paint_node<M>(
                 ..
             } => {
                 let (bg, border, fg) = if *disabled {
-                    (palette.bg_input, palette.border_separator, palette.text_secondary)
+                    (
+                        palette.bg_input,
+                        palette.border_separator,
+                        palette.text_secondary,
+                    )
                 } else {
                     variant.colors(palette, is_hover)
                 };
@@ -416,7 +431,11 @@ pub(crate) fn paint_node<M>(
                     bottom: sw_top + sw_h,
                 };
                 let (track_bg, track_border, thumb_col) = if *disabled {
-                    (palette.bg_input, palette.border_separator, palette.text_secondary)
+                    (
+                        palette.bg_input,
+                        palette.border_separator,
+                        palette.text_secondary,
+                    )
                 } else if *checked {
                     let c = if is_hover {
                         palette.accent_hover
@@ -632,7 +651,13 @@ pub(crate) fn paint_node<M>(
                 } else {
                     palette.border
                 };
-                round_rect(hdc, &rc, radii::RADIUS_MD, palette.bg_input, Some(border_col));
+                round_rect(
+                    hdc,
+                    &rc,
+                    radii::RADIUS_MD,
+                    palette.bg_input,
+                    Some(border_col),
+                );
 
                 let sel_text = options.get(*selected).map(|s| s.as_str()).unwrap_or("");
                 let hf = resolve_font_handle(FontScale::Normal);
@@ -727,7 +752,9 @@ pub(crate) fn paint_node<M>(
                 fill_ellipse(hdc, &thumb_rc, active_col);
             }
             WidgetKind::Row(_) | WidgetKind::Col(_) | WidgetKind::Grid { .. } => {}
-            WidgetKind::TabGroup { options, selected, .. } => {
+            WidgetKind::TabGroup {
+                options, selected, ..
+            } => {
                 round_rect(
                     hdc,
                     &rc,
@@ -870,7 +897,10 @@ pub(crate) fn paint_node<M>(
     }
 
     // 3. Paint Child Nodes
-    if !matches!(node.element.kind, WidgetKind::TabGroup { .. } | WidgetKind::Input { .. }) {
+    if !matches!(
+        node.element.kind,
+        WidgetKind::TabGroup { .. } | WidgetKind::Input { .. }
+    ) {
         for child in &node.children {
             paint_node(
                 hdc,

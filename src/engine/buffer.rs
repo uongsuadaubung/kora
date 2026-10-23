@@ -156,7 +156,7 @@ impl TypingBuffer {
     fn try_smart_english_rollback(
         config: &EngineConfig,
         was_nucleus_or_coda: bool,
-        was_unambiguous_vi: bool,
+        current_state: &SyllableState,
         next_state: &SyllableState,
         action: &EngineAction,
         last_rendered: &str,
@@ -165,11 +165,13 @@ impl TypingBuffer {
     ) -> Option<(SyllableState, EngineAction)> {
         if config.restore_on_wrong_spelling
             && was_nucleus_or_coda
-            && !was_unambiguous_vi
             && matches!(next_state, SyllableState::Passthrough(_))
             && matches!(action, EngineAction::Passthrough)
+            && !current_state.is_unambiguous_completed_vietnamese()
         {
-            let is_same_as_raw = last_rendered.chars().eq(raw_keys_prefix.iter().map(|k| k.ch));
+            let is_same_as_raw = last_rendered
+                .chars()
+                .eq(raw_keys_prefix.iter().map(|k| k.ch));
             if !is_same_as_raw {
                 let mut raw_list = InlineList::new();
                 let mut output = CompactString::new();
@@ -201,7 +203,6 @@ impl TypingBuffer {
             effective.push(key);
             let was_nucleus_or_coda =
                 matches!(state, SyllableState::Nucleus(_) | SyllableState::Coda(_));
-            let was_unambiguous_vi = state.is_unambiguous_completed_vietnamese();
 
             let (mut next_state, mut action) = state.feed_key(key, current_len, config);
 
@@ -209,7 +210,7 @@ impl TypingBuffer {
             if let Some((rollback_state, rollback_action)) = Self::try_smart_english_rollback(
                 config,
                 was_nucleus_or_coda,
-                was_unambiguous_vi,
+                &state,
                 &next_state,
                 &action,
                 &last_rendered,
@@ -307,11 +308,11 @@ impl TypingBuffer {
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
 
         // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-        let was_unambiguous_vi = current_state.is_unambiguous_completed_vietnamese();
+
         if let Some((rollback_state, rollback_action)) = Self::try_smart_english_rollback(
             config,
             was_nucleus_or_coda,
-            was_unambiguous_vi,
+            &current_state,
             &next_state,
             &action,
             &self.last_rendered,

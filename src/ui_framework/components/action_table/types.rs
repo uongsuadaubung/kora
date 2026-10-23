@@ -9,8 +9,6 @@ pub const ROW_HEIGHT: i32 = 32;
 pub const IDC_HAND_ID: usize = 32649;
 pub const IDC_ARROW_ID: usize = 32512;
 
-
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BadgeVariant {
     KeyPill,

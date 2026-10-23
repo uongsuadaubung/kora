@@ -812,4 +812,3 @@ impl<M> Styleable for Element<M> {
         &mut self.style
     }
 }
-

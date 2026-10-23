@@ -79,9 +79,8 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
         ("F1 ➔ Escape", 0x70, 0x1B),
     ];
 
-    let can_submit = state.from_vk.is_some()
-        && state.to_vk.is_some()
-        && state.from_vk != state.to_vk;
+    let can_submit =
+        state.from_vk.is_some() && state.to_vk.is_some() && state.from_vk != state.to_vk;
 
     modal_dialog()
         .header(dialog_callout(strings.dlg_remap_prompt))
@@ -122,7 +121,12 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
                 col(elements![
                     text(strings.dlg_remap_presets_title).secondary().bold(),
                     row(presets.map(|(label, from_vk, to_vk)| {
-                        button(label, Variant::Secondary, RemapMsg::SetPreset(from_vk, to_vk)).into()
+                        button(
+                            label,
+                            Variant::Secondary,
+                            RemapMsg::SetPreset(from_vk, to_vk),
+                        )
+                        .into()
                     }))
                     .gap(2),
                 ])
@@ -134,7 +138,11 @@ fn render_view(state: &RemapState) -> Element<RemapMsg> {
             row(elements![
                 text(&state.target_display).secondary().small(),
                 spacer(),
-                button(strings.dlg_remap_btn_cancel, Variant::Secondary, RemapMsg::Cancel),
+                button(
+                    strings.dlg_remap_btn_cancel,
+                    Variant::Secondary,
+                    RemapMsg::Cancel
+                ),
                 button(
                     strings.dlg_remap_btn_apply,
                     Variant::Primary,
@@ -225,8 +233,7 @@ pub fn show_remap_dialog_with_keys(
                 }
                 RemapMsg::Submit => {
                     stop_single_key_capture();
-                    let (orig, from_opt, to_opt) =
-                        (st.original_from_vk, st.from_vk, st.to_vk);
+                    let (orig, from_opt, to_opt) = (st.original_from_vk, st.from_vk, st.to_vk);
                     drop(st);
                     if let (Some(from), Some(to)) = (from_opt, to_opt)
                         && from != 0
@@ -271,7 +278,9 @@ pub fn show_remap_dialog_with_keys(
                 None
             }
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                if wparam == 0x1B /* VK_ESCAPE */ {
+                if wparam == 0x1B
+                /* VK_ESCAPE */
+                {
                     let was_capturing = state_for_raw
                         .try_lock()
                         .map(|st| st.active_target != ActiveCaptureTarget::None)

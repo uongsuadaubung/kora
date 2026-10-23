@@ -85,4 +85,3 @@ impl<M> From<Badge<M>> for Element<M> {
         b.into_element()
     }
 }
-

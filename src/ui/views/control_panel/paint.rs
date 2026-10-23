@@ -54,8 +54,6 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
             if !ptr.is_null() { Some(&*ptr) } else { None }
         });
 
-
-
         let b_br = CreateSolidBrush(palette.bg_card);
         let b_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);
         let ob = SelectObject(hdc, b_br);

@@ -60,7 +60,9 @@ unsafe extern "system" fn modal_wnd_proc(
                     0
                 }
                 WM_KEYDOWN => {
-                    if wparam == 0x1B /* VK_ESCAPE */ {
+                    if wparam == 0x1B
+                    /* VK_ESCAPE */
+                    {
                         if instance.parent != 0 {
                             EnableWindow(instance.parent, 1);
                             SetForegroundWindow(instance.parent);
@@ -218,12 +220,7 @@ impl<M: Clone + Send + Sync + 'static> ModalDialog<M> {
         let mut sections = Vec::with_capacity(3);
 
         if let Some(h) = self.header {
-            sections.push(
-                col([h])
-                    .px(4)
-                    .pt(3)
-                    .pb(2),
-            );
+            sections.push(col([h]).px(4).pt(3).pb(2));
         }
 
         if let Some(b) = self.body {
@@ -239,12 +236,7 @@ impl<M: Clone + Send + Sync + 'static> ModalDialog<M> {
         }
 
         if let Some(f) = self.footer {
-            sections.push(
-                col([f])
-                    .px(4)
-                    .pt(1)
-                    .pb(3),
-            );
+            sections.push(col([f]).px(4).pt(1).pb(3));
         }
 
         col(sections).w_full().h_flex(1)

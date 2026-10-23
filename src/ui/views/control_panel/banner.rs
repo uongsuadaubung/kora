@@ -20,15 +20,25 @@ pub struct ProfileBanner {
 
 impl ProfileBanner {
     pub fn create(parent: isize, _hfont_normal: isize) -> Option<Self> {
-        let surface = Surface::create(parent, HEADER_X, HEADER_TITLE_Y - 2, HEADER_TITLE_WIDTH, 52)?;
+        let surface =
+            Surface::create(parent, HEADER_X, HEADER_TITLE_Y - 2, HEADER_TITLE_WIDTH, 52)?;
         surface.set_content_width(HEADER_TITLE_WIDTH);
 
         let strings = crate::language::current();
         let initial_title = format!("🌐 {}", strings.banner_root_title);
         let initial_subtitle = strings.banner_root_desc.to_string();
 
-        let current_data = Arc::new(RwLock::new((initial_title.clone(), initial_subtitle.clone(), false)));
-        surface.render(Self::view(&initial_title, &initial_subtitle, false, strings));
+        let current_data = Arc::new(RwLock::new((
+            initial_title.clone(),
+            initial_subtitle.clone(),
+            false,
+        )));
+        surface.render(Self::view(
+            &initial_title,
+            &initial_subtitle,
+            false,
+            strings,
+        ));
 
         surface.set_on_msg(move |msg| match msg {
             BannerMsg::DeleteProfile => {
@@ -42,7 +52,12 @@ impl ProfileBanner {
         })
     }
 
-    pub fn view(title: &str, subtitle: &str, is_child: bool, strings: &LanguageStrings) -> Element<BannerMsg> {
+    pub fn view(
+        title: &str,
+        subtitle: &str,
+        is_child: bool,
+        strings: &LanguageStrings,
+    ) -> Element<BannerMsg> {
         row(elements![
             col(elements![
                 text(title).bold().size(Size::Lg),
@@ -50,9 +65,14 @@ impl ProfileBanner {
             ])
             .gap(1)
             .flex_1(),
-
             if is_child {
-                button(strings.banner_btn_delete, Variant::Danger, BannerMsg::DeleteProfile).w(114).into()
+                button(
+                    strings.banner_btn_delete,
+                    Variant::Danger,
+                    BannerMsg::DeleteProfile,
+                )
+                .w(114)
+                .into()
             } else {
                 empty()
             },
@@ -87,7 +107,8 @@ impl ProfileBanner {
         if let Ok(mut d) = self.current_data.write() {
             *d = (title.clone(), subtitle.clone(), is_child);
         }
-        self.surface.render(Self::view(&title, &subtitle, is_child, strings));
+        self.surface
+            .render(Self::view(&title, &subtitle, is_child, strings));
     }
 
     pub fn update_language(&self, strings: &LanguageStrings) {

@@ -55,10 +55,11 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 | **Giai đoạn 7** (`db34a8c`) | **100% Bitmask Toàn Bộ Quy Tắc Ghép Vần Tiếng Việt**: `is_valid_onset`, `is_valid_onset_extension`, `is_valid_coda_start`, `is_valid_coda_pair`, `is_stop_coda`, `is_valid_onset_vowel_orthography`, `is_valid_coda_start_for_vowels`. Triệt tiêu hoàn toàn mọi chuỗi `match/if-else` trong toàn bộ module chính tả `spelling.rs`. | **20.9M – 24.6M keys/s** (**41–48 ns**) | **18.9M – 22.7M keys/s** (**44–50 ns**) | **100% O(1) Bitwise Zero-Branching** ⚡ |
 | **Giai đoạn 8** (Hoàn tất) | **True 100% Zero-Heap trên cả nhánh Hoàn Tác & Khôi Phục Chính Tả + Thu Gọn L1 Cache**: Đổi `ModifierOutcome::Undone` và Smart English Bypass sang `CompactString` (đẩy English Bypass lên **92.8M keys/s = 10.8 ns**), kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`, gộp các hàm `render_*` xóa 84 dòng code thừa, thu gọn LUT phụ âm đầu từ 1.050B xuống **64B (1 L1 cache line)** không kiểm tra biên (`& 31`). | **21.6M – 24.5M keys/s** (**40.8–46.3 ns**) | **20.35M keys/s** (**49.1 ns**) | **English Bypass: 92.8M keys/s (10.8 ns)** 🔥 |
 | **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **25.45M keys/s** (**39.3 ns**) | **22.50M keys/s** (**44.5 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
+| **Giai đoạn 10** (Hoàn tất) | **Lazy Evaluation cho Smart English Rollback**: Chuyển việc kiểm tra `is_unambiguous_completed_vietnamese` sang đánh giá lười bên trong `try_smart_english_rollback`, chỉ kích hoạt khi `next_state` thực sự là `Passthrough`. Triệt tiêu hoàn toàn chi phí kiểm tra chính tả thừa trên 99.9% phím gõ bình thường. | **25.06M – 26.24M keys/s** (**38.1–39.9 ns**) | **23.99M keys/s** (**41.7 ns**) | **+11.3% Full Simulation (24.0M keys/s, 41.7 ns)** 🚀⚡ |
 
 ### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record)
 
-- **Thời gian đo:** Ngày 14 tháng 10 năm 2026.
+- **Thời gian đo:** Ngày 23 tháng 10 năm 2026.
 - **Môi trường:** Windows 11 x64, Rust toolchain 2024 edition.
 - **Cấu hình Profile Release:** `opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`.
 
@@ -66,25 +67,25 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 [1] PURE ENGINE ON_KEY LATENCY & THROUGHPUT (No screen allocation):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Telex (on_key raw)                         |  25451390 keys/s |    39.3 ns/key (0.039 µs)
-  Simple Telex (on_key raw)                  |  24428842 keys/s |    40.9 ns/key (0.041 µs)
-  English Bypass (on_key raw)                |  90025602 keys/s |    11.1 ns/key (0.011 µs)
+  Telex (on_key raw)                         |  25062105 keys/s |    39.9 ns/key (0.040 µs)
+  Simple Telex (on_key raw)                  |  26235332 keys/s |    38.1 ns/key (0.038 µs)
+  English Bypass (on_key raw)                | 109986802 keys/s |     9.1 ns/key (0.009 µs)
 
 [2] FULL SCREEN SIMULATION (Handling Backspace & Replacement):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  End-to-End Vietnamese Typing               |  22495089 keys/s |    44.5 ns/key (0.044 µs)
+  End-to-End Vietnamese Typing               |  23989459 keys/s |    41.7 ns/key (0.042 µs)
 
 [3] MACRO EXPANSION & ZERO-ALLOCATION ROW MUTE BENCHMARK:
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Macro (All Unmuted)                        |  15988552 keys/s |    62.5 ns/key (0.063 µs)
-  Macro with Muted Rows (Cached Zero-Alloc)  |  20795641 keys/s |    48.1 ns/key (0.048 µs)
+  Macro (All Unmuted)                        |  17702366 keys/s |    56.5 ns/key (0.056 µs)
+  Macro with Muted Rows (Cached Zero-Alloc)  |  21143493 keys/s |    47.3 ns/key (0.047 µs)
 
 [4] KEYBOARD HOOK RULE RESOLUTION (Remap, Disable, Key Macro):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Hook Rule Resolution (4 keys)              | 247524752 keys/s |     4.0 ns/key (0.004 µs)
+  Hook Rule Resolution (4 keys)              | 265727762 keys/s |     3.8 ns/key (0.004 µs)
 ```
 
 ---

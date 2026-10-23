@@ -999,9 +999,7 @@ pub fn is_valid_coda_start_for_vowels(
 /// must be protected from destructive raw-key rollback during word-break / spelling checks.
 #[inline]
 pub fn is_valid_vietnamese_shorthand(chars: &[char]) -> bool {
-    chars.len() == 2
-        && matches!(chars[0], 'đ' | 'Đ')
-        && matches!(chars[1], 'c' | 'C')
+    chars.len() == 2 && matches!(chars[0], 'đ' | 'Đ') && matches!(chars[1], 'c' | 'C')
 }
 
 /// Checks whether a combination of onset, vowels, tone, and coda represents an unambiguous,
@@ -1025,10 +1023,7 @@ pub fn is_unambiguous_completed_vietnamese_syllable(
         .iter()
         .any(|v| matches!(v.diacritic, Diacritic::Horn | Diacritic::Breve))
     {
-        if !has_onset
-            && vowels[0].base == BaseVowel::U
-            && vowels[0].diacritic == Diacritic::Horn
-        {
+        if !has_onset && vowels[0].base == BaseVowel::U && vowels[0].diacritic == Diacritic::Horn {
             if coda.is_empty() {
                 let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
                 let is_valid_standalone_u =
@@ -1081,9 +1076,8 @@ pub fn is_unambiguous_completed_vietnamese_syllable(
         {
             return false;
         }
-        let is_bare_uo = vowels.len() == 2
-            && vowels[0].base == BaseVowel::U
-            && vowels[1].base == BaseVowel::O;
+        let is_bare_uo =
+            vowels.len() == 2 && vowels[0].base == BaseVowel::U && vowels[1].base == BaseVowel::O;
 
         if !(is_bare_uo && coda.is_empty()) {
             return true;
@@ -1105,5 +1099,3 @@ pub fn is_unambiguous_completed_vietnamese_syllable(
 
     false
 }
-
-

@@ -75,7 +75,12 @@ impl HStack {
     }
 
     #[inline]
-    pub fn add_fixed_with_height(&mut self, width: i32, height: i32, hwnd: Option<isize>) -> &mut Self {
+    pub fn add_fixed_with_height(
+        &mut self,
+        width: i32,
+        height: i32,
+        hwnd: Option<isize>,
+    ) -> &mut Self {
         self.items.push(HStackItem {
             length: Length::Fixed(width),
             hwnd,
@@ -140,7 +145,9 @@ impl HStack {
                 CrossAlign::Stretch => self.bounds.y + self.padding.top,
                 CrossAlign::Start => self.bounds.y + self.padding.top,
                 CrossAlign::Center => self.bounds.y + self.padding.top + (inner_h - item_h) / 2,
-                CrossAlign::End => self.bounds.y + self.bounds.height - self.padding.bottom - item_h,
+                CrossAlign::End => {
+                    self.bounds.y + self.bounds.height - self.padding.bottom - item_h
+                }
             };
 
             let rect = Rect::new(cur_x, item_y, item_w, item_h);

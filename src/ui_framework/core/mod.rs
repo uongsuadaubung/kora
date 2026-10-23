@@ -30,8 +30,8 @@ pub use input::*;
 pub use label::*;
 pub use layout_engine::*;
 pub use modal::{
-    modal_dialog, modal_footer, open_modal, open_modal_with_wndproc, ModalConfig, ModalDialog,
-    ModalHandle,
+    ModalConfig, ModalDialog, ModalHandle, modal_dialog, modal_footer, open_modal,
+    open_modal_with_wndproc,
 };
 pub use select::*;
 pub use slider::*;

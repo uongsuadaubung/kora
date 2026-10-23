@@ -31,11 +31,7 @@ pub fn form_group<M: Clone + 'static>(
     lbl: impl Into<String>,
     control: impl IntoElement<M>,
 ) -> Element<M> {
-    col(elements![
-        label(lbl).bold(),
-        control,
-    ])
-    .gap(1)
+    col(elements![label(lbl).bold(), control,]).gap(1)
 }
 
 /// Renders a labeled vertical select field (`Label` + `Select` dropdown).
@@ -108,13 +104,8 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
     if let Some(d) = desc
         && !d.is_empty()
     {
-        left_col.push(
-            row(elements![
-                spacer().w(23),
-                text(d).muted().size(Size::Sm),
-            ])
-            .items_center(),
-        );
+        left_col
+            .push(row(elements![spacer().w(23), text(d).muted().size(Size::Sm),]).items_center());
     }
 
     col(left_col).gap(1)
@@ -130,7 +121,15 @@ pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
     strings: &LanguageStrings,
     on_toggle: impl Fn(Option<bool>) -> M + Send + Sync + 'static,
 ) -> Element<M> {
-    inheritable_check_row(label, desc, is_root, override_val, global_val, strings, on_toggle)
+    inheritable_check_row(
+        label,
+        desc,
+        is_root,
+        override_val,
+        global_val,
+        strings,
+        on_toggle,
+    )
 }
 
 /// Properties for a reusable shortcut / key-rule row inside `OverviewPanel` or `TabTyping`.
@@ -175,12 +174,9 @@ pub fn shortcut_row<M: Clone + Send + Sync + 'static>(props: ShortcutRowProps<M>
     }
 
     let r = row(elements![
-        col(elements![
-            row(header_items).items_center().gap(2),
-            desc_el,
-        ])
-        .gap(1)
-        .flex_1(),
+        col(elements![row(header_items).items_center().gap(2), desc_el,])
+            .gap(1)
+            .flex_1(),
         row(right_items).items_center().gap(2),
     ])
     .items_center()

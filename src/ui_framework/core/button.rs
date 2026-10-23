@@ -91,4 +91,3 @@ impl<M> From<Button<M>> for Element<M> {
         b.into_element()
     }
 }
-

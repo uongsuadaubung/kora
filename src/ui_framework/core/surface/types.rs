@@ -106,4 +106,3 @@ pub fn slider_value_from_x(x: i32, rc: &RECT, min: i32, max: i32) -> i32 {
     let ratio = ((x - track_l) as f32 / (track_r - track_l) as f32).clamp(0.0, 1.0);
     (min as f32 + ratio * (max - min) as f32).round() as i32
 }
-

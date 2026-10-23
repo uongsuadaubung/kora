@@ -28,7 +28,13 @@ pub fn resolve_font_handle(scale: FontScale) -> isize {
 }
 
 /// Measures single-line or multiline text dimensions `(width, height)` in pixels.
-pub fn measure_text_rect(hdc: isize, text: &str, font: FontScale, max_width: i32, wrap: bool) -> (i32, i32) {
+pub fn measure_text_rect(
+    hdc: isize,
+    text: &str,
+    font: FontScale,
+    max_width: i32,
+    wrap: bool,
+) -> (i32, i32) {
     if text.is_empty() {
         return (0, 0);
     }
@@ -44,13 +50,7 @@ pub fn measure_text_rect(hdc: isize, text: &str, font: FontScale, max_width: i32
                 right: avail_w,
                 bottom: 0,
             };
-            let flags = DT_CALCRECT
-                | DT_NOPREFIX
-                | if wrap {
-                    DT_WORDBREAK
-                } else {
-                    DT_SINGLELINE
-                };
+            let flags = DT_CALCRECT | DT_NOPREFIX | if wrap { DT_WORDBREAK } else { DT_SINGLELINE };
             DrawTextW(hdc, wide.as_ptr(), -1, &mut rc, flags);
             if old_f != 0 {
                 SelectObject(hdc, old_f);
@@ -84,7 +84,13 @@ pub fn measure_text_rect(hdc: isize, text: &str, font: FontScale, max_width: i32
 }
 
 /// Resolves an [`Element<M>`] tree into a positioned [`LayoutNode<M>`] tree within `avail_w`.
-pub fn compute_layout<M>(hdc: isize, root: impl IntoElement<M>, x: i32, y: i32, avail_w: i32) -> LayoutNode<M> {
+pub fn compute_layout<M>(
+    hdc: isize,
+    root: impl IntoElement<M>,
+    x: i32,
+    y: i32,
+    avail_w: i32,
+) -> LayoutNode<M> {
     let mut next_id = 1usize;
     layout_node(hdc, root.into_element(), x, y, avail_w, &mut next_id)
 }
@@ -193,7 +199,8 @@ fn intrinsic_size<M>(hdc: isize, el: &Element<M>, avail_w: i32) -> (i32, i32) {
             (w, total_h)
         }
         WidgetKind::Row(children) => {
-            let (_, row_h, used_w) = measure_row_children(hdc, children, inner_avail_w, el.style.gap);
+            let (_, row_h, used_w) =
+                measure_row_children(hdc, children, inner_avail_w, el.style.gap);
             let w = match el.style.width {
                 Length::Auto => used_w,
                 _ => inner_avail_w,
@@ -435,7 +442,11 @@ fn layout_node<M>(
             let sizes = measure_col_children(hdc, &raw_children, inner_w, inner_h, el.style.gap);
             let active_count = raw_children.iter().filter(|c| !c.is_empty()).count();
             let total_used_h: i32 = sizes.iter().map(|&(_, h)| h).sum::<i32>()
-                + if active_count > 1 { el.style.gap * (active_count as i32 - 1) } else { 0 };
+                + if active_count > 1 {
+                    el.style.gap * (active_count as i32 - 1)
+                } else {
+                    0
+                };
             let extra_space = (inner_h - total_used_h).max(0);
             let mut cur_y = match el.style.justify {
                 Justify::Start | Justify::Between => inner_top,
@@ -481,7 +492,8 @@ fn layout_node<M>(
         }
         WidgetKind::Row(children) => {
             let raw_children = std::mem::take(children);
-            let (sizes, row_h, used_w) = measure_row_children(hdc, &raw_children, inner_w, el.style.gap);
+            let (sizes, row_h, used_w) =
+                measure_row_children(hdc, &raw_children, inner_w, el.style.gap);
             let row_box_h = inner_h.max(row_h);
 
             let active_count = raw_children.iter().filter(|c| !c.is_empty()).count();
@@ -552,7 +564,9 @@ fn layout_node<M>(
                 }
             }
         }
-        WidgetKind::TabGroup { options, on_select, .. } => {
+        WidgetKind::TabGroup {
+            options, on_select, ..
+        } => {
             let track_padding = 3;
             let available_w = (inner_w - track_padding * 2).max(1);
             let num_tabs = options.len();
@@ -597,4 +611,3 @@ fn layout_node<M>(
         children: layout_children,
     }
 }
-

@@ -79,10 +79,19 @@ impl SidebarControls {
 
     pub fn render(&self) {
         let items = self.items.read().map(|l| l.clone()).unwrap_or_default();
-        let sel_id = self.selected_id.read().map(|l| l.clone()).unwrap_or_default();
-        let mode = self.current_view_mode.read().map(|l| *l).unwrap_or(ViewMode::Profile(0));
+        let sel_id = self
+            .selected_id
+            .read()
+            .map(|l| l.clone())
+            .unwrap_or_default();
+        let mode = self
+            .current_view_mode
+            .read()
+            .map(|l| *l)
+            .unwrap_or(ViewMode::Profile(0));
         let strings = crate::language::current();
-        self.surface.render(Self::view(&items, &sel_id, mode, strings));
+        self.surface
+            .render(Self::view(&items, &sel_id, mode, strings));
     }
 
     pub fn view(
@@ -117,12 +126,12 @@ impl SidebarControls {
             let card = row(elements![
                 text(&item.icon).bold().w(20).text_center(),
                 col(elements![
-                    text(&item.name)
-                        .bold()
-                        .tone(if is_selected { TextTone::Accent } else { TextTone::Primary }),
-                    text(&item.desc)
-                        .muted()
-                        .size(Size::Sm),
+                    text(&item.name).bold().tone(if is_selected {
+                        TextTone::Accent
+                    } else {
+                        TextTone::Primary
+                    }),
+                    text(&item.desc).muted().size(Size::Sm),
                 ])
                 .gap(1)
                 .flex_1(),
@@ -132,38 +141,68 @@ impl SidebarControls {
             .rounded(RADIUS_MD)
             .w_full()
             .items_center()
-            .bg(if is_selected { BgStyle::TabActive } else { BgStyle::None })
-            .border_style(if is_selected { BorderStyle::Normal } else { BorderStyle::None })
+            .bg(if is_selected {
+                BgStyle::TabActive
+            } else {
+                BgStyle::None
+            })
+            .border_style(if is_selected {
+                BorderStyle::Normal
+            } else {
+                BorderStyle::None
+            })
             .on_click(SidebarMsg::SelectProfile(item.id.clone()));
 
             profile_elements.push(card);
         }
 
         // Footer buttons
-        let btn_settings = row(elements![
-            text(strings.sidebar_btn_settings)
-                .tone(if is_settings { TextTone::Primary } else { TextTone::Secondary }),
-        ])
+        let btn_settings = row(elements![text(strings.sidebar_btn_settings).tone(
+            if is_settings {
+                TextTone::Primary
+            } else {
+                TextTone::Secondary
+            }
+        ),])
         .items_center()
         .padding(Edges::xy(8, 4))
         .rounded(RADIUS_MD)
         .w_full()
         .h(28)
-        .bg(if is_settings { BgStyle::TabActive } else { BgStyle::None })
-        .border_style(if is_settings { BorderStyle::Normal } else { BorderStyle::None })
+        .bg(if is_settings {
+            BgStyle::TabActive
+        } else {
+            BgStyle::None
+        })
+        .border_style(if is_settings {
+            BorderStyle::Normal
+        } else {
+            BorderStyle::None
+        })
         .on_click(SidebarMsg::SystemSettings);
 
-        let btn_about = row(elements![
-            text(strings.sidebar_btn_about)
-                .tone(if is_about { TextTone::Primary } else { TextTone::Secondary }),
-        ])
+        let btn_about = row(elements![text(strings.sidebar_btn_about).tone(
+            if is_about {
+                TextTone::Primary
+            } else {
+                TextTone::Secondary
+            }
+        ),])
         .items_center()
         .padding(Edges::xy(8, 4))
         .rounded(RADIUS_MD)
         .w_full()
         .h(28)
-        .bg(if is_about { BgStyle::TabActive } else { BgStyle::None })
-        .border_style(if is_about { BorderStyle::Normal } else { BorderStyle::None })
+        .bg(if is_about {
+            BgStyle::TabActive
+        } else {
+            BgStyle::None
+        })
+        .border_style(if is_about {
+            BorderStyle::Normal
+        } else {
+            BorderStyle::None
+        })
         .on_click(SidebarMsg::About);
 
         col(elements![

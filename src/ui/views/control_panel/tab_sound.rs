@@ -288,12 +288,7 @@ impl TabSound {
                 }
             }
             SoundMsg::SelectSwitchProfile(idx) => {
-                let chosen = tab
-                    .state
-                    .borrow()
-                    .switch_profiles
-                    .get(idx)
-                    .cloned();
+                let chosen = tab.state.borrow().switch_profiles.get(idx).cloned();
                 if let Some(name) = chosen {
                     tab.state.borrow_mut().selected_profile = name.clone();
                     controller::edit_selected_then(
@@ -332,8 +327,7 @@ impl TabSound {
                 {
                     let mut st = tab.state.borrow_mut();
                     st.is_downloading = true;
-                    st.custom_note =
-                        Some("Đang kết nối GitHub & tải 13 switch... ⏳".to_string());
+                    st.custom_note = Some("Đang kết nối GitHub & tải 13 switch... ⏳".to_string());
                 }
                 tab.refresh();
 
