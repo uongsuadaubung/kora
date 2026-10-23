@@ -37,6 +37,7 @@ unsafe extern "system" {
     pub fn SetForegroundWindow(h_wnd: isize) -> i32;
     pub fn GetFocus() -> isize;
     pub fn SetFocus(h_wnd: isize) -> isize;
+    pub fn GetKeyState(n_virt_key: i32) -> i16;
     pub fn LoadCursorW(h_instance: isize, lp_cursor_name: usize) -> isize;
     pub fn SetCursor(h_cursor: isize) -> isize;
     pub fn GetSystemMetrics(n_index: i32) -> i32;

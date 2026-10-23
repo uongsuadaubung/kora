@@ -97,6 +97,15 @@ pub enum WidgetKind<M> {
         selected: usize,
         on_select: Option<Arc<dyn Fn(usize) -> M + Send + Sync>>,
     },
+    Input {
+        key: u32,
+        value: String,
+        placeholder: String,
+        disabled: bool,
+        password: bool,
+        auto_focus: bool,
+        on_change: Option<Arc<dyn Fn(String) -> M + Send + Sync>>,
+    },
 }
 
 /// A declarative UI node parameterized over the application message type `M`.
@@ -696,8 +705,36 @@ impl<M> Element<M> {
             | WidgetKind::Switch { disabled, .. }
             | WidgetKind::Checkbox { disabled, .. }
             | WidgetKind::Select { disabled, .. }
-            | WidgetKind::Slider { disabled, .. } => {
+            | WidgetKind::Slider { disabled, .. }
+            | WidgetKind::Input { disabled, .. } => {
                 *disabled = is_disabled;
+            }
+            _ => {}
+        }
+        self
+    }
+
+    #[inline]
+    pub fn password(mut self, is_pw: bool) -> Self {
+        if let WidgetKind::Input { password, .. } = &mut self.kind {
+            *password = is_pw;
+        }
+        self
+    }
+
+    #[inline]
+    pub fn auto_focus(mut self, auto: bool) -> Self {
+        if let WidgetKind::Input { auto_focus, .. } = &mut self.kind {
+            *auto_focus = auto;
+        }
+        self
+    }
+
+    #[inline]
+    pub fn key(mut self, k: u32) -> Self {
+        match &mut self.kind {
+            WidgetKind::Select { key, .. } | WidgetKind::Input { key, .. } => {
+                *key = k;
             }
             _ => {}
         }

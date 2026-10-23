@@ -157,6 +157,17 @@ fn intrinsic_size<M>(hdc: isize, el: &Element<M>, avail_w: i32) -> (i32, i32) {
         }
         WidgetKind::Slider { .. } => (inner_avail_w, 24),
         WidgetKind::TabGroup { .. } => (inner_avail_w, 32),
+        WidgetKind::Input { .. } => {
+            let h = match el.style.height {
+                Length::Fixed(fixed_h) => fixed_h,
+                _ => 32,
+            };
+            let w = match el.style.width {
+                Length::Fixed(fixed_w) => fixed_w,
+                _ => inner_avail_w.max(el.style.min_w).max(80),
+            };
+            (w, h)
+        }
         WidgetKind::Col(children) => {
             let mut total_h = 0;
             let mut max_cw = 0;

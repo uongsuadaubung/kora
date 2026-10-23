@@ -10,8 +10,8 @@ use crate::ui_framework::tokens::layout;
 use crate::ui_framework::win32::{SW_HIDE, ShowWindow};
 use std::cell::Cell;
 
-const HERO_CARD_X: i32 = 246;
-const HERO_START_Y: i32 = 64;
+const HERO_CARD_X: i32 = layout::CARD_X;
+const HERO_START_Y: i32 = layout::HEADER_TITLE_Y;
 
 #[derive(Clone, Debug)]
 pub enum AboutMsg {
@@ -21,7 +21,7 @@ pub enum AboutMsg {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum UpdateBtnState {
+pub enum UpdateBtnState {
     Idle,
     Checking,
     Updating,
@@ -34,7 +34,7 @@ pub struct TabAbout {
 
 impl TabAbout {
     pub fn create(parent: isize, _hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
-        let viewport_w = layout::WINDOW_CLIENT_WIDTH - HERO_CARD_X - 8;
+        let viewport_w = layout::CARD_WIDTH;
         let viewport_h = layout::CARD_BOTTOM_Y - HERO_START_Y;
 
         let surface = Surface::create(parent, HERO_CARD_X, HERO_START_Y, viewport_w, viewport_h)?;
@@ -91,7 +91,7 @@ impl TabAbout {
         self.refresh();
     }
 
-    fn view(btn_state: UpdateBtnState, strings: &LanguageStrings) -> Element<AboutMsg> {
+    pub fn view(btn_state: UpdateBtnState, strings: &LanguageStrings) -> Element<AboutMsg> {
         let header = page_header(strings.about_header_title, strings.about_header_sub);
 
         let (btn_update_txt, is_busy) = match btn_state {
@@ -101,45 +101,58 @@ impl TabAbout {
         };
 
         let hero_card = card(vec![
+            // Row 1: App identity & Update check button
             row(vec![
-                spacer(),
-                badge("KORA", Variant::Primary),
-                spacer(),
-            ])
-            .pt(2),
-            text(strings.about_title).bold().size(Size::Lg).text_center(),
-            text(strings.about_engine_desc).muted().text_center(),
-            divider(),
-            row(vec![
-                spacer(),
-                text(strings.about_author).muted(),
-                button("✉️ Email", Variant::Ghost, AboutMsg::ContactAuthor).size(Size::Sm),
-                spacer(),
-            ])
-            .items_center()
-            .gap(2),
-            row(vec![
-                spacer(),
+                col(vec![
+                    row(vec![
+                        text("Kora").bold().size(Size::Lg),
+                        badge(concat!("v", env!("CARGO_PKG_VERSION")), Variant::Primary),
+                    ])
+                    .items_center()
+                    .gap(2),
+                    text(strings.about_engine_desc).muted().size(Size::Sm),
+                ])
+                .gap(1)
+                .flex_1(),
                 button(btn_update_txt, Variant::Primary, AboutMsg::CheckUpdate)
-                    .enabled(!is_busy)
-                    .w(164),
-                button(
-                    strings.about_github_btn,
-                    Variant::Secondary,
-                    AboutMsg::OpenGithub,
-                )
-                .w(164),
-                spacer(),
+                    .enabled(!is_busy),
             ])
             .items_center()
-            .gap(3)
-            .pt(2)
-            .pb(2),
+            .justify_between()
+            .gap(3),
+            divider(),
+            // Row 2: Author info & Email button
+            row(vec![
+                col(vec![
+                    text(strings.about_author).bold(),
+                    text(strings.about_email).muted().size(Size::Sm),
+                ])
+                .gap(1)
+                .flex_1(),
+                button("✉ Email", Variant::Secondary, AboutMsg::ContactAuthor).size(Size::Sm),
+            ])
+            .items_center()
+            .justify_between()
+            .gap(3),
+            divider(),
+            // Row 3: GitHub repository & Open button
+            row(vec![
+                col(vec![
+                    text("GitHub Repository").bold(),
+                    text(strings.about_github).muted().size(Size::Sm),
+                ])
+                .gap(1)
+                .flex_1(),
+                button(strings.about_github_btn, Variant::Secondary, AboutMsg::OpenGithub).size(Size::Sm),
+            ])
+            .items_center()
+            .justify_between()
+            .gap(3),
         ])
-        .p(5)
+        .p(4)
         .gap(3);
 
-        col(vec![header, hero_card]).gap(3).pb(3)
+        col(vec![header, divider(), hero_card]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, msg: AboutMsg) {

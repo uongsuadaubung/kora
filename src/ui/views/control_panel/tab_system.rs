@@ -13,8 +13,8 @@ use crate::ui_framework::win32::{
     RDW_ALLCHILDREN, RDW_INVALIDATE, RedrawWindow, SW_HIDE, SetWindowTextW, ShowWindow, to_wide,
 };
 
-const SYS_CARD_X: i32 = 246;
-const SYS_START_Y: i32 = 64;
+const SYS_CARD_X: i32 = layout::CARD_X;
+const SYS_START_Y: i32 = layout::HEADER_TITLE_Y;
 
 #[derive(Clone, Debug)]
 pub enum SystemMsg {
@@ -33,7 +33,7 @@ pub struct TabSystem {
 
 impl TabSystem {
     pub fn create(parent: isize, _hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
-        let viewport_w = layout::WINDOW_CLIENT_WIDTH - SYS_CARD_X - 8;
+        let viewport_w = layout::CARD_WIDTH;
         let viewport_h = layout::CARD_BOTTOM_Y - SYS_START_Y;
 
         let surface = Surface::create(parent, SYS_CARD_X, SYS_START_Y, viewport_w, viewport_h)?;
@@ -175,7 +175,7 @@ impl TabSystem {
             .gap(3),
         ]);
 
-        col(vec![header, card1, card2, card3]).gap(3).pb(3)
+        col(vec![header, divider(), card1, card2, card3]).gap(3).pb(3)
     }
 
     fn handle_message(parent_hwnd: isize, surface: &Surface<SystemMsg>, msg: SystemMsg) {

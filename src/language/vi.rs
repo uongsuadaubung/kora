@@ -90,14 +90,14 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
 
     // Tab 3: About
     about_header_title: "ℹ Thông tin phần mềm",
-    about_header_sub: "Kora - Modern Input & Keyboard Suite",
+    about_header_sub: "Kora - Bộ gõ tiếng Việt hiện đại & tùy biến phím",
     about_title: concat!("Kora v", env!("CARGO_PKG_VERSION")),
     about_ver: concat!("Phiên bản: ", env!("CARGO_PKG_VERSION")),
-    about_author: "Tác giả: Mạnh Kiên (manhkien13041997@gmail.com)",
+    about_author: "Tác giả: Mạnh Kiên",
     about_email: "Email: manhkien13041997@gmail.com",
     about_github: "GitHub: https://github.com/uongsuadaubung/kora",
     about_engine_desc: "Engine: Pure Rust, Zero-dependency, Native Win32 API",
-    about_github_btn: "Github Repository",
+    about_github_btn: "Mở GitHub ↗",
 
     // Footer Buttons
     btn_exit: "❌ Tắt Kora",

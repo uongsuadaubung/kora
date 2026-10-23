@@ -408,14 +408,13 @@ impl TabTyping {
 
             card(vec![
                 row(vec![
+                    checkbox("", cap_enabled, TypingMsg::ToggleTargetCapture),
                     text(strings.typing_group_target_hotkey)
                         .bold()
-                        .accent()
-                        .flex_1(),
-                    switch("", cap_enabled, TypingMsg::ToggleTargetCapture),
+                        .accent(),
                 ])
                 .items_center()
-                .justify_between(),
+                .gap(2),
                 col(vec![
                     row(vec![
                         text(strings.typing_lbl_current_key).bold().flex_1(),

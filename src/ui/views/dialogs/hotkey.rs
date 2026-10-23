@@ -1,42 +1,488 @@
-//! Modal Dialog for capturing and customizing typing mode switch hotkey
-//! Pixel-perfect native Win32 GDI implementation matching modern mockup.
+//! Declarative Modal Dialog for capturing and customizing Hotkeys / Shortcuts
+//! High-polish declarative Web-like modal built on [`crate::ui_framework::core::modal`].
 
-use super::{
-    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
-};
+use std::sync::{Arc, Mutex};
+
+use super::base::{dialog_callout, dialog_footer, key_capture_box};
 use crate::engine::config::Hotkey;
+use crate::language::LanguageStrings;
 use crate::platform::win32::{
     ENGINE_INSTANCE, WM_COMBO_CANCELLED, WM_COMBO_CAPTURED, get_captured_display_text,
     get_captured_hotkey, get_pending_modifier_hotkey, set_captured_hotkey, start_combo_capture,
     stop_combo_capture,
 };
-use crate::ui::colors::ThemePalette;
-use crate::ui::components::button::{ButtonVariant, PushButton};
-use crate::ui::components::{Label, LabelTone, SurfaceRole};
-use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
-use crate::ui::win32::*;
-use std::ptr::null_mut;
+use crate::ui_framework::core::{
+    button, col, modal_dialog, open_modal_with_wndproc, row, Element, ModalConfig, Variant,
+};
+use crate::ui_framework::win32::{WM_ACTIVATE, WM_KEYDOWN, WM_SYSKEYDOWN};
 
-struct HotkeyDialogState {
-    parent: isize,
-    display_font: isize,
-    is_listening: bool,
-    is_inherit: bool,
-    is_root: bool,
-    is_target_capture: bool,
-    target_profile_id: String,
-    target_display: String,
-    global_hotkey: Hotkey,
-    current_hotkey: Option<Hotkey>,
-    display_text: String,
-    btn_display: Option<PushButton>,
+/// A common / suggested shortcut preset that can be clicked to quickly populate the hotkey.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HotkeyPreset {
+    pub label: String,
+    pub hotkey: Hotkey,
 }
 
-static REGISTERED: std::sync::Once = std::sync::Once::new();
-const CLASS_NAME: &str = "KoraHotkeyDialogClass";
+impl HotkeyPreset {
+    pub fn new(label: impl Into<String>, hotkey: Hotkey) -> Self {
+        Self {
+            label: label.into(),
+            hotkey,
+        }
+    }
+}
 
-/// Displays the modal Hotkey Capture Dialog centered over the parent control panel
-pub fn show_hotkey_dialog(parent: isize) {
+/// Configuration options for launching the reusable Declarative Hotkey Modal.
+pub struct HotkeyModalConfig {
+    pub title: String,
+    pub prompt: String,
+    pub target_display: String,
+    pub current_hotkey: Option<Hotkey>,
+    pub inherit_hotkey: Option<Hotkey>,
+    pub presets: Vec<HotkeyPreset>,
+    pub on_save: Box<dyn Fn(Option<Hotkey>) + Send + Sync + 'static>,
+}
+
+impl HotkeyModalConfig {
+    pub fn new(
+        title: impl Into<String>,
+        prompt: impl Into<String>,
+        on_save: impl Fn(Option<Hotkey>) + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            prompt: prompt.into(),
+            target_display: String::new(),
+            current_hotkey: None,
+            inherit_hotkey: None,
+            presets: Vec::new(),
+            on_save: Box::new(on_save),
+        }
+    }
+
+    pub fn with_target_display(mut self, target_display: impl Into<String>) -> Self {
+        self.target_display = target_display.into();
+        self
+    }
+
+    pub fn with_current_hotkey(mut self, current: Option<Hotkey>) -> Self {
+        self.current_hotkey = current;
+        self
+    }
+
+    pub fn with_inherit_hotkey(mut self, inherit: Option<Hotkey>) -> Self {
+        self.inherit_hotkey = inherit;
+        self
+    }
+
+    pub fn with_presets(mut self, presets: impl IntoIterator<Item = HotkeyPreset>) -> Self {
+        self.presets = presets.into_iter().collect();
+        self
+    }
+}
+
+/// Standard switch hotkey presets (Ctrl + Shift, Alt + Z, Win + Space, Shift + Space).
+pub fn switch_hotkey_presets(strings: &LanguageStrings) -> Vec<HotkeyPreset> {
+    vec![
+        HotkeyPreset::new(
+            strings.hotkey_preset_ctrl_shift,
+            Hotkey::new(true, true, false, false, 0),
+        ),
+        HotkeyPreset::new(
+            strings.hotkey_preset_alt_z,
+            Hotkey::new(false, false, true, false, 0x5A),
+        ),
+        HotkeyPreset::new(
+            strings.hotkey_preset_win_space,
+            Hotkey::new(false, false, false, true, 0x20),
+        ),
+        HotkeyPreset::new(
+            strings.hotkey_preset_shift_space,
+            Hotkey::new(false, true, false, false, 0x20),
+        ),
+    ]
+}
+
+/// Standard target capture presets (Ctrl + ~, Ctrl + Alt + K, Ctrl + Shift + K, Alt + ~).
+pub fn target_capture_presets(strings: &LanguageStrings) -> Vec<HotkeyPreset> {
+    vec![
+        HotkeyPreset::new(
+            strings.hotkey_preset_ctrl_tilde,
+            Hotkey::new(true, false, false, false, 0xC0),
+        ),
+        HotkeyPreset::new(
+            "Ctrl + Alt + K",
+            Hotkey::new(true, false, true, false, 0x4B),
+        ),
+        HotkeyPreset::new(
+            "Ctrl + Shift + K",
+            Hotkey::new(true, true, false, false, 0x4B),
+        ),
+        HotkeyPreset::new(
+            "Alt + ~",
+            Hotkey::new(false, false, true, false, 0xC0),
+        ),
+    ]
+}
+
+#[derive(Clone, Debug)]
+pub struct HotkeyState {
+    pub prompt: String,
+    pub target_display: String,
+    pub current_hotkey: Option<Hotkey>,
+    pub inherit_hotkey: Option<Hotkey>,
+    pub is_inherit: bool,
+    pub is_listening: bool,
+    pub display_text: String,
+    pub presets: Vec<HotkeyPreset>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum HotkeyMsg {
+    ToggleListening,
+    ComboCaptured(Option<Hotkey>, String),
+    ComboCancelled,
+    SetPreset(usize),
+    SetInherit,
+    Submit,
+    Cancel,
+    FocusLost,
+    EscapePressed,
+}
+
+pub fn render_hotkey_view(state: &HotkeyState) -> Element<HotkeyMsg> {
+    let strings = crate::language::current();
+
+    let (box_text, is_placeholder) = if state.is_listening {
+        (strings.hotkey_listening.to_string(), false)
+    } else if state.is_inherit {
+        let global_str = state
+            .inherit_hotkey
+            .map(|h| h.display_text())
+            .unwrap_or_default();
+        (
+            format!("{} ({})", strings.typing_inherit_prefix, global_str),
+            false,
+        )
+    } else if !state.display_text.is_empty() {
+        (state.display_text.clone(), false)
+    } else if let Some(hk) = state.current_hotkey {
+        (hk.display_text(), false)
+    } else {
+        (strings.dlg_remap_unassigned.to_string(), true)
+    };
+
+    let mut preset_rows = Vec::new();
+    let mut idx = 0;
+    for chunk in state.presets.chunks(2) {
+        let mut row_btns = Vec::new();
+        for preset in chunk {
+            let p_idx = idx;
+            row_btns.push(
+                button(&preset.label, Variant::Secondary, HotkeyMsg::SetPreset(p_idx)).flex_1(),
+            );
+            idx += 1;
+        }
+        preset_rows.push(row(row_btns).gap(2));
+    }
+
+    if let Some(inherit_hk) = state.inherit_hotkey {
+        let inherit_label = format!(
+            "🌐 {} ({})",
+            strings.typing_inherit_global,
+            inherit_hk.display_text()
+        );
+        preset_rows.push(row([button(
+            inherit_label,
+            Variant::Secondary,
+            HotkeyMsg::SetInherit,
+        )
+        .flex_1()]));
+    }
+
+    let can_submit = state.is_inherit
+        || state.current_hotkey.is_some()
+        || (!state.display_text.is_empty() && state.display_text != strings.hotkey_listening);
+
+    modal_dialog()
+        .header(dialog_callout(&state.prompt))
+        .body(
+            col([
+                col([
+                    crate::ui_framework::core::text(strings.hotkey_selected_title)
+                        .secondary()
+                        .bold(),
+                    key_capture_box(
+                        &box_text,
+                        state.is_listening,
+                        is_placeholder,
+                        HotkeyMsg::ToggleListening,
+                    ),
+                    crate::ui_framework::core::text(strings.hotkey_click_hint)
+                        .secondary()
+                        .small(),
+                ])
+                .gap(1),
+                if !preset_rows.is_empty() {
+                    col([
+                        crate::ui_framework::core::text(strings.hotkey_presets_title)
+                            .secondary()
+                            .bold(),
+                        col(preset_rows).gap(2),
+                    ])
+                    .gap(1)
+                } else {
+                    col([])
+                },
+            ])
+            .gap(3),
+        )
+        .footer(dialog_footer(
+            &state.target_display,
+            strings.btn_cancel,
+            HotkeyMsg::Cancel,
+            strings.hotkey_btn_save,
+            HotkeyMsg::Submit,
+            Variant::Primary,
+            !can_submit,
+        ))
+        .build()
+}
+
+/// Displays the reusable modal Hotkey Capture Dialog with configurable presets and save callback.
+pub fn show_hotkey_modal(parent: isize, config: HotkeyModalConfig) {
+    let strings = crate::language::current();
+    let is_inherit = config.current_hotkey.is_none() && config.inherit_hotkey.is_some();
+    let display_text = if is_inherit {
+        let global_str = config
+            .inherit_hotkey
+            .map(|h| h.display_text())
+            .unwrap_or_default();
+        format!("{} ({})", strings.typing_inherit_prefix, global_str)
+    } else if let Some(hk) = config.current_hotkey {
+        hk.display_text()
+    } else {
+        String::new()
+    };
+
+    set_captured_hotkey(config.current_hotkey, &display_text);
+
+    let row_count = (config.presets.len() + 1) / 2
+        + if config.inherit_hotkey.is_some() {
+            1
+        } else {
+            0
+        };
+    let modal_height = (290 + (row_count as i32 * 36)).max(340);
+
+    let on_save = Arc::new(config.on_save);
+    let state = Arc::new(Mutex::new(HotkeyState {
+        prompt: config.prompt,
+        target_display: config.target_display,
+        current_hotkey: config.current_hotkey,
+        inherit_hotkey: config.inherit_hotkey,
+        is_inherit,
+        is_listening: false,
+        display_text,
+        presets: config.presets,
+    }));
+
+    let state_for_render = Arc::clone(&state);
+    let state_for_msg = Arc::clone(&state);
+    let state_for_raw = Arc::clone(&state);
+    let on_save_for_msg = Arc::clone(&on_save);
+
+    let initial_view = render_hotkey_view(&state_for_render.lock().unwrap());
+    let modal_cfg = ModalConfig::new(&config.title, 480, modal_height);
+
+    open_modal_with_wndproc(
+        parent,
+        modal_cfg,
+        initial_view,
+        move |handle, msg| {
+            let mut st = state_for_msg.lock().unwrap();
+            match msg {
+                HotkeyMsg::ToggleListening => {
+                    if st.is_listening {
+                        st.is_listening = false;
+                        stop_combo_capture();
+                        st.display_text = if st.is_inherit {
+                            let g = st
+                                .inherit_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default();
+                            format!("{} ({})", strings.typing_inherit_prefix, g)
+                        } else {
+                            st.current_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default()
+                        };
+                    } else {
+                        st.is_listening = true;
+                        st.is_inherit = false;
+                        st.display_text = strings.hotkey_listening.to_string();
+                        start_combo_capture(handle.hwnd, false);
+                    }
+                    handle.render(render_hotkey_view(&st));
+                }
+                HotkeyMsg::ComboCaptured(hk_opt, text) => {
+                    if !text.is_empty() {
+                        st.display_text = text;
+                        if let Some(hk) = hk_opt {
+                            st.current_hotkey = Some(hk);
+                            st.is_listening = false;
+                            st.is_inherit = false;
+                            stop_combo_capture();
+                        }
+                    }
+                    handle.render(render_hotkey_view(&st));
+                }
+                HotkeyMsg::ComboCancelled => {
+                    stop_combo_capture();
+                    st.is_listening = false;
+                    st.display_text = if st.is_inherit {
+                        let g = st
+                            .inherit_hotkey
+                            .map(|h| h.display_text())
+                            .unwrap_or_default();
+                        format!("{} ({})", strings.typing_inherit_prefix, g)
+                    } else {
+                        st.current_hotkey
+                            .map(|h| h.display_text())
+                            .unwrap_or_default()
+                    };
+                    handle.render(render_hotkey_view(&st));
+                }
+                HotkeyMsg::SetPreset(idx) => {
+                    let preset = st.presets.get(idx).cloned();
+                    if let Some(p) = preset {
+                        st.current_hotkey = Some(p.hotkey);
+                        st.display_text = p.label.clone();
+                        st.is_listening = false;
+                        st.is_inherit = false;
+                        set_captured_hotkey(Some(p.hotkey), &p.label);
+                        stop_combo_capture();
+                        handle.render(render_hotkey_view(&st));
+                    }
+                }
+                HotkeyMsg::SetInherit => {
+                    st.current_hotkey = None;
+                    st.is_inherit = true;
+                    st.is_listening = false;
+                    let g = st
+                        .inherit_hotkey
+                        .map(|h| h.display_text())
+                        .unwrap_or_default();
+                    st.display_text = format!("{} ({})", strings.typing_inherit_prefix, g);
+                    set_captured_hotkey(None, &st.display_text);
+                    stop_combo_capture();
+                    handle.render(render_hotkey_view(&st));
+                }
+                HotkeyMsg::Submit => {
+                    stop_combo_capture();
+                    let final_hk = if st.is_inherit {
+                        None
+                    } else {
+                        st.current_hotkey
+                            .or_else(get_captured_hotkey)
+                            .or_else(get_pending_modifier_hotkey)
+                    };
+                    if !st.is_inherit && final_hk.is_none() {
+                        return;
+                    }
+                    if let Some(hk) = final_hk {
+                        if !hk.is_valid() {
+                            return;
+                        }
+                    }
+                    handle.close();
+                    on_save_for_msg(final_hk);
+                }
+                HotkeyMsg::Cancel => {
+                    stop_combo_capture();
+                    handle.close();
+                }
+                HotkeyMsg::FocusLost => {
+                    if st.is_listening {
+                        st.is_listening = false;
+                        stop_combo_capture();
+                        st.display_text = if st.is_inherit {
+                            let g = st
+                                .inherit_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default();
+                            format!("{} ({})", strings.typing_inherit_prefix, g)
+                        } else {
+                            st.current_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default()
+                        };
+                        handle.render(render_hotkey_view(&st));
+                    }
+                }
+                HotkeyMsg::EscapePressed => {
+                    if st.is_listening {
+                        st.is_listening = false;
+                        stop_combo_capture();
+                        st.display_text = if st.is_inherit {
+                            let g = st
+                                .inherit_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default();
+                            format!("{} ({})", strings.typing_inherit_prefix, g)
+                        } else {
+                            st.current_hotkey
+                                .map(|h| h.display_text())
+                                .unwrap_or_default()
+                        };
+                        handle.render(render_hotkey_view(&st));
+                    } else {
+                        stop_combo_capture();
+                        handle.close();
+                    }
+                }
+            }
+        },
+        move |handle, msg, wparam, _lparam| match msg {
+            WM_COMBO_CAPTURED => {
+                let text = get_captured_display_text();
+                let hotkey = get_captured_hotkey();
+                handle.dispatch(HotkeyMsg::ComboCaptured(hotkey, text));
+                Some(0)
+            }
+            WM_COMBO_CANCELLED => {
+                handle.dispatch(HotkeyMsg::ComboCancelled);
+                Some(0)
+            }
+            WM_ACTIVATE => {
+                if (wparam & 0xFFFF) == 0 {
+                    let should_dispatch = state_for_raw
+                        .try_lock()
+                        .map(|st| st.is_listening)
+                        .unwrap_or(false);
+                    if should_dispatch {
+                        handle.dispatch(HotkeyMsg::FocusLost);
+                    }
+                }
+                None
+            }
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                if wparam == 0x1B /* VK_ESCAPE */ {
+                    handle.dispatch(HotkeyMsg::EscapePressed);
+                    return Some(0);
+                }
+                None
+            }
+            _ => None,
+        },
+    );
+}
+
+/// Displays the modal Hotkey Capture Dialog with caller-specified presets for switching typing mode
+pub fn show_hotkey_dialog_with_presets(
+    parent: isize,
+    presets: impl IntoIterator<Item = HotkeyPreset>,
+) {
     let strings = crate::language::current();
     let default_root_name = format!(
         "{} 🌐 {}",
@@ -82,46 +528,34 @@ pub fn show_hotkey_dialog(parent: isize) {
         }
     };
 
-    let is_inherit = !is_root && current_hotkey.is_none();
-    let display_text = if is_inherit {
-        format!(
-            "{} ({})",
-            strings.typing_inherit_prefix,
-            global_hotkey.display_text()
-        )
-    } else {
-        current_hotkey.unwrap_or(global_hotkey).display_text()
-    };
+    let inherit_hotkey = if is_root { None } else { Some(global_hotkey) };
 
-    set_captured_hotkey(current_hotkey, &display_text);
-
-    open_client_modal(
-        parent,
+    let config = HotkeyModalConfig::new(
         strings.hotkey_dialog_title,
-        440,
-        336,
-        CLASS_NAME,
-        hotkey_dialog_wnd_proc,
-        &REGISTERED,
-        Box::new(HotkeyDialogState {
-            parent,
-            display_font: 0,
-            is_listening: false,
-            is_inherit,
-            is_root,
-            is_target_capture: false,
-            target_profile_id,
-            target_display,
-            global_hotkey,
-            current_hotkey,
-            display_text,
-            btn_display: None,
-        }),
-    );
+        strings.hotkey_dialog_prompt,
+        move |final_hotkey| {
+            crate::ui::controller::save_switch_hotkey(&target_profile_id, is_root, final_hotkey);
+        },
+    )
+    .with_target_display(target_display)
+    .with_current_hotkey(current_hotkey)
+    .with_inherit_hotkey(inherit_hotkey)
+    .with_presets(presets);
+
+    show_hotkey_modal(parent, config);
 }
 
-/// Displays the modal Hotkey Capture Dialog specifically for the target field capture shortcut
-pub fn show_target_capture_hotkey_dialog(parent: isize) {
+/// Displays the modal Hotkey Capture Dialog centered over the parent control panel for switching typing mode
+pub fn show_hotkey_dialog(parent: isize) {
+    let strings = crate::language::current();
+    show_hotkey_dialog_with_presets(parent, switch_hotkey_presets(strings));
+}
+
+/// Displays the modal Hotkey Capture Dialog with caller-specified presets for the target field capture shortcut
+pub fn show_target_capture_hotkey_dialog_with_presets(
+    parent: isize,
+    presets: impl IntoIterator<Item = HotkeyPreset>,
+) {
     let strings = crate::language::current();
     let default_root_name = format!(
         "{} 🎯 {}",
@@ -135,525 +569,26 @@ pub fn show_target_capture_hotkey_dialog(parent: isize) {
         Hotkey::new(true, false, false, false, 0xC0)
     };
 
-    let display_text = global_hotkey.display_text();
-    set_captured_hotkey(Some(global_hotkey), &display_text);
-
-    open_client_modal(
-        parent,
+    let config = HotkeyModalConfig::new(
         strings.hotkey_target_dialog_title,
-        440,
-        336,
-        CLASS_NAME,
-        hotkey_dialog_wnd_proc,
-        &REGISTERED,
-        Box::new(HotkeyDialogState {
-            parent,
-            display_font: 0,
-            is_listening: false,
-            is_inherit: false,
-            is_root: true,
-            is_target_capture: true,
-            target_profile_id: "global".to_string(),
-            target_display: default_root_name,
-            global_hotkey,
-            current_hotkey: Some(global_hotkey),
-            display_text,
-            btn_display: None,
-        }),
-    );
-}
-
-unsafe fn apply_hotkey_preset(hwnd: isize, preset: Option<Hotkey>, label: &str) {
-    let Some(st) = (unsafe { state::<HotkeyDialogState>(hwnd) }) else {
-        return;
-    };
-    let disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
-    st.is_listening = false;
-    st.is_inherit = preset.is_none();
-    st.current_hotkey = preset;
-    st.display_text = if preset.is_some() {
-        label.to_string()
-    } else {
-        format!(
-            "{} ({})",
-            crate::language::current().typing_inherit_prefix,
-            st.global_hotkey.display_text()
-        )
-    };
-    set_captured_hotkey(st.current_hotkey, &st.display_text);
-    stop_combo_capture();
-    if disp_hwnd != 0 {
-        unsafe {
-            InvalidateRect(disp_hwnd, null_mut(), 1);
-        }
-    }
-}
-
-unsafe fn submit_hotkey(hwnd: isize) {
-    let Some(st) = (unsafe { state::<HotkeyDialogState>(hwnd) }) else {
-        return;
-    };
-    stop_combo_capture();
-    st.is_listening = false;
-    let strings = crate::language::current();
-    if st.display_text.is_empty() || st.display_text == strings.hotkey_listening {
-        return;
-    }
-
-    if st.is_target_capture {
-        let valid_hk = st
-            .current_hotkey
-            .or_else(get_captured_hotkey)
-            .or_else(get_pending_modifier_hotkey);
-        if let Some(hk) = valid_hk {
-            if hk.is_valid() {
+        strings.typing_target_hotkey_desc,
+        move |final_hotkey| {
+            if let Some(hk) = final_hotkey
+                && hk.is_valid()
+            {
                 crate::ui::controller::save_target_capture_hotkey(hk);
-                unsafe {
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                }
             }
-        }
-        return;
-    }
+        },
+    )
+    .with_target_display(default_root_name)
+    .with_current_hotkey(Some(global_hotkey))
+    .with_presets(presets);
 
-    let final_hotkey = if st.is_inherit {
-        None
-    } else {
-        let valid_hk = st
-            .current_hotkey
-            .or_else(get_captured_hotkey)
-            .or_else(get_pending_modifier_hotkey);
-        match valid_hk {
-            Some(hk) if hk.is_valid() => Some(hk),
-            _ => return,
-        }
-    };
-
-    let is_root = st.is_root;
-    let target_profile_id = st.target_profile_id.clone();
-    crate::ui::controller::save_switch_hotkey(&target_profile_id, is_root, final_hotkey);
-    unsafe {
-        PostMessageW(hwnd, WM_CLOSE, 0, 0);
-    }
+    show_hotkey_modal(parent, config);
 }
 
-#[allow(clippy::missing_safety_doc)]
-pub unsafe extern "system" fn hotkey_dialog_wnd_proc(
-    hwnd: isize,
-    msg: u32,
-    wparam: usize,
-    lparam: isize,
-) -> isize {
-    const WM_CREATE: u32 = 0x0001;
-    const WM_COMMAND: u32 = 0x0111;
-    const WM_PAINT: u32 = 0x000F;
-    const WM_ERASEBKGND: u32 = 0x0014;
-    const WM_CLOSE: u32 = 0x0010;
-    const WM_NCDESTROY: u32 = 0x0082;
-
-    unsafe {
-        if let Some(res) = reflect_dialog_messages(hwnd, msg, wparam, lparam) {
-            return res;
-        }
-        match msg {
-            WM_CREATE => {
-                attach_state::<HotkeyDialogState>(hwnd, lparam);
-                let Some(st) = state::<HotkeyDialogState>(hwnd) else {
-                    return -1;
-                };
-                let hfont_large = super::base::create_display_font();
-                let hfont_normal = get_app_font_normal();
-                let hfont_bold = get_app_font_bold();
-                st.display_font = hfont_large;
-
-                let strings = crate::language::current();
-
-                Label::create(
-                    hwnd,
-                    strings.hotkey_selected_title,
-                    20,
-                    66,
-                    400,
-                    18,
-                    hfont_bold,
-                )
-                .map(|l| {
-                    l.with_tone(LabelTone::Secondary)
-                        .on_surface(SurfaceRole::Window)
-                });
-
-                // Interactive Hotkey Display Box
-                let btn_display =
-                    PushButton::create_owner_draw(hwnd, 0, "", 20, 86, 400, 46, hfont_large);
-                if let Some(ref btn) = btn_display {
-                    btn.set_custom_drawer(move |dis, is_dark| {
-                        let (is_listening, text, font) = state::<HotkeyDialogState>(hwnd)
-                            .map(|s| (s.is_listening, s.display_text.clone(), s.display_font))
-                            .unwrap_or((false, "Ctrl + Shift".to_string(), 0));
-
-                        super::base::draw_key_box(
-                            dis,
-                            is_dark,
-                            is_listening,
-                            &text,
-                            false,
-                            false,
-                            font,
-                        );
-                        true
-                    });
-                    btn.set_on_click(move || {
-                        let Some(st) = state::<HotkeyDialogState>(hwnd) else {
-                            return;
-                        };
-                        let disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
-                        st.is_listening = true;
-                        st.is_inherit = false;
-                        st.display_text = crate::language::current().hotkey_listening.to_string();
-                        start_combo_capture(hwnd, false);
-                        if disp_hwnd != 0 {
-                            InvalidateRect(disp_hwnd, null_mut(), 1);
-                        }
-                    });
-                }
-
-                Label::create(
-                    hwnd,
-                    strings.hotkey_click_hint,
-                    20,
-                    136,
-                    400,
-                    18,
-                    hfont_normal,
-                )
-                .map(|l| {
-                    l.with_tone(LabelTone::Secondary)
-                        .on_surface(SurfaceRole::Window)
-                });
-                Label::create(
-                    hwnd,
-                    strings.hotkey_presets_title,
-                    20,
-                    160,
-                    400,
-                    18,
-                    hfont_bold,
-                )
-                .map(|l| {
-                    l.with_tone(LabelTone::Secondary)
-                        .on_surface(SurfaceRole::Window)
-                });
-
-                // Preset buttons (Row 1 + Row 2)
-                if st.is_target_capture {
-                    let presets = [
-                        (
-                            strings.hotkey_preset_ctrl_tilde,
-                            20,
-                            182,
-                            175,
-                            Hotkey::new(true, false, false, false, 0xC0),
-                            "Ctrl + ~",
-                        ),
-                        (
-                            "Ctrl + Alt + K",
-                            203,
-                            182,
-                            155,
-                            Hotkey::new(true, false, true, false, 0x4B),
-                            "Ctrl + Alt + K",
-                        ),
-                        (
-                            "Ctrl + Shift + K",
-                            20,
-                            216,
-                            120,
-                            Hotkey::new(true, true, false, false, 0x4B),
-                            "Ctrl + Shift + K",
-                        ),
-                        (
-                            "Alt + ~",
-                            148,
-                            216,
-                            85,
-                            Hotkey::new(false, false, true, false, 0xC0),
-                            "Alt + ~",
-                        ),
-                    ];
-                    for (label, x, y, w, hk, text) in presets {
-                        if let Some(btn) = PushButton::create_with_variant(
-                            hwnd,
-                            0,
-                            label,
-                            x,
-                            y,
-                            w,
-                            28,
-                            0,
-                            ButtonVariant::Secondary,
-                            None,
-                        ) {
-                            btn.on_click(move || apply_hotkey_preset(hwnd, Some(hk), text));
-                        }
-                    }
-
-                    if !st.is_root
-                        && let Some(btn) = PushButton::create_with_variant(
-                            hwnd,
-                            0,
-                            strings.typing_inherit_global,
-                            241,
-                            216,
-                            179,
-                            28,
-                            0,
-                            ButtonVariant::Secondary,
-                            None,
-                        )
-                    {
-                        btn.on_click(move || apply_hotkey_preset(hwnd, None, ""));
-                    }
-                } else {
-                    let presets = [
-                        (
-                            strings.hotkey_preset_ctrl_shift,
-                            20,
-                            182,
-                            175,
-                            Hotkey::new(true, true, false, false, 0),
-                            "Ctrl + Shift",
-                        ),
-                        (
-                            strings.hotkey_preset_alt_z,
-                            203,
-                            182,
-                            155,
-                            Hotkey::new(false, false, true, false, 0x5A),
-                            "Alt + Z",
-                        ),
-                        (
-                            strings.hotkey_preset_win_space,
-                            20,
-                            216,
-                            100,
-                            Hotkey::new(false, false, false, true, 0x20),
-                            "Win + Space",
-                        ),
-                        (
-                            strings.hotkey_preset_shift_space,
-                            128,
-                            216,
-                            105,
-                            Hotkey::new(false, true, false, false, 0x20),
-                            "Shift + Space",
-                        ),
-                    ];
-                    for (label, x, y, w, hk, text) in presets {
-                        if let Some(btn) = PushButton::create_with_variant(
-                            hwnd,
-                            0,
-                            label,
-                            x,
-                            y,
-                            w,
-                            28,
-                            0,
-                            ButtonVariant::Secondary,
-                            None,
-                        ) {
-                            btn.on_click(move || apply_hotkey_preset(hwnd, Some(hk), text));
-                        }
-                    }
-
-                    if !st.is_root
-                        && let Some(btn) = PushButton::create_with_variant(
-                            hwnd,
-                            0,
-                            strings.typing_inherit_global,
-                            241,
-                            216,
-                            179,
-                            28,
-                            0,
-                            ButtonVariant::Secondary,
-                            None,
-                        )
-                    {
-                        btn.on_click(move || apply_hotkey_preset(hwnd, None, ""));
-                    }
-                }
-
-                // Footer Buttons
-                let palette_init = ThemePalette::get(is_current_dark());
-                super::create_dialog_footer_layout(
-                    hwnd,
-                    strings.btn_cancel,
-                    84,
-                    strings.hotkey_btn_save,
-                    92,
-                    ButtonVariant::Primary,
-                    280,
-                    32,
-                    20,
-                    Some(palette_init.bg_sidebar),
-                    move || submit_hotkey(hwnd),
-                );
-
-                st.btn_display = btn_display;
-
-                0
-            }
-            WM_PAINT => {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps);
-                if hdc != 0 {
-                    let palette = ThemePalette::get(is_current_dark());
-                    let strings = crate::language::current();
-
-                    super::base::fill_dialog_bg(hwnd, hdc, &palette);
-                    let prompt_text = if state::<HotkeyDialogState>(hwnd)
-                        .map(|s| s.is_target_capture)
-                        .unwrap_or(false)
-                    {
-                        strings.typing_target_hotkey_desc
-                    } else {
-                        strings.hotkey_dialog_prompt
-                    };
-                    super::base::draw_dialog_callout(
-                        hdc,
-                        &palette,
-                        RECT {
-                            left: 20,
-                            top: 12,
-                            right: 420,
-                            bottom: 58,
-                        },
-                        prompt_text,
-                    );
-
-                    let default_root = format!("🌐 {}", strings.banner_root_title);
-                    let target_display = state::<HotkeyDialogState>(hwnd)
-                        .map(|s| s.target_display.clone())
-                        .unwrap_or(default_root);
-                    super::base::draw_dialog_footer(
-                        hdc,
-                        &palette,
-                        440,
-                        264,
-                        336,
-                        Some(&target_display),
-                    );
-
-                    EndPaint(hwnd, &ps);
-                }
-                0
-            }
-            WM_COMBO_CAPTURED => {
-                let text = get_captured_display_text();
-                let hotkey = get_captured_hotkey();
-                let mut disp_hwnd = 0;
-
-                if let Some(st) = state::<HotkeyDialogState>(hwnd) {
-                    disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
-                    if !text.is_empty() {
-                        st.display_text = text;
-                        if hotkey.is_some() {
-                            st.current_hotkey = hotkey;
-                            st.is_listening = false;
-                            stop_combo_capture();
-                        }
-                    }
-                }
-
-                if disp_hwnd != 0 {
-                    InvalidateRect(disp_hwnd, null_mut(), 0);
-                    UpdateWindow(disp_hwnd);
-                }
-                0
-            }
-            WM_COMBO_CANCELLED => {
-                let mut disp_hwnd = 0;
-                if let Some(st) = state::<HotkeyDialogState>(hwnd) {
-                    st.is_listening = false;
-                    st.display_text = if st.is_inherit {
-                        format!(
-                            "{} ({})",
-                            crate::language::current().typing_inherit_prefix,
-                            st.global_hotkey.display_text()
-                        )
-                    } else {
-                        st.current_hotkey
-                            .map(|h| h.display_text())
-                            .unwrap_or_default()
-                    };
-                    disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
-                }
-                stop_combo_capture();
-                if disp_hwnd != 0 {
-                    InvalidateRect(disp_hwnd, null_mut(), 1);
-                }
-                0
-            }
-            WM_ACTIVATE => {
-                if (wparam & 0xFFFF) == 0 {
-                    let mut disp_hwnd = 0;
-                    if let Some(st) = state::<HotkeyDialogState>(hwnd)
-                        && st.is_listening
-                    {
-                        st.is_listening = false;
-                        st.display_text = if st.is_inherit {
-                            format!(
-                                "{} ({})",
-                                crate::language::current().typing_inherit_prefix,
-                                st.global_hotkey.display_text()
-                            )
-                        } else {
-                            st.current_hotkey
-                                .map(|h| h.display_text())
-                                .unwrap_or_default()
-                        };
-                        disp_hwnd = st.btn_display.as_ref().map_or(0, |b| b.hwnd());
-                    }
-                    stop_combo_capture();
-                    if disp_hwnd != 0 {
-                        InvalidateRect(disp_hwnd, null_mut(), 1);
-                    }
-                }
-                0
-            }
-            WM_COMMAND => {
-                match (wparam & 0xFFFF) as u32 {
-                    IDOK => submit_hotkey(hwnd),
-                    IDCANCEL => {
-                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    }
-                    _ => {}
-                }
-                0
-            }
-            WM_KEYDOWN | WM_SYSKEYDOWN => {
-                let vk = wparam as u32;
-                if vk == 0x1B {
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    return 0;
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            WM_ERASEBKGND => 1,
-            WM_CLOSE => {
-                stop_combo_capture();
-                let parent = state::<HotkeyDialogState>(hwnd).map_or(0, |s| s.parent);
-                close_modal(hwnd, parent);
-                0
-            }
-            WM_NCDESTROY => {
-                stop_combo_capture();
-                if let Some(st) = detach_state::<HotkeyDialogState>(hwnd) {
-                    EnableWindow(st.parent, 1);
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-        }
-    }
+/// Displays the modal Hotkey Capture Dialog specifically for the target field capture shortcut
+pub fn show_target_capture_hotkey_dialog(parent: isize) {
+    let strings = crate::language::current();
+    show_target_capture_hotkey_dialog_with_presets(parent, target_capture_presets(strings));
 }

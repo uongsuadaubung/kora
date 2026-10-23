@@ -97,96 +97,100 @@ const fn rgb(r: u8, g: u8, b: u8) -> u32 {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
 }
 
-/// Dark Theme Palette (Windows 11 Fluent Dark inspired)
+/// Dark Theme Palette (Modern Dark Slate & GitHub Dark Dimmed inspired)
+/// Balances soft charcoal slate backgrounds with distinct elevated card surfaces,
+/// eliminating the oppressive, murky pitch-black feel while remaining soothing on the eyes.
 pub const DARK_PALETTE: ThemePalette = ThemePalette {
-    bg_window: rgb(32, 32, 32),
-    bg_sidebar: rgb(26, 26, 28),
-    bg_card: rgb(43, 43, 44),
-    bg_card_header: rgb(36, 36, 38),
-    bg_input: rgb(48, 48, 50),
-    text_primary: rgb(245, 245, 245),
-    text_secondary: rgb(170, 170, 170),
-    text_input: rgb(255, 255, 255),
-    border: rgb(68, 68, 70),
-    border_separator: rgb(58, 58, 62),
-    tab_track_bg: rgb(36, 36, 38),
-    tab_track_border: rgb(52, 52, 56),
-    tab_active_bg: rgb(56, 56, 60),
-    tab_active_border: rgb(76, 76, 82),
-    tab_hover_bg: rgb(44, 44, 48),
-    text_link: rgb(88, 166, 255),
-    accent: rgb(24, 135, 230),
-    accent_hover: rgb(0, 99, 177),
-    badge_root_bg: rgb(24, 45, 68),
+    bg_window: rgb(34, 39, 46),          // #22272E - Soothing deep slate canvas
+    bg_sidebar: rgb(28, 33, 40),         // #1C2128 - Subtle inset sidebar
+    bg_card: rgb(45, 51, 59),            // #2D333B - Clearly elevated card layer
+    bg_card_header: rgb(37, 42, 49),     // #252A31 - Distinct header for cards/tables
+    bg_input: rgb(28, 33, 40),           // #1C2128 - Inset text input with crisp border
+    text_primary: rgb(230, 237, 243),    // #E6EDF3 - Soft crisp off-white, anti-glare
+    text_secondary: rgb(139, 148, 158),  // #8B949E - Balanced muted text
+    text_input: rgb(240, 246, 252),      // #F0F6FC - High-clarity input text
+    border: rgb(68, 76, 86),             // #444C56 - Crisp 1px boundary
+    border_separator: rgb(55, 62, 71),   // #373E47 - Subtle divider
+    tab_track_bg: rgb(28, 33, 40),       // #1C2128 - Inset pill track
+    tab_track_border: rgb(55, 62, 71),   // #373E47 - Track border
+    tab_active_bg: rgb(55, 62, 71),      // #373E47 - Active elevated tab pill
+    tab_active_border: rgb(84, 93, 105), // #545D69 - Subtle tab border
+    tab_hover_bg: rgb(45, 51, 59),       // #2D333B - Hover highlight
+    text_link: rgb(88, 166, 255),        // #58A6FF - Fluent link blue
+    accent: rgb(47, 129, 247),           // #2F81F7 - Radiant electric blue
+    accent_hover: rgb(56, 139, 253),     // #388BFD - Vibrant blue hover
+    badge_root_bg: rgb(30, 50, 80),      // Inset blue badge for root
     text_white: rgb(255, 255, 255),
-    indicator_active: rgb(50, 205, 50),
-    border_hover: rgb(101, 101, 101),
-    row_hover_bg: rgb(56, 56, 60),
-    row_selected_bg: rgb(64, 68, 76),
+    indicator_active: rgb(63, 185, 80),  // #3FB950 - Modern vibrant green
+    border_hover: rgb(118, 131, 144),    // #768390 - Highlighted border on hover
+    row_hover_bg: rgb(55, 62, 71),       // #373E47
+    row_selected_bg: rgb(34, 68, 115),   // Highlighted row selection
     row_selected_text: rgb(255, 255, 255),
-    danger_bg: rgb(43, 27, 27),
-    danger_bg_hover: rgb(50, 31, 31),
-    danger_border: rgb(216, 68, 58),
-    danger_text: rgb(255, 119, 102),
-    danger_text_hover: rgb(255, 136, 120),
-    info_bg: rgb(20, 38, 60),
-    info_border: rgb(35, 75, 120),
-    info_text: rgb(88, 166, 255),
-    warning_bg: rgb(50, 36, 18),
-    warning_border: rgb(110, 80, 28),
-    warning_text: rgb(245, 175, 65),
-    success_bg: rgb(18, 42, 26),
-    success_border: rgb(35, 90, 52),
-    success_text: rgb(75, 210, 120),
-    purple_bg: rgb(40, 25, 55),
-    purple_border: rgb(90, 50, 125),
-    purple_text: rgb(195, 145, 250),
+    danger_bg: rgb(73, 27, 29),          // Rich wine red
+    danger_bg_hover: rgb(90, 32, 35),
+    danger_border: rgb(248, 81, 73),     // Vibrant danger border
+    danger_text: rgb(255, 123, 114),     // Crisp danger text
+    danger_text_hover: rgb(255, 161, 155),
+    info_bg: rgb(27, 60, 104),           // Deep navy
+    info_border: rgb(56, 139, 253),
+    info_text: rgb(121, 192, 255),
+    warning_bg: rgb(77, 56, 0),          // Warm amber
+    warning_border: rgb(210, 153, 34),
+    warning_text: rgb(227, 179, 65),
+    success_bg: rgb(22, 59, 38),         // Forest emerald
+    success_border: rgb(46, 160, 67),
+    success_text: rgb(86, 211, 100),
+    purple_bg: rgb(56, 35, 84),          // Royal violet
+    purple_border: rgb(163, 113, 247),
+    purple_text: rgb(210, 168, 255),
 };
 
-/// Light Theme Palette (Windows 11 Fluent Light inspired)
+/// Light Theme Palette (Modern Clean Slate & GitHub Light inspired)
+/// Features a subtle cool-gray backdrop (#F6F8FA) that makes crisp white (#FFFFFF)
+/// cards and containers pop with clean, professional depth and zero eye strain.
 pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
-    bg_window: rgb(243, 243, 243),
-    bg_sidebar: rgb(235, 235, 238),
-    bg_card: rgb(255, 255, 255),
-    bg_card_header: rgb(240, 240, 243),
-    bg_input: rgb(255, 255, 255),
-    text_primary: rgb(25, 25, 25),
-    text_secondary: rgb(100, 100, 100),
-    text_input: rgb(25, 25, 25),
-    border: rgb(220, 220, 224),
-    border_separator: rgb(215, 215, 220),
-    tab_track_bg: rgb(234, 234, 238),
-    tab_track_border: rgb(220, 220, 224),
-    tab_active_bg: rgb(255, 255, 255),
-    tab_active_border: rgb(212, 212, 216),
-    tab_hover_bg: rgb(242, 242, 246),
-    text_link: rgb(0, 102, 204),
-    accent: rgb(0, 120, 212),
-    accent_hover: rgb(0, 99, 177),
-    badge_root_bg: rgb(228, 240, 255),
+    bg_window: rgb(246, 248, 250),       // #F6F8FA - Subtle off-white canvas
+    bg_sidebar: rgb(238, 242, 246),      // #EEF2F6 - Soft gray sidebar
+    bg_card: rgb(255, 255, 255),         // #FFFFFF - Crisp elevated white card
+    bg_card_header: rgb(246, 248, 250),  // #F6F8FA - Soft header
+    bg_input: rgb(255, 255, 255),        // #FFFFFF - Pure white input
+    text_primary: rgb(31, 35, 40),       // #1F2328 - Deep slate ink, easy on eyes
+    text_secondary: rgb(101, 109, 118),  // #656D76 - High legibility muted text
+    text_input: rgb(31, 35, 40),         // #1F2328
+    border: rgb(208, 215, 222),          // #D0D7DE - Crisp modern border
+    border_separator: rgb(216, 222, 228),// #D8DEE4 - Subtle divider
+    tab_track_bg: rgb(234, 238, 242),    // #EAEEF2 - Track container
+    tab_track_border: rgb(208, 215, 222),// #D0D7DE
+    tab_active_bg: rgb(255, 255, 255),   // #FFFFFF - Elevated active tab
+    tab_active_border: rgb(208, 215, 222),
+    tab_hover_bg: rgb(243, 244, 246),    // #F3F4F6
+    text_link: rgb(9, 105, 218),         // #0969DA
+    accent: rgb(9, 105, 218),            // #0969DA - Modern brand blue
+    accent_hover: rgb(8, 96, 202),       // #0860CA
+    badge_root_bg: rgb(221, 244, 255),   // #DDF4FF
     text_white: rgb(255, 255, 255),
-    indicator_active: rgb(16, 124, 65),
-    border_hover: rgb(176, 176, 176),
-    row_hover_bg: rgb(245, 247, 250),
-    row_selected_bg: rgb(228, 240, 255),
-    row_selected_text: rgb(25, 25, 25),
-    danger_bg: rgb(253, 232, 232),
-    danger_bg_hover: rgb(254, 226, 226),
-    danger_border: rgb(216, 68, 58),
-    danger_text: rgb(197, 21, 21),
-    danger_text_hover: rgb(197, 21, 21),
-    info_bg: rgb(230, 242, 255),
-    info_border: rgb(180, 215, 255),
-    info_text: rgb(0, 102, 204),
-    warning_bg: rgb(255, 248, 230),
-    warning_border: rgb(245, 215, 140),
-    warning_text: rgb(180, 100, 10),
-    success_bg: rgb(232, 250, 238),
-    success_border: rgb(160, 230, 185),
-    success_text: rgb(16, 124, 65),
-    purple_bg: rgb(248, 238, 255),
-    purple_border: rgb(220, 185, 250),
-    purple_text: rgb(125, 45, 185),
+    indicator_active: rgb(26, 127, 55),  // #1A7F37
+    border_hover: rgb(140, 149, 159),    // #8C959F
+    row_hover_bg: rgb(243, 245, 248),
+    row_selected_bg: rgb(221, 244, 255),
+    row_selected_text: rgb(9, 105, 218),
+    danger_bg: rgb(255, 235, 233),       // Soft pink-red
+    danger_bg_hover: rgb(255, 220, 217),
+    danger_border: rgb(255, 129, 130),
+    danger_text: rgb(207, 34, 46),
+    danger_text_hover: rgb(164, 15, 26),
+    info_bg: rgb(221, 244, 255),
+    info_border: rgb(84, 174, 255),
+    info_text: rgb(9, 105, 218),
+    warning_bg: rgb(255, 248, 197),
+    warning_border: rgb(212, 167, 44),
+    warning_text: rgb(154, 103, 0),
+    success_bg: rgb(218, 251, 225),
+    success_border: rgb(74, 194, 107),
+    success_text: rgb(26, 127, 55),
+    purple_bg: rgb(251, 239, 255),
+    purple_border: rgb(209, 168, 255),
+    purple_text: rgb(130, 80, 223),
 };
 
 impl ThemePalette {

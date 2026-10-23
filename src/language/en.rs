@@ -93,11 +93,11 @@ pub static STRINGS: LanguageStrings = LanguageStrings {
     about_header_sub: "Kora - Modern Input & Keyboard Suite built with Rust",
     about_title: concat!("Kora v", env!("CARGO_PKG_VERSION")),
     about_ver: concat!("Version: ", env!("CARGO_PKG_VERSION")),
-    about_author: "Author: Manh Kien (manhkien13041997@gmail.com)",
+    about_author: "Author: Manh Kien",
     about_email: "Email: manhkien13041997@gmail.com",
     about_github: "GitHub: https://github.com/uongsuadaubung/kora",
     about_engine_desc: "Engine: Pure Rust, Zero-dependency, Native Win32 API",
-    about_github_btn: "Github Repository",
+    about_github_btn: "Open GitHub ↗",
 
     // Footer Buttons
     btn_exit: "❌ Exit Kora",

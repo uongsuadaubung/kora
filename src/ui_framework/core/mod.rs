@@ -9,6 +9,7 @@ pub mod button;
 pub mod checkbox;
 pub mod containers;
 pub mod element;
+pub mod input;
 pub mod label;
 pub mod layout_engine;
 pub mod modal;
@@ -25,6 +26,7 @@ pub use button::*;
 pub use checkbox::*;
 pub use containers::*;
 pub use element::*;
+pub use input::*;
 pub use label::*;
 pub use layout_engine::*;
 pub use modal::{

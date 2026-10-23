@@ -67,9 +67,9 @@ pub fn next_inheritable_state(
     }
 }
 
-/// Renders a setting row with a modern toggle `switch`, optional subtitle, and automatic
+/// Renders a setting row with a tri-state `checkbox`, optional subtitle, and automatic
 /// inheritance badge (`Kế thừa: BẬT/TẮT` vs `Riêng ứng dụng`) when viewing a Child profile.
-pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
+pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
     label: impl Into<String>,
     desc: Option<String>,
     is_root: bool,
@@ -79,10 +79,15 @@ pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
     on_toggle: impl Fn(Option<bool>) -> M + Send + Sync + 'static,
 ) -> Element<M> {
     let effective = override_val.unwrap_or(global_val);
+    let is_inherited = override_val.is_none() && !is_root;
     let next_val = next_inheritable_state(is_root, override_val, global_val);
     let msg = on_toggle(next_val);
 
-    let mut title_row = vec![text(label).bold()];
+    let mut title_row = vec![
+        checkbox("", effective, move |_| msg.clone())
+            .indeterminate(is_inherited),
+        text(label).bold(),
+    ];
     if !is_root {
         let (badge_txt, badge_var) = match override_val {
             None => (
@@ -102,16 +107,29 @@ pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
     if let Some(d) = desc
         && !d.is_empty()
     {
-        left_col.push(text(d).muted().size(Size::Sm));
+        left_col.push(
+            row(vec![
+                spacer().w(23),
+                text(d).muted().size(Size::Sm),
+            ])
+            .items_center(),
+        );
     }
 
-    row(vec![
-        col(left_col).gap(1).flex_1(),
-        switch("", effective, move |_| msg.clone()),
-    ])
-    .items_center()
-    .justify_between()
-    .gap(3)
+    col(left_col).gap(1)
+}
+
+#[inline]
+pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
+    label: impl Into<String>,
+    desc: Option<String>,
+    is_root: bool,
+    override_val: Option<bool>,
+    global_val: bool,
+    strings: &LanguageStrings,
+    on_toggle: impl Fn(Option<bool>) -> M + Send + Sync + 'static,
+) -> Element<M> {
+    inheritable_check_row(label, desc, is_root, override_val, global_val, strings, on_toggle)
 }
 
 /// Properties for a reusable shortcut / key-rule row inside `OverviewPanel` or `TabTyping`.

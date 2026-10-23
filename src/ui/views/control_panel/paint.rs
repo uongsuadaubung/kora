@@ -54,25 +54,7 @@ pub fn paint_control_panel(hwnd: isize, hdc: isize, is_dark: bool) {
             if !ptr.is_null() { Some(&*ptr) } else { None }
         });
 
-        let mode = controls
-            .map(|c| c.get_view_mode())
-            .unwrap_or(crate::ui::views::control_panel::ViewMode::Profile(0));
 
-        if matches!(
-            mode,
-            crate::ui::views::control_panel::ViewMode::SystemSettings
-                | crate::ui::views::control_panel::ViewMode::About
-        ) {
-            let h_sep = RECT {
-                left: layout::SIDEBAR_DIVIDER_X,
-                top: layout::HEADER_DIVIDER_Y,
-                right: client_rc.right,
-                bottom: layout::HEADER_DIVIDER_Y + 1,
-            };
-            let sep_brush = CreateSolidBrush(palette.border_separator);
-            FillRect(hdc, &h_sep, sep_brush);
-            DeleteObject(sep_brush);
-        }
 
         let b_br = CreateSolidBrush(palette.bg_card);
         let b_pen = CreatePen(PS_SOLID, borders::WIDTH_THIN, palette.border);

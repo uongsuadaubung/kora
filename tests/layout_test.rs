@@ -551,3 +551,269 @@ fn test_modal_remap_key_declarative_layout() {
         panic!("Expected disabled apply button in footer");
     }
 }
+
+#[test]
+fn test_declarative_input_layout_and_attributes() {
+    use kora::ui_framework::core::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum TestMsg {
+        NameChanged(String),
+        PassChanged(String),
+    }
+
+    let view: Element<TestMsg> = col(vec![
+        input("hello", "Enter your name...", TestMsg::NameChanged),
+        input("custom width", "Search...", TestMsg::NameChanged).w(240),
+        password_input("secret", "Password...", TestMsg::PassChanged)
+            .disabled(true)
+            .auto_focus(true)
+            .key(42),
+    ])
+    .gap(2);
+
+    let root = compute_layout(0, view, 0, 0, 500);
+    assert_eq!(root.children.len(), 3);
+
+    // 1st input: full width 500, default height 32
+    let inp1 = &root.children[0];
+    assert_eq!(inp1.rect.left, 0);
+    assert_eq!(inp1.rect.right, 500);
+    assert_eq!(inp1.rect.bottom - inp1.rect.top, 32);
+    if let WidgetKind::Input { value, placeholder, password, disabled, auto_focus, key, .. } = &inp1.element.kind {
+        assert_eq!(value, "hello");
+        assert_eq!(placeholder, "Enter your name...");
+        assert!(!*password);
+        assert!(!*disabled);
+        assert!(!*auto_focus);
+        assert_eq!(*key, 0);
+    } else {
+        panic!("Expected WidgetKind::Input");
+    }
+
+    // 2nd input: custom width 240, height 32, pushed down by 32 + 8 (gap 2) = 40
+    let inp2 = &root.children[1];
+    assert_eq!(inp2.rect.left, 0);
+    assert_eq!(inp2.rect.right, 240);
+    assert_eq!(inp2.rect.top, 40);
+    assert_eq!(inp2.rect.bottom - inp2.rect.top, 32);
+
+    // 3rd input: password, disabled, auto_focus, key 42, top at 40 + 32 + 8 = 80
+    let inp3 = &root.children[2];
+    assert_eq!(inp3.rect.left, 0);
+    assert_eq!(inp3.rect.right, 500);
+    assert_eq!(inp3.rect.top, 80);
+    assert_eq!(inp3.rect.bottom - inp3.rect.top, 32);
+    if let WidgetKind::Input { value, placeholder, password, disabled, auto_focus, key, .. } = &inp3.element.kind {
+        assert_eq!(value, "secret");
+        assert_eq!(placeholder, "Password...");
+        assert!(*password);
+        assert!(*disabled);
+        assert!(*auto_focus);
+        assert_eq!(*key, 42);
+    } else {
+        panic!("Expected WidgetKind::Input for password");
+    }
+}
+
+#[test]
+fn test_inheritable_check_row_tri_state() {
+    use kora::ui::views::control_panel::components::inheritable_check_row;
+    use kora::ui_framework::core::*;
+
+    let strings = kora::language::current();
+
+    // 1. Root profile: override_val is None, global is true -> checked=true, indeterminate=false
+    let root_row: Element<()> = inheritable_check_row(
+        "Auto Start",
+        Some("Start with Windows".to_string()),
+        true,
+        None,
+        true,
+        &strings,
+        |_| (),
+    );
+    let root_layout = compute_layout(0, root_row, 0, 0, 400);
+    // Col -> Row(title_row) -> Checkbox
+    let title_row = &root_layout.children[0];
+    let cb_node = &title_row.children[0];
+    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_node.element.kind {
+        assert_eq!(*checked, true);
+        assert_eq!(*indeterminate, false);
+    } else {
+        panic!("Expected WidgetKind::Checkbox in root row");
+    }
+
+    // 2. Child profile: override_val is None -> inherited -> indeterminate=true (tri-state dash!)
+    let child_inherited: Element<()> = inheritable_check_row(
+        "Auto Start",
+        Some("Start with Windows".to_string()),
+        false,
+        None,
+        true,
+        strings,
+        |_| (),
+    );
+    let child_layout = compute_layout(0, child_inherited, 0, 0, 400);
+    let title_row_child = &child_layout.children[0];
+    let cb_child = &title_row_child.children[0];
+    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_child.element.kind {
+        assert_eq!(*checked, true);
+        assert_eq!(*indeterminate, true); // 3-state inherited!
+    } else {
+        panic!("Expected WidgetKind::Checkbox in child inherited row");
+    }
+
+    // 3. Child profile: override_val is Some(false) -> overridden -> indeterminate=false, checked=false
+    let child_override: Element<()> = inheritable_check_row(
+        "Auto Start",
+        Some("Start with Windows".to_string()),
+        false,
+        Some(false),
+        true,
+        strings,
+        |_| (),
+    );
+    let child_ovr_layout = compute_layout(0, child_override, 0, 0, 400);
+    let title_row_ovr = &child_ovr_layout.children[0];
+    let cb_ovr = &title_row_ovr.children[0];
+    if let WidgetKind::Checkbox { checked, indeterminate, .. } = &cb_ovr.element.kind {
+        assert_eq!(*checked, false);
+        assert_eq!(*indeterminate, false);
+    } else {
+        panic!("Expected WidgetKind::Checkbox in child overridden row");
+    }
+}
+
+#[test]
+fn test_tab_about_layout() {
+    use kora::language;
+    use kora::ui::views::control_panel::tab_about::{AboutMsg, TabAbout, UpdateBtnState};
+    use kora::ui_framework::core::*;
+    use kora::ui_framework::tokens::layout;
+
+    let strings = language::current();
+    let elem: Element<AboutMsg> = TabAbout::view(UpdateBtnState::Idle, strings);
+    let l_node = compute_layout(0, elem, 0, 0, layout::CARD_WIDTH);
+
+    // Root is col([header, divider, hero_card])
+    assert_eq!(l_node.children.len(), 3);
+    // Header
+    let header_node = &l_node.children[0];
+    assert!(header_node.rect.bottom - header_node.rect.top > 0);
+
+    // Header divider separating header from body
+    let header_divider = &l_node.children[1];
+    assert_eq!(header_divider.rect.bottom - header_divider.rect.top, 1);
+    assert!(header_divider.rect.top > header_node.rect.bottom);
+
+    // Hero card
+    let card_node = &l_node.children[2];
+    assert!(card_node.rect.top > header_divider.rect.bottom);
+    assert!(card_node.rect.bottom - card_node.rect.top > 100);
+    // Contains 3 rows and 2 dividers = 5 children
+    assert_eq!(card_node.children.len(), 5);
+
+    // Row 1: app info + update button
+    let row1 = &card_node.children[0];
+    assert_eq!(row1.children.len(), 2); // left col + right button
+
+    // Divider 1
+    let div1 = &card_node.children[1];
+    assert_eq!(div1.rect.bottom - div1.rect.top, 1);
+
+    // Row 2: author + email button
+    let row2 = &card_node.children[2];
+    assert_eq!(row2.children.len(), 2);
+
+    // Divider 2
+    let div2 = &card_node.children[3];
+    assert_eq!(div2.rect.bottom - div2.rect.top, 1);
+
+    // Row 3: github + repo button
+    let row3 = &card_node.children[4];
+    assert_eq!(row3.children.len(), 2);
+}
+
+#[test]
+fn test_modal_hotkey_declarative_layout() {
+    use kora::engine::config::Hotkey;
+    use kora::ui::views::dialogs::hotkey::{
+        HotkeyMsg, HotkeyPreset, HotkeyState, render_hotkey_view,
+    };
+    use kora::ui_framework::core::*;
+
+    let custom_presets = vec![
+        HotkeyPreset::new("Ctrl + Shift", Hotkey::new(true, true, false, false, 0)),
+        HotkeyPreset::new("Alt + Z", Hotkey::new(false, false, true, false, 0x5A)),
+        HotkeyPreset::new("Win + Space", Hotkey::new(false, false, false, true, 0x20)),
+        HotkeyPreset::new("Shift + Space", Hotkey::new(false, true, false, false, 0x20)),
+    ];
+
+    let state = HotkeyState {
+        prompt: "Chọn phím tắt chuyển đổi".to_string(),
+        target_display: "Áp dụng cho: 🌐 Toàn hệ thống".to_string(),
+        current_hotkey: Some(Hotkey::new(true, true, false, false, 0)),
+        inherit_hotkey: Some(Hotkey::new(false, false, true, false, 0x5A)),
+        is_inherit: false,
+        is_listening: false,
+        display_text: "Ctrl + Shift".to_string(),
+        presets: custom_presets,
+    };
+
+    let view: Element<HotkeyMsg> = render_hotkey_view(&state);
+    let root = compute_layout(0, view, 0, 0, 480);
+
+    assert_eq!(root.rect.left, 0);
+    assert_eq!(root.rect.right, 480);
+    assert_eq!(root.children.len(), 3); // Header callout, Body, Footer
+
+    // Section 0: Header callout
+    let header = &root.children[0];
+    assert!(header.rect.bottom > 0);
+
+    // Section 1: Body
+    let body = &root.children[1];
+    let body_col = &body.children[0];
+    assert_eq!(body_col.children.len(), 2); // Key capture group + Presets group
+
+    // Key capture box
+    let capture_group = &body_col.children[0];
+    let key_box = &capture_group.children[1];
+    assert_eq!(key_box.rect.bottom - key_box.rect.top, 46);
+    assert_eq!(key_box.element.on_click, Some(HotkeyMsg::ToggleListening));
+
+    // Presets group (title + 2 rows of presets + 1 row for inherit)
+    let presets_group = &body_col.children[1];
+    let presets_col = &presets_group.children[1];
+    assert_eq!(presets_col.children.len(), 3); // 2 chunked rows of 2 presets + 1 inherit row
+
+    // Row 0 has 2 buttons
+    let row0 = &presets_col.children[0];
+    assert_eq!(row0.children.len(), 2);
+
+    // Row 1 has 2 buttons
+    let row1 = &presets_col.children[1];
+    assert_eq!(row1.children.len(), 2);
+
+    // Row 2 is the inherit button
+    let row2 = &presets_col.children[2];
+    assert_eq!(row2.children.len(), 1);
+
+    // Section 2: Footer
+    let footer_section = &root.children[2];
+    assert!(footer_section.rect.bottom > 0);
+    let footer_row = &footer_section.children[0];
+    let cancel_btn = &footer_row.children[2];
+    let save_btn = &footer_row.children[3];
+    if let WidgetKind::Button { on_click, .. } = &cancel_btn.element.kind {
+        assert_eq!(*on_click, Some(HotkeyMsg::Cancel));
+    } else {
+        panic!("Expected button for cancel");
+    }
+    if let WidgetKind::Button { on_click, .. } = &save_btn.element.kind {
+        assert_eq!(*on_click, Some(HotkeyMsg::Submit));
+    } else {
+        panic!("Expected button for save");
+    }
+}

@@ -15,7 +15,11 @@ pub use confirm::{
     ConfirmDialogOptions, show_confirm_dialog, show_danger_confirm, show_delete_confirm,
 };
 pub use disable_key::show_disable_dialog;
-pub use hotkey::{show_hotkey_dialog, show_target_capture_hotkey_dialog};
+pub use hotkey::{
+    HotkeyModalConfig, HotkeyPreset, show_hotkey_dialog, show_hotkey_dialog_with_presets,
+    show_hotkey_modal, show_target_capture_hotkey_dialog,
+    show_target_capture_hotkey_dialog_with_presets, switch_hotkey_presets, target_capture_presets,
+};
 pub use key_macro::{show_key_macro_dialog, show_key_macro_dialog_with_key};
 pub use macro_editor::{MacroEditData, show_macro_dialog};
 pub use remap_key::{show_remap_dialog, show_remap_dialog_with_keys};
