@@ -312,8 +312,7 @@ pub fn show_update_result_dialog(hwnd: isize, status: &UpdateStatus) {
 
             if ret == IDYES {
                 if let Some(c) = crate::ui::controls() {
-                    c.tab_about.btn_check_update.set_text(strings.btn_updating);
-                    c.tab_about.btn_check_update.set_enabled(false);
+                    c.tab_about.set_updating_state();
                 }
                 let url = download_url.clone();
                 let hwnd_panel = hwnd;

@@ -17,7 +17,6 @@ use crate::engine::profile::{
 use crate::engine::{EngineConfig, VietnameseEngine};
 use crate::platform::win32::ENGINE_INSTANCE;
 use crate::ui_framework::components::action_table::{ActionVariant, TableAction};
-use crate::ui_framework::components::{CheckBox, Inheritable};
 
 /// The settings object an edit applies to.
 pub enum EditTarget<'a> {
@@ -25,23 +24,6 @@ pub enum EditTarget<'a> {
     Global(&'a mut EngineConfig),
     /// Child profile selected: edit its overrides (`AppProfile<Child>` guarantees `!is_root`).
     Child(&'a mut AppProfile<Child>),
-}
-
-impl<'a> EditTarget<'a> {
-    /// Synchronizes an [`Inheritable`] checkbox into either the global `bool` field
-    /// or the child `Option<bool>` field without manual `match target` branching.
-    #[inline]
-    pub fn sync_checkbox<L: crate::ui_framework::I18nSource>(
-        &mut self,
-        cb: &CheckBox<Inheritable<L>>,
-        global_field: impl FnOnce(&mut EngineConfig) -> &mut bool,
-        child_field: impl FnOnce(&mut AppProfile<Child>) -> &mut Option<bool>,
-    ) {
-        match self {
-            Self::Global(cfg) => *global_field(cfg) = cb.is_checked(),
-            Self::Child(child) => *child_field(child) = cb.tri_state(),
-        }
-    }
 }
 
 /// Runs `f` with the engine locked. Returns `None` if the engine is unavailable.

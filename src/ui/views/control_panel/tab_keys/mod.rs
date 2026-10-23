@@ -17,90 +17,200 @@ pub use panel_remap::RemapPanel;
 
 use crate::engine::profile::{ResolvedDisableItem, ResolvedKeyMacroItem, ResolvedRemapItem};
 use crate::language::LanguageStrings;
-use crate::ui::prelude::*;
+use crate::ui::components::TabBar;
+use crate::ui::tokens::layout;
+use crate::ui::tokens::radii;
+use crate::ui::tokens::spacing;
+use crate::ui::views::control_panel::components::inheritable_switch_row;
 use crate::ui::win32::{
     HWND_TOP, InvalidateRect, SW_HIDE, SW_SHOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
     SetWindowPos, ShowWindow,
 };
+use crate::ui_framework::components::action_table::{ActionTable, ColumnStyle};
+use crate::ui_framework::core::*;
+use std::ptr::null_mut;
+use std::sync::{Arc, RwLock};
+
+type TextFn = fn(&LanguageStrings) -> &'static str;
 
 /// Sub-tab bar geometry
 const SUB_TAB_Y: i32 = layout::CARD_START_Y; // 112
-const SUB_TAB_W_PER_ITEM: i32 = 125;
-const SUB_TAB_HEIGHT: i32 = 30;
+const SUB_TAB_WIDTH: i32 = layout::CARD_WIDTH;
+const SUB_TAB_HEIGHT: i32 = layout::TAB_BAR_HEIGHT;
 
 /// Top of the shared card below the sub-tab bar (painted in paint.rs)
 pub const SUB_CARD_Y: i32 = SUB_TAB_Y + SUB_TAB_HEIGHT + spacing::SPACE_10; // 152
 
 // Shared sub-panel geometry (all sub-tabs use identical slots)
-pub const TITLE_Y: i32 = SUB_CARD_Y + spacing::SPACE_12; // 164
-pub const TITLE_HEIGHT: i32 = 24;
-
 pub const BTN_WIDTH: i32 = 104;
-pub const BTN_HEIGHT: i32 = 28;
 
 pub const TABLE_X: i32 = layout::CARD_CONTENT_X; // 260
 pub const TABLE_WIDTH: i32 = layout::CARD_CONTENT_WIDTH; // 530
 pub const TABLE_Y: i32 = SUB_CARD_Y + 44; // 196
 pub const TABLE_HEIGHT: i32 = layout::CARD_BOTTOM_Y - spacing::SPACE_12 - TABLE_Y; // 324
 
-/// Shared scaffold for a rule table sub-panel (`CheckBox<Inheritable>` + `+ Add` `PushButton` + `ActionTable`).
+#[derive(Clone, Debug)]
+pub enum RuleMsg {
+    Toggle(Option<bool>),
+    Add,
+}
+
+#[derive(Default)]
+pub struct RuleSubPanelState {
+    pub is_root: bool,
+    pub override_val: Option<bool>,
+    pub global_val: bool,
+}
+
+/// Shared scaffold for a rule table sub-panel (`Surface<RuleMsg>` + `ActionTable`).
 pub struct RuleSubPanel {
-    layout: CardLayout,
-    pub check_enabled: CheckBox<Inheritable>,
-    pub btn_add: PushButton,
+    pub surface: Surface<RuleMsg>,
     pub list: ActionTable,
+    pub state: Arc<RwLock<RuleSubPanelState>>,
+    pub title_fn: TextFn,
+    pub add_btn_fn: TextFn,
+    hwnd_slice: [isize; 2],
 }
 
 impl RuleSubPanel {
     pub fn create(
         parent: isize,
         hfont_normal: isize,
-        hfont_bold: isize,
+        _hfont_bold: isize,
         title_fn: TextFn,
         add_btn_fn: TextFn,
         cols: &[(&str, i32, ColumnStyle)],
-        cols_i18n_fn: TextListFn,
+        on_add: impl Fn(isize) + Send + Sync + 'static,
+        on_toggle: impl Fn(&mut crate::ui::controller::EditTarget, Option<bool>) + Send + Sync + 'static,
     ) -> Option<Self> {
-        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
-        let check_enabled = ly.inheritable_checkbox(title_fn, true)?;
-        let btn_add = ly.button(add_btn_fn, true, ButtonVariant::Primary)?;
+        let surface_x = TABLE_X;
+        let surface_y = SUB_CARD_Y + 8;
+        let surface_w = TABLE_WIDTH;
+        let surface_h = 32;
 
-        // Auto layout top row: Checkbox on left, stretch, Add button on right
-        let mut top_row = HStack::at(TABLE_X, SUB_CARD_Y + spacing::SPACE_8, TABLE_WIDTH, BTN_HEIGHT);
-        top_row.align(CrossAlign::Center);
-        top_row.add_stretch(1, Some(check_enabled.hwnd()));
-        top_row.add_fixed(BTN_WIDTH, Some(btn_add.hwnd()));
-        top_row.apply();
-        let list = ly.track_table_i18n(
-            ActionTable::create_styled(
-                parent,
-                0,
-                TABLE_X,
-                TABLE_Y,
-                TABLE_WIDTH,
-                TABLE_HEIGHT,
-                hfont_normal,
-                cols,
-            )?,
-            cols_i18n_fn,
-        );
-        check_enabled.add_dependents(&[&btn_add, &list]);
+        let surface = Surface::create(parent, surface_x, surface_y, surface_w, surface_h)?;
+        surface.set_bg(BgStyle::Card);
+        surface.set_content_width(surface_w);
+
+        let list = ActionTable::create_styled(
+            parent,
+            0,
+            TABLE_X,
+            TABLE_Y,
+            TABLE_WIDTH,
+            TABLE_HEIGHT,
+            hfont_normal,
+            cols,
+        )?;
+
+        let state = Arc::new(RwLock::new(RuleSubPanelState::default()));
+
+        let state_clone = state.clone();
+        let list_hwnd = list.hwnd();
+        let on_add = Arc::new(on_add);
+        let on_toggle = Arc::new(on_toggle);
+
+        let on_add_clone = on_add.clone();
+        let on_toggle_clone = on_toggle.clone();
+
+        surface.set_on_msg(move |msg| match msg {
+            RuleMsg::Add => {
+                on_add_clone(parent);
+            }
+            RuleMsg::Toggle(new_val) => {
+                crate::ui::controller::edit_selected(|mut target| {
+                    on_toggle_clone(&mut target, new_val);
+                });
+                if let Ok(mut st) = state_clone.write() {
+                    if st.is_root {
+                        st.global_val = new_val.unwrap_or(true);
+                    } else {
+                        st.override_val = new_val;
+                    }
+                    let effective = st.override_val.unwrap_or(st.global_val);
+                    unsafe {
+                        crate::ui::win32::EnableWindow(list_hwnd, effective as i32);
+                        InvalidateRect(list_hwnd, null_mut(), 0);
+                    }
+                }
+                if let Some(c) = crate::ui::controls() {
+                    c.tab_keys.render_active_subpanel();
+                }
+            }
+        });
+
+        let hwnd_slice = [surface.hwnd(), list.hwnd()];
 
         let panel = Self {
-            layout: ly,
-            check_enabled,
-            btn_add,
+            surface,
             list,
+            state,
+            title_fn,
+            add_btn_fn,
+            hwnd_slice,
         };
+
+        panel.render();
         Some(panel)
     }
 
-    pub fn hwnds(&self) -> &[isize] {
-        self.layout.hwnds()
+    pub fn render(&self) {
+        let strings = crate::language::current();
+        if let Ok(st) = self.state.read() {
+            self.surface.render(Self::view(&st, self.title_fn, self.add_btn_fn, strings));
+        }
     }
 
-    pub fn update_language(&self, strings: &LanguageStrings) {
-        self.layout.update_language(strings);
+    fn view(
+        state: &RuleSubPanelState,
+        title_fn: TextFn,
+        add_btn_fn: TextFn,
+        strings: &LanguageStrings,
+    ) -> Element<RuleMsg> {
+        let is_root = state.is_root;
+        let override_val = state.override_val;
+        let global_val = state.global_val;
+        let effective = override_val.unwrap_or(global_val);
+
+        let sw = inheritable_switch_row(
+            title_fn(strings),
+            None,
+            is_root,
+            override_val,
+            global_val,
+            strings,
+            RuleMsg::Toggle,
+        );
+
+        let btn = button(add_btn_fn(strings), Variant::Primary, RuleMsg::Add)
+            .disabled(!effective)
+            .w(BTN_WIDTH);
+
+        row(vec![
+            sw.flex_1(),
+            btn,
+        ])
+        .items_center()
+        .w_full()
+    }
+
+    pub fn set_inherited(&self, is_root: bool, override_val: Option<bool>, global_val: bool) {
+        if let Ok(mut st) = self.state.write() {
+            st.is_root = is_root;
+            st.override_val = override_val;
+            st.global_val = global_val;
+        }
+        let effective = override_val.unwrap_or(global_val);
+        self.list.set_enabled(effective);
+        self.render();
+    }
+
+    pub fn hwnds(&self) -> &[isize] {
+        &self.hwnd_slice
+    }
+
+    pub fn update_language(&self, _strings: &LanguageStrings) {
+        self.render();
     }
 }
 
@@ -129,7 +239,7 @@ impl TabKeys {
             0,
             layout::CARD_X,
             SUB_TAB_Y,
-            SUB_TAB_W_PER_ITEM * sub_titles.len() as i32,
+            SUB_TAB_WIDTH,
             SUB_TAB_HEIGHT,
             hfont_normal,
             hfont_bold,
@@ -153,12 +263,34 @@ impl TabKeys {
     }
 
     pub fn paint(&self, hdc: isize, right_bound: i32) {
-        CardLayout::draw_cards(
+        if self.sub_tabs.get_cur_sel() == 0 {
+            self.overview.invalidate();
+            return;
+        }
+        let is_dark = crate::ui::theme::is_current_dark();
+        let palette = crate::ui::colors::ThemePalette::get(is_dark);
+        let rc = crate::ui::win32::RECT {
+            left: layout::CARD_X,
+            top: SUB_CARD_Y,
+            right: right_bound,
+            bottom: layout::CARD_BOTTOM_Y,
+        };
+        crate::ui::win32::round_rect(
             hdc,
-            layout::CARD_X,
-            right_bound,
-            &[(SUB_CARD_Y, layout::CARD_BOTTOM_Y)],
+            &rc,
+            radii::RADIUS_MD,
+            palette.bg_card,
+            Some(palette.border),
         );
+    }
+
+    pub fn render_active_subpanel(&self) {
+        match self.sub_tabs.get_cur_sel() {
+            1 => self.remap.render(),
+            2 => self.disable.render(),
+            3 => self.key_macro.render(),
+            _ => {}
+        }
     }
 
     pub fn load_profile(
@@ -167,19 +299,19 @@ impl TabKeys {
         global_config: &crate::engine::EngineConfig,
     ) {
         let is_root = child.is_none();
-        self.remap.check_enabled.set_inherited(
+        self.remap.set_inherited(
             is_root,
             child.and_then(|c| c.remap_enabled),
             global_config.remap_enabled,
         );
 
-        self.disable.check_enabled.set_inherited(
+        self.disable.set_inherited(
             is_root,
             child.and_then(|c| c.disable_enabled),
             global_config.disable_enabled,
         );
 
-        self.key_macro.check_enabled.set_inherited(
+        self.key_macro.set_inherited(
             is_root,
             child.and_then(|c| c.key_macro_enabled),
             global_config.key_macro_enabled,
@@ -189,57 +321,9 @@ impl TabKeys {
     pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
         if self.sub_tabs.is_changed(ctl_id, notify_code) {
             self.update_visibility(true);
-            return true;
-        }
-
-        let is_remap_toggle = self.remap.check_enabled.is_toggled(ctl_id, notify_code);
-        let is_disable_toggle = self.disable.check_enabled.is_toggled(ctl_id, notify_code);
-        let is_macro_toggle = self.key_macro.check_enabled.is_toggled(ctl_id, notify_code);
-
-        if is_remap_toggle || is_disable_toggle || is_macro_toggle {
-            let remap_on = self.remap.check_enabled.is_checked();
-            let disable_on = self.disable.check_enabled.is_checked();
-            let macro_on = self.key_macro.check_enabled.is_checked();
-            crate::ui::controller::edit_selected_then(
-                |mut target| {
-                    target.sync_checkbox(
-                        &self.remap.check_enabled,
-                        |c| &mut c.remap_enabled,
-                        |p| &mut p.remap_enabled,
-                    );
-                    target.sync_checkbox(
-                        &self.disable.check_enabled,
-                        |c| &mut c.disable_enabled,
-                        |p| &mut p.disable_enabled,
-                    );
-                    target.sync_checkbox(
-                        &self.key_macro.check_enabled,
-                        |c| &mut c.key_macro_enabled,
-                        |p| &mut p.key_macro_enabled,
-                    );
-                },
-                |engine| {
-                    let pm = &mut engine.profile_manager;
-                    if pm.selected_id == crate::ui::GLOBAL_PROFILE_ID {
-                        pm.global_profile.remap_enabled = remap_on;
-                        pm.global_profile.disable_enabled = disable_on;
-                        pm.global_profile.key_macro_enabled = macro_on;
-                    }
-                },
-            );
-            return true;
-        }
-
-        if self.remap.btn_add.is_clicked(ctl_id, notify_code) {
-            crate::ui::views::dialogs::show_remap_dialog(hwnd);
-            return true;
-        }
-        if self.disable.btn_add.is_clicked(ctl_id, notify_code) {
-            crate::ui::views::dialogs::show_disable_dialog(hwnd);
-            return true;
-        }
-        if self.key_macro.btn_add.is_clicked(ctl_id, notify_code) {
-            crate::ui::views::dialogs::show_key_macro_dialog(hwnd);
+            unsafe {
+                InvalidateRect(hwnd, null_mut(), 0);
+            }
             return true;
         }
         false
@@ -327,7 +411,25 @@ impl TabKeys {
         ]);
     }
 
-    pub fn update_language(&self, strings: &crate::language::LanguageStrings) {
+    pub fn update_language(&self, strings: &LanguageStrings) {
+        self.remap.list.set_column_titles(&[
+            strings.col_remap_from,
+            strings.col_remap_to,
+            strings.col_origin,
+            strings.col_action,
+        ]);
+        self.disable.list.set_column_titles(&[
+            strings.col_disable_key,
+            strings.col_status,
+            strings.col_origin,
+            strings.col_action,
+        ]);
+        self.key_macro.list.set_column_titles(&[
+            strings.col_key_macro_trigger,
+            strings.col_key_macro_name,
+            strings.col_origin,
+            strings.col_action,
+        ]);
         self.sub_tabs.set_tabs(&[
             strings.keys_sub_overview,
             strings.keys_sub_remap,
@@ -386,7 +488,7 @@ impl TabKeys {
                     0,
                     SWP_NOSIZE | SWP_NOMOVE | SWP_SHOWWINDOW,
                 );
-                InvalidateRect(*h, std::ptr::null(), 0);
+                InvalidateRect(*h, null_mut(), 0);
             }
         }
     }

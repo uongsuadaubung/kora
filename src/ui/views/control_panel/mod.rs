@@ -2,6 +2,7 @@
 //! 2-Column Layout (Sidebar 230px + Right Workspace Panel 590px)
 
 pub mod banner;
+pub mod components;
 pub mod footer;
 pub mod paint;
 pub mod sidebar;
@@ -125,10 +126,6 @@ impl ControlPanelControls {
         self.tab_system
             .update_visibility(mode == ViewMode::SystemSettings);
         self.tab_about.update_visibility(mode == ViewMode::About);
-        unsafe {
-            InvalidateRect(self.sidebar.btn_system_settings.hwnd(), null_mut(), 0);
-            InvalidateRect(self.sidebar.btn_about.hwnd(), null_mut(), 0);
-        }
     }
 
     pub fn populate_macro_items(&self, items: &[crate::engine::profile::ResolvedMacroItem]) {
@@ -195,10 +192,6 @@ impl ControlPanelControls {
 
         unsafe {
             InvalidateRect(self.tab_bar.hwnd(), null_mut(), 0);
-            InvalidateRect(self.sidebar.list_profiles.hwnd(), null_mut(), 0);
-            InvalidateRect(self.sidebar.btn_system_settings.hwnd(), null_mut(), 0);
-            InvalidateRect(self.sidebar.btn_about.hwnd(), null_mut(), 0);
-            InvalidateRect(self.banner.btn_delete.hwnd(), null_mut(), 0);
         }
     }
 
@@ -221,12 +214,10 @@ impl ControlPanelControls {
         }
     }
 
-    fn switch_global_view(&self, hwnd: isize, mode: ViewMode) -> bool {
-        self.sidebar.list_profiles.set_selected_index(-1);
+    pub(crate) fn switch_global_view(&self, hwnd: isize, mode: ViewMode) -> bool {
         self.update_view_mode(mode);
         unsafe {
             InvalidateRect(hwnd, null_mut(), 0);
-            InvalidateRect(self.sidebar.list_profiles.hwnd(), null_mut(), 0);
         }
         true
     }
@@ -239,16 +230,6 @@ impl ControlPanelControls {
                 InvalidateRect(hwnd, null_mut(), 0);
             }
             return true;
-        }
-        if self
-            .sidebar
-            .btn_system_settings
-            .is_clicked(ctrl_id, notify_code)
-        {
-            return self.switch_global_view(hwnd, ViewMode::SystemSettings);
-        }
-        if self.sidebar.btn_about.is_clicked(ctrl_id, notify_code) {
-            return self.switch_global_view(hwnd, ViewMode::About);
         }
         self.footer.on_command(hwnd, ctrl_id, notify_code)
             || self.banner.on_command(hwnd, ctrl_id, notify_code)

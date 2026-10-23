@@ -58,6 +58,12 @@ unsafe extern "system" {
     ) -> isize;
     pub fn DeleteObject(ho: isize) -> i32;
     pub fn AdjustWindowRect(lp_rect: *mut RECT, dw_style: u32, b_menu: i32) -> i32;
+    pub fn AdjustWindowRectEx(
+        lp_rect: *mut RECT,
+        dw_style: u32,
+        b_menu: i32,
+        dw_ex_style: u32,
+    ) -> i32;
     pub fn SetWindowPos(
         h_wnd: isize,
         h_wnd_insert_after: isize,

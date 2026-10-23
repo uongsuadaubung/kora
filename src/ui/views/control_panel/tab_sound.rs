@@ -1,175 +1,88 @@
 //! Tab 2: Mechanical Keyboard Typing Sound (Bàn phím cơ & Âm thanh)
-//! Uses CardLayout (auto-HWND & auto-i18n), Slider::parse_scroll, and semantic event matchers.
+//!
+//! Powered by the Declarative Single-HWND UI Engine (`Surface<SoundMsg>`).
 
 use crate::engine::EngineConfig;
 use crate::engine::profile::{AppProfile, Child};
 use crate::language::LanguageStrings;
-use crate::ui::prelude::*;
+use crate::ui::views::control_panel::components::{inheritable_switch_row, section_header};
+use crate::ui_framework::core::*;
+use crate::ui_framework::tokens::layout;
 use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
+#[derive(Clone, Debug)]
+pub enum SoundMsg {
+    ToggleSoundEnabled(Option<bool>),
+    SelectSwitchProfile(usize),
+    TestSound,
+    ChangeVolume(i32, bool),
+    DownloadSoundpack,
+}
+
+struct SoundViewState {
+    is_root: bool,
+    sound_override: Option<bool>,
+    global_sound_enabled: bool,
+    volume: u8,
+    selected_profile: String,
+    switch_profiles: Vec<String>,
+    is_downloading: bool,
+    custom_note: Option<String>,
+}
 
 pub struct TabSound {
-    layout: CardLayout,
-    pub check_sound_enabled: CheckBox<Inheritable>,
-    pub combo_switch_type: ComboBox,
-    pub btn_test_sound: PushButton,
-    pub slider_volume: Slider,
-    pub lbl_volume_val: Label,
-    pub lbl_soundpack_note: Label,
-    pub btn_download_soundpack: PushButton,
+    surface: Surface<SoundMsg>,
+    state: Rc<RefCell<SoundViewState>>,
     pub sound_available: Cell<bool>,
-    /// Switch profile names, scanned at creation and reloaded upon install (index == combo index).
-    switch_profiles: RefCell<Vec<String>>,
 }
 
 impl TabSound {
-    pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
-        let strings = crate::language::current();
-        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
+    pub fn create(parent: isize, _hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
+        let viewport_x = layout::CARD_X;
+        let viewport_y = layout::CARD_START_Y;
+        let viewport_w = layout::CARD_WIDTH + 8;
+        let viewport_h = layout::CARD_BOTTOM_Y - layout::CARD_START_Y;
+
+        let surface = Surface::create(parent, viewport_x, viewport_y, viewport_w, viewport_h)?;
         let switch_profiles = crate::engine::config_store::list_switch_profiles();
         let sound_available = !switch_profiles.is_empty();
 
-        // --- Card 1: Thiết lập Âm thanh gõ phím cơ ---
-        let (check_sound_enabled, combo_switch_type, btn_test_sound, lbl_volume_val, slider_volume) =
-            ly.card_with_pad(spacing::SPACE_14, 16, |card| {
-                let lbl_title = card.label(|s| s.sound_title, true)?;
-                let check_sound_enabled = card.inheritable_checkbox(|s| s.check_sound_enabled, true)?;
-                check_sound_enabled.set_align_right(true);
+        let state = Rc::new(RefCell::new(SoundViewState {
+            is_root: true,
+            sound_override: None,
+            global_sound_enabled: false,
+            volume: 50,
+            selected_profile: switch_profiles.first().cloned().unwrap_or_default(),
+            switch_profiles,
+            is_downloading: false,
+            custom_note: None,
+        }));
 
-                card.horizontal(22, 8, |row| {
-                    row.align(CrossAlign::Center);
-                    row.add_stretch(1, Some(lbl_title.hwnd()));
-                    row.add_fixed(290, Some(check_sound_enabled.hwnd()));
-                });
-
-                card.label_row(|s| s.label_switch_type, 18, 4, true)?;
-
-                let combo_switch_type = card.track(ComboBox::new(parent, hfont_normal)?);
-                for p in &switch_profiles {
-                    combo_switch_type.add_item(p);
-                }
-                if switch_profiles.is_empty() {
-                    combo_switch_type.add_item(strings.sound_profile_default);
-                }
-                combo_switch_type.set_selected(0);
-
-                let btn_test_sound = card.button(
-                    |s| s.btn_test_sound,
-                    false,
-                    ButtonVariant::Secondary,
-                )?;
-
-                card.horizontal(28, 14, |row| {
-                    row.align(CrossAlign::Center);
-                    row.add_stretch(1, Some(combo_switch_type.hwnd()));
-                    row.add_fixed(10, None);
-                    row.add_fixed(110, Some(btn_test_sound.hwnd()));
-                });
-
-                let lbl_vol = card.label(|s| s.label_volume, true)?;
-                let lbl_volume_val = card.track(
-                    Label::new_right(parent, "50%", hfont_bold)?
-                        .with_tone(LabelTone::Accent),
-                );
-
-                card.horizontal(18, 4, |row| {
-                    row.align(CrossAlign::Center);
-                    row.add_fixed(120, Some(lbl_vol.hwnd()));
-                    row.add_spacer();
-                    row.add_fixed(60, Some(lbl_volume_val.hwnd()));
-                });
-
-                let slider_volume = card.slider(0, 100, 50)?;
-                card.horizontal(26, 0, |row| {
-                    row.add_stretch(1, Some(slider_volume.hwnd()));
-                });
-
-                if sound_available {
-                    check_sound_enabled.add_dependents(&[&combo_switch_type, &btn_test_sound, &slider_volume]);
-                } else {
-                    combo_switch_type.set_enabled(false);
-                    btn_test_sound.set_enabled(false);
-                    slider_volume.set_enabled(false);
-                }
-
-                Some((
-                    check_sound_enabled,
-                    combo_switch_type,
-                    btn_test_sound,
-                    lbl_volume_val,
-                    slider_volume,
-                ))
-            })?;
-
-        // --- Card 2: Tải & Quản lý gói âm thanh switch ---
-        let (lbl_soundpack_note, btn_download_soundpack) =
-            ly.card_with_pad(spacing::SPACE_14, 20, |card| {
-                card.label_row(|s| s.soundpack_card_title, 18, 4, true)?;
-
-                let lbl_soundpack_note = card.track(
-                    Label::new(
-                        parent,
-                        if sound_available {
-                            strings.soundpack_note_installed
-                        } else {
-                            strings.soundpack_note_missing
-                        },
-                        hfont_normal,
-                    )?
-                    .with_tone(LabelTone::Secondary),
-                );
-                card.horizontal(18, 10, |row| {
-                    row.add_stretch(1, Some(lbl_soundpack_note.hwnd()));
-                });
-
-                let btn_download_soundpack = card.track(PushButton::new_with_bg(
-                    parent,
-                    if sound_available {
-                        strings.btn_update_soundpack
-                    } else {
-                        strings.btn_download_soundpack
-                    },
-                    hfont_normal,
-                    if sound_available {
-                        ButtonVariant::Secondary
-                    } else {
-                        ButtonVariant::Primary
-                    },
-                    None,
-                )?);
-                card.horizontal(32, 0, |row| {
-                    row.add_fixed(260, Some(btn_download_soundpack.hwnd()));
-                    row.add_spacer();
-                });
-                Some((lbl_soundpack_note, btn_download_soundpack))
-            })?;
+        let surface_cb = surface.clone();
+        surface.set_on_msg(move |msg| {
+            Self::handle_message(parent, &surface_cb, msg);
+        });
 
         let tab = Self {
-            layout: ly,
-            check_sound_enabled,
-            combo_switch_type,
-            btn_test_sound,
-            slider_volume,
-            lbl_volume_val,
-            lbl_soundpack_note,
-            btn_download_soundpack,
+            surface,
+            state,
             sound_available: Cell::new(sound_available),
-            switch_profiles: RefCell::new(switch_profiles),
         };
+        tab.refresh();
         Some(tab)
     }
 
-    fn select_switch_profile(&self, name: &str) {
-        let profiles = self.switch_profiles.borrow();
-        if let Some(pos) = profiles.iter().position(|p| p.eq_ignore_ascii_case(name)) {
-            self.combo_switch_type.set_selected(pos);
-        }
+    pub fn viewport_hwnd(&self) -> isize {
+        self.surface.hwnd()
     }
 
-    fn selected_switch_profile(&self) -> Option<String> {
-        let profiles = self.switch_profiles.borrow();
-        profiles
-            .get(self.combo_switch_type.get_selected()?)
-            .cloned()
+    fn refresh(&self) {
+        let strings = crate::language::current();
+        let st = self.state.borrow();
+        let tree = Self::view(&st, self.sound_available.get(), strings);
+        drop(st);
+        self.surface.render(tree);
     }
 
     pub fn load_profile(&self, child: Option<&AppProfile<Child>>, global_config: &EngineConfig) {
@@ -178,134 +91,44 @@ impl TabSound {
             .unwrap_or(global_config.sound_volume);
         let prof_name = child
             .and_then(|c| c.sound_profile.as_deref())
-            .unwrap_or(&global_config.sound_profile);
+            .unwrap_or(&global_config.sound_profile)
+            .to_string();
 
-        self.check_sound_enabled.set_inherited(
-            child.is_none(),
-            child.and_then(|c| c.sound_enabled),
-            global_config.sound_enabled,
-        );
-        self.slider_volume.set_pos(vol as u32);
-        self.lbl_volume_val.set_text(&format!("{}%", vol));
-        self.select_switch_profile(prof_name);
-    }
-
-    /// Saves controls back into the active target (`Global` config or `Child` profile).
-    /// Child: volume is set in `on_hscroll`, switch type only when the combo actually changes
-    /// (keeps them inheriting otherwise).
-    fn sync_to_target(
-        &self,
-        mut target: crate::ui::controller::EditTarget<'_>,
-        combo_changed: bool,
-    ) {
-        use crate::ui::controller::EditTarget;
-        target.sync_checkbox(
-            &self.check_sound_enabled,
-            |c| &mut c.sound_enabled,
-            |p| &mut p.sound_enabled,
-        );
-        match target {
-            EditTarget::Global(config) => {
-                config.sound_volume = self.slider_volume.get_pos() as u8;
-                if let Some(name) = self.selected_switch_profile() {
-                    config.sound_profile = std::sync::Arc::from(name.as_str());
-                }
-            }
-            EditTarget::Child(profile) => {
-                if combo_changed && let Some(name) = self.selected_switch_profile() {
-                    profile.sound_profile = Some(std::sync::Arc::from(name.as_str()));
-                }
-            }
+        {
+            let mut st = self.state.borrow_mut();
+            st.is_root = child.is_none();
+            st.sound_override = child.and_then(|c| c.sound_enabled);
+            st.global_sound_enabled = global_config.sound_enabled;
+            st.volume = vol;
+            st.selected_profile = prof_name;
         }
+        self.refresh();
     }
 
-    fn refresh_soundpack_labels(&self, strings: &LanguageStrings) {
-        let (btn_txt, note_txt) = if self.sound_available.get() {
-            (
-                strings.btn_update_soundpack,
-                strings.soundpack_note_installed,
-            )
-        } else {
-            (
-                strings.btn_download_soundpack,
-                strings.soundpack_note_missing,
-            )
-        };
-        self.btn_download_soundpack.set_text(btn_txt);
-        self.lbl_soundpack_note.set_text(note_txt);
-    }
-
-    pub fn update_language(&self, strings: &LanguageStrings) {
-        self.layout.update_language(strings);
-        self.refresh_soundpack_labels(strings);
+    pub fn update_language(&self, _strings: &LanguageStrings) {
         let snap = crate::ui::controller::with_engine(|e| {
             let pm = &e.profile_manager;
             (pm.get_profile(&pm.selected_id).cloned(), e.config().clone())
         });
         if let Some((child, cfg)) = snap {
             self.load_profile(child.as_ref(), &cfg);
+        } else {
+            self.refresh();
         }
     }
 
-    pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
-        use crate::ui::controller;
-        if self.btn_test_sound.is_clicked(ctl_id, notify_code) {
-            crate::platform::win32::sound::play_test_sound();
-            return true;
-        }
-
-        if self.btn_download_soundpack.is_clicked(ctl_id, notify_code) {
-            let hwnd_panel = hwnd;
-            let strings = crate::language::current();
-            self.btn_download_soundpack
-                .set_text(strings.btn_downloading_soundpack);
-            self.btn_download_soundpack.set_enabled(false);
-            self.lbl_soundpack_note
-                .set_text("Đang kết nối GitHub & tải 13 switch... ⏳");
-
-            std::thread::spawn(move || {
-                let status = Box::new(
-                    crate::platform::win32::sound::installer::download_and_install_soundpack(),
-                );
-                let ptr = Box::into_raw(status);
-                let posted = unsafe {
-                    crate::ui::win32::PostMessageW(
-                        hwnd_panel,
-                        crate::ui::WM_APP_SOUNDPACK_INSTALLED,
-                        0,
-                        ptr as isize,
-                    )
-                };
-                if posted == 0 {
-                    drop(unsafe { Box::from_raw(ptr) });
-                }
-            });
-            return true;
-        }
-
-        let is_check = self.check_sound_enabled.is_toggled(ctl_id, notify_code);
-        let is_combo = self.combo_switch_type.is_changed(ctl_id, notify_code);
-
-        if is_check || is_combo {
-            controller::edit_selected_then(
-                |target| self.sync_to_target(target, is_combo),
-                |engine| controller::reconfigure_sound(engine),
-            );
-            if is_combo {
-                crate::platform::win32::sound::play_test_sound();
-            }
-            return true;
-        }
-
+    pub fn on_command(&self, _hwnd: isize, _ctl_id: u32, _notify_code: u32) -> bool {
         false
     }
 
-    /// UI-thread completion of the background soundpack download & installation
+    pub fn on_hscroll(&self, _wparam: usize, _slider_hwnd: isize) -> bool {
+        false
+    }
+
     pub fn on_soundpack_installed(
         &self,
         status: &crate::platform::win32::sound::installer::SoundpackInstallStatus,
     ) {
-        let strings = crate::language::current();
         if let crate::platform::win32::sound::installer::SoundpackInstallStatus::Success {
             ..
         } = status
@@ -313,60 +136,225 @@ impl TabSound {
             let profiles = crate::engine::config_store::list_switch_profiles();
             self.sound_available.set(!profiles.is_empty());
 
-            self.combo_switch_type.clear();
-            for p in &profiles {
-                self.combo_switch_type.add_item(p);
-            }
-            if profiles.is_empty() {
-                self.combo_switch_type
-                    .add_item(strings.sound_profile_default);
-            }
-            self.combo_switch_type.set_selected(0);
-            *self.switch_profiles.borrow_mut() = profiles;
-            self.check_sound_enabled.add_dependents(&[
-                &self.combo_switch_type,
-                &self.btn_test_sound,
-                &self.slider_volume,
-            ]);
-
-            if let Some(first_name) = self.switch_profiles.borrow().first() {
+            if let Some(first_name) = profiles.first().cloned() {
                 let name_arc = std::sync::Arc::from(first_name.as_str());
                 crate::ui::controller::with_engine(|engine| {
                     engine.config_mut().sound_profile = name_arc;
                     crate::ui::controller::reconfigure_sound(engine);
                 });
+                let mut st = self.state.borrow_mut();
+                st.selected_profile = first_name;
+                st.switch_profiles = profiles;
             }
         }
-        self.refresh_soundpack_labels(strings);
-        self.btn_download_soundpack.set_enabled(true);
-    }
-
-    /// `WM_HSCROLL` from the volume trackbar. While dragging (`!committed`) only the
-    /// label is updated; the value is persisted once the thumb is released / keyboard step.
-    pub fn on_hscroll(&self, wparam: usize, slider_hwnd: isize) -> bool {
-        use crate::ui::controller::{self, EditTarget};
-        let Some((pos, committed)) = self.slider_volume.parse_scroll(wparam, slider_hwnd) else {
-            return false;
-        };
-        self.lbl_volume_val.set_text(&format!("{pos}%"));
-        if committed {
-            let vol = pos as u8;
-            controller::edit_selected_then(
-                |target| match target {
-                    EditTarget::Global(cfg) => cfg.sound_volume = vol,
-                    EditTarget::Child(child) => child.sound_volume = Some(vol),
-                },
-                |engine| controller::reconfigure_sound(engine),
-            );
+        {
+            let mut st = self.state.borrow_mut();
+            st.is_downloading = false;
+            st.custom_note = None;
         }
-        true
+        self.refresh();
     }
 
-    pub fn paint(&self, hdc: isize, right_bound: i32) {
-        self.layout.paint_cards(hdc, layout::CARD_X, right_bound);
+    pub fn paint(&self, _hdc: isize, _right_bound: i32) {
+        self.surface.invalidate();
     }
 
     pub fn update_visibility(&self, visible: bool) {
-        self.layout.set_visible(visible);
+        self.surface.set_visible(visible);
+    }
+
+    fn view(
+        st: &SoundViewState,
+        sound_available: bool,
+        strings: &LanguageStrings,
+    ) -> Element<SoundMsg> {
+        let effective_enabled = st.sound_override.unwrap_or(st.global_sound_enabled);
+        let controls_enabled = sound_available && effective_enabled;
+
+        let switch_options = if st.switch_profiles.is_empty() {
+            vec![strings.sound_profile_default.to_string()]
+        } else {
+            st.switch_profiles.clone()
+        };
+        let sel_idx = st
+            .switch_profiles
+            .iter()
+            .position(|p| p.eq_ignore_ascii_case(&st.selected_profile))
+            .unwrap_or(0);
+
+        let card1 = card(vec![
+            inheritable_switch_row(
+                strings.sound_title,
+                Some(strings.check_sound_enabled.to_string()),
+                st.is_root,
+                st.sound_override,
+                st.global_sound_enabled,
+                strings,
+                SoundMsg::ToggleSoundEnabled,
+            ),
+            divider(),
+            col(vec![
+                text(strings.label_switch_type).bold(),
+                row(vec![
+                    select(switch_options, sel_idx, SoundMsg::SelectSwitchProfile)
+                        .enabled(controls_enabled)
+                        .flex_1(),
+                    button(
+                        strings.btn_test_sound,
+                        Variant::Secondary,
+                        SoundMsg::TestSound,
+                    )
+                    .enabled(controls_enabled),
+                ])
+                .items_center()
+                .gap(3),
+            ])
+            .gap(1),
+            col(vec![
+                row(vec![
+                    text(strings.label_volume).bold().flex_1(),
+                    text(format!("{}%", st.volume)).bold().accent(),
+                ])
+                .items_center()
+                .justify_between(),
+                slider(0, 100, st.volume as i32, SoundMsg::ChangeVolume).enabled(controls_enabled),
+            ])
+            .gap(1),
+        ]);
+
+        let note_txt = st.custom_note.clone().unwrap_or_else(|| {
+            if sound_available {
+                strings.soundpack_note_installed.to_string()
+            } else {
+                strings.soundpack_note_missing.to_string()
+            }
+        });
+        let btn_txt = if st.is_downloading {
+            strings.btn_downloading_soundpack
+        } else if sound_available {
+            strings.btn_update_soundpack
+        } else {
+            strings.btn_download_soundpack
+        };
+
+        let card2 = card(vec![
+            section_header(strings.soundpack_card_title),
+            text(note_txt).muted().size(Size::Sm),
+            row(vec![
+                button(
+                    btn_txt,
+                    if sound_available {
+                        Variant::Secondary
+                    } else {
+                        Variant::Primary
+                    },
+                    SoundMsg::DownloadSoundpack,
+                )
+                .enabled(!st.is_downloading),
+                spacer(),
+            ])
+            .pt(1),
+        ]);
+
+        col(vec![card1, card2]).gap(3).pb(3)
+    }
+
+    fn handle_message(parent_hwnd: isize, _surface: &Surface<SoundMsg>, msg: SoundMsg) {
+        use crate::ui::controller::{self, EditTarget};
+
+        let Some(c) = crate::ui::controls() else {
+            return;
+        };
+        let tab = &c.tab_sound;
+
+        match msg {
+            SoundMsg::ToggleSoundEnabled(next_opt) => {
+                controller::edit_selected_then(
+                    |target| match target {
+                        EditTarget::Global(cfg) => {
+                            cfg.sound_enabled = next_opt.unwrap_or(!cfg.sound_enabled);
+                        }
+                        EditTarget::Child(prof) => {
+                            prof.sound_enabled = next_opt;
+                        }
+                    },
+                    |engine| controller::reconfigure_sound(engine),
+                );
+                if let Some((child, cfg)) = controller::with_engine(|e| {
+                    let pm = &e.profile_manager;
+                    (pm.get_profile(&pm.selected_id).cloned(), e.config().clone())
+                }) {
+                    tab.load_profile(child.as_ref(), &cfg);
+                }
+            }
+            SoundMsg::SelectSwitchProfile(idx) => {
+                let chosen = tab
+                    .state
+                    .borrow()
+                    .switch_profiles
+                    .get(idx)
+                    .cloned();
+                if let Some(name) = chosen {
+                    tab.state.borrow_mut().selected_profile = name.clone();
+                    controller::edit_selected_then(
+                        |target| match target {
+                            EditTarget::Global(cfg) => {
+                                cfg.sound_profile = std::sync::Arc::from(name.as_str());
+                            }
+                            EditTarget::Child(prof) => {
+                                prof.sound_profile = Some(std::sync::Arc::from(name.as_str()));
+                            }
+                        },
+                        |engine| controller::reconfigure_sound(engine),
+                    );
+                    crate::platform::win32::sound::play_test_sound();
+                    tab.refresh();
+                }
+            }
+            SoundMsg::TestSound => {
+                crate::platform::win32::sound::play_test_sound();
+            }
+            SoundMsg::ChangeVolume(pos, committed) => {
+                let vol = pos.clamp(0, 100) as u8;
+                tab.state.borrow_mut().volume = vol;
+                if committed {
+                    controller::edit_selected_then(
+                        |target| match target {
+                            EditTarget::Global(cfg) => cfg.sound_volume = vol,
+                            EditTarget::Child(child) => child.sound_volume = Some(vol),
+                        },
+                        |engine| controller::reconfigure_sound(engine),
+                    );
+                    tab.refresh();
+                }
+            }
+            SoundMsg::DownloadSoundpack => {
+                {
+                    let mut st = tab.state.borrow_mut();
+                    st.is_downloading = true;
+                    st.custom_note =
+                        Some("Đang kết nối GitHub & tải 13 switch... ⏳".to_string());
+                }
+                tab.refresh();
+
+                std::thread::spawn(move || {
+                    let status = Box::new(
+                        crate::platform::win32::sound::installer::download_and_install_soundpack(),
+                    );
+                    let ptr = Box::into_raw(status);
+                    let posted = unsafe {
+                        crate::ui::win32::PostMessageW(
+                            parent_hwnd,
+                            crate::ui::WM_APP_SOUNDPACK_INSTALLED,
+                            0,
+                            ptr as isize,
+                        )
+                    };
+                    if posted == 0 {
+                        drop(unsafe { Box::from_raw(ptr) });
+                    }
+                });
+            }
+        }
     }
 }

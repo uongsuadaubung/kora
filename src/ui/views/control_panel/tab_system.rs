@@ -1,298 +1,340 @@
 //! Tab 2: System controls (Khởi động cùng Windows, Giao diện, Ngôn ngữ, Nhật ký lỗi, Cập nhật)
-//! Uses CardLayout (page_header, section_title, checkbox_row, auto-HWND, auto-i18n).
+//!
+//! Powered by the Declarative Single-HWND UI Engine (`Surface<SystemMsg>`).
 
-use crate::language::LanguageStrings;
-use crate::ui::prelude::*;
+use crate::engine::EngineConfig;
+use crate::engine::config::UiTheme;
+use crate::language::{Language, LanguageStrings};
+use crate::ui::views::control_panel::components::{form_group, page_header, section_header};
 use crate::ui::views::dialogs::show_danger_confirm;
-use crate::ui_framework::win32::{RDW_ALLCHILDREN, RDW_INVALIDATE, RedrawWindow, SetWindowTextW};
+use crate::ui_framework::core::*;
+use crate::ui_framework::tokens::layout;
+use crate::ui_framework::win32::{
+    RDW_ALLCHILDREN, RDW_INVALIDATE, RedrawWindow, SW_HIDE, SetWindowTextW, ShowWindow, to_wide,
+};
 
 const SYS_CARD_X: i32 = 246;
-const SYS_CONTENT_X: i32 = 266;
-const SYS_CONTENT_W: i32 = 520;
+const SYS_START_Y: i32 = 64;
+
+#[derive(Clone, Debug)]
+pub enum SystemMsg {
+    ToggleAutostart(bool),
+    ToggleShowDialog(bool),
+    ToggleDebugLog(bool),
+    OpenDebugLog,
+    SelectTheme(usize),
+    SelectLanguage(usize),
+    RestoreDefaults,
+}
 
 pub struct TabSystem {
-    layout: CardLayout,
-    pub check_autostart: CheckBox,
-    pub check_show_dialog: CheckBox,
-    pub check_debug_log: CheckBox,
-    pub btn_open_log: PushButton,
-    pub combo_theme: ComboBox,
-    pub combo_lang: ComboBox,
-    pub btn_restore_defaults: PushButton,
+    surface: Surface<SystemMsg>,
 }
 
 impl TabSystem {
-    pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
-        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold)
-            .at(86)
-            .with_bounds(SYS_CONTENT_X, SYS_CONTENT_W);
+    pub fn create(parent: isize, _hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
+        let viewport_w = layout::WINDOW_CLIENT_WIDTH - SYS_CARD_X - 8;
+        let viewport_h = layout::CARD_BOTTOM_Y - SYS_START_Y;
 
-        // --- Header Section ---
-        ly.page_header(|s| s.sys_header_title, |s| s.sys_header_sub)?;
+        let surface = Surface::create(parent, SYS_CARD_X, SYS_START_Y, viewport_w, viewport_h)?;
+        unsafe {
+            ShowWindow(surface.hwnd(), SW_HIDE);
+        }
 
-        // --- Card 1: Windows System ---
-        let (check_autostart, check_show_dialog, check_debug_log, btn_open_log) = ly
-            .card_with_pad(16, 18, |card| {
-                card.section_title(|s| s.sys_title, 8)?;
-                let check_autostart =
-                    card.checkbox_row(|s| s.check_autostart, 24, 6, false, false)?;
-                let check_show_dialog =
-                    card.checkbox_row(|s| s.check_show_dialog, 24, 6, false, false)?;
+        let surface_cb = surface.clone();
+        surface.set_on_msg(move |msg| {
+            Self::handle_message(parent, &surface_cb, msg);
+        });
 
-                let check_debug_log = card.checkbox(|s| s.check_debug_log, false)?;
-                let btn_open_log = card.button(
-                    |s| s.btn_open_log,
-                    false,
-                    ButtonVariant::Secondary,
-                )?;
-                card.horizontal(26, 0, |row| {
-                    row.align(CrossAlign::Center);
-                    row.add_stretch(1, Some(check_debug_log.hwnd()));
-                    row.add_fixed(16, None);
-                    row.add_fixed(144, Some(btn_open_log.hwnd()));
-                });
-
-                Some((
-                    check_autostart,
-                    check_show_dialog,
-                    check_debug_log,
-                    btn_open_log,
-                ))
-            })?;
-
-        // --- Card 2: Theme & Language ---
-        ly.skip(4);
-        let (combo_theme, combo_lang) = ly.card_with_pad(16, 26, |card| {
-            card.section_title(|s| s.label_theme_title, 8)?;
-            let ((_, combo_theme), (_, combo_lang)) = card.two_col_combos(
-                20,
-                0,
-                false,
-                (
-                    |s| s.label_theme,
-                    |s| vec![s.theme_auto, s.theme_light, s.theme_dark],
-                ),
-                (|s| s.label_language, |_s| vec!["Tiếng Việt", "English"]),
-            )?;
-            Some((combo_theme, combo_lang))
-        })?;
-
-        // --- Card 3: Restore Defaults ---
-        ly.skip(4);
-        let btn_restore_defaults = ly.card_with_pad(16, 12, |card| {
-            let lbl_title = card.label(|s| s.sys_defaults_title, true)?;
-            let lbl_desc = card.label(|s| s.sys_defaults_desc, false)?
-                .with_tone(LabelTone::Secondary);
-            let btn = card.button(
-                |s| s.btn_restore_defaults,
-                false,
-                ButtonVariant::Secondary,
-            )?;
-
-            // Two-pane split: left info stack, right vertically centered button
-            card.split(56, 0, SplitDirection::Horizontal, SplitRule::FixedSecond(144), |split| {
-                split.gap(16);
-                let (r_left, r_right) = split.compute();
-
-                let mut left_stack = VStack::new(r_left);
-                left_stack.add_fixed(20, Some(lbl_title.hwnd()));
-                left_stack.add_fixed(4, None);
-                left_stack.add_fixed(36, Some(lbl_desc.hwnd()));
-                left_stack.apply();
-
-                let mut right_stack = VStack::new(r_right);
-                right_stack.align(CrossAlign::Stretch);
-                right_stack.add_spacer();
-                right_stack.add_fixed(32, Some(btn.hwnd()));
-                right_stack.add_spacer();
-                right_stack.apply();
-            });
-
-            Some(btn)
-        })?;
-
-        Some(Self {
-            layout: ly,
-            check_autostart,
-            check_show_dialog,
-            check_debug_log,
-            btn_open_log,
-            combo_theme,
-            combo_lang,
-            btn_restore_defaults,
-        })
+        let tab = Self { surface };
+        let def_cfg = EngineConfig::default();
+        tab.load_config(&def_cfg);
+        Some(tab)
     }
 
-    pub fn paint(&self, hdc: isize, right_bound: i32) {
-        self.layout.paint_cards(hdc, SYS_CARD_X, right_bound);
+    pub fn viewport_hwnd(&self) -> isize {
+        self.surface.hwnd()
+    }
+
+    pub fn paint(&self, _hdc: isize, _right_bound: i32) {
+        self.surface.invalidate();
     }
 
     pub fn update_visibility(&self, visible: bool) {
-        self.layout.set_visible(visible);
+        self.surface.set_visible(visible);
     }
 
-    pub fn load_config(&self, config: &crate::engine::EngineConfig) {
-        self.check_autostart
-            .set_checked(crate::platform::is_windows_autostart_enabled());
-        self.check_show_dialog
-            .set_checked(config.show_dialog_on_startup);
-        self.check_debug_log.set_checked(config.debug);
-
-        self.combo_theme.set_selected(config.theme.into());
-        self.combo_lang.set_selected(config.language.into());
+    pub fn load_config(&self, config: &EngineConfig) {
+        let strings = crate::language::current();
+        let autostart = crate::platform::is_windows_autostart_enabled();
+        let tree = Self::view(config, autostart, strings);
+        self.surface.render(tree);
     }
 
-    pub fn read_config(&self, config: &mut crate::engine::EngineConfig) {
-        config.show_dialog_on_startup = self.check_show_dialog.is_checked();
-
-        let new_debug = self.check_debug_log.is_checked();
-        if config.debug != new_debug {
-            config.debug = new_debug;
-            println!(
-                "[Kora] >> Ghi nhật ký lỗi (Debug Log): {}",
-                if new_debug { "BẬT" } else { "TẮT" }
-            );
-        }
-
-        if let Some(theme_sel) = self.combo_theme.get_selected() {
-            let new_theme = crate::engine::config::UiTheme::from(theme_sel);
-            if config.theme != new_theme {
-                config.theme = new_theme;
-                println!("[Kora] >> Đổi giao diện sang: {:?}", new_theme);
-            }
-        }
-
-        if let Some(lang_sel) = self.combo_lang.get_selected() {
-            let new_lang = crate::language::Language::from(lang_sel);
-            if config.language != new_lang {
-                config.language = new_lang;
-                println!("[Kora] >> Đổi ngôn ngữ giao diện sang: {:?}", new_lang);
-            }
-        }
-    }
-
-    pub fn update_language(&self, lang: crate::language::Language, strings: &LanguageStrings) {
-        self.layout.update_language(strings);
-        self.combo_lang.set_selected(lang.into());
+    pub fn update_language(&self, _lang: Language, _strings: &LanguageStrings) {
+        let cfg = crate::ui::controller::with_engine(|e| e.config().clone())
+            .unwrap_or_default();
+        self.load_config(&cfg);
     }
 
     pub fn on_command(
         &self,
-        hwnd: isize,
-        ctl_id: u32,
-        notify_code: u32,
-        controls: &super::ControlPanelControls,
+        _hwnd: isize,
+        _ctl_id: u32,
+        _notify_code: u32,
+        _controls: &super::ControlPanelControls,
     ) -> bool {
-        if self.btn_restore_defaults.is_clicked(ctl_id, notify_code) {
-            let strings = crate::language::current();
-            let hwnd_panel = hwnd;
-            show_danger_confirm(
-                hwnd_panel,
-                strings.confirm_defaults_title,
-                strings.confirm_defaults_msg,
-                move || {
-                    let def_config = crate::engine::EngineConfig::default();
-                    crate::ui::controller::with_engine(|engine| {
-                        *engine.config_mut() = def_config.clone();
-                        engine.profile_manager = crate::engine::profile::ProfileManager::new();
-                        engine.macro_table = crate::engine::macro_table::MacroTable::new();
-                        let _ = crate::engine::config_store::save_config_all(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                        crate::ui::controller::reconfigure_sound(engine);
-                    });
-
-                    if let Some(controls) = crate::ui::controls() {
-                        controls.refresh_from_engine();
-                        controls.update_language(def_config.language);
-                        let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
-                        crate::ui::theme::apply_ui_theme(hwnd_panel, controls, is_dark);
-                    }
-                    unsafe {
-                        let strings = crate::language::get_strings(def_config.language);
-                        SetWindowTextW(hwnd_panel, to_wide(strings.window_title).as_ptr());
-                        RedrawWindow(
-                            hwnd_panel,
-                            std::ptr::null(),
-                            0,
-                            RDW_INVALIDATE | RDW_ALLCHILDREN,
-                        );
-                    }
-                },
-            );
-            return true;
-        }
-
-        if self.btn_open_log.is_clicked(ctl_id, notify_code) {
-            let log_file = {
-                if let Ok(guard) = crate::platform::win32::ENGINE_INSTANCE.lock() {
-                    guard
-                        .as_ref()
-                        .and_then(|e| e.config().debug_file_path.as_deref().map(|s| s.to_string()))
-                        .unwrap_or_else(|| "kora_debug.log".to_string())
-                } else {
-                    "kora_debug.log".to_string()
-                }
-            };
-            if !std::path::Path::new(&log_file).exists() {
-                let _ = std::fs::File::create(&log_file);
-            }
-            let _ = std::process::Command::new("notepad.exe")
-                .arg(&log_file)
-                .spawn();
-            return true;
-        }
-
-        if self.check_autostart.is_toggled(ctl_id, notify_code) {
-            crate::platform::set_windows_autostart(self.check_autostart.is_checked());
-            return true;
-        }
-
-        let is_theme_changed = self.combo_theme.is_changed(ctl_id, notify_code);
-        let is_lang_changed = self.combo_lang.is_changed(ctl_id, notify_code);
-        let is_chk_changed = self.check_show_dialog.is_toggled(ctl_id, notify_code)
-            || self.check_debug_log.is_toggled(ctl_id, notify_code);
-
-        if is_theme_changed || is_lang_changed || is_chk_changed {
-            let snapshot = crate::platform::win32::ENGINE_INSTANCE
-                .lock()
-                .ok()
-                .and_then(|mut guard| {
-                    guard.as_mut().map(|engine| {
-                        self.read_config(engine.config_mut());
-                        crate::engine::config_store::save_config_all_debounced(
-                            engine.config(),
-                            &engine.macro_table,
-                            &engine.profile_manager,
-                        );
-                        (engine.config().theme, engine.config().language)
-                    })
-                });
-
-            if let Some((theme, lang)) = snapshot {
-                if is_theme_changed {
-                    let is_dark = crate::ui::theme::resolve_is_dark(theme);
-                    crate::ui::theme::apply_ui_theme(hwnd, controls, is_dark);
-                    if let Some(ui) = crate::ui::ui() {
-                        ui.tray.borrow_mut().refresh_icon();
-                    }
-                } else if is_lang_changed {
-                    controls.update_language(lang);
-                    if let Some(ui) = crate::ui::ui() {
-                        ui.tray.borrow_mut().refresh_icon();
-                    }
-                    unsafe {
-                        let strings = crate::language::get_strings(lang);
-                        SetWindowTextW(hwnd, to_wide(strings.window_title).as_ptr());
-                        RedrawWindow(hwnd, std::ptr::null(), 0, RDW_INVALIDATE | RDW_ALLCHILDREN);
-                    }
-                }
-            }
-            return true;
-        }
-
         false
+    }
+
+    fn view(
+        config: &EngineConfig,
+        autostart: bool,
+        strings: &LanguageStrings,
+    ) -> Element<SystemMsg> {
+        let header = page_header(strings.sys_header_title, strings.sys_header_sub);
+
+        let card1 = card(vec![
+            section_header(strings.sys_title),
+            switch(strings.check_autostart, autostart, SystemMsg::ToggleAutostart),
+            divider(),
+            switch(
+                strings.check_show_dialog,
+                config.show_dialog_on_startup,
+                SystemMsg::ToggleShowDialog,
+            ),
+            divider(),
+            row(vec![
+                switch(
+                    strings.check_debug_log,
+                    config.debug,
+                    SystemMsg::ToggleDebugLog,
+                )
+                .flex_1(),
+                button(
+                    strings.btn_open_log,
+                    Variant::Secondary,
+                    SystemMsg::OpenDebugLog,
+                )
+                .size(Size::Sm),
+            ])
+            .items_center()
+            .justify_between()
+            .gap(3),
+        ]);
+
+        let theme_idx: usize = config.theme.into();
+        let lang_idx: usize = config.language.into();
+        let card2 = card(vec![
+            section_header(strings.label_theme_title),
+            row(vec![
+                form_group(
+                    strings.label_theme,
+                    select(
+                        vec![
+                            strings.theme_auto.to_string(),
+                            strings.theme_light.to_string(),
+                            strings.theme_dark.to_string(),
+                        ],
+                        theme_idx,
+                        SystemMsg::SelectTheme,
+                    )
+                    .w_full(),
+                )
+                .flex_1(),
+                form_group(
+                    strings.label_language,
+                    select(
+                        vec!["Tiếng Việt".to_string(), "English".to_string()],
+                        lang_idx,
+                        SystemMsg::SelectLanguage,
+                    )
+                    .w_full(),
+                )
+                .flex_1(),
+            ])
+            .gap(3),
+        ]);
+
+        let card3 = card(vec![
+            row(vec![
+                col(vec![
+                    text(strings.sys_defaults_title).bold(),
+                    text(strings.sys_defaults_desc).muted().size(Size::Sm),
+                ])
+                .gap(1)
+                .flex_1(),
+                button(
+                    strings.btn_restore_defaults,
+                    Variant::Secondary,
+                    SystemMsg::RestoreDefaults,
+                ),
+            ])
+            .items_center()
+            .justify_between()
+            .gap(3),
+        ]);
+
+        col(vec![header, card1, card2, card3]).gap(3).pb(3)
+    }
+
+    fn handle_message(parent_hwnd: isize, surface: &Surface<SystemMsg>, msg: SystemMsg) {
+        match msg {
+            SystemMsg::ToggleAutostart(enabled) => {
+                crate::platform::set_windows_autostart(enabled);
+                let cfg = crate::ui::controller::with_engine(|e| e.config().clone())
+                    .unwrap_or_default();
+                let strings = crate::language::current();
+                surface.render(Self::view(&cfg, enabled, strings));
+            }
+            SystemMsg::ToggleShowDialog(enabled) => {
+                let cfg_opt = crate::ui::controller::with_engine(|engine| {
+                    engine.config_mut().show_dialog_on_startup = enabled;
+                    crate::engine::config_store::save_config_all_debounced(
+                        engine.config(),
+                        &engine.macro_table,
+                        &engine.profile_manager,
+                    );
+                    engine.config().clone()
+                });
+                if let Some(cfg) = cfg_opt {
+                    let strings = crate::language::current();
+                    surface.render(Self::view(
+                        &cfg,
+                        crate::platform::is_windows_autostart_enabled(),
+                        strings,
+                    ));
+                }
+            }
+            SystemMsg::ToggleDebugLog(enabled) => {
+                let cfg_opt = crate::ui::controller::with_engine(|engine| {
+                    engine.config_mut().debug = enabled;
+                    crate::engine::config_store::save_config_all_debounced(
+                        engine.config(),
+                        &engine.macro_table,
+                        &engine.profile_manager,
+                    );
+                    engine.config().clone()
+                });
+                if let Some(cfg) = cfg_opt {
+                    let strings = crate::language::current();
+                    surface.render(Self::view(
+                        &cfg,
+                        crate::platform::is_windows_autostart_enabled(),
+                        strings,
+                    ));
+                }
+            }
+            SystemMsg::OpenDebugLog => {
+                let log_file = crate::ui::controller::with_engine(|e| {
+                    e.config()
+                        .debug_file_path
+                        .as_deref()
+                        .map(|s| s.to_string())
+                })
+                .flatten()
+                .unwrap_or_else(|| "kora_debug.log".to_string());
+
+                if !std::path::Path::new(&log_file).exists() {
+                    let _ = std::fs::File::create(&log_file);
+                }
+                let _ = std::process::Command::new("notepad.exe")
+                    .arg(&log_file)
+                    .spawn();
+            }
+            SystemMsg::SelectTheme(theme_sel) => {
+                let new_theme = UiTheme::from(theme_sel);
+                let cfg_opt = crate::ui::controller::with_engine(|engine| {
+                    engine.config_mut().theme = new_theme;
+                    crate::engine::config_store::save_config_all_debounced(
+                        engine.config(),
+                        &engine.macro_table,
+                        &engine.profile_manager,
+                    );
+                    engine.config().clone()
+                });
+                if let Some(cfg) = cfg_opt {
+                    if let Some(controls) = crate::ui::controls() {
+                        let is_dark = crate::ui::theme::resolve_is_dark(new_theme);
+                        crate::ui::theme::apply_ui_theme(parent_hwnd, controls, is_dark);
+                    }
+                    if let Some(ui) = crate::ui::ui() {
+                        ui.tray.borrow_mut().refresh_icon();
+                    }
+                    let strings = crate::language::current();
+                    surface.render(Self::view(
+                        &cfg,
+                        crate::platform::is_windows_autostart_enabled(),
+                        strings,
+                    ));
+                }
+            }
+            SystemMsg::SelectLanguage(lang_sel) => {
+                let new_lang = Language::from(lang_sel);
+                crate::ui::controller::with_engine(|engine| {
+                    engine.config_mut().language = new_lang;
+                    crate::engine::config_store::save_config_all_debounced(
+                        engine.config(),
+                        &engine.macro_table,
+                        &engine.profile_manager,
+                    );
+                });
+                if let Some(controls) = crate::ui::controls() {
+                    controls.update_language(new_lang);
+                }
+                if let Some(ui) = crate::ui::ui() {
+                    ui.tray.borrow_mut().refresh_icon();
+                }
+                unsafe {
+                    let strings = crate::language::get_strings(new_lang);
+                    SetWindowTextW(parent_hwnd, to_wide(strings.window_title).as_ptr());
+                    RedrawWindow(
+                        parent_hwnd,
+                        std::ptr::null(),
+                        0,
+                        RDW_INVALIDATE | RDW_ALLCHILDREN,
+                    );
+                }
+            }
+            SystemMsg::RestoreDefaults => {
+                let strings = crate::language::current();
+                show_danger_confirm(
+                    parent_hwnd,
+                    strings.confirm_defaults_title,
+                    strings.confirm_defaults_msg,
+                    move || {
+                        let def_config = EngineConfig::default();
+                        crate::ui::controller::with_engine(|engine| {
+                            *engine.config_mut() = def_config.clone();
+                            engine.profile_manager = crate::engine::profile::ProfileManager::new();
+                            engine.macro_table = crate::engine::macro_table::MacroTable::new();
+                            let _ = crate::engine::config_store::save_config_all(
+                                engine.config(),
+                                &engine.macro_table,
+                                &engine.profile_manager,
+                            );
+                            crate::ui::controller::reconfigure_sound(engine);
+                        });
+
+                        if let Some(controls) = crate::ui::controls() {
+                            controls.refresh_from_engine();
+                            controls.update_language(def_config.language);
+                            let is_dark = crate::ui::theme::resolve_is_dark(def_config.theme);
+                            crate::ui::theme::apply_ui_theme(parent_hwnd, controls, is_dark);
+                        }
+                        unsafe {
+                            let strings = crate::language::get_strings(def_config.language);
+                            SetWindowTextW(parent_hwnd, to_wide(strings.window_title).as_ptr());
+                            RedrawWindow(
+                                parent_hwnd,
+                                std::ptr::null(),
+                                0,
+                                RDW_INVALIDATE | RDW_ALLCHILDREN,
+                            );
+                        }
+                    },
+                );
+            }
+        }
     }
 }

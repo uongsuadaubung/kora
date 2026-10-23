@@ -2,8 +2,8 @@
 //! Allows blocking specific hardware keys from reaching the system or apps.
 
 use crate::engine::profile::ResolvedDisableItem;
-use crate::ui::prelude::*;
 use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
+use crate::ui_framework::components::action_table::{ColumnStyle, TableRow};
 use std::ops::Deref;
 
 #[repr(transparent)]
@@ -31,7 +31,15 @@ impl DisablePanel {
                 (strings.col_origin, 135, ColumnStyle::Default),
                 (strings.col_action, 105, ColumnStyle::Action),
             ],
-            |s| vec![s.col_disable_key, s.col_status, s.col_origin, s.col_action],
+            move |hwnd| crate::ui::views::dialogs::show_disable_dialog(hwnd),
+            |target, new_val| match target {
+                crate::ui::controller::EditTarget::Global(cfg) => {
+                    cfg.disable_enabled = new_val.unwrap_or(true);
+                }
+                crate::ui::controller::EditTarget::Child(p) => {
+                    p.disable_enabled = new_val;
+                }
+            },
         )
         .map(Self)
     }

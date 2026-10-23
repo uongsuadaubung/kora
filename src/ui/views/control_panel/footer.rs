@@ -1,62 +1,60 @@
 //! Footer controls ([ Thoát Kora ] on left, [ Đóng ] on right panel)
+//! Powered by Declarative Single-HWND UI Engine (`Surface<FooterMsg>`).
 
 use crate::language::LanguageStrings;
-use crate::ui::prelude::*;
 use crate::ui::win32::PostQuitMessage;
+use crate::ui_framework::core::*;
+
+#[derive(Clone, Debug)]
+pub enum FooterMsg {
+    Exit,
+    Close,
+}
 
 pub struct FooterControls {
-    layout: CardLayout,
-    pub btn_exit: PushButton,
-    pub btn_close: PushButton,
+    pub surface: Surface<FooterMsg>,
 }
 
 impl FooterControls {
-    pub fn create(parent: isize, hfont_normal: isize, hfont_bold: isize) -> Option<Self> {
+    pub fn create(parent: isize, _hfont_normal: isize, _hfont_bold: isize) -> Option<Self> {
+        let surface = Surface::create(parent, 244, 542, 562, 30)?;
+        surface.set_content_width(562);
+
         let strings = crate::language::current();
-        let mut ly = CardLayout::with_parent(parent, hfont_normal, hfont_bold);
+        surface.render(Self::view(strings));
 
-        let btn_exit = ly.track_i18n(
-            PushButton::new(parent, strings.btn_exit, hfont_normal, ButtonVariant::Danger)?,
-            |s| s.btn_exit,
-        );
+        surface.set_on_msg(|msg| match msg {
+            FooterMsg::Exit => {
+                println!("[UI] Người dùng nhấn Tắt Kora -> Thoát Kora");
+                crate::engine::config_store::flush_config_debounced();
+                unsafe {
+                    PostQuitMessage(0);
+                }
+            }
+            FooterMsg::Close => {
+                crate::ui::hide_control_panel();
+            }
+        });
 
-        let btn_close = ly.track_i18n(
-            PushButton::new(parent, strings.btn_close, hfont_bold, ButtonVariant::Primary)?,
-            |s| s.btn_close,
-        );
-
-        // Declarative auto-layout: Exit button on left, spacer, Close button on right
-        let mut row = HStack::at(244, 542, 562, 30);
-        row.align(CrossAlign::Center);
-        row.add_fixed(114, Some(btn_exit.hwnd()));
-        row.add_spacer();
-        row.add_fixed(112, Some(btn_close.hwnd()));
-        row.apply();
-
-        Some(Self {
-            layout: ly,
-            btn_exit,
-            btn_close,
-        })
+        Some(Self { surface })
     }
 
-    pub fn on_command(&self, _hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
-        if self.btn_exit.is_clicked(ctl_id, notify_code) {
-            println!("[UI] Người dùng nhấn Tắt Kora -> Thoát Kora");
-            crate::engine::config_store::flush_config_debounced();
-            unsafe {
-                PostQuitMessage(0);
-            }
-            return true;
-        }
-        if self.btn_close.is_clicked(ctl_id, notify_code) {
-            crate::ui::hide_control_panel();
-            return true;
-        }
+    pub fn view(strings: &LanguageStrings) -> Element<FooterMsg> {
+        row(vec![
+            button(strings.btn_exit, Variant::Danger, FooterMsg::Exit).w(114),
+            spacer(),
+            button(strings.btn_close, Variant::Primary, FooterMsg::Close).w(112),
+        ])
+        .items_center()
+        .w_full()
+    }
+
+    #[inline]
+    pub fn on_command(&self, _hwnd: isize, _ctl_id: u32, _notify_code: u32) -> bool {
         false
     }
 
     pub fn update_language(&self, strings: &LanguageStrings) {
-        self.layout.update_language(strings);
+        self.surface.render(Self::view(strings));
     }
 }

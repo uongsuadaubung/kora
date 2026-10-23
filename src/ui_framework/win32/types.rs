@@ -48,6 +48,16 @@ pub struct POINT {
 
 #[repr(C)]
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct MINMAXINFO {
+    pub ptReserved: POINT,
+    pub ptMaxSize: POINT,
+    pub ptMaxPosition: POINT,
+    pub ptMinTrackSize: POINT,
+    pub ptMaxTrackSize: POINT,
+}
+
+#[repr(C)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct SIZE {
     pub cx: i32,
     pub cy: i32,
@@ -141,7 +151,7 @@ pub struct INITCOMMONCONTROLSEX {
 }
 
 pub use crate::platform::win32::types::{
-    NOTIFY_FOR_THIS_SESSION, PBT_APMRESUMEAUTOMATIC, PBT_APMRESUMESUSPEND, PBT_APMSUSPEND,
+    NOTIFY_FOR_THIS_SESSION, PBT_APMRESUMEAUTOMATIC, PBT_APMSUSPEND, PBT_APMRESUMESUSPEND,
     WM_POWERBROADCAST, WM_WTSSESSION_CHANGE, WTS_CONSOLE_CONNECT, WTS_SESSION_LOCK,
     WTS_SESSION_LOGON, WTS_SESSION_UNLOCK, WTSRegisterSessionNotification,
     WTSUnRegisterSessionNotification,
@@ -159,6 +169,7 @@ pub const WM_DESTROY: u32 = 0x0002;
 pub const WM_SIZE: u32 = 0x0005;
 pub const WM_ACTIVATE: u32 = 0x0006;
 pub const WM_SETFONT: u32 = 0x0030;
+pub const WM_GETMINMAXINFO: u32 = 0x0024;
 pub const WM_GETFONT: u32 = 0x0031;
 pub const WM_CLOSE: u32 = 0x0010;
 pub const WM_PAINT: u32 = 0x000F;
@@ -226,6 +237,9 @@ pub const DT_VCENTER: u32 = 0x00000004;
 pub const DT_WORDBREAK: u32 = 0x00000010;
 pub const DT_SINGLELINE: u32 = 0x00000020;
 pub const DT_NOPREFIX: u32 = 0x00000800;
+pub const DT_RIGHT: u32 = 0x00000002;
+pub const DT_CALCRECT: u32 = 0x00000400;
+pub const DT_END_ELLIPSIS: u32 = 0x00008000;
 
 pub const PS_SOLID: i32 = 0;
 pub const PS_DASH: i32 = 1;

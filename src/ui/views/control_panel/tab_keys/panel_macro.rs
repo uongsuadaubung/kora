@@ -2,8 +2,8 @@
 //! Allows mapping a physical trigger key to an automation sequence (press/down/up/delay/text).
 
 use crate::engine::profile::ResolvedKeyMacroItem;
-use crate::ui::prelude::*;
 use crate::ui::views::control_panel::tab_keys::RuleSubPanel;
+use crate::ui_framework::components::action_table::{ColumnStyle, TableRow};
 use std::ops::Deref;
 
 #[repr(transparent)]
@@ -31,13 +31,14 @@ impl MacroPanel {
                 (strings.col_origin, 120, ColumnStyle::Default),
                 (strings.col_action, 125, ColumnStyle::Action),
             ],
-            |s| {
-                vec![
-                    s.col_key_macro_trigger,
-                    s.col_key_macro_name,
-                    s.col_origin,
-                    s.col_action,
-                ]
+            move |hwnd| crate::ui::views::dialogs::show_key_macro_dialog(hwnd),
+            |target, new_val| match target {
+                crate::ui::controller::EditTarget::Global(cfg) => {
+                    cfg.key_macro_enabled = new_val.unwrap_or(true);
+                }
+                crate::ui::controller::EditTarget::Child(p) => {
+                    p.key_macro_enabled = new_val;
+                }
             },
         )
         .map(Self)

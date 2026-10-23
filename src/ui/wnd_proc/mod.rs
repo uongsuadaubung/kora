@@ -168,7 +168,30 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
         }
         WM_MOUSEWHEEL => {
             if let Some(c) = controls {
-                if c.get_view_mode() == crate::ui::views::control_panel::ViewMode::Profile(0) {
+                let vhwnd = match c.get_view_mode() {
+                    crate::ui::views::control_panel::ViewMode::Profile(0) => {
+                        c.tab_typing.viewport_hwnd()
+                    }
+                    crate::ui::views::control_panel::ViewMode::Profile(1)
+                        if c.tab_keys.sub_tabs.get_cur_sel() == 0 =>
+                    {
+                        c.tab_keys.overview.viewport_hwnd()
+                    }
+                    crate::ui::views::control_panel::ViewMode::Profile(2) => {
+                        c.tab_sound.viewport_hwnd()
+                    }
+                    crate::ui::views::control_panel::ViewMode::SystemSettings => {
+                        c.tab_system.viewport_hwnd()
+                    }
+                    crate::ui::views::control_panel::ViewMode::About => {
+                        c.tab_about.viewport_hwnd()
+                    }
+                    _ => 0,
+                };
+                if vhwnd != 0 {
+                    return unsafe { SendMessageW(vhwnd, WM_MOUSEWHEEL, wparam, lparam) };
+                }
+                if false {
                     let vhwnd = c.tab_typing.viewport_hwnd();
                     if vhwnd != 0 {
                         return unsafe { SendMessageW(vhwnd, WM_MOUSEWHEEL, wparam, lparam) };

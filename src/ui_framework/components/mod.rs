@@ -4,14 +4,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 pub mod action_table;
 pub mod button;
-pub mod card_layout;
-pub mod checkbox;
 pub mod combobox;
 pub mod label;
-pub mod listbox;
 pub mod menu;
-pub mod scroll_view;
-pub mod slider;
 pub mod tab_bar;
 pub mod textbox;
 
@@ -20,16 +15,14 @@ pub use action_table::{
     ColumnStyle, ColumnWidth, TableAction, TableCell, TableRow,
 };
 pub use button::{ButtonVariant, PushButton};
-pub use card_layout::{CardLayout, InCard, LayoutState, OutsideCard, TextFn, TextListFn};
-pub use checkbox::{CheckBox, Inheritable, TwoState};
 pub use combobox::ComboBox;
 pub use label::{Label, LabelKind, LabelTone, Link, PillBadge, StaticText, SurfaceRole};
-pub use listbox::ListBox;
 pub use menu::PopupMenu;
-pub use scroll_view::ScrollView;
-pub use slider::Slider;
 pub use tab_bar::TabBar;
 pub use textbox::TextBox;
+
+pub type TextFn<L = ()> = fn(&L) -> &'static str;
+pub type TextListFn<L = ()> = fn(&L) -> Vec<&'static str>;
 
 static NEXT_CONTROL_ID: AtomicU32 = AtomicU32::new(10_000);
 
@@ -45,20 +38,13 @@ pub fn resolve_id(id: u32) -> u32 {
     if id == 0 { next_control_id() } else { id }
 }
 
-/// Trait implemented by all Win32 UI components so [`CardLayout`] can automatically
+/// Trait implemented by all Win32 UI components so parent containers can automatically
 /// track their `HWND` for visibility toggling and localization updates.
 pub trait ComponentHandle {
     fn hwnd(&self) -> isize;
 }
 
 impl<K: LabelKind> ComponentHandle for Label<K> {
-    #[inline]
-    fn hwnd(&self) -> isize {
-        self.hwnd()
-    }
-}
-
-impl<M> ComponentHandle for CheckBox<M> {
     #[inline]
     fn hwnd(&self) -> isize {
         self.hwnd()
@@ -82,20 +68,6 @@ impl_component_handle!(
     PushButton,
     ComboBox,
     TextBox,
-    Slider,
     TabBar,
-    ListBox,
     ActionTable,
 );
-
-pub trait DependsOnExt: ComponentHandle + Sized {
-    /// Declares that this component's enabled state depends on the checked state of a parent CheckBox.
-    /// It is automatically enabled when the parent is checked, and disabled when unchecked.
-    #[inline]
-    fn depends_on<M>(self, parent: &CheckBox<M>) -> Self {
-        parent.add_dependent(&self);
-        self
-    }
-}
-
-impl<T: ComponentHandle> DependsOnExt for T {}

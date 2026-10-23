@@ -10,6 +10,7 @@
 
 pub mod colors;
 pub mod components;
+pub mod core;
 pub mod dialog;
 pub mod layout;
 pub mod theme;
@@ -47,6 +48,7 @@ pub mod prelude {
     pub use crate::ui_framework::I18nSource;
     pub use crate::ui_framework::colors::ThemePalette;
     pub use crate::ui_framework::components::*;
+    pub use crate::ui_framework::core;
     pub use crate::ui_framework::dialog::*;
     pub use crate::ui_framework::layout::*;
     pub use crate::ui_framework::theme::{

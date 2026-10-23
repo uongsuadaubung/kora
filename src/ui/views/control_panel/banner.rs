@@ -1,113 +1,102 @@
 //! Profile Header Banner Component
 //! Shows current profile icon, name, active status, and delete action.
+//! Powered by Declarative Single-HWND UI Engine (`Surface<BannerMsg>`).
 
 use crate::engine::profile::AppProfile;
-use crate::ui::components::{ButtonVariant, Label, LabelTone, PushButton, SurfaceRole};
-use crate::ui::theme::cached_font;
+use crate::language::LanguageStrings;
 use crate::ui::tokens::layout::*;
-use crate::ui::tokens::typography::*;
-use crate::ui::win32::{EnableWindow, FW_BOLD, SW_HIDE, SW_SHOW, ShowWindow, set_hwnds_visible};
-use crate::ui_framework::layout::{CrossAlign, HStack};
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::ui_framework::core::*;
+use std::sync::{Arc, RwLock};
+
+#[derive(Clone, Debug)]
+pub enum BannerMsg {
+    DeleteProfile,
+}
 
 pub struct ProfileBanner {
-    pub lbl_name: Label,
-    pub lbl_status: Label,
-    pub btn_delete: PushButton,
-    pub is_root: AtomicBool,
+    pub surface: Surface<BannerMsg>,
+    current_data: Arc<RwLock<(String, String, bool)>>,
 }
 
 impl ProfileBanner {
-    pub fn create(parent: isize, hfont_normal: isize) -> Option<Self> {
+    pub fn create(parent: isize, _hfont_normal: isize) -> Option<Self> {
+        let surface = Surface::create(parent, HEADER_X, HEADER_TITLE_Y - 2, HEADER_TITLE_WIDTH, 52)?;
+        surface.set_content_width(HEADER_TITLE_WIDTH);
+
         let strings = crate::language::current();
-        let hfont_title = cached_font(FONT_SIZE_TITLE, FW_BOLD);
-
         let initial_title = format!("🌐 {}", strings.banner_root_title);
-        let lbl_name = Label::new(parent, &initial_title, hfont_title)?
-            .on_surface(SurfaceRole::Window);
+        let initial_subtitle = strings.banner_root_desc.to_string();
 
-        let lbl_status = Label::new(parent, strings.banner_root_desc, hfont_normal)?
-            .with_tone(LabelTone::Secondary)
-            .on_surface(SurfaceRole::Window);
+        let current_data = Arc::new(RwLock::new((initial_title.clone(), initial_subtitle.clone(), false)));
+        surface.render(Self::view(&initial_title, &initial_subtitle, false, strings));
 
-        let btn_delete = PushButton::new(
-            parent,
-            strings.banner_btn_delete,
-            hfont_normal,
-            ButtonVariant::Danger,
-        )?;
-
-        // Auto layout header title + delete button
-        let mut title_row = HStack::at(HEADER_X, HEADER_TITLE_Y, HEADER_TITLE_WIDTH, HEADER_TITLE_HEIGHT);
-        title_row.align(CrossAlign::Center);
-        title_row.add_stretch(1, Some(lbl_name.hwnd()));
-        title_row.add_fixed(8, None);
-        title_row.add_fixed(114, Some(btn_delete.hwnd()));
-        title_row.apply();
-
-        // Auto layout subtitle
-        let mut sub_row = HStack::at(HEADER_X, HEADER_SUB_Y, HEADER_SUB_WIDTH, HEADER_SUB_HEIGHT);
-        sub_row.add_stretch(1, Some(lbl_status.hwnd()));
-        sub_row.apply();
-
-        // Hide delete button initially because root profile is active on startup
-        unsafe {
-            ShowWindow(btn_delete.hwnd(), SW_HIDE);
-        }
+        surface.set_on_msg(move |msg| match msg {
+            BannerMsg::DeleteProfile => {
+                Self::handle_delete_profile(parent);
+            }
+        });
 
         Some(Self {
-            lbl_name,
-            lbl_status,
-            btn_delete,
-            is_root: AtomicBool::new(true),
+            surface,
+            current_data,
         })
+    }
+
+    pub fn view(title: &str, subtitle: &str, is_child: bool, strings: &LanguageStrings) -> Element<BannerMsg> {
+        row(vec![
+            col(vec![
+                text(title).bold().size(Size::Lg),
+                text(subtitle).muted().size(Size::Sm),
+            ])
+            .gap(1)
+            .flex_1(),
+
+            if is_child {
+                button(strings.banner_btn_delete, Variant::Danger, BannerMsg::DeleteProfile).w(114)
+            } else {
+                empty()
+            },
+        ])
+        .items_center()
+        .w_full()
     }
 
     /// Updates banner display for the selected profile (`None` = Global Root, `Some(child)` = Child profile).
     pub fn update_profile(&self, child: Option<&AppProfile>) {
         let strings = crate::language::current();
-        self.is_root.store(child.is_none(), Ordering::SeqCst);
-
-        match child {
-            None => {
-                self.lbl_name
-                    .set_text(&format!("🌐 {}", strings.banner_root_title));
-                self.lbl_status.set_text(strings.banner_root_desc);
-                unsafe {
-                    ShowWindow(self.btn_delete.hwnd(), SW_HIDE);
-                }
-            }
+        let (title, subtitle, is_child) = match child {
+            None => (
+                format!("🌐 {}", strings.banner_root_title),
+                strings.banner_root_desc.to_string(),
+                false,
+            ),
             Some(profile) => {
-                self.lbl_name
-                    .set_text(&format!("{} {}", profile.icon, profile.name));
                 let proc_str = if profile.process_names.is_empty() {
                     strings.sidebar_unassigned.to_string()
                 } else {
                     profile.process_names.join(", ")
                 };
-                self.lbl_status.set_text(&format!(
-                    "{}{}",
-                    strings.banner_status_inactive_prefix, proc_str
-                ));
-                unsafe {
-                    ShowWindow(self.btn_delete.hwnd(), SW_SHOW);
-                    EnableWindow(self.btn_delete.hwnd(), 1);
-                }
+                (
+                    format!("{} {}", profile.icon, profile.name),
+                    format!("{}{}", strings.banner_status_inactive_prefix, proc_str),
+                    true,
+                )
             }
+        };
+
+        if let Ok(mut d) = self.current_data.write() {
+            *d = (title.clone(), subtitle.clone(), is_child);
+        }
+        self.surface.render(Self::view(&title, &subtitle, is_child, strings));
+    }
+
+    pub fn update_language(&self, strings: &LanguageStrings) {
+        if let Ok(d) = self.current_data.read() {
+            self.surface.render(Self::view(&d.0, &d.1, d.2, strings));
         }
     }
 
-    pub fn update_language(&self, strings: &crate::language::LanguageStrings) {
-        if let Some(child) = crate::ui::controller::with_engine(|engine| {
-            let sel_id = &engine.profile_manager.selected_id;
-            engine.profile_manager.get_profile(sel_id).cloned()
-        }) {
-            self.update_profile(child.as_ref());
-        }
-        self.btn_delete.set_text(strings.banner_btn_delete);
-    }
-
-    pub fn handle_delete_profile(&self, hwnd: isize) {
+    pub fn handle_delete_profile(hwnd: isize) {
         let name = crate::ui::controller::with_engine(|engine| {
             let sel_id = &engine.profile_manager.selected_id;
             (sel_id != crate::ui::GLOBAL_PROFILE_ID)
@@ -143,25 +132,13 @@ impl ProfileBanner {
         });
     }
 
-    pub fn on_command(&self, hwnd: isize, ctl_id: u32, notify_code: u32) -> bool {
-        if self.btn_delete.is_clicked(ctl_id, notify_code) {
-            self.handle_delete_profile(hwnd);
-            true
-        } else {
-            false
-        }
+    #[inline]
+    pub fn on_command(&self, _hwnd: isize, _ctl_id: u32, _notify_code: u32) -> bool {
+        false
     }
 
+    #[inline]
     pub fn set_visible(&self, visible: bool) {
-        let is_root = self.is_root.load(Ordering::SeqCst);
-        set_hwnds_visible(&[self.lbl_name.hwnd(), self.lbl_status.hwnd()], visible);
-        unsafe {
-            if visible && !is_root {
-                ShowWindow(self.btn_delete.hwnd(), SW_SHOW);
-                EnableWindow(self.btn_delete.hwnd(), 1);
-            } else {
-                ShowWindow(self.btn_delete.hwnd(), SW_HIDE);
-            }
-        }
+        self.surface.set_visible(visible);
     }
 }

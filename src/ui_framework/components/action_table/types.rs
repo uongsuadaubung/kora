@@ -8,8 +8,8 @@ pub const HEADER_HEIGHT: i32 = 30;
 pub const ROW_HEIGHT: i32 = 32;
 pub const IDC_HAND_ID: usize = 32649;
 pub const IDC_ARROW_ID: usize = 32512;
-pub const DT_END_ELLIPSIS: u32 = 0x00004000;
-pub const DT_RIGHT: u32 = 0x00000002;
+
+
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BadgeVariant {

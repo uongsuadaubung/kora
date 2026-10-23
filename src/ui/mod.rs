@@ -8,7 +8,7 @@ pub mod tray;
 pub mod views;
 pub mod wnd_proc;
 
-pub use crate::ui_framework::{colors, components, dialog, layout, tokens, win32};
+pub use crate::ui_framework::{colors, components, core, dialog, layout, tokens, win32};
 pub use win32::*;
 
 pub use theme::{apply_ui_theme, is_current_dark, resolve_is_dark};
@@ -28,24 +28,24 @@ impl crate::ui_framework::I18nSource for crate::language::LanguageStrings {
     }
 }
 
-/// Application-level UI prelude specializing `CardLayout`, `Inheritable`, `TextFn`, and `TextListFn` to [`crate::language::LanguageStrings`].
+/// Application-level UI prelude specializing `CardLayout`, `TextFn`, and `TextListFn` to [`crate::language::LanguageStrings`].
 pub mod prelude {
     pub use crate::ui_framework::dialog::*;
     pub use crate::ui_framework::layout::*;
     pub use crate::ui_framework::prelude::{
         ActionHover, ActionTable, ActionVariant, BadgeConfig, BadgeVariant, ButtonVariant,
-        CellAlign, CheckBox, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
-        DependsOnExt, I18nSource, InCard, Label, LabelKind, LabelTone, LayoutState, Link, ListBox, OutsideCard,
-        PillBadge, PopupMenu, PushButton, RECT, ScrollView, Slider, StaticText, SurfaceRole,
-        TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, TwoState, borders,
+        CellAlign, ColumnDef, ColumnStyle, ColumnWidth, ComboBox, ComponentHandle,
+        I18nSource, Label, LabelKind, LabelTone, Link, PillBadge, StaticText, SurfaceRole,
+        PopupMenu, PushButton, RECT,
+        TabBar, TableAction, TableCell, TableRow, TextBox, ThemePalette, borders,
         cached_font, get_app_font_bold, get_app_font_normal, is_current_dark, layout,
         next_control_id, radii, resolve_id, set_hwnds_visible, spacing, to_wide, typography,
     };
 
-    pub type CardLayout<S = OutsideCard> =
-        crate::ui_framework::components::CardLayout<S, crate::language::LanguageStrings>;
-    pub type Inheritable =
-        crate::ui_framework::components::Inheritable<crate::language::LanguageStrings>;
+
+
+
+
     pub type TextFn = crate::ui_framework::components::TextFn<crate::language::LanguageStrings>;
     pub type TextListFn =
         crate::ui_framework::components::TextListFn<crate::language::LanguageStrings>;
@@ -194,7 +194,8 @@ pub fn update_tray_icon(is_vietnamese: bool) {
     if let Some(ui) = ui() {
         ui.tray.borrow_mut().set_vietnamese_mode(is_vietnamese);
         if let Some(idx) = combo_idx {
-            ui.controls.tab_typing.combo_mode.set_selected(idx);
+        let _ = idx;
+        ui.controls.tab_typing.refresh_from_engine();
         }
     }
 }
