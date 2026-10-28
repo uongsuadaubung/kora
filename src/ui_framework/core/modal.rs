@@ -353,9 +353,6 @@ pub fn open_modal_with_wndproc<M: Clone + Send + Sync + 'static>(
         }
     };
     surface.set_content_width(client_w);
-    let mut view = view;
-    view.style.height = Length::Fixed(client_h);
-    surface.render(view);
 
     let on_msg = Arc::new(on_msg);
     let handle_cell = Arc::new(Mutex::new(None::<ModalHandle<M>>));
@@ -394,6 +391,10 @@ pub fn open_modal_with_wndproc<M: Clone + Send + Sync + 'static>(
         ShowWindow(hwnd, SW_SHOW);
         SetForegroundWindow(hwnd);
     }
+
+    let mut view = view;
+    view.style.height = Length::Fixed(client_h);
+    surface.render(view);
 
     Some(handle)
 }

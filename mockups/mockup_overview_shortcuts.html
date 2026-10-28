@@ -483,11 +483,14 @@
     .shortcut-desc {
       font-size: 11px;
       color: var(--text-secondary);
-      margin-left: 22px;
       margin-top: 2px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    .checkbox-row ~ .shortcut-desc {
+      margin-left: 22px;
     }
 
     /* Native Win32 / WinUI Components: CheckBox, PillBadge, PushButton */
@@ -903,7 +906,6 @@
             <div class="group-header">
               <div class="group-title">
                 <span>⌨️ Phím Tắt Bộ Gõ</span>
-                <span class="group-count-badge">4 phím</span>
               </div>
               <span style="font-size:11px; color:var(--text-secondary);">Chuyển chế độ gõ & bảng mã tiếng Việt</span>
             </div>
@@ -971,57 +973,11 @@
 
             </div>
           </div>
-
-          <!-- GROUP 2: PHÍM TẮT HỆ THỐNG -->
-          <div class="shortcut-group-card" data-group="system">
-            <div class="group-header">
-              <div class="group-title">
-                <span>⚙️ Phím Tắt Hệ Thống</span>
-                <span class="group-count-badge">2 phím</span>
-              </div>
-              <span style="font-size:11px; color:var(--text-secondary);">Tiện ích & điều khiển tiến trình Kora</span>
-            </div>
-            <div class="shortcut-list">
-
-              <!-- Item 1: Mở Bảng Điều Khiển -->
-              <div class="shortcut-row" data-id="open_panel">
-                <div class="shortcut-info">
-                  <label class="checkbox-row">
-                    <input type="checkbox" checked onchange="toggleShortcut('open_panel', this.checked)">
-                    <strong class="shortcut-name">Mở Bảng Điều Khiển Kora</strong>
-                  </label>
-                  <div class="shortcut-desc">Hiện cửa sổ cài đặt Kora từ khay hệ thống lên màn hình</div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge" onclick="openKeyChangeModal('Mở Bảng Điều Khiển Kora', 'Ctrl + Alt + K', 'open_panel')">Ctrl + Alt + K</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Mở Bảng Điều Khiển Kora', 'Ctrl + Alt + K', 'open_panel')">Đổi phím</button>
-                </div>
-              </div>
-
-              <!-- Item 2: Tạm dừng bộ gõ -->
-              <div class="shortcut-row" data-id="pause_typing">
-                <div class="shortcut-info">
-                  <label class="checkbox-row">
-                    <input type="checkbox" onchange="toggleShortcut('pause_typing', this.checked)">
-                    <strong class="shortcut-name">Tạm dừng Bộ gõ (Bypass Hook)</strong>
-                  </label>
-                  <div class="shortcut-desc">Tạm ngắt hook bàn phím khi chơi game hoặc nhập mật khẩu ngân hàng</div>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge" onclick="openKeyChangeModal('Tạm dừng Bộ gõ', 'Ctrl + Alt + P', 'pause_typing')">Ctrl + Alt + P</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Tạm dừng Bộ gõ', 'Ctrl + Alt + P', 'pause_typing')">Đổi phím</button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-
           <!-- GROUP 3: QUY TẮC ĐỔI PHÍM (KEY REMAPPING) -->
           <div class="shortcut-group-card" data-group="remap">
             <div class="group-header">
               <div class="group-title">
                 <span>🔄 Đổi Phím (Key Remap)</span>
-                <span class="group-count-badge">2 quy tắc</span>
               </div>
               <a class="group-action-link" onclick="switchSubTab('remap')">
                 <span>Mở tab Đổi phím chi tiết</span> ➜
@@ -1032,31 +988,23 @@
               <!-- Remap 1 -->
               <div class="shortcut-row" data-id="remap_caps_esc">
                 <div class="shortcut-info">
-                  <label class="checkbox-row">
-                    <input type="checkbox" checked onchange="toggleShortcut('remap_caps_esc', this.checked)">
+                  <div class="shortcut-name-row">
                     <strong class="shortcut-name">Caps Lock ➜ Escape</strong>
-                  </label>
+                  </div>
                   <div class="shortcut-desc">Tối ưu cho lập trình viên Vim / VS Code dễ với tới phím Esc</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge" onclick="openKeyChangeModal('Đổi phím Caps Lock', 'Escape', 'remap_caps')">Caps Lock ➜ Escape</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Đổi phím Caps Lock', 'Escape', 'remap_caps')">Đổi phím</button>
-                </div>
+                <span class="pill-badge" onclick="openKeyChangeModal('Đổi phím Caps Lock', 'Escape', 'remap_caps')">Caps Lock ➜ Escape</span>
               </div>
 
               <!-- Remap 2 -->
               <div class="shortcut-row" data-id="remap_insert_del">
                 <div class="shortcut-info">
-                  <label class="checkbox-row">
-                    <input type="checkbox" checked onchange="toggleShortcut('remap_insert_del', this.checked)">
+                  <div class="shortcut-name-row">
                     <strong class="shortcut-name">Insert ➜ Delete</strong>
-                  </label>
+                  </div>
                   <div class="shortcut-desc">Chống vô tình bật chế độ ghi đè ký tự (Overtype mode) trong Word/IDE</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge" onclick="openKeyChangeModal('Đổi phím Insert', 'Delete', 'remap_insert')">Insert ➜ Delete</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Đổi phím Insert', 'Delete', 'remap_insert')">Đổi phím</button>
-                </div>
+                <span class="pill-badge" onclick="openKeyChangeModal('Đổi phím Insert', 'Delete', 'remap_insert')">Insert ➜ Delete</span>
               </div>
 
             </div>
@@ -1067,7 +1015,6 @@
             <div class="group-header">
               <div class="group-title">
                 <span>🚫 Khóa Phím (Key Disabling)</span>
-                <span class="group-count-badge">2 phím</span>
               </div>
               <a class="group-action-link" onclick="switchSubTab('disable')">
                 <span>Mở tab Khóa phím chi tiết</span> ➜
@@ -1078,34 +1025,24 @@
               <!-- Disable 1: Left Windows -->
               <div class="shortcut-row" data-id="disable_win">
                 <div class="shortcut-info">
-                  <label class="checkbox-row">
-                    <input type="checkbox" checked onchange="toggleShortcut('disable_win', this.checked)">
+                  <div class="shortcut-name-row">
                     <strong class="shortcut-name">Khóa phím Left Windows</strong>
-                  </label>
+                  </div>
                   <div class="shortcut-desc">Chống bấm nhầm văng ra màn hình Desktop khi đang bắn súng</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge pill-disabled" onclick="openKeyChangeModal('Chọn phím cần khóa', 'Left Windows', 'disable_win')">🚫 Left Windows</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Chọn phím cần khóa', 'Left Windows', 'disable_win')">Đổi phím</button>
-                </div>
+                <span class="pill-badge pill-disabled" onclick="openKeyChangeModal('Chọn phím cần khóa', 'Left Windows', 'disable_win')">🚫 Left Windows</span>
               </div>
 
               <!-- Disable 2: F1 (Xung đột với Macro F1) -->
               <div class="shortcut-row" data-id="disable_f1" style="background: rgba(245, 158, 11, 0.04);">
                 <div class="shortcut-info">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <label class="checkbox-row">
-                      <input type="checkbox" checked onchange="toggleShortcut('disable_f1', this.checked)">
-                      <strong class="shortcut-name">Khóa phím F1</strong>
-                    </label>
+                    <strong class="shortcut-name">Khóa phím F1</strong>
                     <span class="priority-tag">🏆 Ưu tiên cao hơn (Chặn phím)</span>
                   </div>
                   <div class="shortcut-desc">Chống bấm nhầm mở cửa sổ Trợ giúp Windows trong trận đấu CS2</div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge pill-disabled" onclick="openKeyChangeModal('Chọn phím cần khóa', 'F1', 'disable_f1')">🚫 F1</span>
-                  <button class="btn-secondary" onclick="openKeyChangeModal('Chọn phím cần khóa', 'F1', 'disable_f1')">Đổi phím</button>
-                </div>
+                <span class="pill-badge pill-disabled" onclick="openKeyChangeModal('Chọn phím cần khóa', 'F1', 'disable_f1')">🚫 F1</span>
               </div>
 
             </div>
@@ -1116,7 +1053,6 @@
             <div class="group-header" style="background: rgba(245, 158, 11, 0.08);">
               <div class="group-title">
                 <span>⚡ Phím Macro (Key Macros)</span>
-                <span class="group-count-badge" style="background: var(--warning-subtle); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.3);">1 xung đột</span>
               </div>
               <a class="group-action-link" onclick="switchSubTab('macro')">
                 <span>Mở tab Macro chi tiết</span> ➜
@@ -1128,10 +1064,7 @@
               <div class="shortcut-row" data-id="macro_cs_buy" style="background: rgba(245, 158, 11, 0.05);">
                 <div class="shortcut-info">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <label class="checkbox-row">
-                      <input type="checkbox" checked onchange="toggleShortcut('macro_cs_buy', this.checked)">
-                      <strong class="shortcut-name">Combo Mua Nhanh AK-47 & Giáp</strong>
-                    </label>
+                    <strong class="shortcut-name">Combo Mua Nhanh AK-47 &amp; Giáp</strong>
                     <span style="font-size: 10.5px; font-weight: 700; color: var(--warning); background: var(--warning-subtle); padding: 1px 7px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3);">
                       ⚠️ Bị che khuất
                     </span>
@@ -1140,14 +1073,9 @@
                     ⚠️ Phím F1 bị chặn bởi [Khóa phím: F1]. Bấm F1 sẽ bị chặn hoàn toàn, không chạy được Macro.
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span class="pill-badge pill-conflict" onclick="openKeyChangeModal('Phím kích hoạt Macro', 'F1', 'macro_cs_buy')" title="Bị xung đột với Khóa phím F1">
-                    ⚡ F1
-                  </span>
-                  <button class="btn-secondary btn-conflict" onclick="openKeyChangeModal('Phím kích hoạt Macro', 'F1', 'macro_cs_buy')">
-                    ✏️ Đổi phím ngay
-                  </button>
-                </div>
+                <span class="pill-badge pill-conflict" onclick="openKeyChangeModal('Phím kích hoạt Macro', 'F1', 'macro_cs_buy')" title="Bị xung đột với Khóa phím F1">
+                  ⚡ F1
+                </span>
               </div>
 
             </div>
@@ -1252,12 +1180,6 @@
           macroCard.style.borderColor = 'rgba(245, 158, 11, 0.45)';
           const header = macroCard.querySelector('.group-header');
           if (header) header.style.background = 'rgba(245, 158, 11, 0.08)';
-          const countBadge = macroCard.querySelector('.group-count-badge');
-          if (countBadge) {
-            countBadge.innerText = '1 xung đột';
-            countBadge.style.background = 'var(--warning-subtle)';
-            countBadge.style.color = 'var(--warning)';
-          }
         }
         if (macroRow) {
           macroRow.style.background = 'rgba(245, 158, 11, 0.05)';
@@ -1267,9 +1189,6 @@
           const badge = macroRow.querySelector('.pill-badge');
           badge.className = 'pill-badge pill-conflict';
           badge.innerText = '⚡ F1';
-          const btn = macroRow.querySelector('button');
-          btn.className = 'btn-secondary btn-conflict';
-          btn.innerText = '✏️ Đổi phím ngay';
         }
       } else {
         const names = {
@@ -1287,12 +1206,6 @@
           macroCard.style.borderColor = 'var(--border)';
           const header = macroCard.querySelector('.group-header');
           if (header) header.style.background = 'var(--bg-card-header)';
-          const countBadge = macroCard.querySelector('.group-count-badge');
-          if (countBadge) {
-            countBadge.innerText = '1 macro';
-            countBadge.style.background = 'rgba(255, 255, 255, 0.08)';
-            countBadge.style.color = 'var(--text-secondary)';
-          }
         }
         if (macroRow) {
           macroRow.style.background = 'transparent';
@@ -1302,9 +1215,6 @@
           const badge = macroRow.querySelector('.pill-badge');
           badge.className = 'pill-badge pill-macro';
           badge.innerText = '⚡ F1';
-          const btn = macroRow.querySelector('button');
-          btn.className = 'btn-secondary';
-          btn.innerText = 'Đổi phím';
         }
       }
     }
@@ -1375,4 +1285,3 @@
   </script>
 </body>
 </html>
-

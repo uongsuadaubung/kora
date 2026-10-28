@@ -10,45 +10,75 @@ use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
-/// Finds the deepest interactive node under document coordinates `(doc_x, doc_y)`.
-pub(crate) fn hit_test_node<'a, M>(
+pub(crate) fn hit_test_node_layer<'a, M>(
+    node: &'a LayoutNode<M>,
+    doc_x: i32,
+    doc_y: i32,
+    parent_z: i32,
+    target_z: i32,
+) -> Option<&'a LayoutNode<M>> {
+    let my_z = if node.element.style.z_index != 0 {
+        node.element.style.z_index
+    } else {
+        parent_z
+    };
+
+    for child in node.children.iter().rev() {
+        if let Some(found) = hit_test_node_layer(child, doc_x, doc_y, my_z, target_z) {
+            return Some(found);
+        }
+    }
+
+    if my_z == target_z && pt_in_rect(doc_x, doc_y, &node.rect) {
+        let is_interactive = node.element.on_click.is_some()
+            || match &node.element.kind {
+                WidgetKind::Button {
+                    disabled, on_click, ..
+                } => !*disabled && on_click.is_some(),
+                WidgetKind::Badge {
+                    disabled, on_click, ..
+                } => !*disabled && on_click.is_some(),
+                WidgetKind::Text { on_click, .. } => on_click.is_some(),
+                WidgetKind::Switch {
+                    disabled,
+                    on_toggle,
+                    ..
+                } => !*disabled && on_toggle.is_some(),
+                WidgetKind::Checkbox {
+                    disabled,
+                    on_toggle,
+                    ..
+                } => !*disabled && on_toggle.is_some(),
+                WidgetKind::Select { disabled, .. } => !*disabled,
+                WidgetKind::Slider { disabled, .. } => !*disabled,
+                WidgetKind::Input { disabled, .. } => !*disabled,
+                _ => false,
+            };
+        if is_interactive {
+            return Some(node);
+        }
+    }
+    None
+}
+
+/// Finds the deepest interactive node under document coordinates `(doc_x, doc_y)`
+/// prioritizing higher `z_index` layers over lower layers.
+pub fn hit_test_node<'a, M>(
     node: &'a LayoutNode<M>,
     doc_x: i32,
     doc_y: i32,
 ) -> Option<&'a LayoutNode<M>> {
-    if !pt_in_rect(doc_x, doc_y, &node.rect) {
-        return None;
-    }
-    for child in node.children.iter().rev() {
-        if let Some(found) = hit_test_node(child, doc_x, doc_y) {
-            return Some(found);
+    let mut z_levels = Vec::with_capacity(4);
+    collect_z_levels(node, 0, &mut z_levels);
+    z_levels.sort_unstable();
+    z_levels.dedup();
+
+    for &z in z_levels.iter().rev() {
+        if let Some(hit) = hit_test_node_layer(node, doc_x, doc_y, 0, z) {
+            return Some(hit);
         }
     }
-    let is_interactive = node.element.on_click.is_some()
-        || match &node.element.kind {
-            WidgetKind::Button {
-                disabled, on_click, ..
-            } => !*disabled && on_click.is_some(),
-            WidgetKind::Badge {
-                disabled, on_click, ..
-            } => !*disabled && on_click.is_some(),
-            WidgetKind::Text { on_click, .. } => on_click.is_some(),
-            WidgetKind::Switch {
-                disabled,
-                on_toggle,
-                ..
-            } => !*disabled && on_toggle.is_some(),
-            WidgetKind::Checkbox {
-                disabled,
-                on_toggle,
-                ..
-            } => !*disabled && on_toggle.is_some(),
-            WidgetKind::Select { disabled, .. } => !*disabled,
-            WidgetKind::Slider { disabled, .. } => !*disabled,
-            WidgetKind::Input { disabled, .. } => !*disabled,
-            _ => false,
-        };
-    if is_interactive { Some(node) } else { None }
+    None
 }
 
 pub(crate) fn update_slider_in_tree<M>(
@@ -68,6 +98,28 @@ pub(crate) fn update_slider_in_tree<M>(
         }
     }
     false
+}
+
+/// Fallback brush for edit controls when surface state is temporarily held during render()
+fn get_cached_edit_brush(color: u32) -> isize {
+    use std::sync::atomic::{AtomicIsize, AtomicU32, Ordering};
+    static CACHED_COLOR: AtomicU32 = AtomicU32::new(0xFFFFFFFF);
+    static CACHED_BRUSH: AtomicIsize = AtomicIsize::new(0);
+
+    let cur = CACHED_COLOR.load(Ordering::Relaxed);
+    let brush = CACHED_BRUSH.load(Ordering::Relaxed);
+    if cur == color && brush != 0 {
+        return brush;
+    }
+    let new_brush = unsafe { CreateSolidBrush(color) };
+    let old_brush = CACHED_BRUSH.swap(new_brush, Ordering::Relaxed);
+    CACHED_COLOR.store(color, Ordering::Relaxed);
+    if old_brush != 0 {
+        unsafe {
+            DeleteObject(old_brush);
+        }
+    }
+    new_brush
 }
 
 pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 'static>(
@@ -129,11 +181,18 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     let w = rc.right - rc.left;
                     let h = rc.bottom - rc.top;
                     let palette = ThemePalette::get(is_current_dark());
+                    let clip_rc = if ps.rc_paint.right > ps.rc_paint.left
+                        && ps.rc_paint.bottom > ps.rc_paint.top
+                    {
+                        ps.rc_paint
+                    } else {
+                        rc
+                    };
                     if w > 0 && h > 0 {
                         if let Some(bb) = BackBuffer::new(hdc, w, h) {
-                            paint_surface(bb.hdc(), state_arc, palette, &rc);
+                            paint_surface(bb.hdc(), state_arc, palette, &rc, &clip_rc);
                         } else {
-                            paint_surface(hdc, state_arc, palette, &rc);
+                            paint_surface(hdc, state_arc, palette, &rc, &clip_rc);
                         }
                     }
                     EndPaint(hwnd, &ps);
@@ -144,10 +203,12 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
         WM_MOUSEWHEEL => {
             let delta = ((wparam >> 16) as i16) as i32;
             let mut should_repaint = false;
+            let mut update_inputs = false;
             if let Ok(mut guard) = state_arc.lock() {
                 if guard.open_select.is_some() {
                     guard.open_select = None;
                     should_repaint = true;
+                    update_inputs = true;
                 }
                 if guard.max_scroll > 0 {
                     let step = 48;
@@ -155,7 +216,11 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     if target != guard.scroll_y {
                         guard.scroll_y = target;
                         should_repaint = true;
+                        update_inputs = true;
                     }
+                }
+                if update_inputs {
+                    guard.update_input_scroll();
                 }
             }
             if should_repaint {
@@ -200,6 +265,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                         (guard.drag_start_scroll + scroll_delta).clamp(0, guard.max_scroll);
                     if target != guard.scroll_y {
                         guard.scroll_y = target;
+                        guard.update_input_scroll();
                         needs_repaint = true;
                     }
                 }
@@ -233,7 +299,10 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                         };
                         if new_hover != sel.hover_idx {
                             sel.hover_idx = new_hover;
-                            needs_repaint = true;
+                            let mut d_rc = inflate_rect(&menu_rc, 2, 2);
+                            unsafe {
+                                InvalidateRect(hwnd, &mut d_rc, 0);
+                            }
                         }
                     }
                 }
@@ -246,8 +315,28 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                         .and_then(|root| hit_test_node(root, x, doc_y))
                         .map(|n| n.id);
                     if new_hover != guard.hover_node_id {
+                        let old_id = guard.hover_node_id;
                         guard.hover_node_id = new_hover;
-                        needs_repaint = true;
+                        let mut damage_rc: Option<RECT> = None;
+                        if let Some(ref root) = guard.layout_root {
+                            let old_rc = old_id.and_then(|id| find_node_rect(root, id));
+                            let new_rc = new_hover.and_then(|id| find_node_rect(root, id));
+                            damage_rc = match (old_rc, new_rc) {
+                                (Some(o), Some(n)) => Some(rect_union(&o, &n)),
+                                (Some(o), None) => Some(o),
+                                (None, Some(n)) => Some(n),
+                                (None, None) => None,
+                            };
+                        }
+                        if let Some(d_rc) = damage_rc {
+                            let mut vp_rc =
+                                inflate_rect(&offset_rect(&d_rc, -guard.scroll_y), 4, 4);
+                            unsafe {
+                                InvalidateRect(hwnd, &mut vp_rc, 0);
+                            }
+                        } else {
+                            needs_repaint = true;
+                        }
                     }
                 }
             }
@@ -265,10 +354,20 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
         WM_MOUSELEAVE => {
             if let Ok(mut guard) = state_arc.lock() {
                 guard.tracking_mouse = false;
-                if guard.hover_node_id.is_some() {
-                    guard.hover_node_id = None;
-                    unsafe {
-                        InvalidateRect(hwnd, null_mut(), 0);
+                if let Some(old_id) = guard.hover_node_id.take() {
+                    let old_rc = guard
+                        .layout_root
+                        .as_ref()
+                        .and_then(|root| find_node_rect(root, old_id));
+                    if let Some(rc) = old_rc {
+                        let mut vp_rc = inflate_rect(&offset_rect(&rc, -guard.scroll_y), 4, 4);
+                        unsafe {
+                            InvalidateRect(hwnd, &mut vp_rc, 0);
+                        }
+                    } else {
+                        unsafe {
+                            InvalidateRect(hwnd, null_mut(), 0);
+                        }
                     }
                 }
             }
@@ -294,6 +393,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                             pending_msg = Some((handler, cb(idx)));
                         }
                     }
+                    guard.update_input_scroll();
                     needs_repaint = true;
                 }
                 // 2. Check Scrollbar Gutter Click
@@ -359,6 +459,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                                         hover_idx: Some(*selected),
                                         on_select: on_select.clone(),
                                     });
+                                    guard.update_input_scroll();
                                     needs_repaint = true;
                                 }
                                 WidgetKind::Slider {
@@ -460,7 +561,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             unsafe {
                 SetTextColor(hdc, palette.text_input);
                 SetBkColor(hdc, palette.bg_input);
-                if let Ok(mut g) = state_arc.lock() {
+                if let Ok(mut g) = state_arc.try_lock() {
                     if g.edit_bg_brush != 0 && g.edit_bg_color != palette.bg_input {
                         DeleteObject(g.edit_bg_brush);
                         g.edit_bg_brush = 0;
@@ -471,7 +572,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     }
                     return g.edit_bg_brush;
                 }
-                return CreateSolidBrush(palette.bg_input);
+                return get_cached_edit_brush(palette.bg_input);
             }
         }
         WM_COMMAND => {
@@ -481,7 +582,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             /* EN_CHANGE */
             {
                 let mut pending: Option<(Arc<dyn Fn(M) + Send + Sync>, M)> = None;
-                if let Ok(mut guard) = state_arc.lock() {
+                if let Ok(mut guard) = state_arc.try_lock() {
                     let on_msg = guard.on_msg.clone();
                     for input in &mut guard.inputs {
                         if input.hwnd == edit_hwnd {
@@ -491,9 +592,11 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                                 GetWindowTextW(edit_hwnd, buf.as_mut_ptr(), buf.len() as i32)
                             };
                             let text = String::from_utf16_lossy(&buf[..len as usize]);
-                            input.last_val = text.clone();
-                            if let (Some(cb), Some(h)) = (&input.on_change, on_msg) {
-                                pending = Some((h, cb(text)));
+                            if text != input.last_val {
+                                input.last_val = text.clone();
+                                if let (Some(cb), Some(h)) = (&input.on_change, on_msg) {
+                                    pending = Some((h, cb(text)));
+                                }
                             }
                             break;
                         }
@@ -506,7 +609,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             } else if notify == 0x0100
             /* EN_SETFOCUS */
             {
-                if let Ok(mut guard) = state_arc.lock() {
+                if let Ok(mut guard) = state_arc.try_lock() {
                     for input in &guard.inputs {
                         if input.hwnd == edit_hwnd {
                             guard.focused_node_id = Some(input.node_id);
@@ -521,7 +624,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             } else if notify == 0x0200
             /* EN_KILLFOCUS */
             {
-                if let Ok(mut guard) = state_arc.lock() {
+                if let Ok(mut guard) = state_arc.try_lock() {
                     if let Some(focused) = guard.focused_node_id {
                         for input in &guard.inputs {
                             if input.hwnd == edit_hwnd && input.node_id == focused {
@@ -542,7 +645,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             let is_shift = wparam != 0;
             let current_hwnd = lparam;
             let mut next_target = 0isize;
-            if let Ok(guard) = state_arc.lock() {
+            if let Ok(guard) = state_arc.try_lock() {
                 if !guard.inputs.is_empty() {
                     let cur_idx = guard.inputs.iter().position(|inp| inp.hwnd == current_hwnd);
                     if let Some(idx) = cur_idx {
@@ -567,6 +670,27 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                 }
             }
             0
+        }
+        WM_KEYDOWN => {
+            if wparam == 0x1B
+            /* VK_ESCAPE */
+            {
+                let mut closed = false;
+                if let Ok(mut guard) = state_arc.try_lock() {
+                    if guard.open_select.is_some() {
+                        guard.open_select = None;
+                        guard.update_input_scroll();
+                        closed = true;
+                    }
+                }
+                if closed {
+                    unsafe {
+                        InvalidateRect(hwnd, null_mut(), 0);
+                    }
+                    return 0;
+                }
+            }
+            unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
         }
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }

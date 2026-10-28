@@ -31,7 +31,7 @@ pub struct WNDCLASSEXW {
 }
 
 #[repr(C)]
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct RECT {
     pub left: i32,
     pub top: i32,

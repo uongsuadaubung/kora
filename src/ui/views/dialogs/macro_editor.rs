@@ -1,15 +1,15 @@
-//! Modal Dialog for Adding / Editing Macro Shorthands (Gõ tắt)
-//! Supports both "Add new shorthand" and "Edit existing shorthand"
+//! Declarative Modal Dialog for Adding / Editing Macro Shorthands (Gõ tắt)
+//!
+//! Uses [`crate::ui_framework::core::modal::{open_modal_with_wndproc, modal_dialog, modal_footer}`]
+//! and declarative widgets [`input`, `select`, `button`, `text`] to render a clean, modern
+//! 3-section modal dialog without manual Win32 child HWND coordinates or GDI subclassing.
 
-use super::{
-    attach_state, close_modal, detach_state, open_client_modal, reflect_dialog_messages, state,
-};
 use crate::engine::macro_table::MacroType;
-use crate::ui::colors::ThemePalette;
-use crate::ui::components::*;
-use crate::ui::theme::is_current_dark;
-use crate::ui::win32::*;
+use crate::ui_framework::core::*;
+use crate::ui_framework::win32::{WM_KEYDOWN, WM_SYSKEYDOWN};
+use std::sync::{Arc, Mutex};
 
+/// Data transferred into or out of the Macro Editor dialog.
 #[derive(Debug, Clone)]
 pub struct MacroEditData {
     pub original_key: String,
@@ -18,17 +18,87 @@ pub struct MacroEditData {
     pub macro_type: MacroType,
 }
 
-struct MacroDialogState {
-    parent: isize,
-    edit_data: Option<MacroEditData>,
-    txt_key: Option<TextBox>,
-    cmb_type: Option<ComboBox>,
-    txt_val: Option<TextBox>,
+#[derive(Clone, Debug)]
+pub struct MacroEditorState {
+    pub original_key: Option<String>,
+    pub key: String,
+    pub val: String,
+    pub macro_type_idx: usize, // 0: Normal, 1: StartConsonant, 2: EndConsonant
 }
 
-static REGISTERED: std::sync::Once = std::sync::Once::new();
-const CLASS_NAME: &str = "KoraMacroDialogClass";
+#[derive(Clone, Debug, PartialEq)]
+pub enum MacroEditorMsg {
+    KeyChanged(String),
+    ValChanged(String),
+    TypeChanged(usize),
+    Submit,
+    Cancel,
+}
 
+pub fn render_macro_editor_view(state: &MacroEditorState) -> Element<MacroEditorMsg> {
+    let strings = crate::language::current();
+    let can_submit = !state.key.trim().is_empty() && !state.val.trim().is_empty();
+
+    modal_dialog()
+        .body(
+            col(elements![
+                row(elements![
+                    col(elements![
+                        text(strings.dlg_macro_lbl_key).bold().secondary().small(),
+                        input(
+                            &state.key,
+                            strings.edit_macro_key_placeholder,
+                            MacroEditorMsg::KeyChanged,
+                        )
+                        .key(101)
+                        .auto_focus(state.original_key.is_none()),
+                    ])
+                    .flex_1()
+                    .gap(1),
+                    col(elements![
+                        text(strings.dlg_macro_lbl_type).bold().secondary().small(),
+                        select(
+                            [
+                                strings.macro_type_normal,
+                                strings.macro_type_start,
+                                strings.macro_type_end,
+                            ],
+                            state.macro_type_idx,
+                            MacroEditorMsg::TypeChanged,
+                        )
+                        .key(102)
+                        .h(32),
+                    ])
+                    .flex_1()
+                    .gap(1),
+                ])
+                .gap(3),
+                col(elements![
+                    text(strings.dlg_macro_lbl_val).bold().secondary().small(),
+                    input(
+                        &state.val,
+                        strings.edit_macro_val_placeholder,
+                        MacroEditorMsg::ValChanged,
+                    )
+                    .key(103)
+                    .auto_focus(state.original_key.is_some()),
+                ])
+                .gap(1),
+            ])
+            .gap(3)
+            .h_flex(1)
+            .justify_center(),
+        )
+        .footer(modal_footer(elements![
+            button(strings.btn_cancel, Variant::Secondary, MacroEditorMsg::Cancel).w(84),
+            button(strings.btn_save, Variant::Primary, MacroEditorMsg::Submit)
+                .disabled(!can_submit)
+                .w(88),
+        ]))
+        .build()
+}
+
+/// Displays the declarative modal dialog for adding or editing a shorthand macro entry.
 pub fn show_macro_dialog(parent: isize, edit_data: Option<MacroEditData>) {
     let strings = crate::language::current();
     let title = if edit_data.is_some() {
@@ -37,227 +107,88 @@ pub fn show_macro_dialog(parent: isize, edit_data: Option<MacroEditData>) {
         strings.dlg_macro_title_add
     };
 
-    open_client_modal(
-        parent,
-        title,
-        434,
-        196,
-        CLASS_NAME,
-        macro_dialog_wnd_proc,
-        &REGISTERED,
-        Box::new(MacroDialogState {
-            parent,
-            edit_data,
-            txt_key: None,
-            cmb_type: None,
-            txt_val: None,
-        }),
-    );
-}
-
-unsafe fn submit_macro(hwnd: isize) {
-    let Some(st) = (unsafe { state::<MacroDialogState>(hwnd) }) else {
-        return;
-    };
-    let key = st
-        .txt_key
-        .as_ref()
-        .map(|t| t.get_text().trim().to_string())
-        .unwrap_or_default();
-    let val = st
-        .txt_val
-        .as_ref()
-        .map(|t| t.get_text().trim().to_string())
-        .unwrap_or_default();
-    let type_idx = st
-        .cmb_type
-        .as_ref()
-        .and_then(|c| c.get_selected())
-        .unwrap_or(0);
-    let original_key = st.edit_data.as_ref().map(|d| d.original_key.clone());
-    let focus_hwnd = if key.is_empty() {
-        st.txt_key.as_ref().map_or(0, |t| t.hwnd())
-    } else {
-        st.txt_val.as_ref().map_or(0, |t| t.hwnd())
-    };
-
-    if !key.is_empty() && !val.is_empty() {
-        let mtype = match type_idx {
-            1 => MacroType::StartConsonant,
-            2 => MacroType::EndConsonant,
-            _ => MacroType::Normal,
+    let (key, val, macro_type_idx, original_key) = if let Some(data) = edit_data {
+        let type_idx = match data.macro_type {
+            MacroType::Normal => 0,
+            MacroType::StartConsonant => 1,
+            MacroType::EndConsonant => 2,
         };
-        crate::ui::controller::save_macro(original_key.as_deref(), &key, &val, mtype);
-        unsafe {
-            PostMessageW(hwnd, WM_CLOSE, 0, 0);
-        }
-    } else if focus_hwnd != 0 {
-        unsafe {
-            SetFocus(focus_hwnd);
-        }
-    }
-}
+        (data.key, data.value, type_idx, Some(data.original_key))
+    } else {
+        (String::new(), String::new(), 0, None)
+    };
 
-/// Standard Win32 Window Procedure for Macro Editor Dialog.
-///
-/// # Safety
-/// Must be invoked by Windows message dispatcher with valid window handle and parameters.
-pub unsafe extern "system" fn macro_dialog_wnd_proc(
-    hwnd: isize,
-    msg: u32,
-    wparam: usize,
-    lparam: isize,
-) -> isize {
-    const WM_NCDESTROY: u32 = 0x0082;
-    unsafe {
-        if let Some(res) = reflect_dialog_messages(hwnd, msg, wparam, lparam) {
-            return res;
-        }
-        match msg {
-            WM_CREATE => {
-                attach_state::<MacroDialogState>(hwnd, lparam);
-                let Some(st) = state::<MacroDialogState>(hwnd) else {
-                    return -1;
-                };
-                let font_bold = crate::ui::theme::cached_font(10, FW_SEMIBOLD);
-                let font_normal = crate::ui::theme::get_app_font_normal();
-                let strings = crate::language::current();
+    let state = Arc::new(Mutex::new(MacroEditorState {
+        original_key,
+        key,
+        val,
+        macro_type_idx,
+    }));
 
-                // 1. Shortcut Key
-                Label::create(hwnd, strings.dlg_macro_lbl_key, 24, 16, 175, 18, font_bold)
-                    .map(|l| l.on_surface(SurfaceRole::Window));
-                let txt_key = TextBox::create_with_placeholder(
-                    hwnd,
-                    0,
-                    strings.edit_macro_key_placeholder,
-                    24,
-                    38,
-                    175,
-                    28,
-                    font_normal,
-                );
+    let state_for_render = Arc::clone(&state);
+    let state_for_msg = Arc::clone(&state);
 
-                // 2. Macro Rule Type
-                Label::create(
-                    hwnd,
-                    strings.dlg_macro_lbl_type,
-                    215,
-                    16,
-                    195,
-                    18,
-                    font_bold,
-                )
-                .map(|l| l.on_surface(SurfaceRole::Window));
-                let cmb_type = ComboBox::create_with_items(
-                    hwnd,
-                    0,
-                    215,
-                    38,
-                    195,
-                    120,
-                    font_normal,
-                    &[
-                        strings.macro_type_normal,
-                        strings.macro_type_start,
-                        strings.macro_type_end,
-                    ],
-                    0,
-                );
+    let initial_view = render_macro_editor_view(&state_for_render.lock().unwrap());
+    let config = ModalConfig::new(title, 440, 205);
 
-                // 3. Replacement Value
-                Label::create(hwnd, strings.dlg_macro_lbl_val, 24, 76, 386, 18, font_bold)
-                    .map(|l| l.on_surface(SurfaceRole::Window));
-                let txt_val = TextBox::create_with_placeholder(
-                    hwnd,
-                    0,
-                    strings.edit_macro_val_placeholder,
-                    24,
-                    98,
-                    386,
-                    28,
-                    font_normal,
-                );
-
-                // Prefill if in Edit Mode
-                if let Some(ref data) = st.edit_data {
-                    if let Some(ref k) = txt_key {
-                        k.set_text(&data.key);
-                    }
-                    if let Some(ref v) = txt_val {
-                        v.set_text(&data.value);
-                    }
-                    if let Some(ref c) = cmb_type {
-                        let idx = match data.macro_type {
-                            MacroType::Normal => 0,
-                            MacroType::StartConsonant => 1,
-                            MacroType::EndConsonant => 2,
+    open_modal_with_wndproc(
+        parent,
+        config,
+        initial_view,
+        move |handle, msg| {
+            let mut st = state_for_msg.lock().unwrap();
+            match msg {
+                MacroEditorMsg::KeyChanged(new_key) => {
+                    st.key = new_key;
+                    let view = render_macro_editor_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                MacroEditorMsg::ValChanged(new_val) => {
+                    st.val = new_val;
+                    let view = render_macro_editor_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                MacroEditorMsg::TypeChanged(new_idx) => {
+                    st.macro_type_idx = new_idx;
+                    let view = render_macro_editor_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                MacroEditorMsg::Submit => {
+                    let key = st.key.trim().to_string();
+                    let val = st.val.trim().to_string();
+                    if !key.is_empty() && !val.is_empty() {
+                        let mtype = match st.macro_type_idx {
+                            1 => MacroType::StartConsonant,
+                            2 => MacroType::EndConsonant,
+                            _ => MacroType::Normal,
                         };
-                        c.set_selected(idx);
+                        let orig_key = st.original_key.clone();
+                        drop(st);
+                        crate::ui::controller::save_macro(orig_key.as_deref(), &key, &val, mtype);
+                        handle.close();
                     }
                 }
-
-                // 4. Action Buttons
-                super::create_dialog_footer_layout(
-                    hwnd,
-                    strings.btn_cancel,
-                    90,
-                    strings.btn_save,
-                    99,
-                    ButtonVariant::Primary,
-                    144,
-                    30,
-                    20,
-                    None,
-                    move || submit_macro(hwnd),
-                );
-
-                st.txt_key = txt_key;
-                st.cmb_type = cmb_type;
-                st.txt_val = txt_val;
-
-                0
-            }
-            WM_ERASEBKGND => 1,
-            WM_PAINT => {
-                let mut ps: PAINTSTRUCT = std::mem::zeroed();
-                let hdc = BeginPaint(hwnd, &mut ps);
-                if hdc != 0 {
-                    let palette = ThemePalette::get(is_current_dark());
-                    super::base::fill_dialog_bg(hwnd, hdc, &palette);
-                    EndPaint(hwnd, &ps);
+                MacroEditorMsg::Cancel => {
+                    drop(st);
+                    handle.close();
                 }
-                0
             }
-            WM_COMMAND => {
-                match (wparam & 0xFFFF) as u32 {
-                    IDCANCEL => {
-                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    }
-                    IDOK => submit_macro(hwnd),
-                    _ => {}
-                }
-                0
-            }
+        },
+        move |handle, msg, wparam, _lparam| match msg {
             WM_KEYDOWN | WM_SYSKEYDOWN => {
-                let vk = wparam as u32;
-                if vk == 0x1B {
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    return 0;
+                if wparam == 0x0D
+                /* VK_RETURN */
+                {
+                    handle.dispatch(MacroEditorMsg::Submit);
+                    Some(0)
+                } else {
+                    None
                 }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
             }
-            WM_CLOSE => {
-                let parent = state::<MacroDialogState>(hwnd).map_or(0, |s| s.parent);
-                close_modal(hwnd, parent);
-                0
-            }
-            WM_NCDESTROY => {
-                if let Some(st) = detach_state::<MacroDialogState>(hwnd) {
-                    EnableWindow(st.parent, 1);
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-        }
-    }
+            _ => None,
+        },
+    );
 }

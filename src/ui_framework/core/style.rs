@@ -311,6 +311,7 @@ pub struct Style {
     pub border_top: bool,
     pub border_left_accent: Option<(i32, Variant)>,
     pub radius: i32,
+    pub z_index: i32,
 }
 
 impl Default for Style {
@@ -330,6 +331,7 @@ impl Default for Style {
             border_top: false,
             border_left_accent: None,
             radius: radii::RADIUS_CARD,
+            z_index: 0,
         }
     }
 }

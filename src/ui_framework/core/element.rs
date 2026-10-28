@@ -519,6 +519,12 @@ impl<M> Element<M> {
         self.style.radius = radii::RADIUS_PILL;
         self
     }
+
+    #[inline]
+    pub fn z_index(mut self, z: i32) -> Self {
+        self.style.z_index = z;
+        self
+    }
 }
 
 /// Trait providing fluent styling and layout utility methods for any UI component.
@@ -802,6 +808,11 @@ pub trait Styleable: Sized {
     #[inline]
     fn rounded_pill(mut self) -> Self {
         self.style_mut().radius = radii::RADIUS_PILL;
+        self
+    }
+    #[inline]
+    fn z_index(mut self, z: i32) -> Self {
+        self.style_mut().z_index = z;
         self
     }
 }

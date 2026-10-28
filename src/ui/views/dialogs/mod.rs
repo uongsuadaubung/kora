@@ -21,5 +21,7 @@ pub use hotkey::{
     show_target_capture_hotkey_dialog_with_presets, switch_hotkey_presets, target_capture_presets,
 };
 pub use key_macro::{show_key_macro_dialog, show_key_macro_dialog_with_key};
-pub use macro_editor::{MacroEditData, show_macro_dialog};
+pub use macro_editor::{
+    MacroEditData, MacroEditorMsg, MacroEditorState, render_macro_editor_view, show_macro_dialog,
+};
 pub use remap_key::{show_remap_dialog, show_remap_dialog_with_keys};

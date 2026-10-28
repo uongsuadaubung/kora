@@ -43,11 +43,34 @@ pub(crate) unsafe extern "system" fn input_subclass_proc(
             if wparam == 0x0D
             /* VK_RETURN */
             {
+                let parent = unsafe { GetParent(hwnd) };
+                if parent != 0 {
+                    let modal = unsafe { GetParent(parent) };
+                    if modal != 0 {
+                        unsafe {
+                            PostMessageW(modal, WM_KEYDOWN, 0x0D, 0);
+                        }
+                    }
+                }
+                return 0;
+            }
+            if wparam == 0x1B
+            /* VK_ESCAPE */
+            {
+                let parent = unsafe { GetParent(hwnd) };
+                if parent != 0 {
+                    let modal = unsafe { GetParent(parent) };
+                    if modal != 0 {
+                        unsafe {
+                            PostMessageW(modal, WM_KEYDOWN, 0x1B, 0);
+                        }
+                    }
+                }
                 return 0;
             }
         }
         WM_CHAR => {
-            if wparam == 0x0D || wparam == 0x09 {
+            if wparam == 0x0D || wparam == 0x09 || wparam == 0x1B {
                 return 0;
             }
         }
@@ -63,6 +86,7 @@ pub(crate) struct CollectedInput<M> {
     pub slot_key: u32,
     pub node_id: usize,
     pub rect: RECT,
+    pub z_index: i32,
     pub value: String,
     pub placeholder: String,
     pub disabled: bool,
@@ -73,9 +97,15 @@ pub(crate) struct CollectedInput<M> {
 
 pub(crate) fn collect_inputs<M: Clone>(
     node: &LayoutNode<M>,
+    parent_z: i32,
     slot_counter: &mut u32,
     out: &mut Vec<CollectedInput<M>>,
 ) {
+    let my_z = if node.element.style.z_index != 0 {
+        node.element.style.z_index
+    } else {
+        parent_z
+    };
     if let WidgetKind::Input {
         key,
         value,
@@ -92,6 +122,7 @@ pub(crate) fn collect_inputs<M: Clone>(
             slot_key: slot,
             node_id: node.id,
             rect: node.rect,
+            z_index: my_z,
             value: value.clone(),
             placeholder: placeholder.clone(),
             disabled: *disabled,
@@ -101,24 +132,57 @@ pub(crate) fn collect_inputs<M: Clone>(
         });
     }
     for child in &node.children {
-        collect_inputs(child, slot_counter, out);
+        collect_inputs(child, my_z, slot_counter, out);
     }
 }
 
+pub fn is_node_occluding_rect<M>(
+    node: &LayoutNode<M>,
+    target_rc: &RECT,
+    target_z: i32,
+    scroll_y: i32,
+    parent_z: i32,
+) -> bool {
+    let my_z = if node.element.style.z_index != 0 {
+        node.element.style.z_index
+    } else {
+        parent_z
+    };
+
+    if my_z > target_z {
+        let node_vp = offset_rect(&node.rect, -scroll_y);
+        if rect_intersects(target_rc, &node_vp) {
+            return true;
+        }
+    }
+
+    for child in &node.children {
+        if is_node_occluding_rect(child, target_rc, target_z, scroll_y, my_z) {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
-    pub(crate) fn sync_inputs(&mut self) {
+    pub(crate) fn sync_inputs(&mut self) -> Option<isize> {
         if self.hwnd == 0 {
-            return;
+            return None;
         }
 
         let mut collected = Vec::new();
         if let Some(ref root) = self.layout_root {
             let mut slot_counter = 1u32;
-            collect_inputs(root, &mut slot_counter, &mut collected);
+            collect_inputs(root, 0, &mut slot_counter, &mut collected);
         }
 
         let font_norm = resolve_font_handle(FontScale::Normal);
         let mut active_slots = Vec::new();
+        let mut focus_target: Option<isize> = None;
+        let menu_rc = self.open_select.as_ref().map(|sel| {
+            compute_dropdown_menu_rect(sel, self.scroll_y, self.height)
+        });
 
         for item in collected {
             active_slots.push(item.slot_key);
@@ -128,7 +192,25 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
             let inner_y = item.rect.top + (box_h - inner_h) / 2 - self.scroll_y;
             let inner_x = item.rect.left + 10;
             let inner_w = (item.rect.right - item.rect.left - 20).max(10);
-            let is_visible = inner_y + inner_h > 0 && inner_y < self.height;
+            let in_viewport = inner_y + inner_h > 0 && inner_y < self.height;
+
+            let container_rc = RECT {
+                left: item.rect.left,
+                top: item.rect.top - self.scroll_y,
+                right: item.rect.right,
+                bottom: item.rect.bottom - self.scroll_y,
+            };
+
+            let is_occluded_by_node = self.layout_root.as_ref().map_or(false, |root| {
+                is_node_occluding_rect(root, &container_rc, item.z_index, self.scroll_y, 0)
+            });
+            let is_occluded_by_select = if let Some(ref m_rc) = menu_rc {
+                rect_intersects(&container_rc, m_rc)
+            } else {
+                false
+            };
+
+            let is_visible = in_viewport && !is_occluded_by_node && !is_occluded_by_select;
 
             if let Some(existing) = self
                 .inputs
@@ -137,6 +219,7 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
             {
                 existing.node_id = item.node_id;
                 existing.rect = item.rect;
+                existing.z_index = item.z_index;
                 existing.on_change = item.on_change;
 
                 unsafe {
@@ -149,7 +232,10 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                         inner_h,
                         SWP_NOZORDER | SWP_NOACTIVATE | if is_visible { SWP_SHOWWINDOW } else { 0 },
                     );
-                    if !is_visible {
+                    if is_visible {
+                        ShowWindow(existing.hwnd, SW_SHOW);
+                        InvalidateRect(existing.hwnd, null_mut(), 1);
+                    } else {
                         ShowWindow(existing.hwnd, SW_HIDE);
                     }
                 }
@@ -201,7 +287,6 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
             } else {
                 // Create new Win32 EDIT control
                 const WS_CHILD: u32 = 0x40000000;
-                const WS_VISIBLE: u32 = 0x10000000;
                 const WS_TABSTOP: u32 = 0x00010000;
                 const ES_AUTOHSCROLL: u32 = 0x0080;
                 const ES_PASSWORD: u32 = 0x0020;
@@ -209,9 +294,6 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                 const EM_SETCUEBANNER: u32 = 0x1501;
 
                 let mut style = WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL;
-                if is_visible {
-                    style |= WS_VISIBLE;
-                }
                 if item.password {
                     style |= ES_PASSWORD;
                 }
@@ -236,7 +318,7 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                 if edit_hwnd != 0 {
                     unsafe {
                         if font_norm != 0 {
-                            SendMessageW(edit_hwnd, WM_SETFONT, font_norm as usize, 1);
+                            SendMessageW(edit_hwnd, WM_SETFONT, font_norm as usize, 0);
                         }
                         if !item.placeholder.is_empty() {
                             SendMessageW(
@@ -250,8 +332,12 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                             EnableWindow(edit_hwnd, 0);
                         }
                         SetWindowSubclass(edit_hwnd, input_subclass_proc, SUBCLASS_ID_INPUT, 0);
+                        if is_visible {
+                            ShowWindow(edit_hwnd, SW_SHOW);
+                        }
                         if item.auto_focus {
-                            SetFocus(edit_hwnd);
+                            focus_target = Some(edit_hwnd);
+                            self.focused_node_id = Some(item.node_id);
                         }
                     }
 
@@ -260,6 +346,7 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                         node_id: item.node_id,
                         hwnd: edit_hwnd,
                         rect: item.rect,
+                        z_index: item.z_index,
                         last_val: item.value,
                         last_placeholder: item.placeholder,
                         is_disabled: item.disabled,
@@ -281,28 +368,57 @@ impl<M: Clone + Send + Sync + 'static> SurfaceInner<M> {
                 true
             }
         });
+
+        focus_target
     }
 
     pub(crate) fn update_input_scroll(&self) {
+        let menu_rc = self.open_select.as_ref().map(|sel| {
+            compute_dropdown_menu_rect(sel, self.scroll_y, self.height)
+        });
+
         for inp in &self.inputs {
             let inner_h = 20;
             let box_h = inp.rect.bottom - inp.rect.top;
             let inner_y = inp.rect.top + (box_h - inner_h) / 2 - self.scroll_y;
-            let is_visible = inner_y + inner_h > 0 && inner_y < self.height;
+            let inner_x = inp.rect.left + 10;
+            let in_viewport = inner_y + inner_h > 0 && inner_y < self.height;
+
+            let container_rc = RECT {
+                left: inp.rect.left,
+                top: inp.rect.top - self.scroll_y,
+                right: inp.rect.right,
+                bottom: inp.rect.bottom - self.scroll_y,
+            };
+
+            let is_occluded_by_node = self.layout_root.as_ref().map_or(false, |root| {
+                is_node_occluding_rect(root, &container_rc, inp.z_index, self.scroll_y, 0)
+            });
+            let is_occluded_by_select = if let Some(ref m_rc) = menu_rc {
+                rect_intersects(&container_rc, m_rc)
+            } else {
+                false
+            };
+
+            let is_visible = in_viewport && !is_occluded_by_node && !is_occluded_by_select;
+
             unsafe {
-                SetWindowPos(
-                    inp.hwnd,
-                    0,
-                    inp.rect.left + 10,
-                    inner_y,
-                    0,
-                    0,
-                    SWP_NOSIZE
-                        | SWP_NOZORDER
-                        | SWP_NOACTIVATE
-                        | if is_visible { SWP_SHOWWINDOW } else { 0 },
-                );
-                if !is_visible {
+                if is_visible {
+                    SetWindowPos(
+                        inp.hwnd,
+                        0,
+                        inner_x,
+                        inner_y,
+                        0,
+                        0,
+                        SWP_NOSIZE
+                            | SWP_NOZORDER
+                            | SWP_NOACTIVATE
+                            | SWP_SHOWWINDOW,
+                    );
+                    ShowWindow(inp.hwnd, SW_SHOW);
+                    InvalidateRect(inp.hwnd, null_mut(), 1);
+                } else {
                     ShowWindow(inp.hwnd, SW_HIDE);
                 }
             }

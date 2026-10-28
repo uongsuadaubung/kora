@@ -876,3 +876,317 @@ fn test_modal_hotkey_declarative_layout() {
         panic!("Expected button for save");
     }
 }
+
+#[test]
+fn test_modal_macro_editor_declarative_layout() {
+    use kora::ui::views::dialogs::{
+        MacroEditorMsg, MacroEditorState, render_macro_editor_view,
+    };
+    use kora::ui_framework::core::*;
+
+    // 1. Empty state: save button should be disabled
+    let empty_state = MacroEditorState {
+        original_key: None,
+        key: String::new(),
+        val: String::new(),
+        macro_type_idx: 0,
+    };
+
+    let view = render_macro_editor_view(&empty_state);
+    let root = compute_layout(0, view, 0, 0, 440);
+
+    assert_eq!(root.rect.left, 0);
+    assert_eq!(root.rect.right, 440);
+    assert_eq!(root.children.len(), 2); // Body and Footer (no header)
+
+    // Body section
+    let body_section = &root.children[0];
+    assert!(body_section.rect.bottom > 0);
+    let body_col = &body_section.children[0];
+    assert_eq!(body_col.children.len(), 2); // Row 1 (key + type), Row 2 (value)
+
+    // Row 1: Key input & Type select
+    let row1 = &body_col.children[0];
+    assert_eq!(row1.children.len(), 2);
+    let key_col = &row1.children[0];
+    let key_input = &key_col.children[1];
+    if let WidgetKind::Input { key, auto_focus, .. } = &key_input.element.kind {
+        assert_eq!(*key, 101);
+        assert_eq!(*auto_focus, true); // Add mode: auto focus key input
+    } else {
+        panic!("Expected WidgetKind::Input for shortcut key");
+    }
+
+    let type_col = &row1.children[1];
+    let type_select = &type_col.children[1];
+    if let WidgetKind::Select { key, selected, .. } = &type_select.element.kind {
+        assert_eq!(*key, 102);
+        assert_eq!(*selected, 0);
+    } else {
+        panic!("Expected WidgetKind::Select for macro rule type");
+    }
+
+    // Row 2: Value input
+    let val_col = &body_col.children[1];
+    let val_input = &val_col.children[1];
+    if let WidgetKind::Input { key, auto_focus, .. } = &val_input.element.kind {
+        assert_eq!(*key, 103);
+        assert_eq!(*auto_focus, false);
+    } else {
+        panic!("Expected WidgetKind::Input for replacement value");
+    }
+
+    // Footer section with disabled save button
+    let footer_section = &root.children[1];
+    let footer_row = &footer_section.children[0];
+    let cancel_btn = &footer_row.children[1];
+    let save_btn = &footer_row.children[2];
+
+    if let WidgetKind::Button { on_click, disabled, .. } = &cancel_btn.element.kind {
+        assert_eq!(*on_click, Some(MacroEditorMsg::Cancel));
+        assert!(!*disabled);
+    } else {
+        panic!("Expected button for cancel");
+    }
+
+    if let WidgetKind::Button { on_click, disabled, .. } = &save_btn.element.kind {
+        assert_eq!(*on_click, Some(MacroEditorMsg::Submit));
+        assert!(*disabled); // Disabled when fields are empty!
+    } else {
+        panic!("Expected button for save");
+    }
+
+    // 2. Filled edit state: save button should be enabled and val input auto focused
+    let filled_state = MacroEditorState {
+        original_key: Some("kr".to_string()),
+        key: "kr".to_string(),
+        val: "Kora Input".to_string(),
+        macro_type_idx: 1,
+    };
+    let view_filled = render_macro_editor_view(&filled_state);
+    let root_filled = compute_layout(0, view_filled, 0, 0, 440);
+
+    let body_col_filled = &root_filled.children[0].children[0];
+    let key_col_filled = &body_col_filled.children[0].children[0];
+    let key_input_filled = &key_col_filled.children[1];
+    if let WidgetKind::Input { auto_focus, .. } = &key_input_filled.element.kind {
+        assert_eq!(*auto_focus, false);
+    }
+    let val_col_filled = &body_col_filled.children[1];
+    let val_input_filled = &val_col_filled.children[1];
+    if let WidgetKind::Input { auto_focus, .. } = &val_input_filled.element.kind {
+        assert_eq!(*auto_focus, true);
+    }
+
+    let footer_row_filled = &root_filled.children[1].children[0];
+    let save_btn_filled = &footer_row_filled.children[2];
+    if let WidgetKind::Button { disabled, .. } = &save_btn_filled.element.kind {
+        assert!(!*disabled); // Enabled when both fields are filled!
+    } else {
+        panic!("Expected button for save");
+    }
+}
+
+#[test]
+fn test_select_dropdown_intersection_with_input() {
+    use kora::ui::views::dialogs::macro_editor::{render_macro_editor_view, MacroEditorState};
+    use kora::ui_framework::core::layout_engine::compute_layout;
+    use kora::ui_framework::core::surface::types::{
+        compute_dropdown_menu_rect, rect_intersects, OpenSelectOverlay,
+    };
+
+    let state = MacroEditorState {
+        original_key: None,
+        key: String::new(),
+        val: String::new(),
+        macro_type_idx: 0,
+    };
+    let view = render_macro_editor_view(&state);
+    let root = compute_layout(0, view, 0, 0, 440);
+
+    let body_col = &root.children[0].children[0];
+    let row1 = &body_col.children[0];
+    let key_col = &row1.children[0];
+    let key_input = &key_col.children[1];
+    let type_col = &row1.children[1];
+    let type_select = &type_col.children[1];
+    let val_col = &body_col.children[1];
+    let val_input = &val_col.children[1];
+
+    let overlay = OpenSelectOverlay::<()> {
+        key: 102,
+        rect_doc: type_select.rect,
+        selected: 0,
+        options: vec![
+            "Bình thường".to_string(),
+            "Đầu từ".to_string(),
+            "Cuối từ".to_string(),
+        ],
+        hover_idx: Some(0),
+        on_select: None,
+    };
+
+    let menu_rc = compute_dropdown_menu_rect(&overlay, 0, 205);
+
+    // The val input ("Nội dung thay thế") intersects the dropdown menu overlay
+    assert!(
+        rect_intersects(&val_input.rect, &menu_rc),
+        "Expected replacement value input to intersect dropdown menu overlay"
+    );
+
+    // The key input ("Từ viết tắt") does NOT intersect the dropdown menu overlay
+    assert!(
+        !rect_intersects(&key_input.rect, &menu_rc),
+        "Key input should NOT intersect dropdown menu on the right"
+    );
+}
+
+#[test]
+fn test_z_index_system_and_layering() {
+    use kora::ui_framework::core::*;
+    use kora::ui_framework::core::layout_engine::compute_layout;
+    use kora::ui_framework::core::surface::events::hit_test_node;
+    use kora::ui_framework::core::surface::input_overlay::is_node_occluding_rect;
+    use kora::ui_framework::core::surface::types::{
+        collect_z_levels, Z_INDEX_BASE, Z_INDEX_DROPDOWN, Z_INDEX_STICKY, Z_INDEX_TOOLTIP,
+    };
+    use kora::ui_framework::win32::types::RECT;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum TestMsg {
+        BtnUnder,
+        BtnOver,
+    }
+
+    // 1. Verify DSL modifiers
+    let btn_under = button("Under", Variant::Secondary, TestMsg::BtnUnder)
+        .w(100)
+        .h(40)
+        .z_index(Z_INDEX_BASE);
+    let btn_over = button("Over", Variant::Primary, TestMsg::BtnOver)
+        .w(100)
+        .h(40)
+        .z_index(Z_INDEX_DROPDOWN);
+
+    assert_eq!(btn_under.style.z_index, 0);
+    assert_eq!(btn_over.style.z_index, 100);
+
+    // 2. Build multi-layer tree and check z_levels collection
+    let tree: Element<TestMsg> = col(elements![
+        row(elements![text("Sticky Title")]).z_index(Z_INDEX_STICKY),
+        row(elements![btn_under]),
+        row(elements![btn_over]),
+        row(elements![badge("Tooltip", Variant::Info)]).z_index(Z_INDEX_TOOLTIP),
+    ]);
+
+    let root = compute_layout(0, tree, 0, 0, 400);
+
+    let mut z_levels = Vec::new();
+    collect_z_levels(&root, 0, &mut z_levels);
+    z_levels.sort_unstable();
+    z_levels.dedup();
+
+    assert_eq!(z_levels, vec![Z_INDEX_BASE, Z_INDEX_STICKY, Z_INDEX_DROPDOWN, Z_INDEX_TOOLTIP]);
+
+    // 3. Verify Hit-Test priority: Overlapping nodes must hit highest z_index first!
+    let overlapping_tree: Element<TestMsg> = col(elements![
+        button("Under Layer", Variant::Secondary, TestMsg::BtnUnder)
+            .w(200)
+            .h(40)
+            .z_index(0),
+        // A child elevated with z_index: 100 positioned overlapping the first
+        button("Top Layer", Variant::Primary, TestMsg::BtnOver)
+            .w(200)
+            .h(40)
+            .z_index(100),
+    ]);
+
+    let mut layout_root = compute_layout(0, overlapping_tree, 0, 0, 300);
+    // Artificially make both buttons share the exact same bounding box
+    layout_root.children[0].rect = RECT { left: 10, top: 10, right: 150, bottom: 50 };
+    layout_root.children[1].rect = RECT { left: 10, top: 10, right: 150, bottom: 50 };
+
+    let hit = hit_test_node(&layout_root, 30, 30);
+    assert!(hit.is_some(), "Expected a hit");
+    let hit_node = hit.unwrap();
+    if let WidgetKind::Button { label, on_click, .. } = &hit_node.element.kind {
+        assert_eq!(label, "Top Layer", "Highest z_index layer must win hit-test priority!");
+        assert_eq!(on_click.as_ref(), Some(&TestMsg::BtnOver));
+    } else {
+        panic!("Expected button hit");
+    }
+
+    // 4. Verify generic Input occlusion detection
+    let target_input_rc = RECT { left: 20, top: 20, right: 200, bottom: 52 };
+    // Node at z_index 100 overlaps target_input_rc (from 10..150, 10..50)
+    let occluded = is_node_occluding_rect(&layout_root, &target_input_rc, 0, 0, 0);
+    assert!(occluded, "Input at z=0 should be detected as occluded by node at z=100");
+
+    // Non-overlapping input at (250, 20, 400, 52)
+    let outside_input_rc = RECT { left: 250, top: 20, right: 400, bottom: 52 };
+    let outside_occluded = is_node_occluding_rect(&layout_root, &outside_input_rc, 0, 0, 0);
+    assert!(!outside_occluded, "Input outside overlay bounds must NOT be occluded");
+}
+
+#[test]
+fn test_damage_tracking_and_rect_culling() {
+    use kora::ui_framework::core::layout_engine::compute_layout;
+    use kora::ui_framework::core::surface::types::{
+        find_node_rect, inflate_rect, rect_intersects, rect_union,
+    };
+    use kora::ui_framework::core::*;
+    use kora::ui_framework::win32::types::RECT;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum TestMsg {
+        Btn1,
+        Btn2,
+    }
+
+    // 1. Test rect_union
+    let r1 = RECT { left: 10, top: 10, right: 50, bottom: 30 };
+    let r2 = RECT { left: 40, top: 20, right: 80, bottom: 60 };
+    let union_r = rect_union(&r1, &r2);
+    assert_eq!(union_r.left, 10);
+    assert_eq!(union_r.top, 10);
+    assert_eq!(union_r.right, 80);
+    assert_eq!(union_r.bottom, 60);
+
+    let empty_r = RECT::default();
+    assert_eq!(rect_union(&empty_r, &r1), r1);
+    assert_eq!(rect_union(&r1, &empty_r), r1);
+
+    // 2. Test inflate_rect
+    let inflated = inflate_rect(&r1, 4, 2);
+    assert_eq!(inflated.left, 6);
+    assert_eq!(inflated.top, 8);
+    assert_eq!(inflated.right, 54);
+    assert_eq!(inflated.bottom, 32);
+
+    // 3. Test find_node_rect in layout tree
+    let view: Element<TestMsg> = col(elements![
+        button("First", Variant::Secondary, TestMsg::Btn1).w(100).h(35),
+        button("Second", Variant::Primary, TestMsg::Btn2).w(120).h(40),
+    ]);
+
+    let root = compute_layout(0, view, 0, 0, 300);
+    let first_btn_id = root.children[0].id;
+    let second_btn_id = root.children[1].id;
+
+    let found_first = find_node_rect(&root, first_btn_id);
+    let found_second = find_node_rect(&root, second_btn_id);
+
+    assert!(found_first.is_some());
+    assert!(found_second.is_some());
+    assert_eq!(found_first.unwrap(), root.children[0].rect);
+    assert_eq!(found_second.unwrap(), root.children[1].rect);
+    assert_eq!(find_node_rect(&root, 999_999), None);
+
+    // 4. Test dirty rect intersection culling
+    let clip_rc = RECT { left: 0, top: 0, right: 150, bottom: 35 };
+    assert!(rect_intersects(&root.children[0].rect, &clip_rc), "First button within clip must intersect");
+    // If second button starts below 35px, it should be culled
+    if root.children[1].rect.top >= 35 {
+        assert!(!rect_intersects(&root.children[1].rect, &clip_rc), "Node outside clip rect must be culled");
+    }
+}

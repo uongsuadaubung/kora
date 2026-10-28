@@ -9,6 +9,7 @@ use crate::ui_framework::colors::ThemePalette;
 use crate::ui_framework::core::element::*;
 use crate::ui_framework::core::layout_engine::*;
 use crate::ui_framework::core::style::BgStyle;
+use crate::ui_framework::theme::is_current_dark;
 use crate::ui_framework::tokens::{radii, spacing};
 use crate::ui_framework::win32::*;
 use std::ptr::null_mut;
@@ -19,6 +20,7 @@ pub(crate) fn paint_surface<M>(
     state_arc: &Mutex<SurfaceInner<M>>,
     palette: &ThemePalette,
     client_rc: &RECT,
+    clip_rc: &RECT,
 ) {
     let Ok(guard) = state_arc.lock() else { return };
 
@@ -33,18 +35,28 @@ pub(crate) fn paint_surface<M>(
     let open_select_key = guard.open_select.as_ref().map(|s| s.key);
     let focused_node_id = guard.focused_node_id;
 
-    // 2. Paint layout tree
+    // 2. Paint layout tree by z-index layers with damage culling
     if let Some(ref root) = guard.layout_root {
-        paint_node(
-            hdc,
-            root,
-            scroll_y,
-            viewport_h,
-            hover_id,
-            open_select_key,
-            focused_node_id,
-            palette,
-        );
+        let mut z_levels = Vec::with_capacity(4);
+        collect_z_levels(root, 0, &mut z_levels);
+        z_levels.sort_unstable();
+        z_levels.dedup();
+
+        for &z in &z_levels {
+            paint_node_layer(
+                hdc,
+                root,
+                scroll_y,
+                viewport_h,
+                clip_rc,
+                hover_id,
+                open_select_key,
+                focused_node_id,
+                palette,
+                0,
+                z,
+            );
+        }
     }
 
     // 3. Paint slim modern scrollbar thumb (only if scrollable and viewport has enough height)
@@ -73,16 +85,18 @@ pub(crate) fn paint_surface<M>(
         round_rect(hdc, &thumb_rc, 4, thumb_color, None);
     }
 
-    // 4. Paint top-layer open Select dropdown overlay (z-index: top)
+    // 4. Paint top-layer open Select dropdown overlay (z-index: top) with Fluent elevation shadow
     if let Some(ref sel) = guard.open_select {
         let menu_rc = compute_dropdown_menu_rect(sel, scroll_y, viewport_h);
-        round_rect(
-            hdc,
-            &menu_rc,
-            radii::RADIUS_MD,
-            palette.bg_card,
-            Some(palette.accent),
-        );
+        if rect_intersects(&menu_rc, clip_rc) {
+            draw_elevation_shadow(hdc, &menu_rc, radii::RADIUS_MD, 4, is_current_dark());
+            round_rect(
+                hdc,
+                &menu_rc,
+                radii::RADIUS_MD,
+                palette.bg_card,
+                Some(palette.accent),
+            );
 
         unsafe {
             SetBkMode(hdc, TRANSPARENT);
@@ -152,26 +166,37 @@ pub(crate) fn paint_surface<M>(
                 }
             }
         }
+        }
     }
 }
 
-pub(crate) fn paint_node<M>(
+pub(crate) fn paint_node_layer<M>(
     hdc: isize,
     node: &LayoutNode<M>,
     scroll_y: i32,
     viewport_h: i32,
+    clip_rc: &RECT,
     hover_id: Option<usize>,
     open_select_key: Option<u32>,
     focused_node_id: Option<usize>,
     palette: &ThemePalette,
+    parent_z: i32,
+    target_z: i32,
 ) {
     let rc = offset_rect(&node.rect, -scroll_y);
     if rc.bottom < 0 || rc.top > viewport_h {
         return;
     }
 
-    let style = &node.element.style;
-    let is_hover = hover_id == Some(node.id);
+    let my_z = if node.element.style.z_index != 0 {
+        node.element.style.z_index
+    } else {
+        parent_z
+    };
+
+    if my_z == target_z && rect_intersects(&rc, clip_rc) {
+        let style = &node.element.style;
+        let is_hover = hover_id == Some(node.id);
 
     // 1. Paint Container Box Background & Borders
     let is_clickable_container = node.element.on_click.is_some();
@@ -895,6 +920,7 @@ pub(crate) fn paint_node<M>(
             }
         }
     }
+    }
 
     // 3. Paint Child Nodes
     if !matches!(
@@ -902,15 +928,18 @@ pub(crate) fn paint_node<M>(
         WidgetKind::TabGroup { .. } | WidgetKind::Input { .. }
     ) {
         for child in &node.children {
-            paint_node(
+            paint_node_layer(
                 hdc,
                 child,
                 scroll_y,
                 viewport_h,
+                clip_rc,
                 hover_id,
                 open_select_key,
                 focused_node_id,
                 palette,
+                my_z,
+                target_z,
             );
         }
     }

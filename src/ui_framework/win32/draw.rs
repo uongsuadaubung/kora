@@ -64,6 +64,39 @@ pub fn round_rect_outline(hdc: isize, rc: &RECT, radius: i32, border: u32) {
     }
 }
 
+#[inline]
+pub const fn rgb(r: u8, g: u8, b: u8) -> u32 {
+    (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
+}
+
+/// Draws a soft multi-ring elevation drop shadow around `rc`.
+/// `radius` is the corner radius of the inner box.
+/// `elevation` is the blur spread in pixels (typically 3 to 6).
+pub fn draw_elevation_shadow(hdc: isize, rc: &RECT, radius: i32, elevation: i32, is_dark: bool) {
+    if elevation <= 0 {
+        return;
+    }
+    for i in (1..=elevation).rev() {
+        let shadow_rc = RECT {
+            left: rc.left - i,
+            top: rc.top - (i / 2).max(1) + 1,
+            right: rc.right + i,
+            bottom: rc.bottom + i + 1,
+        };
+        let factor = 1.0 - (i as f32 / (elevation + 1) as f32);
+        let color = if is_dark {
+            let v = (18.0 * factor) as u8;
+            rgb(v, v, v)
+        } else {
+            let r = (248.0 - 45.0 * factor) as u8;
+            let g = (249.0 - 42.0 * factor) as u8;
+            let b = (250.0 - 38.0 * factor) as u8;
+            rgb(r, g, b)
+        };
+        round_rect_outline(hdc, &shadow_rc, radius + i, color);
+    }
+}
+
 /// Filled ellipse (outline in the same color).
 pub fn fill_ellipse(hdc: isize, rc: &RECT, color: u32) {
     unsafe {

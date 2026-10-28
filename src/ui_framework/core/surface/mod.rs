@@ -145,7 +145,7 @@ impl<M: Clone + Send + Sync + 'static> Surface<M> {
     /// Mounts and lays out a new [`Element<M>`] tree, clamping scroll bounds and scheduling a 120 FPS repaint.
     pub fn render(&self, root: impl IntoElement<M>) {
         let root = root.into_element();
-        let hwnd = {
+        let (hwnd, focus_target) = {
             let mut guard = match self.state.lock() {
                 Ok(g) => g,
                 Err(_) => return,
@@ -167,9 +167,14 @@ impl<M: Clone + Send + Sync + 'static> Surface<M> {
             guard.max_scroll = total_h.saturating_sub(guard.height);
             guard.scroll_y = guard.scroll_y.clamp(0, guard.max_scroll);
             guard.layout_root = Some(layout_tree);
-            guard.sync_inputs();
-            guard.hwnd
+            let focus_target = guard.sync_inputs();
+            (guard.hwnd, focus_target)
         };
+        if let Some(target) = focus_target {
+            unsafe {
+                SetFocus(target);
+            }
+        }
         if hwnd != 0 {
             unsafe {
                 InvalidateRect(hwnd, null_mut(), 0);

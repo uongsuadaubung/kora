@@ -10,6 +10,13 @@ pub const WM_APP_FOCUS_NEXT: u32 = 0x8001;
 pub const SUBCLASS_ID_INPUT: usize = 0x501;
 pub const SELECT_ITEM_H: i32 = 28;
 
+pub const Z_INDEX_BASE: i32 = 0;
+pub const Z_INDEX_STICKY: i32 = 10;
+pub const Z_INDEX_DROPDOWN: i32 = 100;
+pub const Z_INDEX_POPOVER: i32 = 200;
+pub const Z_INDEX_MODAL: i32 = 500;
+pub const Z_INDEX_TOOLTIP: i32 = 1000;
+
 pub struct OpenSelectOverlay<M> {
     pub key: u32,
     pub rect_doc: RECT,
@@ -33,6 +40,7 @@ pub struct ActiveInput<M> {
     pub node_id: usize,
     pub hwnd: isize,
     pub rect: RECT,
+    pub z_index: i32,
     pub last_val: String,
     pub last_placeholder: String,
     pub is_disabled: bool,
@@ -69,6 +77,11 @@ pub fn pt_in_rect(x: i32, y: i32, rc: &RECT) -> bool {
 }
 
 #[inline]
+pub fn rect_intersects(a: &RECT, b: &RECT) -> bool {
+    a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
+}
+
+#[inline]
 pub fn offset_rect(rc: &RECT, dy: i32) -> RECT {
     RECT {
         left: rc.left,
@@ -76,6 +89,44 @@ pub fn offset_rect(rc: &RECT, dy: i32) -> RECT {
         right: rc.right,
         bottom: rc.bottom + dy,
     }
+}
+
+#[inline]
+pub fn rect_union(a: &RECT, b: &RECT) -> RECT {
+    if a.left >= a.right || a.top >= a.bottom {
+        return *b;
+    }
+    if b.left >= b.right || b.top >= b.bottom {
+        return *a;
+    }
+    RECT {
+        left: a.left.min(b.left),
+        top: a.top.min(b.top),
+        right: a.right.max(b.right),
+        bottom: a.bottom.max(b.bottom),
+    }
+}
+
+#[inline]
+pub fn inflate_rect(rc: &RECT, dx: i32, dy: i32) -> RECT {
+    RECT {
+        left: rc.left - dx,
+        top: rc.top - dy,
+        right: rc.right + dx,
+        bottom: rc.bottom + dy,
+    }
+}
+
+pub fn find_node_rect<M>(node: &LayoutNode<M>, target_id: usize) -> Option<RECT> {
+    if node.id == target_id {
+        return Some(node.rect);
+    }
+    for child in &node.children {
+        if let Some(rc) = find_node_rect(child, target_id) {
+            return Some(rc);
+        }
+    }
+    None
 }
 
 pub fn compute_dropdown_menu_rect<M>(
@@ -105,4 +156,16 @@ pub fn slider_value_from_x(x: i32, rc: &RECT, min: i32, max: i32) -> i32 {
     let track_r = (rc.right - pad).max(track_l + 1);
     let ratio = ((x - track_l) as f32 / (track_r - track_l) as f32).clamp(0.0, 1.0);
     (min as f32 + ratio * (max - min) as f32).round() as i32
+}
+
+pub fn collect_z_levels<M>(node: &LayoutNode<M>, parent_z: i32, out: &mut Vec<i32>) {
+    let my_z = if node.element.style.z_index != 0 {
+        node.element.style.z_index
+    } else {
+        parent_z
+    };
+    out.push(my_z);
+    for child in &node.children {
+        collect_z_levels(child, my_z, out);
+    }
 }
