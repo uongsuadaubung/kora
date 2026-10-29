@@ -272,6 +272,16 @@ pub(crate) fn paint_node_layer<M>(
             palette.border_separator,
         );
     }
+    if style.border_right {
+        draw_line(
+            hdc,
+            rc.right - 1,
+            rc.top,
+            rc.right - 1,
+            rc.bottom,
+            palette.border_separator,
+        );
+    }
 
     // 2. Paint Atomic Widget Content
     unsafe {
@@ -309,6 +319,8 @@ pub(crate) fn paint_node_layer<M>(
                     DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS
                 };
                 let wide = to_wide(content);
+                let saved = SaveDC(hdc);
+                IntersectClipRect(hdc, text_rc.left, text_rc.top, text_rc.right, text_rc.bottom);
                 DrawTextW(
                     hdc,
                     wide.as_ptr(),
@@ -316,6 +328,7 @@ pub(crate) fn paint_node_layer<M>(
                     &mut text_rc,
                     align_flag | wrap_flag | DT_NOPREFIX,
                 );
+                RestoreDC(hdc, saved);
                 if old_f != 0 {
                     SelectObject(hdc, old_f);
                 }
@@ -344,6 +357,8 @@ pub(crate) fn paint_node_layer<M>(
                     TextAlign::Right => DT_RIGHT,
                 };
                 let wide = to_wide(content);
+                let saved = SaveDC(hdc);
+                IntersectClipRect(hdc, text_rc.left, text_rc.top, text_rc.right, text_rc.bottom);
                 DrawTextW(
                     hdc,
                     wide.as_ptr(),
@@ -351,6 +366,7 @@ pub(crate) fn paint_node_layer<M>(
                     &mut text_rc,
                     align_flag | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS,
                 );
+                RestoreDC(hdc, saved);
                 if old_f != 0 {
                     SelectObject(hdc, old_f);
                 }

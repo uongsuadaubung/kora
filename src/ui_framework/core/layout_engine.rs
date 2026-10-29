@@ -284,12 +284,12 @@ fn measure_col_children<M>(
             }
             Length::Fixed(h) => {
                 let (w, _) = intrinsic_size(hdc, c, inner_w);
-                sizes[i] = (w, h);
+                sizes[i] = (w.min(inner_w), h);
                 fixed_sum += h;
             }
             Length::Auto => {
                 let (w, h) = intrinsic_size(hdc, c, inner_w);
-                sizes[i] = (w, h);
+                sizes[i] = (w.min(inner_w), h);
                 fixed_sum += h;
             }
         }
@@ -323,7 +323,7 @@ fn measure_col_children<M>(
             rem_left = (rem_left - alloc_h).max(0);
             weight_left = weight_left.saturating_sub(h_val);
             let (w, _) = intrinsic_size(hdc, c, inner_w);
-            sizes[i] = (w, alloc_h.max(0));
+            sizes[i] = (w.min(inner_w), alloc_h.max(0));
         }
     }
 
@@ -422,6 +422,11 @@ fn layout_node<M>(
     *next_id += 1;
 
     let (w, h) = intrinsic_size(hdc, &el, avail_w);
+    let w = if avail_w > 0 && !matches!(el.style.width, Length::Fixed(_)) {
+        w.min(avail_w)
+    } else {
+        w
+    };
     let rect = RECT {
         left: x,
         top: y,
@@ -472,7 +477,7 @@ fn layout_node<M>(
                         if el.style.align == Align::Stretch {
                             inner_w
                         } else {
-                            cw
+                            cw.min(inner_w)
                         }
                     }
                 };

@@ -1,46 +1,23 @@
-//! Modal Dialog for Adding a New Application Profile
-//! Allows user to pick a running app or specify an executable name.
-//! Layout follows mockup_profiles.html: custom header, hint box, icon + name,
-//! .exe field with file browser, searchable running-app list and footer bar.
+//! Declarative Modal Dialog for Adding a New Application Profile
+//!
+//! Uses [`crate::ui_framework::core::modal::{open_modal_with_wndproc, modal_dialog, modal_footer}`]
+//! and declarative widgets [`input`, `select`, `button`, `text`] to render a clean, modern
+//! 3-section modal dialog without manual Win32 child HWND coordinates or GDI subclassing.
 
-use super::{
-    ModalSpec, attach_state, close_modal, detach_state, open_modal, reflect_dialog_messages, state,
-};
+use std::sync::{Arc, Mutex};
+
+use super::base::dialog_callout;
 use crate::engine::profile::AppProfile;
 use crate::platform::win32::app_detect::get_process_name_for_pid;
 use crate::platform::win32::types::GetWindowThreadProcessId;
-use crate::ui::colors::ThemePalette;
-use crate::ui::components::*;
-use crate::ui::theme::{get_app_font_bold, get_app_font_normal, is_current_dark};
-use crate::ui::win32::*;
-use std::sync::{Arc, Mutex, OnceLock};
+use crate::ui_framework::core::*;
+use crate::ui_framework::win32::*;
 
 /// Emoji per entry of `Strings::profile_icons()` (same order)
 const ICONS: [&str; 6] = ["🎮", "💻", "📝", "🎨", "🌐", "⚙️"];
 const DEFAULT_ICON: usize = 5;
 
-// Layout (client coordinates)
-const W: i32 = 520;
-const PAD: i32 = 16;
-const HEADER_H: i32 = 52;
-const HINT_Y: i32 = 68;
-const HINT_H: i32 = 58;
-const NAME_LBL_Y: i32 = 140;
-const NAME_Y: i32 = 162;
-const EXE_LBL_Y: i32 = 212;
-const EXE_Y: i32 = 240;
-const APPS_LBL_Y: i32 = 290;
-const SEARCH_Y: i32 = 314;
-const FIELD_H: i32 = 34;
-const LIST_Y: i32 = SEARCH_Y + FIELD_H - 1;
-const LIST_H: i32 = 5 * 32;
-const FOOTER_Y: i32 = LIST_Y + LIST_H + PAD;
-const FOOTER_H: i32 = 60;
-const H: i32 = FOOTER_Y + FOOTER_H;
-
-const DT_RIGHT: u32 = 0x0002;
-const DT_CALCRECT: u32 = 0x0400;
-const DT_END_ELLIPSIS: u32 = 0x4000;
+const WM_APP_ENUM_DONE: u32 = 0x8000 + 104;
 
 #[link(name = "user32")]
 unsafe extern "system" {
@@ -83,76 +60,433 @@ unsafe extern "system" {
     fn GetOpenFileNameW(ofn: *mut OPENFILENAMEW) -> i32;
 }
 
-#[derive(Clone)]
-struct AppWindowEntry {
-    title: String,
-    exe_name: String,
+#[derive(Clone, Debug)]
+pub struct AppWindowEntry {
+    pub title: String,
+    pub exe_name: String,
 }
 
-struct AddProfileState {
-    parent: isize,
-    selected_icon: usize,
-    running_apps: Arc<Mutex<Vec<AppWindowEntry>>>,
-    visible_apps: Vec<AppWindowEntry>,
-    btn_icon: Option<PushButton>,
-    txt_name: Option<TextBox>,
-    txt_exe: Option<TextBox>,
-    lnk_rescan: Option<Label<Link>>,
-    txt_search: Option<TextBox>,
-    table: Option<ActionTable>,
+#[derive(Clone, Debug)]
+pub struct AddProfileState {
+    pub selected_icon: usize,
+    pub name: String,
+    pub exe: String,
+    pub search_query: String,
+    pub running_apps: Arc<Mutex<Vec<AppWindowEntry>>>,
+    pub visible_apps: Vec<AppWindowEntry>,
+    pub is_scanning: bool,
+    pub scroll_offset: usize,
 }
 
-static REGISTERED: std::sync::Once = std::sync::Once::new();
-const CLASS_NAME: &str = "KoraAddProfileDialogClass";
-const WM_APP_ENUM_DONE: u32 = 0x8000 + 104;
+#[derive(Clone, Debug, PartialEq)]
+pub enum AddProfileMsg {
+    IconChanged(usize),
+    NameChanged(String),
+    ExeChanged(String),
+    BrowseExe,
+    SearchChanged(String),
+    Scroll(i32),
+    Rescan,
+    AppsScanned,
+    SelectApp(String, String),
+    Submit,
+    Cancel,
+}
 
-pub fn show_add_profile_dialog(parent: isize) {
-    register_class_once(
-        &REGISTERED,
-        CLASS_NAME,
-        add_profile_dialog_wnd_proc,
-        0x0002_0000,
-    );
+fn update_visible_apps(st: &mut AddProfileState) {
+    let q = st.search_query.trim().to_lowercase();
+    if let Ok(apps) = st.running_apps.lock() {
+        st.visible_apps = if q.is_empty() {
+            apps.clone()
+        } else {
+            apps.iter()
+                .filter(|a| {
+                    a.title.to_lowercase().contains(&q)
+                        || a.exe_name.to_lowercase().contains(&q)
+                })
+                .cloned()
+                .collect()
+        };
+    }
+    st.scroll_offset = 0;
+}
 
+pub fn render_add_profile_view(state: &AddProfileState) -> Element<AddProfileMsg> {
     let strings = crate::language::current();
-    let st = Box::new(AddProfileState {
-        parent,
+    let can_submit = !state.name.trim().is_empty();
+
+    // Strings in profile_icons() already start with the emoji icon (e.g. "🎮 Trò chơi")
+    let icon_options: Vec<String> = strings
+        .profile_icons()
+        .iter()
+        .map(|&s| s.to_string())
+        .collect();
+
+    let total_apps = state.visible_apps.len();
+
+    let mut app_tbl = table()
+        .columns([
+            col_def("Tiến trình").flex_1(),
+            col_def("Tên file").auto().min_w(110).max_w(150),
+        ])
+        .hide_header(true)
+        .scroll_offset(state.scroll_offset)
+        .on_scroll(AddProfileMsg::Scroll)
+        .bordered(true)
+        .column_dividers(true)
+        .empty_text(if state.is_scanning {
+            "⏳ Đang quét các ứng dụng đang chạy..."
+        } else {
+            "Không tìm thấy ứng dụng phù hợp"
+        });
+
+    for app in &state.visible_apps {
+        let is_selected = !state.exe.is_empty()
+            && app.exe_name.eq_ignore_ascii_case(&state.exe);
+        app_tbl = app_tbl.row(
+            table_row([
+                table_cell(
+                    text(&app.title)
+                        .small()
+                        .tone(if is_selected {
+                            TextTone::Accent
+                        } else {
+                            TextTone::Primary
+                        })
+                        .nowrap(),
+                ),
+                table_cell(
+                    text(&app.exe_name)
+                        .small()
+                        .secondary()
+                        .nowrap(),
+                ),
+            ])
+            .selected(is_selected)
+            .on_click(AddProfileMsg::SelectApp(
+                app.title.clone(),
+                app.exe_name.clone(),
+            )),
+        );
+    }
+
+    modal_dialog()
+        .header(dialog_callout(strings.dlg_add_prof_hint))
+        .body(
+            col(elements![
+                // Row 1: Icon & Name
+                row(elements![
+                    col(elements![
+                        text(strings.dlg_add_prof_icon).bold().secondary().small(),
+                        select(
+                            icon_options,
+                            state.selected_icon,
+                            AddProfileMsg::IconChanged,
+                        )
+                        .key(201)
+                        .h(32),
+                    ])
+                    .w(140)
+                    .gap(1),
+                    col(elements![
+                        text(strings.dlg_add_prof_name).bold().secondary().small(),
+                        input(
+                            &state.name,
+                            strings.dlg_add_prof_name_placeholder,
+                            AddProfileMsg::NameChanged,
+                        )
+                        .key(202)
+                        .auto_focus(true),
+                    ])
+                    .flex_1()
+                    .gap(1),
+                ])
+                .gap(2),
+
+                // Row 2: Exe & Browse button (dynamic intrinsic width prevents text clipping)
+                col(elements![
+                    text(strings.dlg_add_prof_exe).bold().secondary().small(),
+                    row(elements![
+                        input(
+                            &state.exe,
+                            strings.dlg_add_prof_exe_placeholder,
+                            AddProfileMsg::ExeChanged,
+                        )
+                        .key(203)
+                        .flex_1(),
+                        button(
+                            strings.dlg_add_prof_browse,
+                            Variant::Secondary,
+                            AddProfileMsg::BrowseExe,
+                        ),
+                    ])
+                    .gap(2),
+                ])
+                .gap(1),
+
+                // Row 3: Running apps header with search & rescan
+                col(elements![
+                    row(elements![
+                        text(if total_apps > 0 {
+                            format!("{} ({} tiến trình)", strings.dlg_add_prof_linked_app, total_apps)
+                        } else {
+                            strings.dlg_add_prof_linked_app.to_string()
+                        })
+                        .bold()
+                        .secondary()
+                        .small(),
+                        spacer(),
+                        if state.is_scanning {
+                            text("⏳ Đang quét...").secondary().small().into_element()
+                        } else {
+                            button(
+                                strings.dlg_add_prof_rescan,
+                                Variant::Ghost,
+                                AddProfileMsg::Rescan,
+                            )
+                            .sm()
+                            .into_element()
+                        },
+                    ])
+                    .items_center(),
+                    input(
+                        &state.search_query,
+                        strings.dlg_add_prof_search_placeholder,
+                        AddProfileMsg::SearchChanged,
+                    )
+                    .key(204),
+                    app_tbl,
+                ])
+                .gap(1),
+            ])
+            .gap(3)
+            .h_flex(1),
+        )
+        .footer(
+            row(elements![
+                text(strings.dlg_add_prof_footer).secondary().small().flex_1(),
+                button(strings.dlg_btn_cancel, Variant::Secondary, AddProfileMsg::Cancel).w(84),
+                button(
+                    strings.dlg_add_prof_btn_create,
+                    Variant::Primary,
+                    AddProfileMsg::Submit,
+                )
+                .disabled(!can_submit)
+                .w(110),
+            ])
+            .items_center()
+            .gap(2),
+        )
+        .build()
+}
+
+/// Displays the declarative modal dialog for adding a new application profile.
+pub fn show_add_profile_dialog(parent: isize) {
+    let strings = crate::language::current();
+    let title = strings.dlg_add_prof_title;
+
+    let state = Arc::new(Mutex::new(AddProfileState {
         selected_icon: DEFAULT_ICON,
+        name: String::new(),
+        exe: String::new(),
+        search_query: String::new(),
         running_apps: Arc::new(Mutex::new(Vec::new())),
         visible_apps: Vec::new(),
-        btn_icon: None,
-        txt_name: None,
-        txt_exe: None,
-        lnk_rescan: None,
-        txt_search: None,
-        table: None,
-    });
+        is_scanning: true,
+        scroll_offset: 0,
+    }));
 
-    // Borderless popup: header/close button are drawn by the dialog itself
-    let hwnd = open_modal(
+    let state_for_render = Arc::clone(&state);
+    let state_for_msg = Arc::clone(&state);
+
+    let initial_view = render_add_profile_view(&state_for_render.lock().unwrap());
+    let config = ModalConfig::new(title, 520, 560);
+
+    let handle = open_modal_with_wndproc(
         parent,
-        &ModalSpec {
-            class_name: CLASS_NAME,
-            title: strings.dlg_add_prof_title,
-            width: W,
-            height: H,
-            ex_style: WS_EX_CONTROLPARENT,
-            style: 0x8000_0000 /* WS_POPUP */ | WS_CLIPCHILDREN,
+        config,
+        initial_view,
+        move |handle, msg| {
+            let mut st = state_for_msg.lock().unwrap();
+            match msg {
+                AddProfileMsg::IconChanged(idx) => {
+                    st.selected_icon = idx;
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::NameChanged(name) => {
+                    st.name = name;
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::ExeChanged(exe) => {
+                    st.exe = exe;
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::BrowseExe => {
+                    let hwnd = handle.hwnd;
+                    drop(st);
+                    if let Some(exe) = browse_exe(hwnd) {
+                        let mut st = state_for_msg.lock().unwrap();
+                        st.exe = exe.clone();
+                        if st.name.trim().is_empty() {
+                            let stem = exe
+                                .strip_suffix(".exe")
+                                .or_else(|| exe.strip_suffix(".EXE"))
+                                .unwrap_or(&exe);
+                            st.name = stem.to_string();
+                        }
+                        let view = render_add_profile_view(&st);
+                        drop(st);
+                        handle.render(view);
+                    }
+                }
+                AddProfileMsg::SearchChanged(query) => {
+                    st.search_query = query;
+                    update_visible_apps(&mut st);
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::Scroll(delta) => {
+                    let page_size = 6;
+                    let max_offset = st.visible_apps.len().saturating_sub(page_size);
+                    if max_offset > 0 {
+                        let new_offset = if delta < 0 {
+                            st.scroll_offset.saturating_sub((-delta) as usize)
+                        } else {
+                            (st.scroll_offset + delta as usize).min(max_offset)
+                        };
+                        if new_offset != st.scroll_offset {
+                            st.scroll_offset = new_offset;
+                            let view = render_add_profile_view(&st);
+                            drop(st);
+                            handle.render(view);
+                        }
+                    }
+                }
+                AddProfileMsg::Rescan => {
+                    st.is_scanning = true;
+                    let running_apps = Arc::clone(&st.running_apps);
+                    let hwnd = handle.hwnd;
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                    scan_running_apps_async(hwnd, running_apps);
+                }
+                AddProfileMsg::AppsScanned => {
+                    st.is_scanning = false;
+                    update_visible_apps(&mut st);
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::SelectApp(title, exe_name) => {
+                    st.exe = exe_name;
+                    if st.name.trim().is_empty() {
+                        let clean_title = title
+                            .split(['-', '|', '—'])
+                            .next()
+                            .unwrap_or(&title)
+                            .trim();
+                        st.name = clean_title.to_string();
+                    }
+                    let view = render_add_profile_view(&st);
+                    drop(st);
+                    handle.render(view);
+                }
+                AddProfileMsg::Submit => {
+                    let name = st.name.trim().to_string();
+                    let exe = st.exe.trim().to_lowercase();
+                    let selected_icon = st.selected_icon;
+
+                    if !name.is_empty() {
+                        let icon = ICONS[selected_icon.min(ICONS.len() - 1)];
+
+                        let id = exe
+                            .trim_end_matches(".exe")
+                            .replace([' ', '-', '.'], "_")
+                            .to_lowercase();
+                        let id = if id.is_empty() {
+                            name.to_lowercase().replace(' ', "_")
+                        } else {
+                            id
+                        };
+
+                        let profile = AppProfile::new_child(id.clone(), name, exe, icon);
+
+                        if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
+                            && let Some(ref mut engine) = *guard
+                        {
+                            engine.profile_manager.add_profile(profile);
+                            engine.profile_manager.selected_id = id.clone();
+                            crate::engine::config_store::save_config_all_debounced(
+                                engine.config(),
+                                &engine.macro_table,
+                                &engine.profile_manager,
+                            );
+                        }
+
+                        if parent != 0
+                            && let Some(c) = crate::ui::controls().or_else(|| {
+                                let ptr = unsafe { GetWindowLongPtrW(parent, GWLP_USERDATA) }
+                                    as *const crate::ui::views::ControlPanelControls;
+                                if !ptr.is_null() {
+                                    unsafe { Some(&*ptr) }
+                                } else {
+                                    None
+                                }
+                            })
+                        {
+                            crate::ui::views::control_panel::SidebarControls::switch_to_profile(
+                                c, parent, &id,
+                            );
+                        }
+                        drop(st);
+                        handle.close();
+                    }
+                }
+                AddProfileMsg::Cancel => {
+                    drop(st);
+                    handle.close();
+                }
+            }
         },
-        st,
+        move |handle, msg, wparam, _lparam| match msg {
+            WM_KEYDOWN | WM_SYSKEYDOWN => {
+                if wparam == 0x0D
+                /* VK_RETURN */
+                {
+                    handle.dispatch(AddProfileMsg::Submit);
+                    Some(0)
+                } else {
+                    None
+                }
+            }
+            WM_MOUSEWHEEL => {
+                let delta = ((wparam >> 16) as i16) as i32;
+                if delta > 0 {
+                    handle.dispatch(AddProfileMsg::Scroll(-2));
+                } else if delta < 0 {
+                    handle.dispatch(AddProfileMsg::Scroll(2));
+                }
+                Some(0)
+            }
+            WM_APP_ENUM_DONE => {
+                handle.dispatch(AddProfileMsg::AppsScanned);
+                Some(0)
+            }
+            _ => None,
+        },
     );
 
-    if hwnd != 0 {
-        unsafe {
-            let disable: i32 = 1; // DWMWA_TRANSITIONS_FORCEDISABLED: no fade on show/hide
-            DwmSetWindowAttribute(hwnd, 3, &disable as *const i32 as *const _, 4);
-            let name_hwnd = state::<AddProfileState>(hwnd)
-                .and_then(|s| s.txt_name.as_ref().map(|t| t.hwnd()))
-                .unwrap_or(0);
-            if name_hwnd != 0 {
-                SetFocus(name_hwnd);
-            }
-        }
+    if let Some(h) = handle {
+        let running_apps = Arc::clone(&state.lock().unwrap().running_apps);
+        scan_running_apps_async(h.hwnd, running_apps);
     }
 }
 
@@ -173,7 +507,7 @@ fn scan_running_apps_async(hwnd: isize, running_apps: Arc<Mutex<Vec<AppWindowEnt
                 let exe = get_process_name_for_pid(pid);
                 if !exe.is_empty() {
                     let acc = &mut *(lparam as *mut Vec<AppWindowEntry>);
-                    if !acc.iter().any(|a| a.exe_name == exe) {
+                    if !acc.iter().any(|a| a.exe_name.eq_ignore_ascii_case(&exe)) {
                         acc.push(AppWindowEntry {
                             title,
                             exe_name: exe,
@@ -211,113 +545,6 @@ fn window_text(hwnd: isize) -> String {
     }
 }
 
-fn mono_font() -> isize {
-    static FONT: OnceLock<isize> = OnceLock::new();
-    *FONT.get_or_init(|| unsafe {
-        CreateFontW(
-            -12,
-            0,
-            0,
-            0,
-            FW_NORMAL,
-            0,
-            0,
-            0,
-            DEFAULT_CHARSET,
-            0,
-            0,
-            CLEARTYPE_QUALITY,
-            0,
-            to_wide("Consolas").as_ptr(),
-        )
-    })
-}
-
-/// One list row: window title on the left, monospace exe name right-aligned
-fn app_row(app: &AppWindowEntry) -> TableRow {
-    let title = to_wide(&app.title);
-    let exe = to_wide(&app.exe_name);
-    TableRow::new().cell(TableCell::Custom(Arc::new(
-        move |hdc: isize, rc: &RECT, palette: &ThemePalette| unsafe {
-            SetBkMode(hdc, TRANSPARENT);
-            let old = SelectObject(hdc, mono_font());
-            let mut calc = *rc;
-            DrawTextW(
-                hdc,
-                exe.as_ptr(),
-                -1,
-                &mut calc,
-                DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX,
-            );
-            let exe_w = (calc.right - calc.left).min((rc.right - rc.left) / 2);
-            let mut exe_rc = RECT {
-                left: rc.right - 14 - exe_w,
-                right: rc.right - 14,
-                ..*rc
-            };
-            SetTextColor(hdc, palette.text_secondary);
-            DrawTextW(
-                hdc,
-                exe.as_ptr(),
-                -1,
-                &mut exe_rc,
-                DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-            );
-
-            SelectObject(hdc, get_app_font_normal());
-            let mut title_rc = RECT {
-                left: rc.left + 14,
-                right: exe_rc.left - 12,
-                ..*rc
-            };
-            SetTextColor(hdc, palette.text_primary);
-            DrawTextW(
-                hdc,
-                title.as_ptr(),
-                -1,
-                &mut title_rc,
-                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS,
-            );
-            SelectObject(hdc, old);
-        },
-    )))
-}
-
-/// Re-enumerates windows (if `rescan`) and refills the list using the search box filter
-unsafe fn refresh_running_apps(hwnd: isize, rescan: bool) {
-    let Some(st) = (unsafe { state::<AddProfileState>(hwnd) }) else {
-        return;
-    };
-    if rescan {
-        scan_running_apps_async(hwnd, st.running_apps.clone());
-        return;
-    }
-    let query = st
-        .txt_search
-        .as_ref()
-        .map(|t| t.get_text().trim().to_lowercase())
-        .unwrap_or_default();
-    let visible: Vec<AppWindowEntry> = st
-        .running_apps
-        .lock()
-        .map(|list| {
-            list.iter()
-                .filter(|a| {
-                    a.title.to_lowercase().contains(&query)
-                        || a.exe_name.to_lowercase().contains(&query)
-                })
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default();
-
-    if let Some(ref tbl) = st.table {
-        tbl.clear();
-        tbl.set_rows(visible.iter().map(app_row));
-    }
-    st.visible_apps = visible;
-}
-
 /// Opens the native file picker and returns the chosen file name (e.g. "app.exe")
 fn browse_exe(owner: isize) -> Option<String> {
     let mut file = [0u16; 260];
@@ -339,600 +566,4 @@ fn browse_exe(owner: isize) -> Option<String> {
     std::path::Path::new(&path)
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
-}
-
-unsafe fn fill(hdc: isize, rc: &RECT, color: u32) {
-    unsafe {
-        let br = CreateSolidBrush(color);
-        FillRect(hdc, rc, br);
-        DeleteObject(br);
-    }
-}
-
-unsafe fn round_box(hdc: isize, rc: &RECT, bg: u32, border: u32, radius: i32) {
-    unsafe {
-        let br = CreateSolidBrush(bg);
-        let pen = CreatePen(PS_SOLID, 1, border);
-        let ob = SelectObject(hdc, br);
-        let op = SelectObject(hdc, pen);
-        RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, radius, radius);
-        SelectObject(hdc, ob);
-        SelectObject(hdc, op);
-        DeleteObject(br);
-        DeleteObject(pen);
-    }
-}
-
-unsafe fn draw_text(hdc: isize, text: &str, rc: &RECT, font: isize, color: u32, flags: u32) {
-    unsafe {
-        let old = SelectObject(hdc, font);
-        SetTextColor(hdc, color);
-        let mut r = *rc;
-        DrawTextW(hdc, to_wide(text).as_ptr(), -1, &mut r, flags | DT_NOPREFIX);
-        SelectObject(hdc, old);
-    }
-}
-
-unsafe fn paint(hwnd: isize) {
-    unsafe {
-        let mut ps: PAINTSTRUCT = std::mem::zeroed();
-        let hdc = BeginPaint(hwnd, &mut ps);
-        if hdc == 0 {
-            return;
-        }
-        let palette = ThemePalette::get(is_current_dark());
-        let strings = crate::language::current();
-        let mut rc = RECT::default();
-        GetClientRect(hwnd, &mut rc);
-        SetBkMode(hdc, TRANSPARENT);
-        fill(hdc, &rc, palette.bg_window);
-
-        // Header: accent "+" badge, title, bottom divider
-        fill(
-            hdc,
-            &RECT {
-                left: 0,
-                top: 0,
-                right: W,
-                bottom: HEADER_H,
-            },
-            palette.bg_sidebar,
-        );
-        fill(
-            hdc,
-            &RECT {
-                left: 0,
-                top: HEADER_H - 1,
-                right: W,
-                bottom: HEADER_H,
-            },
-            palette.border,
-        );
-        let badge = RECT {
-            left: PAD,
-            top: 15,
-            right: PAD + 22,
-            bottom: 37,
-        };
-        round_box(hdc, &badge, palette.accent, palette.accent, 6);
-        draw_text(
-            hdc,
-            "+",
-            &badge,
-            get_app_font_bold(),
-            palette.text_white,
-            DT_CENTER | DT_VCENTER | DT_SINGLELINE,
-        );
-        draw_text(
-            hdc,
-            strings.dlg_add_prof_title,
-            &RECT {
-                left: PAD + 34,
-                top: 0,
-                right: W - 60,
-                bottom: HEADER_H,
-            },
-            crate::ui::theme::cached_font(11, FW_BOLD),
-            palette.text_primary,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE,
-        );
-
-        // Hint box (text vertically centered)
-        let hint = RECT {
-            left: PAD,
-            top: HINT_Y,
-            right: W - PAD,
-            bottom: HINT_Y + HINT_H,
-        };
-        round_box(hdc, &hint, palette.bg_card_header, palette.border, 8);
-        let mut inner = RECT {
-            left: hint.left + 12,
-            top: hint.top + 6,
-            right: hint.right - 12,
-            bottom: hint.bottom - 6,
-        };
-        let hint_w = to_wide(strings.dlg_add_prof_hint);
-        let old = SelectObject(hdc, get_app_font_normal());
-        let mut calc = inner;
-        DrawTextW(
-            hdc,
-            hint_w.as_ptr(),
-            -1,
-            &mut calc,
-            DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX,
-        );
-        inner.top += ((inner.bottom - inner.top) - (calc.bottom - calc.top)).max(0) / 2;
-        SetTextColor(hdc, palette.text_secondary);
-        DrawTextW(
-            hdc,
-            hint_w.as_ptr(),
-            -1,
-            &mut inner,
-            DT_WORDBREAK | DT_NOPREFIX,
-        );
-        SelectObject(hdc, old);
-
-        // Footer bar
-        fill(
-            hdc,
-            &RECT {
-                left: 0,
-                top: FOOTER_Y,
-                right: W,
-                bottom: H,
-            },
-            palette.bg_sidebar,
-        );
-        fill(
-            hdc,
-            &RECT {
-                left: 0,
-                top: FOOTER_Y,
-                right: W,
-                bottom: FOOTER_Y + 1,
-            },
-            palette.border,
-        );
-        draw_text(
-            hdc,
-            strings.dlg_add_prof_footer,
-            &RECT {
-                left: PAD + 4,
-                top: FOOTER_Y,
-                right: W - PAD - 110 - 8 - 90 - 8,
-                bottom: H,
-            },
-            get_app_font_normal(),
-            palette.text_secondary,
-            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS,
-        );
-
-        // Window outline
-        let br = CreateSolidBrush(palette.border);
-        FrameRect(hdc, &rc, br);
-        DeleteObject(br);
-
-        EndPaint(hwnd, &ps);
-    }
-}
-
-unsafe fn create_controls(hwnd: isize) {
-    unsafe {
-        let palette = ThemePalette::get(is_current_dark());
-        let strings = crate::language::current();
-        let font_label = get_app_font_bold();
-        let font_normal = get_app_font_normal();
-        let cw = W - 2 * PAD;
-
-        // Header close button
-        if let Some(btn) = PushButton::create_with_variant(
-            hwnd,
-            0,
-            "✕",
-            W - PAD - 32,
-            10,
-            32,
-            32,
-            font_normal,
-            ButtonVariant::Ghost,
-            Some(palette.bg_sidebar),
-        ) {
-            btn.on_click(move || {
-                PostMessageW(hwnd, WM_CLOSE, 0, 0);
-            });
-        }
-
-        // Icon + display name
-        Label::create(
-            hwnd,
-            strings.dlg_add_prof_icon,
-            PAD,
-            NAME_LBL_Y,
-            56,
-            18,
-            font_label,
-        )
-        .map(|l| {
-            l.with_tone(LabelTone::Secondary)
-                .on_surface(SurfaceRole::Window)
-        });
-        Label::create(
-            hwnd,
-            strings.dlg_add_prof_name,
-            PAD + 68,
-            NAME_LBL_Y,
-            300,
-            18,
-            font_label,
-        )
-        .map(|l| {
-            l.with_tone(LabelTone::Secondary)
-                .on_surface(SurfaceRole::Window)
-        });
-        let btn_icon = PushButton::create_with_variant(
-            hwnd,
-            0,
-            ICONS[DEFAULT_ICON],
-            PAD,
-            NAME_Y,
-            56,
-            FIELD_H,
-            font_normal,
-            ButtonVariant::Secondary,
-            Some(palette.bg_window),
-        );
-        if let Some(ref btn) = btn_icon {
-            btn.set_on_click(move || pick_icon(hwnd));
-        }
-        let txt_name = TextBox::create_with_placeholder(
-            hwnd,
-            0,
-            strings.dlg_add_prof_name_placeholder,
-            PAD + 68,
-            NAME_Y,
-            cw - 68,
-            FIELD_H,
-            font_normal,
-        );
-
-        // Executable + file browser
-        Label::create(
-            hwnd,
-            strings.dlg_add_prof_exe,
-            PAD,
-            EXE_LBL_Y,
-            300,
-            18,
-            font_label,
-        )
-        .map(|l| {
-            l.with_tone(LabelTone::Secondary)
-                .on_surface(SurfaceRole::Window)
-        });
-        if let Some(btn) = PushButton::create_with_variant(
-            hwnd,
-            0,
-            strings.dlg_add_prof_browse,
-            W - PAD - 150,
-            EXE_LBL_Y - 6,
-            150,
-            28,
-            font_normal,
-            ButtonVariant::Secondary,
-            Some(palette.bg_window),
-        ) {
-            btn.on_click(move || {
-                if let Some(exe) = browse_exe(hwnd)
-                    && let Some(st) = state::<AddProfileState>(hwnd)
-                {
-                    if let Some(ref txt_exe) = st.txt_exe {
-                        txt_exe.set_text(&exe);
-                    }
-                    if let Some(ref txt_name) = st.txt_name
-                        && txt_name.get_text().is_empty()
-                    {
-                        let stem = exe
-                            .strip_suffix(".exe")
-                            .or_else(|| exe.strip_suffix(".EXE"))
-                            .unwrap_or(&exe);
-                        txt_name.set_text(stem);
-                    }
-                }
-            });
-        }
-        let txt_exe = TextBox::create_with_placeholder(
-            hwnd,
-            0,
-            strings.dlg_add_prof_exe_placeholder,
-            PAD,
-            EXE_Y,
-            cw,
-            FIELD_H,
-            font_normal,
-        );
-
-        // Running apps: label, rescan link, search box, list
-        Label::create(
-            hwnd,
-            strings.dlg_add_prof_linked_app,
-            PAD,
-            APPS_LBL_Y,
-            340,
-            18,
-            font_label,
-        )
-        .map(|l| {
-            l.with_tone(LabelTone::Secondary)
-                .on_surface(SurfaceRole::Window)
-        });
-        let lnk_rescan = Label::create_right(
-            hwnd,
-            strings.dlg_add_prof_rescan,
-            W - PAD - 120,
-            APPS_LBL_Y,
-            120,
-            18,
-            font_normal,
-        )
-        .map(|l| l.as_link().on_surface(SurfaceRole::Window));
-        let txt_search = TextBox::create_with_placeholder(
-            hwnd,
-            0,
-            strings.dlg_add_prof_search_placeholder,
-            PAD,
-            SEARCH_Y,
-            cw,
-            FIELD_H,
-            font_normal,
-        );
-
-        let table = ActionTable::create_with_defs(
-            hwnd,
-            0,
-            PAD,
-            LIST_Y,
-            cw,
-            LIST_H,
-            font_normal,
-            vec![ColumnDef::flex("", ColumnStyle::Default)],
-        );
-        if let Some(ref tbl) = table {
-            tbl.hide_header();
-            tbl.set_on_select(move |sel| {
-                let Some(st) = state::<AddProfileState>(hwnd) else {
-                    return;
-                };
-                if let Some(app) = st.visible_apps.get(sel as usize).cloned() {
-                    if let Some(ref txt_name) = st.txt_name
-                        && txt_name.get_text().is_empty()
-                    {
-                        let clean_title = app
-                            .title
-                            .split(['-', '|', '—'])
-                            .next()
-                            .unwrap_or(&app.title)
-                            .trim();
-                        txt_name.set_text(clean_title);
-                    }
-                    if let Some(ref txt_exe) = st.txt_exe {
-                        txt_exe.set_text(&app.exe_name);
-                    }
-                }
-            });
-        }
-
-        // Footer buttons
-        let btn_y = FOOTER_Y + (FOOTER_H - 32) / 2;
-        super::create_dialog_footer_layout(
-            hwnd,
-            strings.dlg_btn_cancel,
-            90,
-            strings.dlg_add_prof_btn_create,
-            110,
-            ButtonVariant::Primary,
-            btn_y,
-            32,
-            PAD,
-            Some(palette.bg_sidebar),
-            move || create_profile(hwnd),
-        );
-
-        if let Some(st) = state::<AddProfileState>(hwnd) {
-            st.btn_icon = btn_icon;
-            st.txt_name = txt_name;
-            st.txt_exe = txt_exe;
-            st.lnk_rescan = lnk_rescan;
-            st.txt_search = txt_search;
-            st.table = table;
-        }
-        refresh_running_apps(hwnd, true);
-    }
-}
-
-unsafe fn pick_icon(hwnd: isize) {
-    unsafe {
-        let (current, btn_hwnd) = state::<AddProfileState>(hwnd)
-            .map(|s| (s.selected_icon, s.btn_icon.as_ref().map_or(0, |b| b.hwnd())))
-            .unwrap_or((DEFAULT_ICON, 0));
-        if btn_hwnd == 0 {
-            return;
-        }
-        let Some(mut menu) = PopupMenu::new() else {
-            return;
-        };
-        for (i, label) in crate::language::current()
-            .profile_icons()
-            .iter()
-            .enumerate()
-        {
-            menu.add_checked_item(i as u32 + 1, label, i == current);
-        }
-        let mut rc = RECT::default();
-        GetWindowRect(btn_hwnd, &mut rc);
-        let cmd = menu.track(hwnd, rc.left, rc.bottom + 2) as usize;
-        if (1..=ICONS.len()).contains(&cmd)
-            && let Some(st) = state::<AddProfileState>(hwnd)
-        {
-            st.selected_icon = cmd - 1;
-            if let Some(ref btn) = st.btn_icon {
-                btn.set_text(ICONS[cmd - 1]);
-            }
-        }
-    }
-}
-
-unsafe fn create_profile(hwnd: isize) {
-    unsafe {
-        let Some(st) = state::<AddProfileState>(hwnd) else {
-            return;
-        };
-        let name = st
-            .txt_name
-            .as_ref()
-            .map(|t| t.get_text().trim().to_string())
-            .unwrap_or_default();
-        let exe = st
-            .txt_exe
-            .as_ref()
-            .map(|t| t.get_text().trim().to_lowercase())
-            .unwrap_or_default();
-        let selected_icon = st.selected_icon;
-        let parent = st.parent;
-        let name_hwnd = st.txt_name.as_ref().map_or(0, |t| t.hwnd());
-
-        if !name.is_empty() {
-            let icon = ICONS[selected_icon.min(ICONS.len() - 1)];
-
-            let id = exe
-                .trim_end_matches(".exe")
-                .replace([' ', '-', '.'], "_")
-                .to_lowercase();
-            let id = if id.is_empty() {
-                name.to_lowercase().replace(' ', "_")
-            } else {
-                id
-            };
-
-            let profile = AppProfile::new_child(id.clone(), name, exe, icon);
-
-            if let Ok(mut guard) = crate::platform::win32::ENGINE_INSTANCE.lock()
-                && let Some(ref mut engine) = *guard
-            {
-                engine.profile_manager.add_profile(profile);
-                engine.profile_manager.selected_id = id.clone();
-                crate::engine::config_store::save_config_all_debounced(
-                    engine.config(),
-                    &engine.macro_table,
-                    &engine.profile_manager,
-                );
-            }
-
-            // Hide first so the user sees the result immediately, then refresh the panel
-            EnableWindow(parent, 1);
-            ShowWindow(hwnd, SW_HIDE);
-            if parent != 0
-                && let Some(c) = crate::ui::controls().or_else(|| {
-                    let ptr = GetWindowLongPtrW(parent, GWLP_USERDATA)
-                        as *const crate::ui::views::ControlPanelControls;
-                    if !ptr.is_null() { Some(&*ptr) } else { None }
-                })
-            {
-                crate::ui::views::control_panel::SidebarControls::switch_to_profile(c, parent, &id);
-            }
-            PostMessageW(hwnd, WM_CLOSE, 0, 0);
-        } else if name_hwnd != 0 {
-            SetFocus(name_hwnd);
-        }
-    }
-}
-
-/// # Safety
-///
-/// Win32 window procedure callback called by Windows OS message dispatch.
-pub unsafe extern "system" fn add_profile_dialog_wnd_proc(
-    hwnd: isize,
-    msg: u32,
-    wparam: usize,
-    lparam: isize,
-) -> isize {
-    const HTCLIENT: isize = 1;
-    const HTCAPTION: isize = 2;
-    const WM_NCDESTROY: u32 = 0x0082;
-
-    unsafe {
-        if let Some(res) = reflect_dialog_messages(hwnd, msg, wparam, lparam) {
-            return res;
-        }
-        match msg {
-            WM_CREATE => {
-                attach_state::<AddProfileState>(hwnd, lparam);
-                create_controls(hwnd);
-                0
-            }
-            WM_APP_ENUM_DONE => {
-                refresh_running_apps(hwnd, false);
-                0
-            }
-            WM_KEYDOWN | WM_SYSKEYDOWN => {
-                let vk = wparam as u32;
-                if vk == 0x1B {
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                    return 0;
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            WM_NCHITTEST => {
-                // Header strip drags the borderless window
-                let mut pt = POINT {
-                    x: (lparam & 0xFFFF) as i16 as i32,
-                    y: ((lparam >> 16) & 0xFFFF) as i16 as i32,
-                };
-                ScreenToClient(hwnd, &mut pt);
-                if pt.y < HEADER_H { HTCAPTION } else { HTCLIENT }
-            }
-            WM_COMMAND => {
-                let ctl_id = (wparam & 0xFFFF) as u32;
-                let notify_code = ((wparam >> 16) & 0xFFFF) as u32;
-                let Some(st) = state::<AddProfileState>(hwnd) else {
-                    return 0;
-                };
-
-                if st
-                    .txt_search
-                    .as_ref()
-                    .is_some_and(|t| t.is_changed(ctl_id, notify_code))
-                {
-                    refresh_running_apps(hwnd, false);
-                } else if st
-                    .lnk_rescan
-                    .as_ref()
-                    .is_some_and(|l| l.is_clicked(ctl_id, notify_code))
-                {
-                    refresh_running_apps(hwnd, true);
-                } else if ctl_id == IDCANCEL {
-                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
-                } else if ctl_id == IDOK {
-                    create_profile(hwnd);
-                }
-                0
-            }
-            WM_ERASEBKGND => 1,
-            WM_PAINT => {
-                paint(hwnd);
-                0
-            }
-            WM_CLOSE => {
-                let parent = state::<AddProfileState>(hwnd).map_or(0, |s| s.parent);
-                close_modal(hwnd, parent);
-                0
-            }
-            WM_NCDESTROY => {
-                if let Some(st) = detach_state::<AddProfileState>(hwnd) {
-                    EnableWindow(st.parent, 1);
-                }
-                DefWindowProcW(hwnd, msg, wparam, lparam)
-            }
-            _ => DefWindowProcW(hwnd, msg, wparam, lparam),
-        }
-    }
 }

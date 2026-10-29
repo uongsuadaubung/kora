@@ -1190,3 +1190,362 @@ fn test_damage_tracking_and_rect_culling() {
         assert!(!rect_intersects(&root.children[1].rect, &clip_rc), "Node outside clip rect must be culled");
     }
 }
+
+#[test]
+fn test_modal_add_profile_declarative_layout() {
+    use kora::ui::views::dialogs::{
+        AddProfileState, AppWindowEntry, render_add_profile_view,
+    };
+    use kora::ui_framework::core::*;
+    use std::sync::{Arc, Mutex};
+
+    // 1. Initial state with sample apps
+    let sample_apps = vec![
+        AppWindowEntry {
+            title: "Visual Studio Code".to_string(),
+            exe_name: "code.exe".to_string(),
+        },
+        AppWindowEntry {
+            title: "Google Chrome".to_string(),
+            exe_name: "chrome.exe".to_string(),
+        },
+    ];
+
+    let state = AddProfileState {
+        selected_icon: 1, // Laptop / Dev icon
+        name: String::new(),
+        exe: String::new(),
+        search_query: String::new(),
+        running_apps: Arc::new(Mutex::new(sample_apps.clone())),
+        visible_apps: sample_apps,
+        is_scanning: false,
+        scroll_offset: 0,
+    };
+
+    let view = render_add_profile_view(&state);
+    let root = compute_layout(0, view, 0, 0, 520);
+
+    assert_eq!(root.rect.left, 0);
+    assert_eq!(root.rect.right, 520);
+    assert_eq!(root.children.len(), 3); // Header (callout), Body, Footer
+
+    // Header section: Callout alert
+    let header_section = &root.children[0];
+    assert!(header_section.rect.bottom > 0);
+
+    // Body section: Form fields and running app list
+    let body_section = &root.children[1];
+    assert!(body_section.rect.bottom > header_section.rect.bottom);
+    let body_col = &body_section.children[0];
+    assert_eq!(body_col.children.len(), 3); // Row 1 (icon + name), Row 2 (exe + browse), Row 3 (running apps)
+
+    // Row 1: Icon select & Name input
+    let row1 = &body_col.children[0];
+    assert_eq!(row1.children.len(), 2);
+    let icon_col = &row1.children[0];
+    let icon_select = &icon_col.children[1];
+    if let WidgetKind::Select { key, selected, .. } = &icon_select.element.kind {
+        assert_eq!(*key, 201);
+        assert_eq!(*selected, 1);
+    } else {
+        panic!("Expected WidgetKind::Select for profile icon");
+    }
+
+    let name_col = &row1.children[1];
+    let name_input = &name_col.children[1];
+    if let WidgetKind::Input { key, auto_focus, .. } = &name_input.element.kind {
+        assert_eq!(*key, 202);
+        assert_eq!(*auto_focus, true);
+    } else {
+        panic!("Expected WidgetKind::Input for profile name");
+    }
+
+    // Row 2: Exe input & Browse button
+    let row2_col = &body_col.children[1];
+    let row2 = &row2_col.children[1];
+    assert_eq!(row2.children.len(), 2);
+    let exe_input = &row2.children[0];
+    if let WidgetKind::Input { key, .. } = &exe_input.element.kind {
+        assert_eq!(*key, 203);
+    } else {
+        panic!("Expected WidgetKind::Input for executable name");
+    }
+
+    let browse_btn = &row2.children[1];
+    if let WidgetKind::Button { variant, .. } = &browse_btn.element.kind {
+        assert_eq!(*variant, Variant::Secondary);
+    } else {
+        panic!("Expected WidgetKind::Button for browse exe");
+    }
+
+    // Row 3: Running apps container
+    let row3_col = &body_col.children[2];
+    assert_eq!(row3_col.children.len(), 3); // Header row, search input, app list container
+    let search_input = &row3_col.children[1];
+    if let WidgetKind::Input { key, .. } = &search_input.element.kind {
+        assert_eq!(*key, 204);
+    } else {
+        panic!("Expected WidgetKind::Input for search running apps");
+    }
+
+    let app_list_container = &row3_col.children[2];
+    assert_eq!(app_list_container.children.len(), 2); // 2 sample apps rendered
+
+    // Footer section: Cancel and Submit button (disabled because name is empty)
+    let footer_section = &root.children[2];
+    let footer_row = &footer_section.children[0];
+    let submit_btn = &footer_row.children[footer_row.children.len() - 1];
+    if let WidgetKind::Button { disabled, variant, .. } = &submit_btn.element.kind {
+        assert_eq!(*disabled, true);
+        assert_eq!(*variant, Variant::Primary);
+    } else {
+        panic!("Expected WidgetKind::Button for submit");
+    }
+
+    // 2. Filled state: name provided -> submit button enabled
+    let mut filled_state = state.clone();
+    filled_state.name = "VS Code".to_string();
+    filled_state.exe = "code.exe".to_string();
+    let view2 = render_add_profile_view(&filled_state);
+    let root2 = compute_layout(0, view2, 0, 0, 520);
+    let footer_row2 = &root2.children[2].children[0];
+    let submit_btn2 = &footer_row2.children[footer_row2.children.len() - 1];
+    if let WidgetKind::Button { disabled, .. } = &submit_btn2.element.kind {
+        assert_eq!(*disabled, false);
+    }
+
+    // 3. Many apps: scroll controls and scrollbar appear
+    let mut many_apps = Vec::new();
+    for i in 0..15 {
+        many_apps.push(AppWindowEntry {
+            title: format!("Window {i}"),
+            exe_name: format!("app_{i}.exe"),
+        });
+    }
+    let mut scroll_state = state.clone();
+    scroll_state.visible_apps = many_apps;
+    scroll_state.scroll_offset = 2;
+    let view3 = render_add_profile_view(&scroll_state);
+    let root3 = compute_layout(0, view3, 0, 0, 520);
+    let body_col3 = &root3.children[1].children[0];
+    let row3_col3 = &body_col3.children[2];
+    let app_container3 = &row3_col3.children[2];
+    assert_eq!(app_container3.children.len(), 2); // Row containing: [App rows column, Scrollbar]
+    let apps_col = &app_container3.children[0];
+    assert_eq!(apps_col.children.len(), 6); // Exactly 6 visible rows per page
+}
+
+#[test]
+fn test_table_declarative_layout_basic() {
+    use kora::ui_framework::core::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum TableTestMsg {
+        RowClicked(usize),
+    }
+
+    let tbl: Element<TableTestMsg> = table()
+        .columns([
+            col_def("Tên tiến trình").flex(1),
+            col_def("Bộ nhớ").w(80).align_center(),
+            col_def("Trạng thái").w(100).align_right(),
+        ])
+        .row(table_row([
+            table_cell("Code.exe"),
+            table_cell("128 MB"),
+            table_cell("Running"),
+        ]).on_click(TableTestMsg::RowClicked(1)))
+        .row(table_row([
+            table_cell("Chrome.exe"),
+            table_cell("512 MB"),
+            table_cell("Active"),
+        ]).on_click(TableTestMsg::RowClicked(2)))
+        .into_element();
+
+    let root = compute_layout(0, tbl, 0, 0, 500);
+
+    assert_eq!(root.rect.left, 0);
+    assert_eq!(root.rect.right, 500);
+    assert_eq!(root.children.len(), 2); // Section 1: Sticky Header, Section 2: Body
+
+    // 1. Sticky Header
+    let header = &root.children[0];
+    assert_eq!(header.children.len(), 3); // 3 columns
+    assert_eq!(header.children[1].rect.right - header.children[1].rect.left, 80); // Fixed 80px
+    assert_eq!(header.children[2].rect.right - header.children[2].rect.left, 100); // Fixed 100px
+    // First col flex: 500 - 80 - 100 = 320px
+    assert_eq!(header.children[0].rect.right - header.children[0].rect.left, 320);
+
+    // 2. Body
+    let body = &root.children[1];
+    assert_eq!(body.children.len(), 2); // 2 rows rendered
+    let row1 = &body.children[0];
+    assert_eq!(row1.children.len(), 3);
+    assert_eq!(row1.children[1].rect.right - row1.children[1].rect.left, 80);
+    assert_eq!(row1.children[2].rect.right - row1.children[2].rect.left, 100);
+}
+
+#[test]
+fn test_table_overflow_scrolling_and_sticky_header() {
+    use kora::ui_framework::core::*;
+
+    #[derive(Clone, Debug, PartialEq)]
+    enum ScrollMsg {
+        Scrolled(i32),
+    }
+
+    let mut rows = Vec::new();
+    for i in 0..12 {
+        rows.push(table_row([
+            table_cell(format!("Item {i}")),
+            table_cell(format!("{i} KB")),
+        ]));
+    }
+
+    let tbl: Element<ScrollMsg> = table()
+        .columns([
+            col_def("Name").flex(1),
+            col_def("Size").w(90),
+        ])
+        .max_rows(4) // Only 4 rows visible at once
+        .scroll_offset(2)
+        .on_scroll(ScrollMsg::Scrolled)
+        .rows(rows)
+        .into_element();
+
+    let root = compute_layout(0, tbl, 0, 0, 400);
+
+    // Header has 2 column cells + 1 empty spacer (w=12) compensating for body scrollbar
+    let header = &root.children[0];
+    assert_eq!(header.children.len(), 3);
+    assert_eq!(header.children[2].rect.right - header.children[2].rect.left, 12); // Scrollbar spacer
+
+    // Body contains a side-by-side row: [col(4 rows), scrollbar(w=12)]
+    let body = &root.children[1];
+    assert_eq!(body.children.len(), 2);
+    let rows_col = &body.children[0];
+    assert_eq!(rows_col.children.len(), 4); // Exactly 4 rows in viewport!
+    let scrollbar = &body.children[1];
+    assert_eq!(scrollbar.rect.right - scrollbar.rect.left, 12);
+}
+
+#[test]
+fn test_table_bootstrap_modifiers_and_empty() {
+    use kora::ui_framework::core::*;
+
+    // 1. Test empty state
+    let empty_tbl: Element<()> = table()
+        .columns([col_def("Col1").flex(1)])
+        .empty_text("Dữ liệu rỗng")
+        .into_element();
+
+    let root_empty = compute_layout(0, empty_tbl, 0, 0, 300);
+    assert_eq!(root_empty.children.len(), 2); // Header + Empty body
+    let body_empty = &root_empty.children[1];
+    assert_eq!(body_empty.children.len(), 1); // Empty text element
+
+    // 2. Test compact / sm and striped
+    let sm_tbl: Element<()> = table()
+        .columns([col_def("Name").flex(1)])
+        .sm()
+        .striped()
+        .row(table_row([table_cell("Row 0")]))
+        .row(table_row([table_cell("Row 1")]))
+        .into_element();
+
+    let root_sm = compute_layout(0, sm_tbl, 0, 0, 300);
+    let header_sm = &root_sm.children[0];
+    assert_eq!(header_sm.element.style.min_h, 26); // Compact header min_h is 26px vs normal 30px
+}
+
+#[test]
+fn test_table_auto_column_width_and_dividers() {
+    use kora::ui_framework::core::*;
+
+    // A table with 2 columns: Column 0 flexes, Column 1 is auto-sized to longest content
+    let tbl: Element<()> = table()
+        .columns([
+            col_def("Application").flex_1(),
+            col_def("Process").auto().align_right(),
+        ])
+        .row(table_row([
+            table_cell("VS Code"),
+            table_cell("code.exe"), // 8 chars
+        ]))
+        .row(table_row([
+            table_cell("Windows Terminal"),
+            table_cell("WindowsTerminal.exe"), // 19 chars -> longest!
+        ]))
+        .row(table_row([
+            table_cell("Notepad"),
+            table_cell("notepad.exe"), // 11 chars
+        ]))
+        .column_dividers(true)
+        .into_element();
+
+    let root = compute_layout(0, tbl, 0, 0, 500);
+    assert_eq!(root.rect.right - root.rect.left, 500);
+
+    // Header has 2 columns
+    let header = &root.children[0];
+    assert_eq!(header.children.len(), 2);
+    // Column 0 has border_right divider, Column 1 does not (it's the last column)
+    assert!(header.children[0].element.style.border_right);
+    assert!(!header.children[1].element.style.border_right);
+
+    // Body rows
+    let body = &root.children[1];
+    assert_eq!(body.children.len(), 3); // 3 rows
+
+    let col1_w_row0 = body.children[0].children[1].rect.right - body.children[0].children[1].rect.left;
+    let col1_w_row1 = body.children[1].children[1].rect.right - body.children[1].children[1].rect.left;
+    let col1_w_row2 = body.children[2].children[1].rect.right - body.children[2].children[1].rect.left;
+
+    // All rows have exactly the same width for column 1!
+    assert_eq!(col1_w_row0, col1_w_row1);
+    assert_eq!(col1_w_row1, col1_w_row2);
+
+    // Column 1 width is auto-sized based on the longest ("WindowsTerminal.exe" 114px + 24px pad + 4px margin = 142px)
+    assert!(col1_w_row0 >= 135 && col1_w_row0 <= 150);
+
+    // Every row has border_right on column 0 to separate from column 1
+    for r in &body.children {
+        assert!(r.children[0].element.style.border_right);
+        assert!(!r.children[1].element.style.border_right);
+    }
+}
+
+#[test]
+fn test_table_text_does_not_overflow_column_boundary() {
+    use kora::ui_framework::core::*;
+
+    let long_title = "A very long application window title that has many characters and words which would easily exceed the column width if unconstrained";
+
+    let tbl: Element<()> = table()
+        .columns([
+            col_def("App").flex_1(),
+            col_def("Exe").w(100),
+        ])
+        .row(table_row([
+            table_cell(text(long_title).small().nowrap()),
+            table_cell("app.exe"),
+        ]))
+        .into_element();
+
+    let root = compute_layout(0, tbl, 0, 0, 400);
+
+    // Body row:
+    let body = &root.children[1];
+    let row0 = &body.children[0];
+
+    // Cell 0 is flex_1() (taking 400 - 100 = 300px)
+    let cell0 = &row0.children[0];
+    let cell0_w = cell0.rect.right - cell0.rect.left;
+    assert_eq!(cell0_w, 300);
+
+    // The text element inside cell 0 must be strictly within cell 0 (less than 300px)!
+    let text_node = &cell0.children[0];
+    let text_w = text_node.rect.right - text_node.rect.left;
+    assert!(text_w < cell0_w); // Stays within inner width (e.g. 300 - 24 = 276px)!
+    assert!(text_node.rect.right <= cell0.rect.right);
+}

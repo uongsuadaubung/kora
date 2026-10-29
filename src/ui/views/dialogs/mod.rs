@@ -9,7 +9,9 @@ pub mod key_macro;
 pub mod macro_editor;
 pub mod remap_key;
 
-pub use add_profile::show_add_profile_dialog;
+pub use add_profile::{
+    AddProfileMsg, AddProfileState, AppWindowEntry, render_add_profile_view, show_add_profile_dialog,
+};
 pub use base::*;
 pub use confirm::{
     ConfirmDialogOptions, show_confirm_dialog, show_danger_confirm, show_delete_confirm,

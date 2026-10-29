@@ -74,6 +74,12 @@ pub(crate) unsafe extern "system" fn input_subclass_proc(
                 return 0;
             }
         }
+        WM_MOUSEWHEEL => {
+            let parent = unsafe { GetParent(hwnd) };
+            if parent != 0 {
+                return unsafe { SendMessageW(parent, WM_MOUSEWHEEL, wparam, lparam) };
+            }
+        }
         WM_NCDESTROY => unsafe {
             RemoveWindowSubclass(hwnd, input_subclass_proc, uid_subclass);
         },

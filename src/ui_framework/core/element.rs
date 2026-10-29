@@ -491,6 +491,12 @@ impl<M> Element<M> {
     }
 
     #[inline]
+    pub fn border_right(mut self) -> Self {
+        self.style.border_right = true;
+        self
+    }
+
+    #[inline]
     pub fn border_left(mut self, width_px: i32, variant: Variant) -> Self {
         self.style.border_left_accent = Some((width_px, variant));
         self
@@ -781,6 +787,11 @@ pub trait Styleable: Sized {
     #[inline]
     fn border_top(mut self) -> Self {
         self.style_mut().border_top = true;
+        self
+    }
+    #[inline]
+    fn border_right(mut self) -> Self {
+        self.style_mut().border_right = true;
         self
     }
     #[inline]

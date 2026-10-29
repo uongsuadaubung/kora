@@ -204,6 +204,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             let delta = ((wparam >> 16) as i16) as i32;
             let mut should_repaint = false;
             let mut update_inputs = false;
+            let mut handled = false;
             if let Ok(mut guard) = state_arc.lock() {
                 if guard.open_select.is_some() {
                     guard.open_select = None;
@@ -211,6 +212,7 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
                     update_inputs = true;
                 }
                 if guard.max_scroll > 0 {
+                    handled = true;
                     let step = 48;
                     let target = (guard.scroll_y - (delta / 120) * step).clamp(0, guard.max_scroll);
                     if target != guard.scroll_y {
@@ -226,6 +228,14 @@ pub(crate) unsafe extern "system" fn surface_wndproc<M: Clone + Send + Sync + 's
             if should_repaint {
                 unsafe {
                     InvalidateRect(hwnd, null_mut(), 0);
+                }
+            }
+            if !handled {
+                let parent = unsafe { GetParent(hwnd) };
+                if parent != 0 {
+                    unsafe {
+                        SendMessageW(parent, WM_MOUSEWHEEL, wparam, lparam);
+                    }
                 }
             }
             0

@@ -220,4 +220,7 @@ unsafe extern "system" {
     pub fn GetStockObject(i: i32) -> isize;
     pub fn SetDCBrushColor(hdc: isize, color: u32) -> u32;
     pub fn SetDCPenColor(hdc: isize, color: u32) -> u32;
+    pub fn SaveDC(hdc: isize) -> i32;
+    pub fn RestoreDC(hdc: isize, saved_dc: i32) -> i32;
+    pub fn IntersectClipRect(hdc: isize, left: i32, top: i32, right: i32, bottom: i32) -> i32;
 }
