@@ -2,9 +2,8 @@
 
 use super::icon::TrayIcon;
 use super::loader::{get_small_icon_size, load_icon_from_memory, safe_destroy_icon};
+use super::menu::PopupMenu;
 use crate::engine::config::InputMethod;
-use crate::ui::components::PopupMenu;
-use crate::ui::tokens::spacing;
 
 pub const WM_TRAY_MESSAGE: u32 = 0x8001; // WM_USER + 1
 pub const TRAY_ICON_ID: u32 = 1001;
@@ -75,7 +74,7 @@ impl TrayHandler {
 /// Builds and tracks the tray context menu. Takes plain values so callers don't hold any
 /// lock while TrackPopupMenu runs its modal loop (the keyboard hook fires inside it).
 pub fn show_context_menu(hwnd: isize, x: i32, y: i32, method: InputMethod) -> u32 {
-    let mut menu = match PopupMenu::new() {
+    let menu = match PopupMenu::new() {
         Some(m) => m,
         None => return 0,
     };
@@ -83,15 +82,15 @@ pub fn show_context_menu(hwnd: isize, x: i32, y: i32, method: InputMethod) -> u3
     let strings = crate::language::current();
 
     // 1. Input Method Submenu ("Kiểu gõ: Telex ▸")
-    if let Some(mut method_menu) = PopupMenu::new() {
+    if let Some(method_menu) = PopupMenu::new() {
         method_menu.add_checked_item(
-            IDM_TELEX,
+            IDM_TELEX as usize,
             strings.method_telex,
             method == InputMethod::Telex,
         );
-        method_menu.add_checked_item(IDM_VNI, strings.method_vni, method == InputMethod::Vni);
+        method_menu.add_checked_item(IDM_VNI as usize, strings.method_vni, method == InputMethod::Vni);
         method_menu.add_checked_item(
-            IDM_SIMPLE_TELEX,
+            IDM_SIMPLE_TELEX as usize,
             strings.method_simple_telex,
             matches!(
                 method,
@@ -109,11 +108,12 @@ pub fn show_context_menu(hwnd: isize, x: i32, y: i32, method: InputMethod) -> u3
     menu.add_separator();
 
     // 2. Control Panel & Exit
-    menu.add_item(IDM_CONTROL_PANEL, strings.tray_control_panel);
+    menu.add_item(IDM_CONTROL_PANEL as usize, strings.tray_control_panel);
     menu.add_separator();
-    menu.add_item(IDM_EXIT, strings.tray_exit);
+    menu.add_item(IDM_EXIT as usize, strings.tray_exit);
 
-    menu.track(hwnd, x, y - spacing::SPACE_16)
+    menu.track(hwnd, x, y - 16);
+    0
 }
 
 impl Drop for TrayHandler {

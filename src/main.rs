@@ -6,6 +6,11 @@ use kora::{EngineAction, VietnameseEngine};
 use std::io::{self, BufRead};
 
 fn main() {
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("PANIC: {}\n", info);
+        let _ = std::fs::write("C:\\Users\\uongsuadaubung\\Desktop\\mkey\\panic.log", &msg);
+        eprintln!("{}", msg);
+    }));
     let args: Vec<String> = std::env::args().collect();
     let is_cli = args.iter().any(|a| a == "--cli");
     let is_autostart = args.iter().any(|a| a == "--autostart" || a == "--silent");
@@ -144,9 +149,6 @@ fn main() {
 
             let show_dialog_on_startup = !is_autostart && engine.config().show_dialog_on_startup;
             kora::platform::win32::set_mode_change_callback(kora::ui::post_mode_change);
-            kora::platform::win32::set_message_filter(
-                kora::ui::views::dialogs::pre_translate_message,
-            );
             kora::platform::win32::run_hook_loop(engine, move || {
                 kora::ui::init_ui();
                 if show_dialog_on_startup {

@@ -24,57 +24,6 @@ fn test_default_config_has_macro_disabled() {
     );
 }
 
-#[test]
-fn test_textbox_composite() {
-    use kora::ui::components::textbox::TextBox;
-    use kora::ui::win32::*;
-    use std::ptr::null_mut;
-
-    unsafe {
-        let parent = CreateWindowExW(
-            0,
-            to_wide("STATIC").as_ptr(),
-            null_mut(),
-            0x80000000,
-            0,
-            0,
-            300,
-            300,
-            0,
-            0,
-            0,
-            null_mut(),
-        );
-        assert!(parent != 0);
-
-        let tb = TextBox::create(parent, 101, "initial", "placeholder", 10, 10, 120, 28, 0)
-            .expect("TextBox should create successfully");
-
-        assert_eq!(tb.id(), 101);
-        assert_eq!(tb.get_text(), "initial");
-
-        // Test SetText / GetText via method
-        tb.set_text("updated text");
-        assert_eq!(tb.get_text(), "updated text");
-        assert!(!tb.is_empty());
-
-        // Test Win32 standard API forwarding via container HWND
-        let mut buf = [0u16; 64];
-        let copied = GetWindowTextW(tb.hwnd(), buf.as_mut_ptr(), 64);
-        assert!(copied > 0);
-        let win_text = String::from_utf16_lossy(&buf[..copied as usize]);
-        assert_eq!(win_text, "updated text");
-
-        SetWindowTextW(tb.hwnd(), to_wide("via win32 set").as_ptr());
-        assert_eq!(tb.get_text(), "via win32 set");
-
-        tb.clear();
-        assert!(tb.is_empty());
-
-        DestroyWindow(tb.hwnd());
-        DestroyWindow(parent);
-    }
-}
 
 #[test]
 fn test_parse_config_and_macros() {

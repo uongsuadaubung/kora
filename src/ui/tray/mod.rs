@@ -3,9 +3,11 @@
 pub mod handler;
 pub mod icon;
 pub mod loader;
+pub mod menu;
 
 pub use handler::*;
 pub use icon::TrayIcon;
 pub use loader::{
     get_small_icon_size, is_windows_dark_apps, load_icon_from_memory, safe_destroy_icon,
 };
+pub use menu::PopupMenu;

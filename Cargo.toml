@@ -22,7 +22,8 @@ path = "examples/benchmark.rs"
 
 
 [dependencies]
-
+eframe = { version = "0.37.0", default-features = false, features = ["glow"] }
+winit = { version = "0.30", default-features = false }
 [build-dependencies]
 winres = "0.1.12"
 

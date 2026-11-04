@@ -10,13 +10,10 @@ pub mod logger;
 pub mod platform;
 #[cfg(windows)]
 pub mod ui;
-#[cfg(windows)]
-pub mod ui_framework;
 pub mod updater;
 pub mod vietnamese;
 
 pub use engine::{
-    VietnameseEngine,
     action::{CompactString, EngineAction},
     config::{EngineConfig, Hotkey, InputMethod, UiTheme},
     config_store::{
@@ -29,8 +26,9 @@ pub use engine::{
     profile::{
         AppProfile, CharsetMode, KeyRemapRule, LanguageMode, MethodMode, ProfileManager, RuleOrigin,
     },
+    VietnameseEngine,
 };
-pub use language::{Language, LanguageStrings, current as current_strings, get_strings};
+pub use language::{current as current_strings, get_strings, Language, LanguageStrings};
 pub use vietnamese::{
     BaseVowel, Charset, CharsetStrategy, Diacritic, Tcvn3Charset, Tone, UnicodeCharset,
 };
