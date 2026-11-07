@@ -138,13 +138,13 @@ fn intrinsic_size<M>(hdc: isize, el: &Element<M>, avail_w: i32) -> (i32, i32) {
         WidgetKind::Switch { label, note, .. } => {
             let (lw, _) = measure_text_rect(hdc, label, FontScale::Bold, 2000, false);
             let (nw, _) = measure_text_rect(hdc, note, FontScale::Small, 2000, false);
-            let w = 36 + if lw > 0 { 8 + lw } else { 0 } + if nw > 0 { 6 + nw } else { 0 };
-            (w, 22)
+            let w = 40 + if lw > 0 { 10 + lw } else { 0 } + if nw > 0 { 6 + nw } else { 0 };
+            (w, 24)
         }
         WidgetKind::Checkbox { label, note, .. } => {
             let (lw, _) = measure_text_rect(hdc, label, FontScale::Normal, 2000, false);
             let (nw, _) = measure_text_rect(hdc, note, FontScale::Small, 2000, false);
-            let w = 16 + if lw > 0 { 8 + lw } else { 0 } + if nw > 0 { 6 + nw } else { 0 };
+            let w = 16 + if lw > 0 { 9 + lw } else { 0 } + if nw > 0 { 6 + nw } else { 0 };
             (w, 22)
         }
         WidgetKind::Select { options, .. } => {

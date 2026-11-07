@@ -171,6 +171,8 @@ unsafe extern "system" {
     pub fn GetParent(h_wnd: isize) -> isize;
     pub fn SetThreadDpiAwarenessContext(dpi_context: isize) -> isize;
     pub fn GetWindowDpiAwarenessContext(h_wnd: isize) -> isize;
+    pub fn MonitorFromPoint(pt: POINT, dw_flags: u32) -> isize;
+    pub fn GetMonitorInfoW(h_monitor: isize, lpmi: *mut MONITORINFO) -> i32;
 }
 
 #[link(name = "comctl32")]

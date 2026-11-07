@@ -107,6 +107,30 @@ pub fn register_class_once(
 
 pub fn center_window(hwnd: isize, width: i32, height: i32) {
     unsafe {
+        let mut pt = POINT::default();
+        if GetCursorPos(&mut pt) != 0 {
+            let hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            if hmon != 0 {
+                let mut mi = MONITORINFO::default();
+                mi.cb_size = std::mem::size_of::<MONITORINFO>() as u32;
+                if GetMonitorInfoW(hmon, &mut mi) != 0 {
+                    let work_w = mi.rc_work.right - mi.rc_work.left;
+                    let work_h = mi.rc_work.bottom - mi.rc_work.top;
+                    let x = mi.rc_work.left + (work_w - width).max(0) / 2;
+                    let y = mi.rc_work.top + (work_h - height).max(0) / 2;
+                    SetWindowPos(
+                        hwnd,
+                        0,
+                        x,
+                        y,
+                        width,
+                        height,
+                        0x0004 /* SWP_NOZORDER */ | 0x0010, /* SWP_NOACTIVATE */
+                    );
+                    return;
+                }
+            }
+        }
         let screen_w = GetSystemMetrics(SM_CXSCREEN);
         let screen_h = GetSystemMetrics(SM_CYSCREEN);
         let x = (screen_w - width) / 2;

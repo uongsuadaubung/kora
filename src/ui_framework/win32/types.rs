@@ -46,6 +46,17 @@ pub struct POINT {
     pub y: i32,
 }
 
+pub const MONITOR_DEFAULTTONEAREST: u32 = 2;
+
+#[repr(C)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct MONITORINFO {
+    pub cb_size: u32,
+    pub rc_monitor: RECT,
+    pub rc_work: RECT,
+    pub dw_flags: u32,
+}
+
 #[repr(C)]
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct MINMAXINFO {

@@ -462,8 +462,8 @@ pub(crate) fn paint_node_layer<M>(
                 disabled,
                 ..
             } => {
-                let sw_w = 34;
-                let sw_h = 18;
+                let sw_w = 40;
+                let sw_h = 22;
                 let sw_top = rc.top + ((rc.bottom - rc.top) - sw_h) / 2;
                 let sw_rc = RECT {
                     left: rc.left,
@@ -471,11 +471,10 @@ pub(crate) fn paint_node_layer<M>(
                     right: rc.left + sw_w,
                     bottom: sw_top + sw_h,
                 };
-                let (track_bg, track_border, thumb_col) = if *disabled {
+                let (track_bg, track_border) = if *disabled {
                     (
                         palette.bg_input,
                         palette.border_separator,
-                        palette.text_secondary,
                     )
                 } else if *checked {
                     let c = if is_hover {
@@ -483,7 +482,7 @@ pub(crate) fn paint_node_layer<M>(
                     } else {
                         palette.accent
                     };
-                    (c, c, palette.text_white)
+                    (c, c)
                 } else {
                     (
                         palette.bg_input,
@@ -492,26 +491,45 @@ pub(crate) fn paint_node_layer<M>(
                         } else {
                             palette.border_hover
                         },
-                        palette.text_secondary,
                     )
                 };
                 round_rect(hdc, &sw_rc, sw_h, track_bg, Some(track_border));
 
-                let thumb_d = 12;
+                let thumb_d = 16;
                 let thumb_left = if *checked {
                     sw_rc.right - thumb_d - 3
                 } else {
                     sw_rc.left + 3
                 };
+                let thumb_top = sw_rc.top + 3;
+
+                // 2-Layer Drop Shadow for Fluent Knob:
+                // Layer 1: subtle shadow shifted 1px down
+                if !*disabled {
+                    let shadow_rc = RECT {
+                        left: thumb_left,
+                        top: thumb_top + 1,
+                        right: thumb_left + thumb_d,
+                        bottom: thumb_top + 1 + thumb_d,
+                    };
+                    fill_ellipse(hdc, &shadow_rc, palette.thumb_shadow);
+                }
+
+                // Layer 2: crisp white / light thumb
+                let thumb_col = if *disabled {
+                    palette.text_secondary
+                } else {
+                    palette.text_white
+                };
                 let thumb_rc = RECT {
                     left: thumb_left,
-                    top: sw_rc.top + 3,
+                    top: thumb_top,
                     right: thumb_left + thumb_d,
-                    bottom: sw_rc.top + 3 + thumb_d,
+                    bottom: thumb_top + thumb_d,
                 };
                 fill_ellipse(hdc, &thumb_rc, thumb_col);
 
-                let mut cur_x = sw_rc.right + 8;
+                let mut cur_x = sw_rc.right + 10;
                 if !label.is_empty() {
                     let hf = resolve_font_handle(FontScale::Bold);
                     let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
@@ -574,7 +592,7 @@ pub(crate) fn paint_node_layer<M>(
                 disabled,
                 ..
             } => {
-                let box_sz = 15;
+                let box_sz = 16;
                 let box_top = rc.top + ((rc.bottom - rc.top) - box_sz) / 2;
                 let box_rc = RECT {
                     left: rc.left,
@@ -602,27 +620,27 @@ pub(crate) fn paint_node_layer<M>(
                         },
                     )
                 };
-                round_rect(hdc, &box_rc, 3, bg, Some(border));
+                round_rect(hdc, &box_rc, 4, bg, Some(border));
 
                 if *indeterminate {
                     let dash_rc = RECT {
-                        left: box_rc.left + 3,
-                        top: box_rc.top + 6,
-                        right: box_rc.right - 3,
+                        left: box_rc.left + 4,
+                        top: box_rc.top + 7,
+                        right: box_rc.right - 4,
                         bottom: box_rc.top + 9,
                     };
                     fill_rect_color(hdc, &dash_rc, palette.text_white);
                 } else if *checked {
                     let pen = CreatePen(PS_SOLID, 2, palette.text_white);
                     let op = SelectObject(hdc, pen);
-                    MoveToEx(hdc, box_rc.left + 3, box_rc.top + 7, null_mut());
-                    LineTo(hdc, box_rc.left + 6, box_rc.top + 10);
-                    LineTo(hdc, box_rc.left + 12, box_rc.top + 4);
+                    MoveToEx(hdc, box_rc.left + 3, box_rc.top + 8, null_mut());
+                    LineTo(hdc, box_rc.left + 6, box_rc.top + 11);
+                    LineTo(hdc, box_rc.left + 12, box_rc.top + 5);
                     SelectObject(hdc, op);
                     DeleteObject(pen);
                 }
 
-                let mut cur_x = box_rc.right + 8;
+                let mut cur_x = box_rc.right + 9;
                 if !label.is_empty() {
                     let hf = resolve_font_handle(FontScale::Normal);
                     let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };

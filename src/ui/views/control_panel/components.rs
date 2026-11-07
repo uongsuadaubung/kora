@@ -9,7 +9,7 @@ use crate::ui_framework::core::*;
 
 /// Renders a bold accent section header title inside a card.
 pub fn section_header<M: Clone + 'static>(title: impl Into<String>) -> Element<M> {
-    text(title).bold().accent().into()
+    text(title).bold().accent().pb(1).into()
 }
 
 /// Renders a top-of-page header block (Title + Subtitle) for global views (`System`, `About`).
@@ -105,7 +105,7 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
         && !d.is_empty()
     {
         left_col
-            .push(row(elements![spacer().w(23), text(d).muted().size(Size::Sm),]).items_center());
+            .push(row(elements![spacer().w(24), text(d).muted().size(Size::Sm),]).items_center());
     }
 
     col(left_col).gap(1)
@@ -130,6 +130,30 @@ pub fn inheritable_switch_row<M: Clone + Send + Sync + 'static>(
         strings,
         on_toggle,
     )
+}
+
+/// Renders a modern Windows 11 Fluent setting switch row:
+/// [ Title + Optional Subtitle (left) ]  <--->  [ Toggle Switch (right) ]
+pub fn setting_switch_row<M: Clone + Send + Sync + 'static>(
+    title: impl Into<String>,
+    desc: Option<String>,
+    checked: bool,
+    on_toggle: impl Fn(bool) -> M + Send + Sync + 'static,
+) -> Element<M> {
+    let mut left_items = vec![text(title).bold().into_element()];
+    if let Some(d) = desc
+        && !d.is_empty()
+    {
+        left_items.push(text(d).muted().size(Size::Sm).into_element());
+    }
+
+    row(elements![
+        col(left_items).gap(1).flex_1(),
+        switch("", checked, on_toggle).into_element(),
+    ])
+    .items_center()
+    .justify_between()
+    .py(1)
 }
 
 /// Properties for a reusable shortcut / key-rule row inside `OverviewPanel` or `TabTyping`.

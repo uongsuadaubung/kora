@@ -89,6 +89,8 @@ pub struct ThemePalette {
     pub purple_border: u32,
     /// Purple badge text
     pub purple_text: u32,
+    /// Subtle drop shadow under switch thumb / floating knobs
+    pub thumb_shadow: u32,
 }
 
 /// Private helper to pack RGB bytes into a Win32 COLORREF (0x00BBGGRR).
@@ -143,6 +145,7 @@ pub const DARK_PALETTE: ThemePalette = ThemePalette {
     purple_bg: rgb(56, 35, 84), // Royal violet
     purple_border: rgb(163, 113, 247),
     purple_text: rgb(210, 168, 255),
+    thumb_shadow: rgb(15, 18, 22),
 };
 
 /// Light Theme Palette (Modern Clean Slate & GitHub Light inspired)
@@ -191,6 +194,7 @@ pub const LIGHT_PALETTE: ThemePalette = ThemePalette {
     purple_bg: rgb(251, 239, 255),
     purple_border: rgb(209, 168, 255),
     purple_text: rgb(130, 80, 223),
+    thumb_shadow: rgb(190, 195, 202),
 };
 
 impl ThemePalette {

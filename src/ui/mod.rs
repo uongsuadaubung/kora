@@ -165,6 +165,19 @@ pub fn show_control_panel() {
         ui.tray.borrow_mut().set_vietnamese_mode(is_viet);
     }
 
+    let is_visible = unsafe { IsWindowVisible(ui.h_panel) != 0 };
+    if !is_visible {
+        let mut wr = RECT::default();
+        unsafe {
+            GetWindowRect(ui.h_panel, &mut wr);
+        }
+        let w = wr.right - wr.left;
+        let h = wr.bottom - wr.top;
+        if w > 0 && h > 0 {
+            center_window(ui.h_panel, w, h);
+        }
+    }
+
     unsafe {
         InvalidateRect(ui.h_panel, null_mut(), 0);
         ShowWindow(ui.h_panel, SW_SHOW);

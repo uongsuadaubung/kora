@@ -5,7 +5,9 @@
 use crate::engine::EngineConfig;
 use crate::engine::config::UiTheme;
 use crate::language::{Language, LanguageStrings};
-use crate::ui::views::control_panel::components::{form_group, page_header, section_header};
+use crate::ui::views::control_panel::components::{
+    form_group, page_header, section_header, setting_switch_row,
+};
 use crate::ui::views::dialogs::show_danger_confirm;
 use crate::ui_framework::core::*;
 use crate::ui_framework::tokens::layout;
@@ -95,35 +97,37 @@ impl TabSystem {
 
         let card1 = card(elements![
             section_header(strings.sys_title),
-            switch(
+            setting_switch_row(
                 strings.check_autostart,
+                None,
                 autostart,
-                SystemMsg::ToggleAutostart
+                SystemMsg::ToggleAutostart,
             ),
             divider(),
-            switch(
+            setting_switch_row(
                 strings.check_show_dialog,
+                None,
                 config.show_dialog_on_startup,
                 SystemMsg::ToggleShowDialog,
             ),
             divider(),
             row(elements![
-                switch(
-                    strings.check_debug_log,
-                    config.debug,
-                    SystemMsg::ToggleDebugLog,
-                )
-                .flex_1(),
-                button(
-                    strings.btn_open_log,
-                    Variant::Secondary,
-                    SystemMsg::OpenDebugLog,
-                )
-                .size(Size::Sm),
+                text(strings.check_debug_log).bold().flex_1(),
+                row(elements![
+                    button(
+                        strings.btn_open_log,
+                        Variant::Secondary,
+                        SystemMsg::OpenDebugLog,
+                    )
+                    .size(Size::Sm),
+                    switch("", config.debug, SystemMsg::ToggleDebugLog),
+                ])
+                .items_center()
+                .gap(2),
             ])
             .items_center()
             .justify_between()
-            .gap(3),
+            .py(1),
         ]);
 
         let theme_idx: usize = config.theme.into();
