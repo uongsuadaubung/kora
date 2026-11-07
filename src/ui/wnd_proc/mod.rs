@@ -167,15 +167,32 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
             0
         }
         WM_MOUSEWHEEL => {
+            static IS_FORWARDING: std::sync::atomic::AtomicBool =
+                std::sync::atomic::AtomicBool::new(false);
+            if IS_FORWARDING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                return 0;
+            }
+            struct ResetGuard;
+            impl Drop for ResetGuard {
+                fn drop(&mut self) {
+                    IS_FORWARDING.store(false, std::sync::atomic::Ordering::SeqCst);
+                }
+            }
+            let _guard = ResetGuard;
+
             if let Some(c) = controls {
                 let vhwnd = match c.get_view_mode() {
                     crate::ui::views::control_panel::ViewMode::Profile(0) => {
                         c.tab_typing.viewport_hwnd()
                     }
-                    crate::ui::views::control_panel::ViewMode::Profile(1)
-                        if c.tab_keys.sub_tabs.get_cur_sel() == 0 =>
-                    {
-                        c.tab_keys.overview.viewport_hwnd()
+                    crate::ui::views::control_panel::ViewMode::Profile(1) => {
+                        match c.tab_keys.sub_tabs.get_cur_sel() {
+                            0 => c.tab_keys.overview.viewport_hwnd(),
+                            1 => c.tab_keys.remap.list.hwnd(),
+                            2 => c.tab_keys.disable.list.hwnd(),
+                            3 => c.tab_keys.key_macro.list.hwnd(),
+                            _ => 0,
+                        }
                     }
                     crate::ui::views::control_panel::ViewMode::Profile(2) => {
                         c.tab_sound.viewport_hwnd()
@@ -188,12 +205,6 @@ pub unsafe extern "system" fn control_panel_wnd_proc(
                 };
                 if vhwnd != 0 {
                     return unsafe { SendMessageW(vhwnd, WM_MOUSEWHEEL, wparam, lparam) };
-                }
-                if false {
-                    let vhwnd = c.tab_typing.viewport_hwnd();
-                    if vhwnd != 0 {
-                        return unsafe { SendMessageW(vhwnd, WM_MOUSEWHEEL, wparam, lparam) };
-                    }
                 }
             }
             0
