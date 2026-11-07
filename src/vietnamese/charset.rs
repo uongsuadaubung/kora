@@ -24,6 +24,37 @@ impl Charset {
             Self::Tcvn3 => "TCVN3 (ABC)",
         }
     }
+
+    /// Tự động nhận diện bảng mã từ tên font chữ (AutoCAD, Word, Excel, MicroStation...).
+    /// Font TCVN3 thường bắt đầu bằng dấu chấm (".VnTime", ".VnArial", ".Vn..."),
+    /// hoặc chứa tiền tố/hậu tố vn/tc quen thuộc trong ngành CAD/GIS kỹ thuật.
+    pub fn from_font(font_name: &str) -> Self {
+        detect_charset_from_font(font_name)
+    }
+}
+
+/// Tự động nhận diện bảng mã từ tên font chữ (VD: AutoCAD, Word, Excel, MicroStation...).
+/// Font TCVN3 thường bắt đầu bằng dấu chấm (".VnTime", ".VnArial", ".Vn..."),
+/// hoặc chứa tiền tố/hậu tố vn/tc quen thuộc trong CAD/GIS kỹ thuật (SHX fonts).
+pub fn detect_charset_from_font(font_name: &str) -> Charset {
+    let lower = font_name.trim().to_ascii_lowercase();
+    if lower.is_empty() {
+        return Charset::Unicode;
+    }
+    if lower.starts_with('.')
+        || lower.contains("vntime")
+        || lower.contains("vnarial")
+        || lower.contains("vnavant")
+        || lower.contains("vncooper")
+        || lower.contains("vncourier")
+        || lower.contains("tc.shx")
+        || lower.starts_with("vn_")
+        || lower.starts_with("vntxt")
+    {
+        Charset::Tcvn3
+    } else {
+        Charset::Unicode
+    }
 }
 
 impl std::str::FromStr for Charset {

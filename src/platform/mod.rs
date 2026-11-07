@@ -1,8 +1,10 @@
+pub mod ipc;
 pub mod process;
 pub mod registry;
 #[cfg(target_os = "windows")]
 pub mod win32;
 
+pub use ipc::{KORA_IPC_PORT, start_ipc_server};
 pub use process::{
     alloc_console, attach_parent_console, ensure_single_instance, release_single_instance,
 };

@@ -10,7 +10,7 @@ use crate::logger::{AsyncLogWriter, current_timestamp_str};
 use crate::vietnamese::CharsetStrategy;
 pub use action::{CompactString, EngineAction};
 use buffer::{RawKey, TypingBuffer};
-pub use config::EngineConfig;
+pub use config::{EngineConfig, InputMethod};
 use history::{HistoryBackspace, WordHistory};
 use macro_table::MacroTable;
 pub use profile::ProfileManager;
@@ -167,6 +167,242 @@ impl VietnameseEngine {
             }
         }
         (changed, new_id)
+    }
+
+    /// Dynamically sets the character set for an application based on process name and font name.
+    /// If the profile is currently active in the foreground, immediately refreshes effective config
+    /// and resets the typing buffer to prevent cross-charset state corruption.
+    pub fn update_charset_by_process_and_font(
+        &mut self,
+        process_name: &str,
+        font_name: &str,
+    ) -> (bool, crate::vietnamese::Charset) {
+        let (is_active, charset) = self
+            .profile_manager
+            .update_charset_by_process_and_font(process_name, font_name);
+        if is_active {
+            self.refresh_effective_config();
+            self.reset();
+            if self.config.debug {
+                self.log_debug(format!(
+                    "[CHARSET] Auto-updated charset for '{}' (font: '{}') -> {:?}",
+                    process_name, font_name, charset
+                ));
+            }
+        }
+        (is_active, charset)
+    }
+
+    /// Dynamically applies configuration updates from external callers (IPC / GUI).
+    /// If `target_process` is Some (and not "global"), updates that child profile (creating it if needed).
+    /// If `target_process` is None or Some("global"), updates global EngineConfig.
+    /// Automatically saves configuration to disk (debounced).
+    /// Returns (is_active_profile_updated, effective_config_for_target).
+    pub fn apply_config_update(
+        &mut self,
+        target_process: Option<&str>,
+        params: &std::collections::HashMap<String, String>,
+    ) -> (bool, EngineConfig) {
+        let is_global = match target_process {
+            None => true,
+            Some(t) => {
+                let trimmed = t.trim();
+                trimmed.is_empty() || trimmed.eq_ignore_ascii_case("global")
+            }
+        };
+
+        if is_global {
+            if let Some(mode) = params.get("mode") {
+                let m = mode.trim().to_ascii_lowercase();
+                if m == "toggle" {
+                    self.config.enabled = !self.config.enabled;
+                } else if let Ok(b) = m.parse::<bool>() {
+                    self.config.enabled = b;
+                } else if m == "vietnamese" || m == "viet" || m == "vn" || m == "vi" || m == "1" || m == "on" {
+                    self.config.enabled = true;
+                } else if m == "english" || m == "eng" || m == "en" || m == "0" || m == "off" {
+                    self.config.enabled = false;
+                }
+            }
+            if let Some(method) = params.get("method") {
+                let m: InputMethod = method.trim().parse().unwrap_or_default();
+                self.config.method = m;
+            }
+            if let Some(charset) = params.get("charset") {
+                if let Ok(c) = charset.trim().parse() {
+                    self.config.charset = c;
+                }
+            }
+            if let Some(font) = params.get("font") {
+                self.config.charset = crate::vietnamese::charset::detect_charset_from_font(font);
+            }
+            if let Some(sound) = params.get("sound") {
+                let s = sound.trim().to_ascii_lowercase();
+                if let Ok(b) = s.parse::<bool>() {
+                    self.config.sound_enabled = b;
+                } else if s == "on" || s == "1" || s == "enable" || s == "enabled" {
+                    self.config.sound_enabled = true;
+                } else if s == "off" || s == "0" || s == "disable" || s == "disabled" {
+                    self.config.sound_enabled = false;
+                }
+            }
+            if let Some(sp) = params.get("sound_profile") {
+                let trimmed = sp.trim();
+                if !trimmed.is_empty() {
+                    self.config.sound_profile = trimmed.into();
+                }
+            }
+            if let Some(vol) = params.get("sound_volume") {
+                if let Ok(v) = vol.trim().parse::<u8>() {
+                    self.config.sound_volume = v.min(100);
+                }
+            }
+            if let Some(use_macro) = params.get("use_macro") {
+                let m = use_macro.trim().to_ascii_lowercase();
+                if let Ok(b) = m.parse::<bool>() {
+                    self.config.use_macro = b;
+                } else if m == "on" || m == "1" || m == "enable" || m == "enabled" {
+                    self.config.use_macro = true;
+                } else if m == "off" || m == "0" || m == "disable" || m == "disabled" {
+                    self.config.use_macro = false;
+                }
+            }
+            if let Some(caps) = params.get("auto_caps") {
+                let c = caps.trim().to_ascii_lowercase();
+                if let Ok(b) = c.parse::<bool>() {
+                    self.config.auto_uppercase_first_char = b;
+                } else if c == "on" || c == "1" || c == "enable" || c == "enabled" {
+                    self.config.auto_uppercase_first_char = true;
+                } else if c == "off" || c == "0" || c == "disable" || c == "disabled" {
+                    self.config.auto_uppercase_first_char = false;
+                }
+            }
+
+            self.refresh_effective_config();
+            self.reset();
+            let _ = crate::engine::config_store::save_config_all_debounced(
+                &self.config,
+                &self.macro_table,
+                &self.profile_manager,
+            );
+            (self.profile_manager.active_id == "global", self.config.clone())
+        } else {
+            let proc_name = target_process.unwrap().trim();
+            let target_id = {
+                let child = self.profile_manager.get_or_create_profile_mut(proc_name);
+                if let Some(mode) = params.get("mode") {
+                    let m = mode.trim().to_ascii_lowercase();
+                    if m == "inherit" {
+                        child.mode = profile::LanguageMode::Inherit;
+                    } else if m == "toggle" {
+                        let cur_effective = if child.mode == profile::LanguageMode::Vietnamese {
+                            true
+                        } else if child.mode == profile::LanguageMode::English {
+                            false
+                        } else {
+                            self.config.enabled
+                        };
+                        child.mode = if cur_effective {
+                            profile::LanguageMode::English
+                        } else {
+                            profile::LanguageMode::Vietnamese
+                        };
+                    } else if let Ok(b) = m.parse::<bool>() {
+                        child.mode = if b { profile::LanguageMode::Vietnamese } else { profile::LanguageMode::English };
+                    } else if m == "vietnamese" || m == "viet" || m == "vn" || m == "vi" || m == "1" || m == "on" {
+                        child.mode = profile::LanguageMode::Vietnamese;
+                    } else if m == "english" || m == "eng" || m == "en" || m == "0" || m == "off" {
+                        child.mode = profile::LanguageMode::English;
+                    }
+                }
+                if let Some(method) = params.get("method") {
+                    let m = method.trim().to_ascii_lowercase();
+                    if m == "inherit" {
+                        child.method = profile::MethodMode::Inherit;
+                    } else {
+                        let im: InputMethod = m.parse().unwrap_or_default();
+                        child.method = profile::MethodMode::Specific(im);
+                    }
+                }
+                if let Some(charset) = params.get("charset") {
+                    let c = charset.trim().to_ascii_lowercase();
+                    if c == "inherit" {
+                        child.charset = profile::CharsetMode::Inherit;
+                    } else if let Ok(cs) = c.parse() {
+                        child.charset = profile::CharsetMode::Specific(cs);
+                    }
+                }
+                if let Some(font) = params.get("font") {
+                    child.charset = profile::CharsetMode::Specific(crate::vietnamese::charset::detect_charset_from_font(font));
+                }
+                if let Some(sound) = params.get("sound") {
+                    let s = sound.trim().to_ascii_lowercase();
+                    if s == "inherit" {
+                        child.sound_enabled = None;
+                    } else if let Ok(b) = s.parse::<bool>() {
+                        child.sound_enabled = Some(b);
+                    } else if s == "on" || s == "1" || s == "enable" || s == "enabled" {
+                        child.sound_enabled = Some(true);
+                    } else if s == "off" || s == "0" || s == "disable" || s == "disabled" {
+                        child.sound_enabled = Some(false);
+                    }
+                }
+                if let Some(sp) = params.get("sound_profile") {
+                    let trimmed = sp.trim();
+                    if trimmed.eq_ignore_ascii_case("inherit") {
+                        child.sound_profile = None;
+                    } else if !trimmed.is_empty() {
+                        child.sound_profile = Some(trimmed.into());
+                    }
+                }
+                if let Some(vol) = params.get("sound_volume") {
+                    let trimmed = vol.trim();
+                    if trimmed.eq_ignore_ascii_case("inherit") {
+                        child.sound_volume = None;
+                    } else if let Ok(v) = trimmed.parse::<u8>() {
+                        child.sound_volume = Some(v.min(100));
+                    }
+                }
+                if let Some(use_macro) = params.get("use_macro") {
+                    let m = use_macro.trim().to_ascii_lowercase();
+                    if m == "inherit" {
+                        child.use_macro = None;
+                    } else if let Ok(b) = m.parse::<bool>() {
+                        child.use_macro = Some(b);
+                    } else if m == "on" || m == "1" || m == "enable" || m == "enabled" {
+                        child.use_macro = Some(true);
+                    } else if m == "off" || m == "0" || m == "disable" || m == "disabled" {
+                        child.use_macro = Some(false);
+                    }
+                }
+                if let Some(caps) = params.get("auto_caps") {
+                    let c = caps.trim().to_ascii_lowercase();
+                    if c == "inherit" {
+                        child.auto_uppercase_first_char = None;
+                    } else if let Ok(b) = c.parse::<bool>() {
+                        child.auto_uppercase_first_char = Some(b);
+                    } else if c == "on" || c == "1" || c == "enable" || c == "enabled" {
+                        child.auto_uppercase_first_char = Some(true);
+                    } else if c == "off" || c == "0" || c == "disable" || c == "disabled" {
+                        child.auto_uppercase_first_char = Some(false);
+                    }
+                }
+                child.id.clone()
+            };
+
+            let is_active = self.profile_manager.active_id == target_id;
+            if is_active {
+                self.refresh_effective_config();
+                self.reset();
+            }
+            let effective = self.profile_manager.resolve_effective_config(&target_id, &self.config);
+            let _ = crate::engine::config_store::save_config_all_debounced(
+                &self.config,
+                &self.macro_table,
+                &self.profile_manager,
+            );
+            (is_active, effective)
+        }
     }
 
     /// Chuyển đổi qua lại giữa chế độ gõ Tiếng Việt và Tiếng Anh (trả về trạng thái mới: true là Tiếng Việt, false là Tiếng Anh)

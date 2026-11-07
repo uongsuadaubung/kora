@@ -33,4 +33,5 @@ pub use engine::{
 pub use language::{Language, LanguageStrings, current as current_strings, get_strings};
 pub use vietnamese::{
     BaseVowel, Charset, CharsetStrategy, Diacritic, Tcvn3Charset, Tone, UnicodeCharset,
+    detect_charset_from_font,
 };

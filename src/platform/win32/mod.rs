@@ -575,6 +575,13 @@ pub fn run_hook_loop(engine: VietnameseEngine, on_ready: impl FnOnce()) {
         // Initialize foreground application tracker for automatic profile switching
         app_tracker::init_app_tracker();
 
+        // Initialize local IPC listener for real-time dynamic charset switching (AutoCAD LISP, etc.)
+        if let Err(e) = crate::platform::ipc::start_ipc_server() {
+            eprintln!("[Kora IPC] Không thể khởi động IPC server: {}", e);
+        } else {
+            println!(">> Kora IPC Server đang lắng nghe tại 127.0.0.1:{}", crate::platform::ipc::KORA_IPC_PORT);
+        }
+
         let mut msg: MSG = std::mem::zeroed();
         let filter = MESSAGE_FILTER.get().copied();
         while GetMessageW(&mut msg, 0, 0, 0) > 0 {

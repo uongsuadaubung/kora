@@ -10,7 +10,8 @@ pub mod syllable;
 
 pub use charset::{
     BaseVowel, Charset, CharsetStrategy, Diacritic, Tcvn3Charset, Tone, UnicodeCharset, compose_d,
-    compose_tcvn3_d, compose_tcvn3_vowel, compose_vowel, decompose_vowel, is_d_stroke,
+    compose_tcvn3_d, compose_tcvn3_vowel, compose_vowel, decompose_vowel, detect_charset_from_font,
+    is_d_stroke,
 };
 pub use coda::CodaState;
 pub use inline_list::InlineList;

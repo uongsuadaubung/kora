@@ -123,6 +123,57 @@ impl ProfileManager {
         }
     }
 
+    /// Finds an existing child profile matching the executable filename, or creates a new one.
+    pub fn get_or_create_profile_mut(&mut self, process_name: &str) -> &mut AppProfile<Child> {
+        let proc_clean = process_name.trim().to_lowercase();
+        let proc_with_exe = if proc_clean.ends_with(".exe") {
+            proc_clean.clone()
+        } else {
+            format!("{}.exe", proc_clean)
+        };
+
+        let pos = if let Some(p) = self.profiles.iter().position(|p| {
+            p.matches_process(&proc_clean) || p.matches_process(&proc_with_exe)
+        }) {
+            p
+        } else {
+            let base_name = proc_clean
+                .strip_suffix(".exe")
+                .unwrap_or(&proc_clean);
+            let id = base_name.to_string();
+            let mut name = base_name.to_string();
+            if let Some(first) = name.get_mut(0..1) {
+                first.make_ascii_uppercase();
+            }
+            let mut profile = AppProfile::<Child>::new_child(&id, name, &proc_with_exe, "⚙️");
+            if proc_clean != proc_with_exe && !profile.process_names.contains(&proc_clean) {
+                profile.process_names.push(proc_clean);
+            }
+            self.profiles.push(profile);
+            self.profiles.len() - 1
+        };
+
+        &mut self.profiles[pos]
+    }
+
+    /// Dynamically sets the charset for a specific process based on font detection.
+    /// If no profile matches the process name, automatically creates a new child profile for it.
+    /// Returns (is_active_profile, detected_charset).
+    pub fn update_charset_by_process_and_font(
+        &mut self,
+        process_name: &str,
+        font_name: &str,
+    ) -> (bool, crate::vietnamese::Charset) {
+        let detected = crate::vietnamese::charset::detect_charset_from_font(font_name);
+        let child_id = {
+            let child = self.get_or_create_profile_mut(process_name);
+            child.charset = CharsetMode::Specific(detected);
+            child.id.clone()
+        };
+        let is_active = self.active_id == child_id;
+        (is_active, detected)
+    }
+
     /// Computes effective EngineConfig for a profile based on Live Inheritance
     pub fn resolve_effective_config(&self, profile_id: &str, base: &EngineConfig) -> EngineConfig {
         let mut cfg = base.clone();
