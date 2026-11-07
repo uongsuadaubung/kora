@@ -144,9 +144,14 @@ impl TypingBuffer {
         if self.raw_keys.len() != self.emitted_len {
             false
         } else {
-            self.rendered()
-                .chars()
-                .eq(self.raw_keys.iter().map(|k| k.ch))
+            let rendered_bytes = self.last_rendered.as_bytes();
+            if rendered_bytes.len() != self.raw_keys.len() {
+                return false;
+            }
+            rendered_bytes
+                .iter()
+                .zip(self.raw_keys.iter())
+                .all(|(&b, k)| b as char == k.ch)
         }
     }
 
@@ -169,9 +174,15 @@ impl TypingBuffer {
             && matches!(action, EngineAction::Passthrough)
             && !current_state.is_unambiguous_completed_vietnamese()
         {
-            let is_same_as_raw = last_rendered
-                .chars()
-                .eq(raw_keys_prefix.iter().map(|k| k.ch));
+            let is_same_as_raw = if last_rendered.len() != raw_keys_prefix.len() {
+                false
+            } else {
+                last_rendered
+                    .as_bytes()
+                    .iter()
+                    .zip(raw_keys_prefix.iter())
+                    .all(|(&b, k)| b as char == k.ch)
+            };
             if !is_same_as_raw {
                 let mut raw_list = InlineList::new();
                 let mut output = CompactString::new();
@@ -341,11 +352,16 @@ impl TypingBuffer {
                 mut output,
             } => {
                 // Thuật toán so khớp tiền tố chung một lượt (Single-Pass Common Prefix Optimization):
-                // 1. Duyệt đồng thời chuỗi đã render cũ và chuỗi mới để đếm số ký tự trùng khớp và số byte UTF-8 tương ứng.
-                // 2. Tích lũy trực tiếp common_bytes để cắt ngắn buffer mà không cần duyệt lại char_indices().
-                // 3. Số phím Backspace tối ưu: nếu có ký tự không khớp, chỉ cần xóa lùi (1 + phần còn lại của prev_iter).
-                // 4. Tái sử dụng vùng đệm cũ bằng truncate(common_bytes) thay vì clear() rồi sao chép lại toàn bộ.
-                let full_output_utf16: usize = output.chars().map(|c| c.len_utf16()).sum();
+                // 1. Nếu chuỗi là ASCII, tính nhanh UTF-16 length bằng O(1) byte length, tránh duyệt UTF-8 lặp.
+                // 2. Duyệt đồng thời chuỗi đã render cũ và chuỗi mới để đếm số ký tự trùng khớp và số byte UTF-8 tương ứng.
+                // 3. Tích lũy trực tiếp common_bytes để cắt ngắn buffer mà không cần duyệt lại char_indices().
+                // 4. Số phím Backspace tối ưu: nếu có ký tự không khớp, chỉ cần xóa lùi (1 + phần còn lại của prev_iter).
+                // 5. Tái sử dụng vùng đệm cũ bằng truncate(common_bytes) thay vì clear() rồi sao chép lại toàn bộ.
+                let full_output_utf16 = if output.is_ascii() {
+                    output.len()
+                } else {
+                    output.chars().map(|c| c.len_utf16()).sum()
+                };
                 let mut prev_iter = self.last_rendered.chars();
                 let mut new_iter = output.chars();
                 let mut common = 0;

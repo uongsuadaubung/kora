@@ -30,6 +30,20 @@ pub enum KeyEffect {
     DStroke,
 }
 
+/// Bitmask of Telex modifier keys: 'a', 'd', 'e', 'f', 'j', 'o', 'r', 's', 'w', 'x', 'z'.
+/// Rejects non-modifier consonants ('b', 'c', 'g', 'h', 'i', 'k', 'l', 'm', 'n', 'p', 'q', 't', 'u', 'v', 'y')
+/// in exactly 1 CPU cycle without evaluating match arms or closures.
+const TELEX_MODIFIER_MASK: u32 = {
+    let chars = b"asfrxjzwaeod";
+    let mut mask = 0u32;
+    let mut i = 0;
+    while i < chars.len() {
+        mask |= 1u32 << (chars[i] - b'a');
+        i += 1;
+    }
+    mask
+};
+
 /// Matches a key character to its modifier effect based on the active input method
 /// and syllable context (present vowels, onset 'd').
 pub fn match_modifier_key(
@@ -38,9 +52,14 @@ pub fn match_modifier_key(
     has_vowel: impl Fn(BaseVowel) -> bool,
     has_onset_d: bool,
 ) -> Option<KeyEffect> {
-    let ch_lower = ch.to_ascii_lowercase();
-
     if method.is_telex_family() {
+        let cp = ch as u32 | 0x20;
+        let delta = cp.wrapping_sub('a' as u32);
+        if delta >= 26 || (TELEX_MODIFIER_MASK & (1u32 << delta)) == 0 {
+            return None;
+        }
+
+        let ch_lower = (cp as u8) as char;
         match ch_lower {
             's' => Some(KeyEffect::Tone(Tone::Acute)),
             'f' => Some(KeyEffect::Tone(Tone::Grave)),
@@ -56,7 +75,13 @@ pub fn match_modifier_key(
             _ => None,
         }
     } else if method.is_vni() {
-        match ch_lower {
+        let cp = ch as u32;
+        let delta = cp.wrapping_sub('0' as u32);
+        if delta >= 10 {
+            return None;
+        }
+
+        match ch {
             '1' => Some(KeyEffect::Tone(Tone::Acute)),
             '2' => Some(KeyEffect::Tone(Tone::Grave)),
             '3' => Some(KeyEffect::Tone(Tone::HookAbove)),

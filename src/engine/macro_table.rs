@@ -1,3 +1,4 @@
+use crate::engine::action::CompactString;
 use crate::vietnamese::charset::decompose_vowel;
 use std::collections::HashMap;
 
@@ -69,6 +70,7 @@ pub struct MacroTable {
     end_consonants: Vec<MacroEntry>,
     start_first_mask: u32,
     end_last_mask: u32,
+    normal_lengths_mask: u32,
 }
 
 #[inline]
@@ -129,6 +131,14 @@ impl MacroTable {
         self.end_consonants = ends;
         self.start_first_mask = start_mask;
         self.end_last_mask = end_mask;
+
+        let mut normal_mask = 0u32;
+        for (k, entry) in &self.entries {
+            if entry.macro_type == MacroType::Normal && k.len() < 32 {
+                normal_mask |= 1u32 << k.len();
+            }
+        }
+        self.normal_lengths_mask = normal_mask;
     }
 
     /// Create a macro table pre-populated with standard default rules
@@ -162,6 +172,9 @@ impl MacroTable {
     ) {
         let key_str = key.into().to_lowercase();
         let value_str = value.into();
+        if macro_type == MacroType::Normal && key_str.len() < 32 {
+            self.normal_lengths_mask |= 1u32 << key_str.len();
+        }
         self.entries.insert(
             key_str.clone(),
             MacroEntry {
@@ -204,6 +217,7 @@ impl MacroTable {
         self.end_consonants.clear();
         self.start_first_mask = 0;
         self.end_last_mask = 0;
+        self.normal_lengths_mask = 0;
     }
 
     /// Number of macro entries
@@ -307,10 +321,14 @@ impl MacroTable {
             return None;
         }
 
+        if word.len() < 32 && (self.normal_lengths_mask & (1u32 << word.len())) == 0 {
+            return None;
+        }
+
         with_lowercase_key(word, |key| {
             let entry = self.entries.get(key)?;
             if entry.macro_type == MacroType::Normal {
-                Some(apply_case_style(word, &entry.value))
+                Some(apply_case_style(word, &entry.value).into())
             } else {
                 None
             }
@@ -329,7 +347,7 @@ impl MacroTable {
         word: &str,
         allow_start_consonant: bool,
         allow_end_consonant: bool,
-    ) -> Option<String> {
+    ) -> Option<CompactString> {
         if word.is_empty() || self.entries.is_empty() {
             return None;
         }
@@ -347,10 +365,15 @@ impl MacroTable {
         };
 
         // 1. Exact Normal macro match takes highest priority
-        if let Some(entry) = self.entries.get(lower)
-            && entry.macro_type == MacroType::Normal
-        {
-            return Some(apply_case_style(word, &entry.value));
+        // O(1) bitmask filter: bypass HashMap hashing if no Normal macro exists with this word length!
+        let has_normal_length =
+            word.len() >= 32 || (self.normal_lengths_mask & (1u32 << word.len())) != 0;
+        if has_normal_length {
+            if let Some(entry) = self.entries.get(lower)
+                && entry.macro_type == MacroType::Normal
+            {
+                return Some(apply_case_style(word, &entry.value));
+            }
         }
 
         // 2. Single-character guard: single letters like 'f', 'j', 'w' MUST NOT be modified
@@ -404,28 +427,28 @@ impl MacroTable {
             (Some((sk, sv)), Some((ek, ev))) => {
                 if word.len() >= sk.len() + ek.len() {
                     let middle = &word[sk.len()..word.len() - ek.len()];
-                    let mut res = String::with_capacity(sv.len() + middle.len() + ev.len());
+                    let mut res = CompactString::new();
                     res.push_str(sv);
                     res.push_str(middle);
                     res.push_str(ev);
-                    Some(apply_case_style(word, &res))
+                    Some(apply_case_style(word, res.as_str()))
                 } else {
                     None
                 }
             }
             (Some((sk, sv)), None) => {
                 let rem = &word[sk.len()..];
-                let mut res = String::with_capacity(sv.len() + rem.len());
+                let mut res = CompactString::new();
                 res.push_str(sv);
                 res.push_str(rem);
-                Some(apply_case_style(word, &res))
+                Some(apply_case_style(word, res.as_str()))
             }
             (None, Some((ek, ev))) => {
                 let prefix = &word[..word.len() - ek.len()];
-                let mut res = String::with_capacity(prefix.len() + ev.len());
+                let mut res = CompactString::new();
                 res.push_str(prefix);
                 res.push_str(ev);
-                Some(apply_case_style(word, &res))
+                Some(apply_case_style(word, res.as_str()))
             }
             (None, None) => None,
         }
@@ -442,22 +465,28 @@ pub fn is_vowel(c: char) -> bool {
 /// - "ko" -> "không"
 /// - "Ko" -> "Không"
 /// - "KO" -> "KHÔNG"
-pub fn apply_case_style(source: &str, target: &str) -> String {
+pub fn apply_case_style(source: &str, target: &str) -> CompactString {
     if source.is_empty() || target.is_empty() {
-        return target.to_string();
+        return CompactString::from(target);
     }
 
     let is_all_upper = source
         .chars()
         .all(|c| !c.is_alphabetic() || c.is_uppercase());
     if is_all_upper {
-        return target.to_uppercase();
+        let mut res = CompactString::new();
+        for c in target.chars() {
+            for u in c.to_uppercase() {
+                res.push(u);
+            }
+        }
+        return res;
     }
 
     if let (Some(first_source), Some(first_target)) = (source.chars().next(), target.chars().next())
         && first_source.is_uppercase()
     {
-        let mut res = String::with_capacity(target.len());
+        let mut res = CompactString::new();
         for u in first_target.to_uppercase() {
             res.push(u);
         }
@@ -465,5 +494,5 @@ pub fn apply_case_style(source: &str, target: &str) -> String {
         return res;
     }
 
-    target.to_string()
+    CompactString::from(target)
 }

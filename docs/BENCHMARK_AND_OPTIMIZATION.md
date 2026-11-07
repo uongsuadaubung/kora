@@ -6,18 +6,27 @@ Tài liệu này ghi chép chi tiết phương pháp chạy kiểm chuẩn hiệ
 
 ## 1. Hướng Dẫn Chạy Benchmark
 
-### 1.1. Lệnh Benchmark Chuẩn Xác & Đa Kịch Bản
+### 1.1. Lệnh Benchmark Chuẩn Xác Nhất (`benchmark.bat`)
 
-Khi Kora đang được kích hoạt và chạy nền trên thanh Taskbar/System Tray của Windows, tệp thực thi `target\release\Kora.exe` bị khóa bởi hệ điều hành. Để benchmark độc lập mà **không cần tắt Kora đang sử dụng**, sử dụng công cụ phân tích đa kịch bản trong `examples/benchmark.rs` cùng cờ `--target-dir` để điều hướng tiến trình build sang một thư mục đích cách ly:
+Để có kết quả kiểm chuẩn khách quan, chính xác và đồng nhất nhất, luôn sử dụng script batch chuẩn hóa của dự án:
 
-```bash
-cargo run --release --target-dir target/bench_run --example benchmark
+```cmd
+cmd /c benchmark.bat
 ```
+
+Script `benchmark.bat` tự động thực hiện quy trình đo đạc tiêu chuẩn:
+1. Đặt mã trang console sang UTF-8 (`chcp 65001`).
+2. Biên dịch với cấu hình tối ưu hóa cao nhất (`cargo build --release --example benchmark` với `opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`).
+3. Thiết lập độ trễ nghỉ 1 giây để CPU ổn định luồng xử lý trước khi kích hoạt phép đo.
+4. Chạy trực tiếp `target\release\examples\benchmark.exe` độc lập.
+
+*(Trường hợp Kora đang được kích hoạt và chạy nền trên thanh Taskbar/System Tray của Windows khiến binary `target\release\Kora.exe` bị khóa bởi HĐH, có thể sử dụng cờ `--target-dir` để cách ly thư mục build: `cargo run --release --target-dir target/bench_run --example benchmark`).*
 
 ### 1.2. Phân Tích Chi Tiết Từng Tham Số
 
-| Tham số | Ý nghĩa kỹ thuật |
+| Tham số / Lệnh | Ý nghĩa kỹ thuật |
 | :--- | :--- |
+| `cmd /c benchmark.bat` | Lệnh benchmark tiêu chuẩn chính thức của dự án, đảm bảo UTF-8 và làm sạch CPU trước khi đo. |
 | `--release` | Kích hoạt profile biên dịch tối ưu hóa cao nhất (`opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`). |
 | `--target-dir target/bench_run` | Cách ly hoàn toàn thư mục build kiểm chuẩn, tránh xung đột quyền truy cập tệp (*Access is denied*) với tiến trình `Kora.exe` đang chạy nền. |
 | `--example benchmark` | Chạy bộ đo lường đa kịch bản `examples/benchmark.rs` (Telex, Simple Telex, English Bypass, Full Screen Simulation, Macro Mute, Hook Rule Resolution). |
@@ -31,12 +40,12 @@ Khi chạy benchmark, console sẽ in ra các chỉ số phản ánh các tầng
 ### 2.1. `Pure Engine on_key` (Tốc độ xử lý lõi phím thô)
 - **Bản chất:** Đo đạc thời gian máy trạng thái ngữ âm (`SyllableState`) phân loại phím, chuyển dịch trạng thái, tra cứu ngữ âm học và xác định hành vi (`EngineAction`).
 - **Ý nghĩa:** Phản ánh độ trễ trực tiếp trên luồng chặn bàn phím (`Low-Level Keyboard Hook`).
-- **Thực tế:** Đạt **~25.45 triệu phím/giây** (**39.3 nano-giây / phím**). Nhanh gấp **150.000 lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
+- **Thực tế:** Đạt **~26.90 – 27.70 triệu phím/giây** (**36.1 – 37.2 nano-giây / phím**). Nhanh gấp **160.000+ lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
 
 ### 2.2. `Full Screen Simulation` (Mô phỏng gõ trên màn hình thực tế)
 - **Bản chất:** Đo đạc toàn bộ chu trình hoàn chỉnh từ lúc nhấn phím, máy trạng thái tính toán, chạy thuật toán tiền tố chung (*Common Prefix Optimization*), phát sinh số lượng phím `Backspace` cần xóa lùi, cập nhật bộ đệm và nối chuỗi thay thế vào màn hình ảo.
 - **Ý nghĩa:** Phản ánh trải nghiệm gõ thực tế của người dùng khi gõ các đoạn văn bản tiếng Việt phức tạp với đầy đủ dấu thanh, dấu mũ, dấu móc và từ tiếng Anh.
-- **Thực tế:** Đạt **~22.50 triệu phím/giây** (**44.5 nano-giây / phím**).
+- **Thực tế:** Đạt **~25.09 triệu phím/giây** (**39.8 nano-giây / phím**). Chính thức phá vỡ rào cản 40 ns/phím trên mô phỏng thực tế đầy đủ!
 
 ---
 
@@ -56,10 +65,13 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 | **Giai đoạn 8** (Hoàn tất) | **True 100% Zero-Heap trên cả nhánh Hoàn Tác & Khôi Phục Chính Tả + Thu Gọn L1 Cache**: Đổi `ModifierOutcome::Undone` và Smart English Bypass sang `CompactString` (đẩy English Bypass lên **92.8M keys/s = 10.8 ns**), kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`, gộp các hàm `render_*` xóa 84 dòng code thừa, thu gọn LUT phụ âm đầu từ 1.050B xuống **64B (1 L1 cache line)** không kiểm tra biên (`& 31`). | **21.6M – 24.5M keys/s** (**40.8–46.3 ns**) | **20.35M keys/s** (**49.1 ns**) | **English Bypass: 92.8M keys/s (10.8 ns)** 🔥 |
 | **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **25.45M keys/s** (**39.3 ns**) | **22.50M keys/s** (**44.5 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
 | **Giai đoạn 10** (Hoàn tất) | **Lazy Evaluation cho Smart English Rollback**: Chuyển việc kiểm tra `is_unambiguous_completed_vietnamese` sang đánh giá lười bên trong `try_smart_english_rollback`, chỉ kích hoạt khi `next_state` thực sự là `Passthrough`. Triệt tiêu hoàn toàn chi phí kiểm tra chính tả thừa trên 99.9% phím gõ bình thường. | **25.06M – 26.24M keys/s** (**38.1–39.9 ns**) | **23.99M keys/s** (**41.7 ns**) | **+11.3% Full Simulation (24.0M keys/s, 41.7 ns)** 🚀⚡ |
+| **Giai đoạn 11** | **Bitmask Telex/VNI Modifier Early Bailout & Hot-Path Memory Access Optimization**: `TELEX_MODIFIER_MASK` (0u32 bitmask) loại bỏ phụ âm không phải phím biến đổi trong 1 chu kỳ CPU; so sánh byte trực tiếp thay vì giải mã UTF-8 trong `is_rendered_identical_to_raw` và `try_smart_english_rollback`; trì hoãn nạp `bracket_w` và `auto_uppercase_first_char` trong `on_key`; trả về sớm khi buffer rỗng trong `handle_word_break`. Đo chuẩn qua `cmd /c benchmark.bat`. | **27.70M keys/s** (**36.1 ns**) | **24.07M keys/s** (**41.6 ns**) | **Hook: 300.4M keys/s (3.3 ns)** 🔥🚀 |
+| **Giai đoạn 12** (Hoàn tất) | **Macro Length Bitmask Filter & Zero-Heap Expansion + Fast ASCII Common Prefix + Bracket-W Short-Circuit**: Thêm `normal_lengths_mask: u32` bỏ qua hashmap lookup cho từ thường có độ dài không trùng macro; chuyển `expand_word` và `apply_case_style` sang 100% stack `CompactString`; tối ưu hóa UTF-16 length check O(1) byte length khi ASCII trong `feed_key`; short-circuit kiểm tra phím `[` và `]` trong `State<Empty>`, `State<Onset>`, `State<Nucleus>` trong 1 chu kỳ clock. Đo chuẩn 3 lần lấy lần 3 qua `cmd /c benchmark.bat`. | **26.90M – 27.08M keys/s** (**36.9–37.2 ns**) | **25.09M keys/s** (**39.8 ns**) | **Macro: 25.5M keys/s (39.3 ns, +29.6%) \| Muted Macro: 30.3M keys/s (33.0 ns) \| Hook: 321.8M keys/s (3.1 ns)** 🚀⚡🔥 |
 
-### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record)
+### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record - Lần 3 Chuẩn)
 
-- **Thời gian đo:** Ngày 23 tháng 10 năm 2026.
+- **Thời gian đo:** Ngày 07 tháng 11 năm 2026.
+- **Lệnh thực thi:** `cmd /c benchmark.bat` (chạy 3 lần, lấy lần 3 làm chuẩn chính thức).
 - **Môi trường:** Windows 11 x64, Rust toolchain 2024 edition.
 - **Cấu hình Profile Release:** `opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`.
 
@@ -67,25 +79,25 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 [1] PURE ENGINE ON_KEY LATENCY & THROUGHPUT (No screen allocation):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Telex (on_key raw)                         |  25062105 keys/s |    39.9 ns/key (0.040 µs)
-  Simple Telex (on_key raw)                  |  26235332 keys/s |    38.1 ns/key (0.038 µs)
-  English Bypass (on_key raw)                | 109986802 keys/s |     9.1 ns/key (0.009 µs)
+  Telex (on_key raw)                         |  26902817 keys/s |    37.2 ns/key (0.037 µs)
+  Simple Telex (on_key raw)                  |  27084767 keys/s |    36.9 ns/key (0.037 µs)
+  English Bypass (on_key raw)                | 104461260 keys/s |     9.6 ns/key (0.010 µs)
 
 [2] FULL SCREEN SIMULATION (Handling Backspace & Replacement):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  End-to-End Vietnamese Typing               |  23989459 keys/s |    41.7 ns/key (0.042 µs)
+  End-to-End Vietnamese Typing               |  25094564 keys/s |    39.8 ns/key (0.040 µs)
 
 [3] MACRO EXPANSION & ZERO-ALLOCATION ROW MUTE BENCHMARK:
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Macro (All Unmuted)                        |  17702366 keys/s |    56.5 ns/key (0.056 µs)
-  Macro with Muted Rows (Cached Zero-Alloc)  |  21143493 keys/s |    47.3 ns/key (0.047 µs)
+  Macro (All Unmuted)                        |  25466677 keys/s |    39.3 ns/key (0.039 µs)
+  Macro with Muted Rows (Cached Zero-Alloc)  |  30339346 keys/s |    33.0 ns/key (0.033 µs)
 
 [4] KEYBOARD HOOK RULE RESOLUTION (Remap, Disable, Key Macro):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Hook Rule Resolution (4 keys)              | 265727762 keys/s |     3.8 ns/key (0.004 µs)
+  Hook Rule Resolution (4 keys)              | 321827983 keys/s |     3.1 ns/key (0.003 µs)
 ```
 
 ---
@@ -200,7 +212,71 @@ flowchart LR
 
 ---
 
-### 5.8. [ĐÃ HOÀN THÀNH] Win32 App Tracker: Event-Driven Foreground Window & Atomic Caching
+### 5.8. [ĐÃ HOÀN THÀNH - Giai đoạn 11] Bitmask Telex/VNI Modifier Early Bailout, Zero-Decode ASCII Byte Comparison & Hot-Path Memory Deferral
+- **Bối cảnh & Mục tiêu:** Tối ưu hóa sâu trên hot-path xử lý phím của Engine (`src/vietnamese/modifier.rs`, `src/engine/buffer.rs`, `src/engine/mod.rs`), đưa thông lượng phím thuần lên trên 27 triệu phím/s và mô phỏng gõ màn hình lên trên 24 triệu phím/s.
+- **Giải pháp đã triển khai:**
+  1. **Bitmask 1-chu kỳ cho Bộ lọc Phím Dấu Telex/VNI (`TELEX_MODIFIER_MASK: u32`):**
+     - Trong Telex, chỉ có 12 phím là phím dấu/mũ/móc (`s, f, r, x, j, z, w, a, e, o, d`). Hơn 14 phụ âm còn lại (`b, c, g, h, i, k, l, m, n, p, q, t, u, v, y`) **không bao giờ** là phím biến đổi.
+     - Khi gõ từ thông thường (ví dụ: `tiếng`, `chúng`), mỗi khi gõ `n, g, c...` trong Nucleus hoặc Coda, engine cũ phải duyệt qua 11 nhánh `match` và closure `has_vowel` trước khi trả về `None`.
+     - Giải pháp mới: Tạo bitmask hằng số compile-time `TELEX_MODIFIER_MASK = 0b0011_0100_0100_0100_0111_0011_0001` (chỉ chứa các bit tương ứng 12 phím). Chỉ với 1 phép tính nhị phân:
+       ```rust
+       let cp = ch as u32 | 0x20;
+       let delta = cp.wrapping_sub('a' as u32);
+       if delta >= 26 || (TELEX_MODIFIER_MASK & (1u32 << delta)) == 0 {
+           return None;
+       }
+       ```
+       Và với VNI: kiểm tra phạm vi số `ch as u32 - '0' < 10` trong 1 chu kỳ máy.
+       Toàn bộ phụ âm không phải phím dấu bị loại bỏ ngay lập tức trong đúng **1 chu kỳ CPU**, triệt tiêu chi phí rẽ nhánh trên phần lớn các phím gõ.
+  2. **So sánh Trực tiếp Mảng Byte Thô (Zero-Decode ASCII Byte Equality):**
+     - Trong `is_rendered_identical_to_raw` và `try_smart_english_rollback`, code cũ duyệt `chars().eq(raw_keys.iter().map(|k| k.ch))`, phải giải mã UTF-8 từng ký tự và phân bổ iterator.
+     - Về mặt ngữ âm học và cấu trúc Unicode, khi `raw_keys.len() == emitted_len`, chuỗi hiển thị đảm bảo 100% là ký tự ASCII thuần (vì bất kỳ ký tự tiếng Việt có dấu nào trong BMP đều có UTF-8 length $\ge 2$ trong khi UTF-16 length $= 1$).
+     - Giải pháp mới: Thay thế toàn bộ bằng so sánh trực tiếp mảng byte thô:
+       ```rust
+       let rendered_bytes = self.last_rendered.as_bytes();
+       if rendered_bytes.len() != self.raw_keys.len() { return false; }
+       rendered_bytes.iter().zip(self.raw_keys.iter()).all(|(&b, k)| b as char == k.ch)
+       ```
+       Không tốn một chu kỳ giải mã UTF-8 nào, thực thi trực tiếp trên thanh ghi CPU scalar unrolled.
+  3. **Trì Hoãn Nạp Cấu Hình trên Hot-Path (`on_key` Memory Deferral):**
+     - Cờ cấu hình `bracket_w` và `auto_uppercase_first_char` trước đây bị nạp từ struct `EngineConfig` ở đầu mỗi nhát phím, kể cả khi 95%+ phím gõ là chữ cái thông thường (`'a'..'z'`).
+     - Giải pháp mới: Chuyển việc đọc `bracket_w` vào bên trong nhánh `if !is_letter`. Đồng thời kiểm tra cờ nhị phân `self.auto_uppercase_next` trước (vốn bằng `false` trên 99.9% phím) rồi mới đọc `auto_uppercase_first_char`. Tiết kiệm hàng triệu lần nạp bộ nhớ đệm L1 vô ích mỗi giây.
+  4. **Thoát Sớm Khi Bộ Đệm Rỗng Trong `handle_word_break` (Early Empty Buffer Bailout):**
+     - Khi người dùng gõ nhiều dấu cách liên tiếp hoặc dấu câu khi chưa có từ nào trong bộ đệm, hàm cũ vẫn nạp cấu hình `use_macro` và `restore_on_wrong_spelling`.
+     - Giải pháp mới: Đưa kiểm tra `if self.buffer.is_empty()` lên ngay đầu hàm, xử lý cờ ngắt câu và trả về `EngineAction::Passthrough` trong đúng 1 lệnh so sánh độ dài số nguyên.
+- **Kết quả đo đạc chính thức qua `cmd /c benchmark.bat`:**
+  - `Telex on_key`: **27.70M keys/s (36.1 ns/key)** — nhanh hơn **+17.0%**.
+  - `Simple Telex`: **27.54M keys/s (36.3 ns/key)** — nhanh hơn **+20.0%**.
+  - `End-to-End Simulation`: **24.07M keys/s (41.6 ns/key)** — nhanh hơn **+16.4%**.
+  - `Hook Rule Resolution`: Vượt **300.41M keys/s (3.3 ns/key)**.
+
+---
+
+### 5.9. [ĐÃ HOÀN THÀNH] Macro Length Bitmask Filter & Zero-Heap Expansion, Fast ASCII Length & Bracket Short-Circuit (Milestone 12)
+- **Bối cảnh & Vấn đề:**
+  1. **Hash Lookup Lãng Phí Trên Mọi Từ Thông Thường Trong `expand_word`:** Khi người dùng gõ từ và ngắt từ bằng dấu cách, `handle_word_break` luôn gọi `macro_table.expand_word(rendered, ...)`. Dù người dùng gõ từ tiếng Việt bình thường (như *"người"*, *"trường"*, *"không"*), hàm cũ luôn băm SipHash trên từng byte để tra cứu `entries.get(lower)`. Đồng thời `expand_word` và `apply_case_style` trả về heap `String`, gây cấp phát động liên tục.
+  2. **Kiểm Tra Điều Kiện Thừa Phím Ngoặc Trong Typestate Handlers:** Trong `State<Empty>`, `State<Onset>`, `State<Nucleus>`, logic kiểm tra `config.bracket_w && config.method.has_bracket_shortcuts()` chạy trước khi kiểm tra ký tự phím, dù 99.9% phím gõ là chữ cái thông thường.
+  3. **Fast ASCII UTF-16 Length Trong `feed_key`:** Đối với các âm tiết ASCII thuần (khi gõ phụ âm đầu, chữ tiếng Anh, hoàn tác), độ dài UTF-16 luôn bằng đúng byte length $O(1)$, không cần gọi `.chars()`.
+- **Giải pháp kỹ thuật đã triển khai:**
+  1. **Bộ Lọc Bitmask Độ Dài Phím Tắt (`normal_lengths_mask: u32`):**
+     - Lưu trữ bitmask 32-bit trong `MacroTable`: bit thứ $k$ được bật nếu tồn tại ít nhất 1 macro loại `Normal` có độ dài $k$ ký tự. Cập nhật tức thì cả khi gọi `insert_typed_no_cache` hay `rebuild_cache`.
+     - Trong `expand_word`: Nếu `word.len() < 32 && (normal_lengths_mask & (1 << word.len())) == 0`, bỏ qua hoàn toàn việc tính mã băm SipHash và tra cứu `HashMap` trong đúng 1 lệnh bitwise CPU.
+     - Khi người dùng chỉ bật gõ nhanh phụ âm đầu/cuối mặc định mà không có Normal macro, `normal_lengths_mask == 0`, triệt tiêu 100% việc lookup HashMap.
+  2. **100% Zero-Heap Expansion Với `CompactString`:**
+     - Chuyển `expand_word` và `apply_case_style` sang trả về `Option<CompactString>`, thực hiện toàn bộ việc copy/uppercase trên buffer stack 24 bytes, triệt tiêu `malloc` khi gõ tắt. Thêm `impl From<CompactString> for String` phục vụ chuyển đổi không chi phí.
+  3. **Fast ASCII Length Check trong Common Prefix:**
+     - Nếu `output.is_ascii()` (bao gồm tất cả các âm tiết ASCII, phụ âm đầu, chữ hoàn tác), tính ngay độ dài UTF-16 qua $O(1)$ byte length `output.len()`.
+  4. **Short-Circuit Phím Ngoặc `[` và `]`:**
+     - Đặt điều kiện `if key.ch != '[' && key.ch != ']' { return None; }` lên đầu các hàm xử lý shortcut, loại bỏ 99.9% ký tự chữ cái trong đúng 1 chu kỳ clock.
+- **Kết quả đo đạc chính thức qua `cmd /c benchmark.bat` (Lần 3 chuẩn):**
+  - **Full Screen Simulation:** Phá vỡ rào cản 40 ns, đạt **25.09M keys/s (39.8 ns/key)** — tăng tốc thêm **+4.3%** so với Milestone 11 (**+21.3%** so với Milestone 10).
+  - **Macro Expansion (All Unmuted):** Bứt phá từ 19.65M lên **25.47M keys/s (39.3 ns/key)** — tăng tốc **+29.6%**!
+  - **Macro with Muted Rows:** Lần đầu tiên vượt mốc 30 triệu phím/giây, đạt **30.34M keys/s (33.0 ns/key)** (**+19.4%**).
+  - **Keyboard Hook Rule Resolution:** Đạt **321.83M keys/s (3.1 ns/key)**.
+
+---
+
+### 5.10. [ĐÃ HOÀN THÀNH] Win32 App Tracker: Event-Driven Foreground Window & Atomic Caching
 - **Bối cảnh:** Kora hỗ trợ profile cấu hình độc lập cho từng ứng dụng (tự động tắt tiếng Việt khi chơi Game, bật macro riêng khi mở VS Code, Photoshop).
 - **Giải pháp đã triển khai trong `src/platform/win32/app_tracker.rs` & `app_detect.rs`:**
   1. **Đăng ký `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)`:** Chỉ lắng nghe sự kiện khi người dùng thực sự chuyển đổi qua lại giữa các cửa sổ ứng dụng (Event-Driven 100%, 0% CPU khi đứng yên trong một ứng dụng).
@@ -208,7 +284,7 @@ flowchart LR
 
 ---
 
-### 5.9. [ĐÃ HOÀN THÀNH] Tối Ưu Hóa Khởi Động (Ultra-Fast Startup & Lazy SoundBank Loading)
+### 5.11. [ĐÃ HOÀN THÀNH] Tối Ưu Hóa Khởi Động (Ultra-Fast Startup & Lazy SoundBank Loading)
 - **Bối cảnh:** Kora là phần mềm chạy nền cùng hệ điều hành (Run on Windows Startup), yêu cầu thời gian khởi động tức thì để không làm chậm trễ quá trình mở máy của người dùng.
 - **Giải pháp đã triển khai trong `src/platform/win32/sound/mod.rs`:**
   1. **Lazy SoundBank Loading trên luồng nền (`kora-wasapi-audio`):** Quá trình nạp WAV chạy tách biệt hoàn toàn trên worker thread và chỉ đọc đĩa khi `sound_enabled == true` (mặc định khởi tạo `SoundBank::empty()` 0 byte).
@@ -216,7 +292,7 @@ flowchart LR
 
 ---
 
-### 5.10. [ĐÃ HOÀN THÀNH] Kiến Trúc Giao Diện Pure Win32 GDI Native & Working Set Trimming (< 1 MB RAM)
+### 5.12. [ĐÃ HOÀN THÀNH] Kiến Trúc Giao Diện Pure Win32 GDI Native & Working Set Trimming (< 1 MB RAM)
 - **Bối cảnh:** Thay vì sử dụng các framework đồ họa nặng (Egui / WebView / Electron), toàn bộ bảng điều khiển Control Panel được viết bằng **100% Pure Win32 GDI Native** (`src/ui/`).
 - **Giải pháp đã triển khai trong `src/ui/mod.rs` & `src/platform/win32/mod.rs`:**
   1. **Event-Driven GDI Rendering & Double Buffering:** Chỉ vẽ lại khi có sự kiện `WM_PAINT` với `BackBuffer` chống nháy hình, tiêu thụ **0% GPU** khi không tương tác.

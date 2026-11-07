@@ -283,6 +283,18 @@ impl From<String> for CompactString {
     }
 }
 
+impl From<CompactString> for String {
+    #[inline]
+    fn from(s: CompactString) -> Self {
+        match s {
+            CompactString::Inline { buf, len } => unsafe {
+                std::str::from_utf8_unchecked(&buf[..len as usize]).to_string()
+            },
+            CompactString::Heap(s) => s,
+        }
+    }
+}
+
 impl From<char> for CompactString {
     #[inline]
     fn from(c: char) -> Self {

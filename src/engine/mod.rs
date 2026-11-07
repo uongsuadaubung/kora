@@ -301,15 +301,6 @@ impl VietnameseEngine {
 
     /// Feed a character into the engine with hardware Shift & CapsLock state.
     pub fn on_key(&mut self, ch: char, is_shift: bool, is_caps: bool) -> EngineAction {
-        let (bracket_w, auto_uppercase_first_char) = if self.is_active_global {
-            (self.config.bracket_w, self.config.auto_uppercase_first_char)
-        } else {
-            (
-                self.cached_effective_config.bracket_w,
-                self.cached_effective_config.auto_uppercase_first_char,
-            )
-        };
-
         let is_letter = if ch.is_ascii() {
             ch.is_ascii_alphabetic()
         } else {
@@ -317,11 +308,15 @@ impl VietnameseEngine {
         };
         let mut is_upper = (is_shift ^ is_caps) && is_letter;
 
-        // Auto-uppercase first letter after period or newline
-        if auto_uppercase_first_char
-            && self.auto_uppercase_next
+        // Auto-uppercase first letter after period or newline (only check if triggered)
+        if self.auto_uppercase_next
             && is_letter
             && self.buffer.is_empty()
+            && if self.is_active_global {
+                self.config.auto_uppercase_first_char
+            } else {
+                self.cached_effective_config.auto_uppercase_first_char
+            }
         {
             is_upper = true;
             self.auto_uppercase_next = false;
@@ -329,9 +324,16 @@ impl VietnameseEngine {
 
         // Letter Fast-Path: Hơn 95% thao tác gõ phím là chữ cái thông thường ('a'..'z', 'A'..'Z').
         // Nhờ điều kiện `!is_letter`, toàn bộ các chữ cái bỏ qua kiểm tra whitespace và bitmask ngắt từ
-        // ngay trong đúng 1 chu kỳ CPU mà không tốn lệnh rẽ nhánh phụ.
-        if !is_letter && (ch.is_whitespace() || TypingBuffer::is_word_break(ch, bracket_w)) {
-            return self.handle_word_break(ch);
+        // ngay trong đúng 1 chu kỳ CPU mà không tốn lệnh rẽ nhánh phụ hay đọc cấu hình bracket_w.
+        if !is_letter {
+            let bracket_w = if self.is_active_global {
+                self.config.bracket_w
+            } else {
+                self.cached_effective_config.bracket_w
+            };
+            if ch.is_whitespace() || TypingBuffer::is_word_break(ch, bracket_w) {
+                return self.handle_word_break(ch);
+            }
         }
 
         // Settings of the active (foreground app) profile, resolved over the global config
@@ -432,6 +434,24 @@ impl VietnameseEngine {
     }
 
     fn handle_word_break(&mut self, ch: char) -> EngineAction {
+        // Fast path: if buffer is empty, no macro expansion or spelling restoration needed
+        if self.buffer.is_empty() {
+            let auto_uppercase = if self.is_active_global {
+                self.config.auto_uppercase_first_char
+            } else {
+                self.cached_effective_config.auto_uppercase_first_char
+            };
+            if auto_uppercase && (ch == '.' || ch == '\n' || ch == '\r') {
+                self.auto_uppercase_next = true;
+            }
+            if ch == ' ' {
+                self.history.add_space();
+            } else {
+                self.history.clear();
+            }
+            return EngineAction::Passthrough;
+        }
+
         let (auto_uppercase, use_macro, restore_on_wrong_spelling) = if self.is_active_global {
             (
                 self.config.auto_uppercase_first_char,
@@ -449,16 +469,6 @@ impl VietnameseEngine {
         // Update auto-uppercase trigger
         if auto_uppercase && (ch == '.' || ch == '\n' || ch == '\r') {
             self.auto_uppercase_next = true;
-        }
-
-        // Fast path: if buffer is empty, no macro expansion or spelling restoration needed
-        if self.buffer.is_empty() {
-            if ch == ' ' {
-                self.history.add_space();
-            } else {
-                self.history.clear();
-            }
-            return EngineAction::Passthrough;
         }
 
         // O(1) Length Fast-Path: Với mọi từ tiếng Việt có dấu phụ hoặc dấu thanh (tiếng, việt, được, rất),
@@ -514,7 +524,7 @@ impl VietnameseEngine {
                     {
                         self.config.charset.encode_text(&output)
                     } else {
-                        output.into()
+                        output
                     };
                     return EngineAction::Replace {
                         backspaces,

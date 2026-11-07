@@ -75,6 +75,9 @@ impl State<Empty> {
         key: RawKey,
         config: &EngineConfig,
     ) -> Option<(SyllableState, EngineAction)> {
+        if key.ch != '[' && key.ch != ']' {
+            return None;
+        }
         if config.bracket_w && config.method.has_bracket_shortcuts() {
             let base = match key.ch {
                 '[' => BaseVowel::U,
@@ -253,6 +256,9 @@ impl State<Onset> {
         current_len: usize,
         config: &EngineConfig,
     ) -> Option<(SyllableState, EngineAction)> {
+        if key.ch != '[' && key.ch != ']' {
+            return None;
+        }
         if config.bracket_w && config.method.has_bracket_shortcuts() {
             let base = match key.ch {
                 '[' => BaseVowel::U,
@@ -460,7 +466,8 @@ impl State<Nucleus> {
         let is_telex = config.method.is_telex_family();
 
         // 1. Bracket W shortcuts: [[ -> [, ]] -> ]
-        if config.bracket_w
+        if (key.ch == '[' || key.ch == ']')
+            && config.bracket_w
             && config.method.has_bracket_shortcuts()
             && self.onset.is_none()
             && self.vowels.len() == 1
