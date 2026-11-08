@@ -690,6 +690,8 @@ fn test_inheritable_check_row_tri_state() {
         panic!("Expected WidgetKind::Checkbox in root row");
     }
 
+    assert_eq!(title_row.children.len(), 2); // Checkbox + Title, no badge in root
+
     // 2. Child profile: override_val is None -> inherited -> indeterminate=true (tri-state dash!)
     let child_inherited: Element<()> = inheritable_check_row(
         "Auto Start",
@@ -714,6 +716,7 @@ fn test_inheritable_check_row_tri_state() {
     } else {
         panic!("Expected WidgetKind::Checkbox in child inherited row");
     }
+    assert_eq!(title_row_child.children.len(), 3); // Checkbox + Title + Badge (Inherited)
 
     // 3. Child profile: override_val is Some(false) -> overridden -> indeterminate=false, checked=false
     let child_override: Element<()> = inheritable_check_row(
@@ -739,6 +742,96 @@ fn test_inheritable_check_row_tri_state() {
     } else {
         panic!("Expected WidgetKind::Checkbox in child overridden row");
     }
+    assert_eq!(title_row_ovr.children.len(), 2); // Checkbox + Title, no badge when overridden!
+}
+
+#[test]
+fn test_shortcut_row_tri_state_and_cycling() {
+    use kora::ui::views::control_panel::components::{
+        ShortcutRowProps, next_inheritable_state, shortcut_row,
+    };
+    use kora::ui_framework::core::*;
+
+    // 1. Verify 3-state cycling order for next_inheritable_state when global is ON
+    let s0 = None;
+    let s1 = next_inheritable_state(false, s0, true);
+    assert_eq!(s1, Some(false)); // 1. Inherited -> Overridden OFF
+    let s2 = next_inheritable_state(false, s1, true);
+    assert_eq!(s2, Some(true)); // 2. Overridden OFF -> Overridden ON
+    let s3 = next_inheritable_state(false, s2, true);
+    assert_eq!(s3, None); // 3. Overridden ON -> Reverts to Inherited (All 3 states!)
+
+    // 2. Verify 3-state cycling order when global is OFF
+    let s0_off = None;
+    let s1_off = next_inheritable_state(false, s0_off, false);
+    assert_eq!(s1_off, Some(true)); // 1. Inherited -> Overridden ON
+    let s2_off = next_inheritable_state(false, s1_off, false);
+    assert_eq!(s2_off, Some(false)); // 2. Overridden ON -> Overridden OFF
+    let s3_off = next_inheritable_state(false, s2_off, false);
+    assert_eq!(s3_off, None); // 3. Reverts to Inherited
+
+    // 3. Verify ShortcutRow rendering in Inherited state (indeterminate = true)
+    let indet_row: Element<()> = shortcut_row(ShortcutRowProps {
+        title: "Test Shortcut".to_string(),
+        desc: "Description".to_string(),
+        checked: Some((true, ())),
+        indeterminate: true,
+        status_badge: None,
+        origin_badge: Some(("🌐 Kế thừa: Bật".to_string(), Variant::Info)),
+        key_pill: "Ctrl+Shift".to_string(),
+        key_variant: Variant::Primary,
+        is_conflict: false,
+        action_btn: None,
+    });
+    let indet_layout = compute_layout(0, indet_row, 0, 0, 500);
+    // Root Row -> Left Col -> Row(header) -> Checkbox
+    let left_col = &indet_layout.children[0];
+    let header_row = &left_col.children[0];
+    let cb_node = &header_row.children[0];
+    if let WidgetKind::Checkbox {
+        checked,
+        indeterminate,
+        ..
+    } = &cb_node.element.kind
+    {
+        assert_eq!(*checked, true);
+        assert_eq!(*indeterminate, true); // Indeterminate 3rd state active!
+    } else {
+        panic!("Expected Checkbox in shortcut_row header");
+    }
+
+    // Origin badge present in Inherited state
+    assert_eq!(header_row.children.len(), 2); // Checkbox + Badge
+
+    // 4. Verify ShortcutRow rendering in Overridden state (indeterminate = false, badge = None)
+    let ovr_row: Element<()> = shortcut_row(ShortcutRowProps {
+        title: "Test Shortcut".to_string(),
+        desc: "Description".to_string(),
+        checked: Some((false, ())),
+        indeterminate: false,
+        status_badge: None,
+        origin_badge: None,
+        key_pill: "Ctrl+Shift".to_string(),
+        key_variant: Variant::Secondary,
+        is_conflict: false,
+        action_btn: None,
+    });
+    let ovr_layout = compute_layout(0, ovr_row, 0, 0, 500);
+    let left_col_ovr = &ovr_layout.children[0];
+    let header_row_ovr = &left_col_ovr.children[0];
+    let cb_node_ovr = &header_row_ovr.children[0];
+    if let WidgetKind::Checkbox {
+        checked,
+        indeterminate,
+        ..
+    } = &cb_node_ovr.element.kind
+    {
+        assert_eq!(*checked, false);
+        assert_eq!(*indeterminate, false);
+    } else {
+        panic!("Expected Checkbox in shortcut_row header");
+    }
+    assert_eq!(header_row_ovr.children.len(), 1); // Only Checkbox, no badge!
 }
 
 #[test]

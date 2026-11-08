@@ -85,19 +85,13 @@ pub fn inheritable_check_row<M: Clone + Send + Sync + 'static>(
             .into_element(),
         text(label).bold().into_element(),
     ];
-    if !is_root {
-        let (badge_txt, badge_var) = match override_val {
-            None => (
-                if global_val {
-                    strings.check_inherit_on
-                } else {
-                    strings.check_inherit_off
-                },
-                Variant::Secondary,
-            ),
-            Some(_) => (strings.origin_app_specific, Variant::Purple),
+    if !is_root && override_val.is_none() {
+        let (badge_txt, badge_var) = if global_val {
+            (strings.badge_inherited_on, Variant::Info)
+        } else {
+            (strings.badge_inherited_off, Variant::Secondary)
         };
-        title_row.push(badge(badge_txt, badge_var).into());
+        title_row.push(badge(badge_txt, badge_var).pill().into());
     }
 
     let mut left_col = vec![row(title_row).items_center().gap(2)];
@@ -161,6 +155,7 @@ pub struct ShortcutRowProps<M> {
     pub title: String,
     pub desc: String,
     pub checked: Option<(bool, M)>,
+    pub indeterminate: bool,
     pub status_badge: Option<(String, Variant)>,
     pub origin_badge: Option<(String, Variant)>,
     pub key_pill: String,
@@ -174,16 +169,20 @@ pub fn shortcut_row<M: Clone + Send + Sync + 'static>(props: ShortcutRowProps<M>
     let mut header_items: Vec<Element<M>> = Vec::new();
 
     if let Some((is_on, toggle_msg)) = props.checked {
-        header_items.push(checkbox(props.title, is_on, move |_| toggle_msg.clone()).into());
+        header_items.push(
+            checkbox(props.title, is_on, move |_| toggle_msg.clone())
+                .indeterminate(props.indeterminate)
+                .into(),
+        );
     } else {
         header_items.push(text(props.title).bold().into());
     }
 
     if let Some((b_txt, b_var)) = props.origin_badge {
-        header_items.push(badge(b_txt, b_var).into());
+        header_items.push(badge(b_txt, b_var).pill().into());
     }
     if let Some((s_txt, s_var)) = props.status_badge {
-        header_items.push(badge(s_txt, s_var).into());
+        header_items.push(badge(s_txt, s_var).pill().into());
     }
 
     let desc_el: Element<M> = if props.is_conflict {
@@ -192,7 +191,7 @@ pub fn shortcut_row<M: Clone + Send + Sync + 'static>(props: ShortcutRowProps<M>
         text(props.desc).muted().size(Size::Sm).into()
     };
 
-    let mut right_items: Vec<Element<M>> = vec![badge(props.key_pill, props.key_variant).into()];
+    let mut right_items: Vec<Element<M>> = vec![badge(props.key_pill, props.key_variant).pill().into()];
     if let Some((btn_label, btn_var, btn_msg)) = props.action_btn {
         right_items.push(button(btn_label, btn_var, btn_msg).size(Size::Sm).into());
     }

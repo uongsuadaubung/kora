@@ -347,12 +347,14 @@ impl TabKeys {
         disabled: &[ResolvedDisableItem],
         key_macros: &[ResolvedKeyMacroItem],
     ) {
-        let (remap_on, disable_on, macro_on, switch_key, switch_key_enabled, switch_key_origin) =
+        let (remap_on, disable_on, macro_on, switch_key, switch_key_enabled, switch_override, global_switch_enabled, switch_key_origin, is_root) =
             crate::ui::controller::with_engine(|e| {
                 let pm = &e.profile_manager;
                 let sel_id = &pm.selected_id;
+                let is_root = sel_id == crate::ui::GLOBAL_PROFILE_ID;
                 let eff = pm.resolve_effective_config(sel_id, e.config());
-                let origin = if sel_id == crate::ui::GLOBAL_PROFILE_ID {
+                let switch_override = pm.get_profile(sel_id).and_then(|p| p.switch_key_enabled);
+                let origin = if is_root {
                     crate::engine::profile::RuleOrigin::Root
                 } else if pm
                     .get_profile(sel_id)
@@ -369,7 +371,10 @@ impl TabKeys {
                     eff.key_macro_enabled,
                     eff.switch_key,
                     eff.switch_key_enabled,
+                    switch_override,
+                    e.config().switch_key_enabled,
                     origin,
+                    is_root,
                 )
             })
             .unwrap_or((
@@ -378,7 +383,10 @@ impl TabKeys {
                 false,
                 crate::engine::config::Hotkey::default(),
                 false,
+                None,
+                false,
                 crate::engine::profile::RuleOrigin::Root,
+                true,
             ));
 
         let diag = self.overview.populate(
@@ -390,7 +398,10 @@ impl TabKeys {
             macro_on,
             switch_key,
             switch_key_enabled,
+            switch_override,
+            global_switch_enabled,
             switch_key_origin,
+            is_root,
         );
 
         let strings = crate::language::current();

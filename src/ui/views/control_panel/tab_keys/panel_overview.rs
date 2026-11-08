@@ -11,7 +11,9 @@ use crate::engine::profile::{
     RuleOrigin, check_profile_conflicts,
 };
 use crate::language::LanguageStrings;
-use crate::ui::views::control_panel::components::{ShortcutRowProps, shortcut_row};
+use crate::ui::views::control_panel::components::{
+    ShortcutRowProps, next_inheritable_state, shortcut_row,
+};
 use crate::ui::views::control_panel::tab_keys::SUB_CARD_Y;
 use crate::ui_framework::core::*;
 use crate::ui_framework::tokens::layout;
@@ -22,7 +24,7 @@ use std::ptr::null_mut;
 
 #[derive(Clone, Debug)]
 pub enum OverviewMsg {
-    ToggleSwitchKey,
+    ToggleSwitchKey(Option<bool>),
     OpenSwitchHotkeyDialog,
     ToggleRemapMuted(u32, bool),
     OpenRemapDialog(u32, u32),
@@ -97,7 +99,10 @@ impl OverviewPanel {
         key_macro_enabled: bool,
         switch_key: Hotkey,
         switch_key_enabled: bool,
+        switch_override: Option<bool>,
+        global_switch_enabled: bool,
         switch_key_origin: RuleOrigin,
+        is_root: bool,
     ) -> KeyDiagnostics {
         let strings = crate::language::current();
         let diag = check_profile_conflicts(
@@ -122,7 +127,10 @@ impl OverviewPanel {
             key_macro_enabled,
             switch_key,
             switch_key_enabled,
+            switch_override,
+            global_switch_enabled,
             switch_key_origin,
+            is_root,
         );
         self.surface.render(tree);
         diag
@@ -140,7 +148,10 @@ impl OverviewPanel {
         key_macro_enabled: bool,
         switch_key: Hotkey,
         switch_key_enabled: bool,
-        switch_key_origin: RuleOrigin,
+        switch_override: Option<bool>,
+        global_switch_enabled: bool,
+        _switch_key_origin: RuleOrigin,
+        is_root: bool,
     ) -> Element<OverviewMsg> {
         let mut sections: Vec<Element<OverviewMsg>> = Vec::new();
 
@@ -173,21 +184,18 @@ impl OverviewPanel {
             sections.push(alert(Variant::Warning, title, details.join("\n")));
         }
 
-        let origin_badge_for = |origin: RuleOrigin| -> (String, Variant) {
+        let origin_badge_for = |origin: RuleOrigin| -> Option<(String, Variant)> {
+            if is_root {
+                return None;
+            }
             match origin {
-                RuleOrigin::Root => (strings.origin_root.to_string(), Variant::Secondary),
-                RuleOrigin::InheritedGlobal => (
-                    origin.localized_badge_label(strings).to_string(),
-                    Variant::Info,
-                ),
-                RuleOrigin::AppSpecific | RuleOrigin::OverriddenGlobal => (
-                    origin.localized_badge_label(strings).to_string(),
-                    Variant::Purple,
-                ),
-                RuleOrigin::MutedGlobal => (
-                    origin.localized_badge_label(strings).to_string(),
-                    Variant::Secondary,
-                ),
+                RuleOrigin::InheritedGlobal => {
+                    Some((strings.badge_inherited_on.to_string(), Variant::Info))
+                }
+                RuleOrigin::MutedGlobal => {
+                    Some((strings.badge_inherited_off.to_string(), Variant::Secondary))
+                }
+                RuleOrigin::Root | RuleOrigin::AppSpecific | RuleOrigin::OverriddenGlobal => None,
             }
         };
 
@@ -196,27 +204,40 @@ impl OverviewPanel {
             .conflicts
             .iter()
             .find(|c| c.shadowed == ConflictFeature::SwitchKey);
-        let switch_status = if let Some(c) = switch_conflict {
-            (
+        let switch_conflict_status = if let Some(c) = switch_conflict {
+            Some((
                 strings
                     .status_shadowed_by
                     .replace("{feature}", c.winner.localized_name(strings)),
                 Variant::Warning,
-            )
-        } else if switch_key_enabled {
-            (strings.status_active.to_string(), Variant::Success)
+            ))
         } else {
-            (strings.status_disabled.to_string(), Variant::Secondary)
+            None
+        };
+
+        let (switch_origin, switch_indeterminate, switch_next_opt) = if is_root {
+            (None, false, Some(!global_switch_enabled))
+        } else {
+            let next_opt = next_inheritable_state(false, switch_override, global_switch_enabled);
+            let (badge_opt, is_indet) = match switch_override {
+                None => {
+                    let b = if global_switch_enabled {
+                        Some((strings.badge_inherited_on.to_string(), Variant::Info))
+                    } else {
+                        Some((strings.badge_inherited_off.to_string(), Variant::Secondary))
+                    };
+                    (b, true)
+                }
+                Some(_) => (None, false),
+            };
+
+            (badge_opt, is_indet, next_opt)
         };
 
         let group1_header = row(elements![
-            row(elements![
-                text(format!("⌨️ {}", strings.feature_switch_key)).bold(),
-                badge("1", Variant::Primary),
-            ])
-            .items_center()
-            .gap(2)
-            .flex_1(),
+            text(format!("⌨️ {}", strings.overview_group_switch))
+                .bold()
+                .flex_1(),
             badge(
                 if diag.is_healthy() {
                     strings.overview_healthy.to_string()
@@ -238,9 +259,10 @@ impl OverviewPanel {
         let switch_row = shortcut_row(ShortcutRowProps {
             title: strings.typing_group_switch.to_string(),
             desc: strings.action_toggle_vietnamese.to_string(),
-            checked: Some((switch_key_enabled, OverviewMsg::ToggleSwitchKey)),
-            status_badge: Some(switch_status),
-            origin_badge: Some(origin_badge_for(switch_key_origin)),
+            checked: Some((switch_key_enabled, OverviewMsg::ToggleSwitchKey(switch_next_opt))),
+            indeterminate: switch_indeterminate,
+            status_badge: switch_conflict_status,
+            origin_badge: switch_origin,
             key_pill: switch_key.display_text(),
             key_variant: if switch_conflict.is_some() {
                 Variant::Warning
@@ -260,13 +282,9 @@ impl OverviewPanel {
 
         // 3. Group 2: Key Remap (Đổi phím)
         let group2_header = row(elements![
-            row(elements![
-                text(format!("🔄 {}", strings.feature_remap)).bold(),
-                badge(remaps.len().to_string(), Variant::Primary),
-            ])
-            .items_center()
-            .gap(2)
-            .flex_1(),
+            text(format!("🔄 {}", strings.feature_remap))
+                .bold()
+                .flex_1(),
             button(
                 format!("{} ➜", strings.keys_sub_remap),
                 Variant::Ghost,
@@ -292,19 +310,18 @@ impl OverviewPanel {
                     remap_rows.push(divider());
                 }
                 let shadowed = diag.is_shadowed(r.from_vk, ConflictFeature::Remap);
-                let status = if let Some(c) = shadowed {
-                    (
+                let conflict_status = if let Some(c) = shadowed {
+                    Some((
                         strings
                             .status_shadowed_by
                             .replace("{feature}", c.winner.localized_name(strings)),
                         Variant::Warning,
-                    )
-                } else if r.is_active && remap_enabled {
-                    (strings.status_active.to_string(), Variant::Success)
+                    ))
                 } else {
-                    (strings.status_disabled.to_string(), Variant::Secondary)
+                    None
                 };
 
+                let is_indet = !is_root && r.origin == RuleOrigin::InheritedGlobal;
                 remap_rows.push(shortcut_row(ShortcutRowProps {
                     title: format!("{} ➜ {}", r.from_name, r.to_name),
                     desc: strings.feature_remap.to_string(),
@@ -312,8 +329,9 @@ impl OverviewPanel {
                         r.is_active && remap_enabled,
                         OverviewMsg::ToggleRemapMuted(r.from_vk, r.is_active),
                     )),
-                    status_badge: Some(status),
-                    origin_badge: Some(origin_badge_for(r.origin)),
+                    indeterminate: is_indet,
+                    status_badge: conflict_status,
+                    origin_badge: origin_badge_for(r.origin),
                     key_pill: format!("{} ➜ {}", r.from_name, r.to_name),
                     key_variant: if shadowed.is_some() {
                         Variant::Warning
@@ -335,13 +353,9 @@ impl OverviewPanel {
 
         // 4. Group 3: Key Disabling (Khóa phím)
         let group3_header = row(elements![
-            row(elements![
-                text(format!("🚫 {}", strings.feature_disable)).bold(),
-                badge(disabled.len().to_string(), Variant::Primary),
-            ])
-            .items_center()
-            .gap(2)
-            .flex_1(),
+            text(format!("🚫 {}", strings.feature_disable))
+                .bold()
+                .flex_1(),
             button(
                 format!("{} ➜", strings.keys_sub_disable),
                 Variant::Ghost,
@@ -367,18 +381,15 @@ impl OverviewPanel {
                     disable_rows.push(divider());
                 }
                 let is_on = d.is_active && disable_enabled;
-                let status = if is_on {
-                    (strings.status_active.to_string(), Variant::Success)
-                } else {
-                    (strings.status_disabled.to_string(), Variant::Secondary)
-                };
+                let is_indet = !is_root && d.origin == RuleOrigin::InheritedGlobal;
 
                 disable_rows.push(shortcut_row(ShortcutRowProps {
                     title: d.key_name.clone(),
                     desc: strings.status_blocked.to_string(),
                     checked: Some((is_on, OverviewMsg::ToggleDisableMuted(d.vk, d.is_active))),
-                    status_badge: Some(status),
-                    origin_badge: Some(origin_badge_for(d.origin)),
+                    indeterminate: is_indet,
+                    status_badge: None,
+                    origin_badge: origin_badge_for(d.origin),
                     key_pill: format!("🚫 {}", d.key_name),
                     key_variant: if is_on {
                         Variant::Danger
@@ -398,13 +409,9 @@ impl OverviewPanel {
 
         // 5. Group 4: Key Macros (Phím Macro)
         let group4_header = row(elements![
-            row(elements![
-                text(format!("⚡ {}", strings.feature_key_macro)).bold(),
-                badge(key_macros.len().to_string(), Variant::Primary),
-            ])
-            .items_center()
-            .gap(2)
-            .flex_1(),
+            text(format!("⚡ {}", strings.feature_key_macro))
+                .bold()
+                .flex_1(),
             button(
                 format!("{} ➜", strings.keys_sub_macro),
                 Variant::Ghost,
@@ -431,17 +438,15 @@ impl OverviewPanel {
                 }
                 let shadowed = diag.is_shadowed(m.trigger_vk, ConflictFeature::KeyMacro);
                 let is_on = m.is_active && key_macro_enabled;
-                let status = if let Some(c) = shadowed {
-                    (
+                let conflict_status = if let Some(c) = shadowed {
+                    Some((
                         strings
                             .status_shadowed_by
                             .replace("{feature}", c.winner.localized_name(strings)),
                         Variant::Warning,
-                    )
-                } else if is_on {
-                    (strings.status_active.to_string(), Variant::Success)
+                    ))
                 } else {
-                    (strings.status_disabled.to_string(), Variant::Secondary)
+                    None
                 };
 
                 let trigger_display = if !m.trigger_name.is_empty() {
@@ -463,6 +468,7 @@ impl OverviewPanel {
                     strings.feature_key_macro.to_string()
                 };
 
+                let is_indet = !is_root && m.origin == RuleOrigin::InheritedGlobal;
                 macro_rows.push(shortcut_row(ShortcutRowProps {
                     title: m.name.clone(),
                     desc,
@@ -470,8 +476,9 @@ impl OverviewPanel {
                         is_on,
                         OverviewMsg::ToggleKeyMacroMuted(m.trigger_vk, m.is_active),
                     )),
-                    status_badge: Some(status),
-                    origin_badge: Some(origin_badge_for(m.origin)),
+                    indeterminate: is_indet,
+                    status_badge: conflict_status,
+                    origin_badge: origin_badge_for(m.origin),
                     key_pill: format!("⚡ {}", trigger_display),
                     key_variant: if shadowed.is_some() {
                         Variant::Warning
@@ -502,14 +509,13 @@ impl OverviewPanel {
         use crate::ui::controller::{self, EditTarget};
 
         match msg {
-            OverviewMsg::ToggleSwitchKey => {
+            OverviewMsg::ToggleSwitchKey(next_opt) => {
                 controller::edit_selected(|target| match target {
                     EditTarget::Global(cfg) => {
-                        cfg.switch_key_enabled = !cfg.switch_key_enabled;
+                        cfg.switch_key_enabled = next_opt.unwrap_or(!cfg.switch_key_enabled);
                     }
                     EditTarget::Child(prof) => {
-                        let cur = prof.switch_key_enabled.unwrap_or(true);
-                        prof.switch_key_enabled = Some(!cur);
+                        prof.switch_key_enabled = next_opt;
                     }
                 });
                 if let Some(c) = crate::ui::controls() {
