@@ -1,8 +1,8 @@
-//! Zero-Allocation GDI Drawing Helpers & Double-Buffering BackBuffer
+//! Double-Buffering Off-Screen BackBuffer & GDI Fast Fill Primitives
 //!
-//! Cung cấp các hàm vẽ đồ họa tối ưu hóa:
-//! - Sử dụng trực tiếp Stock Objects (`DC_BRUSH`, `DC_PEN`), không tạo và không rò rỉ GDI Handle.
-//! - Bộ đệm vẽ hai lớp (`BackBuffer`) tự động BitBlt khi Drop, triệt tiêu hiện tượng giật nháy màn hình.
+//! Cung cấp hạ tầng bộ đệm khung hình chống giật nháy:
+//! - [`BackBuffer`]: Tạo Device Context phụ ngoài màn hình và tự động `BitBlt` khi Drop.
+//! - Các tiện ích GDI cơ bản (`fill_rect_color`, `draw_line`, `rgb`).
 
 use super::ffi::*;
 use super::types::*;
