@@ -605,7 +605,14 @@ impl PushButton {
                 }
             };
 
-            round_rect(hdc, rc, radius, btn_color, Some(border_color));
+            if let Some(g) = crate::ui_framework::core::surface::gdiplus_draw::GdiGraphics::new(hdc) {
+                g.round_rect(
+                    rc,
+                    radius as f32,
+                    Some(colorref_to_argb(btn_color, 255)),
+                    Some((colorref_to_argb(border_color, 255), 1.0)),
+                );
+            }
 
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, text_color);

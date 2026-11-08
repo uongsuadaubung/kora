@@ -67,6 +67,15 @@ impl GdiGraphics {
         }
     }
 
+    /// Vẽ đường thẳng khử răng cưa (Antialiased Straight Line).
+    pub fn draw_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, color_argb: u32, width: f32) {
+        if let Some(pen) = GdiPen::new(color_argb, width) {
+            unsafe {
+                GdipDrawLine(self.0, pen.raw(), x1, y1, x2, y2);
+            }
+        }
+    }
+
     /// Vẽ hình chữ nhật bo góc khử răng cưa (Smooth Antialiased RoundRect).
     /// Áp dụng thuật toán nối 4 cung tròn (Arc) chuẩn xác từng subpixel.
     pub fn round_rect(

@@ -271,13 +271,14 @@ impl TabKeys {
             right: right_bound,
             bottom: layout::CARD_BOTTOM_Y,
         };
-        crate::ui::win32::round_rect(
-            hdc,
-            &rc,
-            radii::RADIUS_MD,
-            palette.bg_card,
-            Some(palette.border),
-        );
+        if let Some(g) = crate::ui_framework::core::surface::gdiplus_draw::GdiGraphics::new(hdc) {
+            g.round_rect(
+                &rc,
+                radii::RADIUS_MD as f32,
+                Some(crate::ui_framework::win32::colorref_to_argb(palette.bg_card, 255)),
+                Some((crate::ui_framework::win32::colorref_to_argb(palette.border, 255), 1.0)),
+            );
+        }
     }
 
     pub fn render_active_subpanel(&self) {

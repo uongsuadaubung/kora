@@ -79,6 +79,15 @@ unsafe extern "system" {
     pub fn GdipAddPathLine(path: isize, x1: f32, y1: f32, x2: f32, y2: f32) -> i32;
     pub fn GdipClosePathFigure(path: isize) -> i32;
 
+    pub fn GdipDrawLine(
+        graphics: isize,
+        pen: isize,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+    ) -> i32;
+
     pub fn GdipFillPath(graphics: isize, brush: isize, path: isize) -> i32;
     pub fn GdipDrawPath(graphics: isize, pen: isize, path: isize) -> i32;
 
