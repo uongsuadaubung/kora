@@ -605,7 +605,7 @@ impl PushButton {
                 }
             };
 
-            if let Some(g) = crate::ui_framework::core::surface::gdiplus_draw::GdiGraphics::new(hdc) {
+            if let Some(g) = crate::ui_framework::core::surface::canvas::GdiGraphics::new(hdc) {
                 g.round_rect(
                     rc,
                     radius as f32,

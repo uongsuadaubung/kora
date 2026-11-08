@@ -271,7 +271,7 @@ impl TabKeys {
             right: right_bound,
             bottom: layout::CARD_BOTTOM_Y,
         };
-        if let Some(g) = crate::ui_framework::core::surface::gdiplus_draw::GdiGraphics::new(hdc) {
+        if let Some(g) = crate::ui_framework::core::surface::canvas::GdiGraphics::new(hdc) {
             g.round_rect(
                 &rc,
                 radii::RADIUS_MD as f32,

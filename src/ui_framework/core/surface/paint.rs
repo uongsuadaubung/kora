@@ -4,7 +4,7 @@
 //! styling, theme palette colors (Dark / Light), hover states, accent borders,
 //! drop shadows, and top-layer select dropdown overlays.
 
-use super::gdiplus_draw::*;
+use super::canvas::*;
 use super::types::*;
 use crate::ui_framework::colors::ThemePalette;
 use crate::ui_framework::core::element::*;
@@ -279,33 +279,33 @@ pub(crate) fn paint_node_layer<M>(
     }
 
     if style.border_bottom {
-        draw_line(
-            hdc,
-            rc.left,
-            rc.bottom - 1,
-            rc.right,
-            rc.bottom - 1,
-            palette.border_separator,
+        graphics.draw_line(
+            rc.left as f32,
+            (rc.bottom - 1) as f32,
+            rc.right as f32,
+            (rc.bottom - 1) as f32,
+            colorref_to_argb(palette.border_separator, 255),
+            1.0,
         );
     }
     if style.border_top {
-        draw_line(
-            hdc,
-            rc.left,
-            rc.top,
-            rc.right,
-            rc.top,
-            palette.border_separator,
+        graphics.draw_line(
+            rc.left as f32,
+            rc.top as f32,
+            rc.right as f32,
+            rc.top as f32,
+            colorref_to_argb(palette.border_separator, 255),
+            1.0,
         );
     }
     if style.border_right {
-        draw_line(
-            hdc,
-            rc.right - 1,
-            rc.top,
-            rc.right - 1,
-            rc.bottom,
-            palette.border_separator,
+        graphics.draw_line(
+            (rc.right - 1) as f32,
+            rc.top as f32,
+            (rc.right - 1) as f32,
+            rc.bottom as f32,
+            colorref_to_argb(palette.border_separator, 255),
+            1.0,
         );
     }
 

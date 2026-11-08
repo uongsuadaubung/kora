@@ -657,7 +657,16 @@ pub unsafe extern "system" fn key_macro_dialog_wnd_proc(
                 SelectObject(hdc, old_font);
 
                 // Footer divider line
-                draw_line(hdc, 0, 406, client_rc.right, 406, palette.border_separator);
+                if let Some(g) = crate::ui_framework::core::surface::canvas::GdiGraphics::new(hdc) {
+                    g.draw_line(
+                        0.0,
+                        406.0,
+                        client_rc.right as f32,
+                        406.0,
+                        crate::ui_framework::win32::colorref_to_argb(palette.border_separator, 255),
+                        1.0,
+                    );
+                }
 
                 EndPaint(hwnd, &ps);
                 0

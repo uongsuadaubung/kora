@@ -2,7 +2,7 @@
 //!
 //! Cung cấp hạ tầng bộ đệm khung hình chống giật nháy:
 //! - [`BackBuffer`]: Tạo Device Context phụ ngoài màn hình và tự động `BitBlt` khi Drop.
-//! - Các tiện ích GDI cơ bản (`fill_rect_color`, `draw_line`, `rgb`).
+//! - Các tiện ích GDI cơ bản (`fill_rect_color`, `rgb`).
 
 use super::ffi::*;
 use super::types::*;
@@ -18,17 +18,6 @@ pub fn fill_rect_color(hdc: isize, rc: &RECT, color: u32) {
 #[inline]
 pub const fn rgb(r: u8, g: u8, b: u8) -> u32 {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
-}
-
-/// 1px straight line from (x1, y1) to (x2, y2).
-pub fn draw_line(hdc: isize, x1: i32, y1: i32, x2: i32, y2: i32, color: u32) {
-    unsafe {
-        SetDCPenColor(hdc, color);
-        let old_pen = SelectObject(hdc, GetStockObject(DC_PEN));
-        MoveToEx(hdc, x1, y1, std::ptr::null_mut());
-        LineTo(hdc, x2, y2);
-        SelectObject(hdc, old_pen);
-    }
 }
 
 /// Off-screen buffer for flicker-free painting. Draw into [`BackBuffer::hdc`];

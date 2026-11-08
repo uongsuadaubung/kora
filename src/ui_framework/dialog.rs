@@ -437,14 +437,16 @@ pub fn draw_dialog_footer(
         bottom: client_h,
     };
     fill_rect_color(hdc, &rc_footer, palette.bg_sidebar);
-    draw_line(
-        hdc,
-        0,
-        footer_y,
-        client_w,
-        footer_y,
-        palette.border_separator,
-    );
+    if let Some(g) = crate::ui_framework::core::surface::canvas::GdiGraphics::new(hdc) {
+        g.draw_line(
+            0.0,
+            footer_y as f32,
+            client_w as f32,
+            footer_y as f32,
+            colorref_to_argb(palette.border_separator, 255),
+            1.0,
+        );
+    }
 
     if let Some(text) = footer_text {
         unsafe {
