@@ -4,6 +4,7 @@
 //! styling, theme palette colors (Dark / Light), hover states, accent borders,
 //! drop shadows, and top-layer select dropdown overlays.
 
+use super::gdiplus_draw::*;
 use super::types::*;
 use crate::ui_framework::colors::ThemePalette;
 use crate::ui_framework::core::element::*;
@@ -29,6 +30,7 @@ pub(crate) fn paint_surface<M>(
         fill_rect_color(hdc, client_rc, bg_color);
     }
 
+    let graphics = GdiGraphics::new(hdc);
     let scroll_y = guard.scroll_y;
     let viewport_h = client_rc.bottom - client_rc.top;
     let hover_id = guard.hover_node_id;
@@ -45,6 +47,7 @@ pub(crate) fn paint_surface<M>(
         for &z in &z_levels {
             paint_node_layer(
                 hdc,
+                graphics.as_ref(),
                 root,
                 scroll_y,
                 viewport_h,
@@ -82,7 +85,16 @@ pub(crate) fn paint_surface<M>(
             right: guard.content_w + 7,
             bottom: thumb_top + thumb_h,
         };
-        round_rect(hdc, &thumb_rc, 4, thumb_color, None);
+        if let Some(ref g) = graphics {
+            g.round_rect(
+                &thumb_rc,
+                2.0,
+                Some(colorref_to_argb(thumb_color, 255)),
+                None,
+            );
+        } else {
+            round_rect(hdc, &thumb_rc, 4, thumb_color, None);
+        }
     }
 
     // 4. Paint top-layer open Select dropdown overlay (z-index: top) with Fluent elevation shadow
@@ -90,48 +102,73 @@ pub(crate) fn paint_surface<M>(
         let menu_rc = compute_dropdown_menu_rect(sel, scroll_y, viewport_h);
         if rect_intersects(&menu_rc, clip_rc) {
             draw_elevation_shadow(hdc, &menu_rc, radii::RADIUS_MD, 4, is_current_dark());
-            round_rect(
-                hdc,
-                &menu_rc,
-                radii::RADIUS_MD,
-                palette.bg_card,
-                Some(palette.accent),
-            );
+            if let Some(ref g) = graphics {
+                g.round_rect(
+                    &menu_rc,
+                    radii::RADIUS_MD as f32,
+                    Some(colorref_to_argb(palette.bg_card, 255)),
+                    Some((colorref_to_argb(palette.accent, 255), 1.0)),
+                );
+            } else {
+                round_rect(
+                    hdc,
+                    &menu_rc,
+                    radii::RADIUS_MD,
+                    palette.bg_card,
+                    Some(palette.accent),
+                );
+            }
 
-        unsafe {
-            SetBkMode(hdc, TRANSPARENT);
-            let font_norm = resolve_font_handle(FontScale::Normal);
-            let font_bold = resolve_font_handle(FontScale::Bold);
+            unsafe {
+                SetBkMode(hdc, TRANSPARENT);
+                let font_norm = resolve_font_handle(FontScale::Normal);
+                let font_bold = resolve_font_handle(FontScale::Bold);
 
-            for (i, opt) in sel.options.iter().enumerate() {
-                let item_top = menu_rc.top + 2 + i as i32 * SELECT_ITEM_H;
-                if item_top + SELECT_ITEM_H > menu_rc.bottom {
-                    break;
-                }
-                let item_rc = RECT {
-                    left: menu_rc.left + 2,
-                    top: item_top,
-                    right: menu_rc.right - 2,
-                    bottom: item_top + SELECT_ITEM_H,
-                };
-                let is_sel = i == sel.selected;
-                let is_hov = sel.hover_idx == Some(i);
+                for (i, opt) in sel.options.iter().enumerate() {
+                    let item_top = menu_rc.top + 2 + i as i32 * SELECT_ITEM_H;
+                    if item_top + SELECT_ITEM_H > menu_rc.bottom {
+                        break;
+                    }
+                    let item_rc = RECT {
+                        left: menu_rc.left + 2,
+                        top: item_top,
+                        right: menu_rc.right - 2,
+                        bottom: item_top + SELECT_ITEM_H,
+                    };
+                    let is_sel = i == sel.selected;
+                    let is_hov = sel.hover_idx == Some(i);
 
-                if is_hov {
-                    round_rect(hdc, &item_rc, 4, palette.accent, None);
-                } else if is_sel {
-                    round_rect(hdc, &item_rc, 4, palette.tab_active_bg, None);
-                }
+                    if let Some(ref g) = graphics {
+                        if is_hov {
+                            g.round_rect(
+                                &item_rc,
+                                4.0,
+                                Some(colorref_to_argb(palette.accent, 255)),
+                                None,
+                            );
+                        } else if is_sel {
+                            g.round_rect(
+                                &item_rc,
+                                4.0,
+                                Some(colorref_to_argb(palette.tab_active_bg, 255)),
+                                None,
+                            );
+                        }
+                    } else if is_hov {
+                        round_rect(hdc, &item_rc, 4, palette.accent, None);
+                    } else if is_sel {
+                        round_rect(hdc, &item_rc, 4, palette.tab_active_bg, None);
+                    }
 
-                let txt_color = if is_hov {
-                    palette.text_white
-                } else if is_sel {
-                    palette.accent
-                } else {
-                    palette.text_primary
-                };
-                SetTextColor(hdc, txt_color);
-                SelectObject(hdc, if is_sel { font_bold } else { font_norm });
+                    let txt_color = if is_hov {
+                        palette.text_white
+                    } else if is_sel {
+                        palette.accent
+                    } else {
+                        palette.text_primary
+                    };
+                    SetTextColor(hdc, txt_color);
+                    SelectObject(hdc, if is_sel { font_bold } else { font_norm });
 
                 let mut text_rc = RECT {
                     left: item_rc.left + 10,
@@ -172,6 +209,7 @@ pub(crate) fn paint_surface<M>(
 
 pub(crate) fn paint_node_layer<M>(
     hdc: isize,
+    graphics: Option<&GdiGraphics>,
     node: &LayoutNode<M>,
     scroll_y: i32,
     viewport_h: i32,
@@ -232,9 +270,23 @@ pub(crate) fn paint_node_layer<M>(
                     SelectObject(hdc, op);
                     DeleteObject(pen);
                 }
+            } else if let Some(g) = graphics {
+                g.round_rect(
+                    &rc,
+                    radius as f32,
+                    Some(colorref_to_argb(fill, 255)),
+                    Some((colorref_to_argb(b_col, 255), 1.0)),
+                );
             } else {
                 round_rect(hdc, &rc, radius, fill, Some(b_col));
             }
+        } else if let Some(g) = graphics {
+            g.round_rect(
+                &rc,
+                radius as f32,
+                Some(colorref_to_argb(fill, 255)),
+                None,
+            );
         } else {
             round_rect(hdc, &rc, radius, fill, None);
         }
@@ -249,7 +301,11 @@ pub(crate) fn paint_node_layer<M>(
             right: (rc.left + bar_w).min(rc.right),
             bottom: rc.bottom - 2,
         };
-        round_rect(hdc, &bar_rc, 4, bar_col, None);
+        if let Some(g) = graphics {
+            g.round_rect(&bar_rc, 2.0, Some(colorref_to_argb(bar_col, 255)), None);
+        } else {
+            round_rect(hdc, &bar_rc, 4, bar_col, None);
+        }
     }
 
     if style.border_bottom {
@@ -399,7 +455,16 @@ pub(crate) fn paint_node_layer<M>(
                 } else {
                     radii::RADIUS_MD
                 };
-                round_rect(hdc, &rc, rad, bg, Some(border));
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &rc,
+                        rad as f32,
+                        Some(colorref_to_argb(bg, 255)),
+                        Some((colorref_to_argb(border, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(hdc, &rc, rad, bg, Some(border));
+                }
                 let hf = resolve_font_handle(FontScale::Bold);
                 let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
                 SetTextColor(
@@ -438,7 +503,16 @@ pub(crate) fn paint_node_layer<M>(
                 } else {
                     variant.colors(palette, is_hover)
                 };
-                round_rect(hdc, &rc, radii::RADIUS_MD, bg, Some(border));
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &rc,
+                        radii::RADIUS_MD as f32,
+                        Some(colorref_to_argb(bg, 255)),
+                        Some((colorref_to_argb(border, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(hdc, &rc, radii::RADIUS_MD, bg, Some(border));
+                }
                 let hf = resolve_font_handle(FontScale::Bold);
                 let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
                 SetTextColor(hdc, fg);
@@ -493,7 +567,18 @@ pub(crate) fn paint_node_layer<M>(
                         },
                     )
                 };
-                round_rect(hdc, &sw_rc, sw_h, track_bg, Some(track_border));
+
+                let track_r = sw_h as f32 / 2.0;
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &sw_rc,
+                        track_r,
+                        Some(colorref_to_argb(track_bg, 255)),
+                        Some((colorref_to_argb(track_border, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(hdc, &sw_rc, sw_h, track_bg, Some(track_border));
+                }
 
                 let thumb_d = 16;
                 let thumb_left = if *checked {
@@ -503,31 +588,49 @@ pub(crate) fn paint_node_layer<M>(
                 };
                 let thumb_top = sw_rc.top + 3;
 
-                // 2-Layer Drop Shadow for Fluent Knob:
-                // Layer 1: subtle shadow shifted 1px down
-                if !*disabled {
-                    let shadow_rc = RECT {
-                        left: thumb_left,
-                        top: thumb_top + 1,
-                        right: thumb_left + thumb_d,
-                        bottom: thumb_top + 1 + thumb_d,
-                    };
-                    fill_ellipse(hdc, &shadow_rc, palette.thumb_shadow);
-                }
-
-                // Layer 2: crisp white / light thumb
                 let thumb_col = if *disabled {
                     palette.text_secondary
                 } else {
                     palette.text_white
                 };
-                let thumb_rc = RECT {
-                    left: thumb_left,
-                    top: thumb_top,
-                    right: thumb_left + thumb_d,
-                    bottom: thumb_top + thumb_d,
-                };
-                fill_ellipse(hdc, &thumb_rc, thumb_col);
+
+                if let Some(g) = graphics {
+                    // True Alpha Drop Shadow (45/255 opacity black)
+                    if !*disabled {
+                        g.fill_ellipse(
+                            thumb_left as f32,
+                            (thumb_top + 1) as f32,
+                            thumb_d as f32,
+                            thumb_d as f32,
+                            colorref_to_argb(0x000000, 45),
+                        );
+                    }
+                    // Antialiased crisp white knob
+                    g.fill_ellipse(
+                        thumb_left as f32,
+                        thumb_top as f32,
+                        thumb_d as f32,
+                        thumb_d as f32,
+                        colorref_to_argb(thumb_col, 255),
+                    );
+                } else {
+                    if !*disabled {
+                        let shadow_rc = RECT {
+                            left: thumb_left,
+                            top: thumb_top + 1,
+                            right: thumb_left + thumb_d,
+                            bottom: thumb_top + 1 + thumb_d,
+                        };
+                        fill_ellipse(hdc, &shadow_rc, palette.thumb_shadow);
+                    }
+                    let thumb_rc = RECT {
+                        left: thumb_left,
+                        top: thumb_top,
+                        right: thumb_left + thumb_d,
+                        bottom: thumb_top + thumb_d,
+                    };
+                    fill_ellipse(hdc, &thumb_rc, thumb_col);
+                }
 
                 let mut cur_x = sw_rc.right + 10;
                 if !label.is_empty() {
@@ -620,7 +723,17 @@ pub(crate) fn paint_node_layer<M>(
                         },
                     )
                 };
-                round_rect(hdc, &box_rc, 4, bg, Some(border));
+
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &box_rc,
+                        4.0,
+                        Some(colorref_to_argb(bg, 255)),
+                        Some((colorref_to_argb(border, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(hdc, &box_rc, 4, bg, Some(border));
+                }
 
                 if *indeterminate {
                     let dash_rc = RECT {
@@ -629,15 +742,47 @@ pub(crate) fn paint_node_layer<M>(
                         right: box_rc.right - 4,
                         bottom: box_rc.top + 9,
                     };
-                    fill_rect_color(hdc, &dash_rc, palette.text_white);
+                    if let Some(g) = graphics {
+                        g.fill_rect(
+                            dash_rc.left as f32,
+                            dash_rc.top as f32,
+                            (dash_rc.right - dash_rc.left) as f32,
+                            (dash_rc.bottom - dash_rc.top) as f32,
+                            colorref_to_argb(palette.text_white, 255),
+                        );
+                    } else {
+                        fill_rect_color(hdc, &dash_rc, palette.text_white);
+                    }
                 } else if *checked {
-                    let pen = CreatePen(PS_SOLID, 2, palette.text_white);
-                    let op = SelectObject(hdc, pen);
-                    MoveToEx(hdc, box_rc.left + 3, box_rc.top + 8, null_mut());
-                    LineTo(hdc, box_rc.left + 6, box_rc.top + 11);
-                    LineTo(hdc, box_rc.left + 12, box_rc.top + 5);
-                    SelectObject(hdc, op);
-                    DeleteObject(pen);
+                    if let Some(g) = graphics {
+                        if let Some(pen) = GdiPen::new(colorref_to_argb(palette.text_white, 255), 2.0) {
+                            if let Some(path) = GdiPath::new() {
+                                GdipAddPathLine(
+                                    path.raw(),
+                                    (box_rc.left + 3) as f32,
+                                    (box_rc.top + 8) as f32,
+                                    (box_rc.left + 6) as f32,
+                                    (box_rc.top + 11) as f32,
+                                );
+                                GdipAddPathLine(
+                                    path.raw(),
+                                    (box_rc.left + 6) as f32,
+                                    (box_rc.top + 11) as f32,
+                                    (box_rc.left + 12) as f32,
+                                    (box_rc.top + 5) as f32,
+                                );
+                                GdipDrawPath(g.raw(), pen.raw(), path.raw());
+                            }
+                        }
+                    } else {
+                        let pen = CreatePen(PS_SOLID, 2, palette.text_white);
+                        let op = SelectObject(hdc, pen);
+                        MoveToEx(hdc, box_rc.left + 3, box_rc.top + 8, null_mut());
+                        LineTo(hdc, box_rc.left + 6, box_rc.top + 11);
+                        LineTo(hdc, box_rc.left + 12, box_rc.top + 5);
+                        SelectObject(hdc, op);
+                        DeleteObject(pen);
+                    }
                 }
 
                 let mut cur_x = box_rc.right + 9;
@@ -710,13 +855,22 @@ pub(crate) fn paint_node_layer<M>(
                 } else {
                     palette.border
                 };
-                round_rect(
-                    hdc,
-                    &rc,
-                    radii::RADIUS_MD,
-                    palette.bg_input,
-                    Some(border_col),
-                );
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &rc,
+                        radii::RADIUS_MD as f32,
+                        Some(colorref_to_argb(palette.bg_input, 255)),
+                        Some((colorref_to_argb(border_col, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(
+                        hdc,
+                        &rc,
+                        radii::RADIUS_MD,
+                        palette.bg_input,
+                        Some(border_col),
+                    );
+                }
 
                 let sel_text = options.get(*selected).map(|s| s.as_str()).unwrap_or("");
                 let hf = resolve_font_handle(FontScale::Normal);
@@ -781,7 +935,6 @@ pub(crate) fn paint_node_layer<M>(
                     right: track_r,
                     bottom: cy + 3,
                 };
-                round_rect(hdc, &track_rc, 6, palette.bg_input, Some(palette.border));
 
                 let ratio = ((*value - *min) as f32 / (*max - *min).max(1) as f32).clamp(0.0, 1.0);
                 let thumb_x = track_l + (ratio * (track_r - track_l) as f32).round() as i32;
@@ -791,36 +944,77 @@ pub(crate) fn paint_node_layer<M>(
                     palette.accent
                 };
 
-                if thumb_x > track_l {
-                    let fill_rc = RECT {
-                        left: track_l,
-                        top: cy - 3,
-                        right: thumb_x,
-                        bottom: cy + 3,
-                    };
-                    round_rect(hdc, &fill_rc, 6, active_col, None);
-                }
+                let r = if is_hover && !*disabled { 8.0f32 } else { 7.0f32 };
 
-                let r = if is_hover && !*disabled { 8 } else { 7 };
-                let thumb_rc = RECT {
-                    left: thumb_x - r,
-                    top: cy - r,
-                    right: thumb_x + r,
-                    bottom: cy + r,
-                };
-                fill_ellipse(hdc, &thumb_rc, active_col);
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &track_rc,
+                        3.0,
+                        Some(colorref_to_argb(palette.bg_input, 255)),
+                        Some((colorref_to_argb(palette.border, 255), 1.0)),
+                    );
+                    if thumb_x > track_l {
+                        let fill_rc = RECT {
+                            left: track_l,
+                            top: cy - 3,
+                            right: thumb_x,
+                            bottom: cy + 3,
+                        };
+                        g.round_rect(
+                            &fill_rc,
+                            3.0,
+                            Some(colorref_to_argb(active_col, 255)),
+                            None,
+                        );
+                    }
+                    g.fill_ellipse(
+                        thumb_x as f32 - r,
+                        cy as f32 - r,
+                        r * 2.0,
+                        r * 2.0,
+                        colorref_to_argb(active_col, 255),
+                    );
+                } else {
+                    round_rect(hdc, &track_rc, 6, palette.bg_input, Some(palette.border));
+                    if thumb_x > track_l {
+                        let fill_rc = RECT {
+                            left: track_l,
+                            top: cy - 3,
+                            right: thumb_x,
+                            bottom: cy + 3,
+                        };
+                        round_rect(hdc, &fill_rc, 6, active_col, None);
+                    }
+                    let r_i32 = r as i32;
+                    let thumb_rc = RECT {
+                        left: thumb_x - r_i32,
+                        top: cy - r_i32,
+                        right: thumb_x + r_i32,
+                        bottom: cy + r_i32,
+                    };
+                    fill_ellipse(hdc, &thumb_rc, active_col);
+                }
             }
             WidgetKind::Row(_) | WidgetKind::Col(_) | WidgetKind::Grid { .. } => {}
             WidgetKind::TabGroup {
                 options, selected, ..
             } => {
-                round_rect(
-                    hdc,
-                    &rc,
-                    radii::RADIUS_PILL,
-                    palette.tab_track_bg,
-                    Some(palette.tab_track_border),
-                );
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &rc,
+                        radii::RADIUS_PILL as f32,
+                        Some(colorref_to_argb(palette.tab_track_bg, 255)),
+                        Some((colorref_to_argb(palette.tab_track_border, 255), 1.0)),
+                    );
+                } else {
+                    round_rect(
+                        hdc,
+                        &rc,
+                        radii::RADIUS_PILL,
+                        palette.tab_track_bg,
+                        Some(palette.tab_track_border),
+                    );
+                }
 
                 let num_tabs = options.len();
                 if num_tabs > 0 {
@@ -853,13 +1047,22 @@ pub(crate) fn paint_node_layer<M>(
                         };
 
                         if i == *selected {
-                            round_rect(
-                                hdc,
-                                &item_rc,
-                                radii::RADIUS_CARD,
-                                palette.tab_active_bg,
-                                Some(palette.tab_active_border),
-                            );
+                            if let Some(g) = graphics {
+                                g.round_rect(
+                                    &item_rc,
+                                    radii::RADIUS_CARD as f32,
+                                    Some(colorref_to_argb(palette.tab_active_bg, 255)),
+                                    Some((colorref_to_argb(palette.tab_active_border, 255), 1.0)),
+                                );
+                            } else {
+                                round_rect(
+                                    hdc,
+                                    &item_rc,
+                                    radii::RADIUS_CARD,
+                                    palette.tab_active_bg,
+                                    Some(palette.tab_active_border),
+                                );
+                            }
 
                             let hf = resolve_font_handle(FontScale::Bold);
                             let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
@@ -888,13 +1091,22 @@ pub(crate) fn paint_node_layer<M>(
                             }
                         } else {
                             if is_item_hover {
-                                round_rect(
-                                    hdc,
-                                    &item_rc,
-                                    radii::RADIUS_CARD,
-                                    palette.tab_hover_bg,
-                                    None,
-                                );
+                                if let Some(g) = graphics {
+                                    g.round_rect(
+                                        &item_rc,
+                                        radii::RADIUS_CARD as f32,
+                                        Some(colorref_to_argb(palette.tab_hover_bg, 255)),
+                                        None,
+                                    );
+                                } else {
+                                    round_rect(
+                                        hdc,
+                                        &item_rc,
+                                        radii::RADIUS_CARD,
+                                        palette.tab_hover_bg,
+                                        None,
+                                    );
+                                }
                             }
                             let hf = resolve_font_handle(FontScale::Normal);
                             let old_f = if hf != 0 { SelectObject(hdc, hf) } else { 0 };
@@ -918,13 +1130,13 @@ pub(crate) fn paint_node_layer<M>(
             WidgetKind::Input { disabled, .. } => {
                 let is_focused = focused_node_id == Some(node.id);
                 let (border_color, border_w) = if *disabled {
-                    (palette.border, 1)
+                    (palette.border, 1.0f32)
                 } else if is_focused {
-                    (palette.accent, 2)
+                    (palette.accent, 2.0f32)
                 } else if is_hover {
-                    (palette.border_hover, 1)
+                    (palette.border_hover, 1.0f32)
                 } else {
-                    (palette.border, 1)
+                    (palette.border, 1.0f32)
                 };
                 let bg_color = if *disabled {
                     palette.bg_window
@@ -932,25 +1144,34 @@ pub(crate) fn paint_node_layer<M>(
                     palette.bg_input
                 };
 
-                let brush = CreateSolidBrush(bg_color);
-                let pen = CreatePen(PS_SOLID, border_w, border_color);
-                let old_b = SelectObject(hdc, brush);
-                let old_p = SelectObject(hdc, pen);
+                if let Some(g) = graphics {
+                    g.round_rect(
+                        &rc,
+                        radii::RADIUS_MD as f32,
+                        Some(colorref_to_argb(bg_color, 255)),
+                        Some((colorref_to_argb(border_color, 255), border_w)),
+                    );
+                } else {
+                    let brush = CreateSolidBrush(bg_color);
+                    let pen = CreatePen(PS_SOLID, border_w as i32, border_color);
+                    let old_b = SelectObject(hdc, brush);
+                    let old_p = SelectObject(hdc, pen);
 
-                RoundRect(
-                    hdc,
-                    rc.left,
-                    rc.top,
-                    rc.right,
-                    rc.bottom,
-                    radii::RADIUS_MD,
-                    radii::RADIUS_MD,
-                );
+                    RoundRect(
+                        hdc,
+                        rc.left,
+                        rc.top,
+                        rc.right,
+                        rc.bottom,
+                        radii::RADIUS_MD,
+                        radii::RADIUS_MD,
+                    );
 
-                SelectObject(hdc, old_b);
-                SelectObject(hdc, old_p);
-                DeleteObject(brush);
-                DeleteObject(pen);
+                    SelectObject(hdc, old_b);
+                    SelectObject(hdc, old_p);
+                    DeleteObject(brush);
+                    DeleteObject(pen);
+                }
             }
         }
     }
@@ -964,6 +1185,7 @@ pub(crate) fn paint_node_layer<M>(
         for child in &node.children {
             paint_node_layer(
                 hdc,
+                graphics,
                 child,
                 scroll_y,
                 viewport_h,

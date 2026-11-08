@@ -235,6 +235,7 @@ pub fn init_ui() -> bool {
     crate::language::set_current_language(cfg_lang);
     let is_dark = resolve_is_dark(cfg_theme);
     set_preferred_app_mode(is_dark);
+    ensure_gdiplus_initialized();
 
     unsafe {
         recreate_theme_brushes(is_dark);

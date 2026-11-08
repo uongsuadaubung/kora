@@ -5,10 +5,12 @@
 //! child Win32 native `EDIT` overlay synchronization, and floating select dropdowns.
 
 pub mod events;
+pub mod gdiplus_draw;
 pub mod input_overlay;
 pub mod paint;
 pub mod types;
 
+pub use gdiplus_draw::*;
 pub use types::*;
 
 use crate::ui_framework::core::element::IntoElement;

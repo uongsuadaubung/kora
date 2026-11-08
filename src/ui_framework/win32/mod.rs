@@ -12,6 +12,7 @@ pub mod ctlcolor;
 pub mod draw;
 pub mod ffi;
 pub mod font;
+pub mod gdiplus;
 pub mod styling;
 pub mod types;
 
@@ -19,5 +20,6 @@ pub use ctlcolor::*;
 pub use draw::*;
 pub use ffi::*;
 pub use font::*;
+pub use gdiplus::*;
 pub use styling::*;
 pub use types::*;
