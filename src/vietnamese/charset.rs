@@ -162,8 +162,8 @@ impl CharsetStrategy for Tcvn3Charset {
             'đ' => '\u{00AE}',
             'Đ' => '\u{00A7}',
             other => {
-                if let Some((vowel, diacritic, tone)) = decompose_vowel(other) {
-                    let uppercase = other.is_uppercase();
+                if let Some((vowel, diacritic, tone, uppercase)) = decompose_vowel_with_case(other)
+                {
                     compose_tcvn3_vowel(vowel, diacritic, tone, uppercase)
                 } else {
                     other
@@ -231,38 +231,41 @@ impl CharsetStrategy for Charset {
 }
 
 /// Vietnamese Tones (Dấu thanh)
+#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tone {
     #[default]
-    None,
-    Acute,     // Sắc  (á, é, ó...)
-    Grave,     // Huyền (à, è, ò...)
-    HookAbove, // Hỏi  (ả, ẻ, ỏ...)
-    Tilde,     // Ngã  (ã, ẽ, õ...)
-    DotBelow,  // Nặng (ạ, ẹ, ọ...)
+    None = 0,
+    Acute = 1,     // Sắc  (á, é, ó...)
+    Grave = 2,     // Huyền (à, è, ò...)
+    HookAbove = 3, // Hỏi  (ả, ẻ, ỏ...)
+    Tilde = 4,     // Ngã  (ã, ẽ, õ...)
+    DotBelow = 5,  // Nặng (ạ, ẹ, ọ...)
 }
 
 /// Vietnamese Diacritics (Dấu phụ / mũ / móc)
+#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Diacritic {
     #[default]
-    None,
-    Circumflex, // Mũ (â, ê, ô)
-    Breve,      // Trăng (ă)
-    Horn,       // Móc (ơ, ư)
-    DStroke,    // Gạch ngang (đ)
+    None = 0,
+    Circumflex = 1, // Mũ (â, ê, ô)
+    Breve = 2,      // Trăng (ă)
+    Horn = 3,       // Móc (ơ, ư)
+    DStroke = 4,    // Gạch ngang (đ)
 }
 
 /// Base vowel letter without diacritics
+#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BaseVowel {
     #[default]
-    A,
-    E,
-    I,
-    O,
-    U,
-    Y,
+    A = 0,
+    E = 1,
+    I = 2,
+    O = 3,
+    U = 4,
+    Y = 5,
 }
 
 /// Bảng tra cứu tĩnh compile-time O(1) cho 128 ký tự ASCII (128 bytes trong .rodata).
@@ -465,6 +468,19 @@ const VOWEL_COMPOSE_LUT: [u16; 360] = {
     lut
 };
 
+/// Returns the precomposed UTF-16 BMP codepoint for (base, diacritic, tone, uppercase) in O(1).
+#[inline(always)]
+pub const fn compose_vowel_u16(
+    base: BaseVowel,
+    diacritic: Diacritic,
+    tone: Tone,
+    uppercase: bool,
+) -> u16 {
+    let idx = (((base as usize * 5 + diacritic as usize) * 6 + tone as usize) << 1)
+        | (uppercase as usize);
+    VOWEL_COMPOSE_LUT[idx]
+}
+
 /// Builds a precomposed UTF-8 Unicode character from base vowel, diacritic, tone, and uppercase flag.
 /// Evaluated via O(1) compile-time LUT `VOWEL_COMPOSE_LUT` with zero branches.
 #[inline(always)]
@@ -474,9 +490,7 @@ pub const fn compose_vowel(
     tone: Tone,
     uppercase: bool,
 ) -> char {
-    let idx = (((base as usize * 5 + diacritic as usize) * 6 + tone as usize) << 1)
-        | (uppercase as usize);
-    unsafe { char::from_u32_unchecked(VOWEL_COMPOSE_LUT[idx] as u32) }
+    unsafe { char::from_u32_unchecked(compose_vowel_u16(base, diacritic, tone, uppercase) as u32) }
 }
 
 /// Compose the letter 'd' / 'đ'
@@ -669,98 +683,138 @@ pub fn compose_d(has_stroke: bool, uppercase: bool) -> char {
     }
 }
 
-/// Decomposes a character into (BaseVowel, Diacritic, Tone) if it is a Vietnamese vowel
-#[inline]
-pub fn decompose_vowel(c: char) -> Option<(BaseVowel, Diacritic, Tone)> {
-    let cp = c as u32;
-    if cp < 128 {
-        return ASCII_VOWELS[cp as usize].map(|v| (v, Diacritic::None, Tone::None));
-    }
+/// Packed vowel entry:
+/// - Bit 0: 1 (valid vowel entry; 0 = not a Vietnamese vowel)
+/// - Bit 1: is_upper (0 = lowercase, 1 = uppercase)
+/// - Bits 2..5: BaseVowel (0..=5)
+/// - Bits 5..8: Diacritic (0..=3)
+/// - Bits 8..11: Tone (0..=5)
+#[inline(always)]
+const fn pack_decomposed_vowel(
+    base: BaseVowel,
+    diacritic: Diacritic,
+    tone: Tone,
+    is_upper: bool,
+) -> u16 {
+    1u16 | ((is_upper as u16) << 1)
+        | ((base as u16) << 2)
+        | ((diacritic as u16) << 5)
+        | ((tone as u16) << 8)
+}
 
-    match c {
-        'á' | 'Á' => Some((BaseVowel::A, Diacritic::None, Tone::Acute)),
-        'à' | 'À' => Some((BaseVowel::A, Diacritic::None, Tone::Grave)),
-        'ả' | 'Ả' => Some((BaseVowel::A, Diacritic::None, Tone::HookAbove)),
-        'ã' | 'Ã' => Some((BaseVowel::A, Diacritic::None, Tone::Tilde)),
-        'ạ' | 'Ạ' => Some((BaseVowel::A, Diacritic::None, Tone::DotBelow)),
-
-        'â' | 'Â' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::None)),
-        'ấ' | 'Ấ' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::Acute)),
-        'ầ' | 'Ầ' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::Grave)),
-        'ẩ' | 'Ẩ' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::HookAbove)),
-        'ẫ' | 'Ẫ' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::Tilde)),
-        'ậ' | 'Ậ' => Some((BaseVowel::A, Diacritic::Circumflex, Tone::DotBelow)),
-
-        'ă' | 'Ă' => Some((BaseVowel::A, Diacritic::Breve, Tone::None)),
-        'ắ' | 'Ắ' => Some((BaseVowel::A, Diacritic::Breve, Tone::Acute)),
-        'ằ' | 'Ằ' => Some((BaseVowel::A, Diacritic::Breve, Tone::Grave)),
-        'ẳ' | 'Ẳ' => Some((BaseVowel::A, Diacritic::Breve, Tone::HookAbove)),
-        'ẵ' | 'Ẵ' => Some((BaseVowel::A, Diacritic::Breve, Tone::Tilde)),
-        'ặ' | 'Ặ' => Some((BaseVowel::A, Diacritic::Breve, Tone::DotBelow)),
-
-        'é' | 'É' => Some((BaseVowel::E, Diacritic::None, Tone::Acute)),
-        'è' | 'È' => Some((BaseVowel::E, Diacritic::None, Tone::Grave)),
-        'ẻ' | 'Ẻ' => Some((BaseVowel::E, Diacritic::None, Tone::HookAbove)),
-        'ẽ' | 'Ẽ' => Some((BaseVowel::E, Diacritic::None, Tone::Tilde)),
-        'ẹ' | 'Ẹ' => Some((BaseVowel::E, Diacritic::None, Tone::DotBelow)),
-
-        'ê' | 'Ê' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::None)),
-        'ế' | 'Ế' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::Acute)),
-        'ề' | 'Ề' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::Grave)),
-        'ể' | 'Ể' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::HookAbove)),
-        'ễ' | 'Ễ' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::Tilde)),
-        'ệ' | 'Ệ' => Some((BaseVowel::E, Diacritic::Circumflex, Tone::DotBelow)),
-
-        'í' | 'Í' => Some((BaseVowel::I, Diacritic::None, Tone::Acute)),
-        'ì' | 'Ì' => Some((BaseVowel::I, Diacritic::None, Tone::Grave)),
-        'ỉ' | 'Ỉ' => Some((BaseVowel::I, Diacritic::None, Tone::HookAbove)),
-        'ĩ' | 'Ĩ' => Some((BaseVowel::I, Diacritic::None, Tone::Tilde)),
-        'ị' | 'Ị' => Some((BaseVowel::I, Diacritic::None, Tone::DotBelow)),
-
-        'ó' | 'Ó' => Some((BaseVowel::O, Diacritic::None, Tone::Acute)),
-        'ò' | 'Ò' => Some((BaseVowel::O, Diacritic::None, Tone::Grave)),
-        'ỏ' | 'Ỏ' => Some((BaseVowel::O, Diacritic::None, Tone::HookAbove)),
-        'õ' | 'Õ' => Some((BaseVowel::O, Diacritic::None, Tone::Tilde)),
-        'ọ' | 'Ọ' => Some((BaseVowel::O, Diacritic::None, Tone::DotBelow)),
-
-        'ô' | 'Ô' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::None)),
-        'ố' | 'Ố' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::Acute)),
-        'ồ' | 'Ồ' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::Grave)),
-        'ổ' | 'Ổ' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::HookAbove)),
-        'ỗ' | 'Ỗ' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::Tilde)),
-        'ộ' | 'Ộ' => Some((BaseVowel::O, Diacritic::Circumflex, Tone::DotBelow)),
-
-        'ơ' | 'Ơ' => Some((BaseVowel::O, Diacritic::Horn, Tone::None)),
-        'ớ' | 'Ớ' => Some((BaseVowel::O, Diacritic::Horn, Tone::Acute)),
-        'ờ' | 'Ờ' => Some((BaseVowel::O, Diacritic::Horn, Tone::Grave)),
-        'ở' | 'Ở' => Some((BaseVowel::O, Diacritic::Horn, Tone::HookAbove)),
-        'ỡ' | 'Ỡ' => Some((BaseVowel::O, Diacritic::Horn, Tone::Tilde)),
-        'ợ' | 'Ợ' => Some((BaseVowel::O, Diacritic::Horn, Tone::DotBelow)),
-
-        'ú' | 'Ú' => Some((BaseVowel::U, Diacritic::None, Tone::Acute)),
-        'ù' | 'Ù' => Some((BaseVowel::U, Diacritic::None, Tone::Grave)),
-        'ủ' | 'Ủ' => Some((BaseVowel::U, Diacritic::None, Tone::HookAbove)),
-        'ũ' | 'Ũ' => Some((BaseVowel::U, Diacritic::None, Tone::Tilde)),
-        'ụ' | 'Ụ' => Some((BaseVowel::U, Diacritic::None, Tone::DotBelow)),
-
-        'ư' | 'Ư' => Some((BaseVowel::U, Diacritic::Horn, Tone::None)),
-        'ứ' | 'Ứ' => Some((BaseVowel::U, Diacritic::Horn, Tone::Acute)),
-        'ừ' | 'Ừ' => Some((BaseVowel::U, Diacritic::Horn, Tone::Grave)),
-        'ử' | 'Ử' => Some((BaseVowel::U, Diacritic::Horn, Tone::HookAbove)),
-        'ữ' | 'Ữ' => Some((BaseVowel::U, Diacritic::Horn, Tone::Tilde)),
-        'ự' | 'Ự' => Some((BaseVowel::U, Diacritic::Horn, Tone::DotBelow)),
-
-        'ý' | 'Ý' => Some((BaseVowel::Y, Diacritic::None, Tone::Acute)),
-        'ỳ' | 'Ỳ' => Some((BaseVowel::Y, Diacritic::None, Tone::Grave)),
-        'ỷ' | 'Ỷ' => Some((BaseVowel::Y, Diacritic::None, Tone::HookAbove)),
-        'ỹ' | 'Ỹ' => Some((BaseVowel::Y, Diacritic::None, Tone::Tilde)),
-        'ỵ' | 'Ỵ' => Some((BaseVowel::Y, Diacritic::None, Tone::DotBelow)),
-
-        _ => None,
+#[inline(always)]
+const fn unpack_decomposed_vowel(entry: u16) -> Option<(BaseVowel, Diacritic, Tone, bool)> {
+    if entry == 0 {
+        None
+    } else {
+        let is_upper = ((entry >> 1) & 1) != 0;
+        let base = unsafe { std::mem::transmute::<u8, BaseVowel>(((entry >> 2) & 0x7) as u8) };
+        let diacritic =
+            unsafe { std::mem::transmute::<u8, Diacritic>(((entry >> 5) & 0x7) as u8) };
+        let tone = unsafe { std::mem::transmute::<u8, Tone>(((entry >> 8) & 0x7) as u8) };
+        Some((base, diacritic, tone, is_upper))
     }
 }
 
-/// Checks if character is 'đ' or 'Đ'
-pub fn is_d_stroke(c: char) -> bool {
-    matches!(c, 'đ' | 'Đ')
+/// Compile-time O(1) vowel decomposition tables for the two Unicode blocks containing all
+/// non-ASCII Vietnamese precomposed vowels:
+/// - `LATIN_EXT_VOWEL_LUT`: U+00C0..=U+01B0 (241 entries = 482 bytes)
+/// - `VIET_EXT_VOWEL_LUT`: U+1EA0..=U+1EF9 (90 entries = 180 bytes)
+const VOWEL_DECOMPOSE_LUTS: ([u16; 241], [u16; 90]) = {
+    let mut latin_ext = [0u16; 241];
+    let mut viet_ext = [0u16; 90];
+
+    let valid_base_diacritics: &[(BaseVowel, Diacritic)] = &[
+        (BaseVowel::A, Diacritic::None),
+        (BaseVowel::A, Diacritic::Circumflex),
+        (BaseVowel::A, Diacritic::Breve),
+        (BaseVowel::E, Diacritic::None),
+        (BaseVowel::E, Diacritic::Circumflex),
+        (BaseVowel::I, Diacritic::None),
+        (BaseVowel::O, Diacritic::None),
+        (BaseVowel::O, Diacritic::Circumflex),
+        (BaseVowel::O, Diacritic::Horn),
+        (BaseVowel::U, Diacritic::None),
+        (BaseVowel::U, Diacritic::Horn),
+        (BaseVowel::Y, Diacritic::None),
+    ];
+    let tones = [
+        Tone::None,
+        Tone::Acute,
+        Tone::Grave,
+        Tone::HookAbove,
+        Tone::Tilde,
+        Tone::DotBelow,
+    ];
+
+    let mut i = 0;
+    while i < valid_base_diacritics.len() {
+        let (base, diacritic) = valid_base_diacritics[i];
+        let mut t = 0;
+        while t < 6 {
+            let tone = tones[t];
+            if !(matches!(diacritic, Diacritic::None) && matches!(tone, Tone::None)) {
+                let (lower, upper) = compute_vowel_pair(base, diacritic, tone);
+                let l_cp = lower as u32;
+                if l_cp >= 0x00C0 && l_cp <= 0x01B0 {
+                    latin_ext[(l_cp - 0x00C0) as usize] =
+                        pack_decomposed_vowel(base, diacritic, tone, false);
+                } else if l_cp >= 0x1EA0 && l_cp <= 0x1EF9 {
+                    viet_ext[(l_cp - 0x1EA0) as usize] =
+                        pack_decomposed_vowel(base, diacritic, tone, false);
+                } else {
+                    panic!("Vietnamese vowel outside LUT range");
+                }
+
+                let u_cp = upper as u32;
+                if u_cp >= 0x00C0 && u_cp <= 0x01B0 {
+                    latin_ext[(u_cp - 0x00C0) as usize] =
+                        pack_decomposed_vowel(base, diacritic, tone, true);
+                } else if u_cp >= 0x1EA0 && u_cp <= 0x1EF9 {
+                    viet_ext[(u_cp - 0x1EA0) as usize] =
+                        pack_decomposed_vowel(base, diacritic, tone, true);
+                } else {
+                    panic!("Vietnamese uppercase vowel outside LUT range");
+                }
+            }
+            t += 1;
+        }
+        i += 1;
+    }
+
+    (latin_ext, viet_ext)
+};
+
+/// Decomposes a character into `(BaseVowel, Diacritic, Tone, is_upper)` in O(1) via LUTs.
+#[inline(always)]
+pub const fn decompose_vowel_with_case(c: char) -> Option<(BaseVowel, Diacritic, Tone, bool)> {
+    let cp = c as u32;
+    if cp < 128 {
+        match ASCII_VOWELS[cp as usize] {
+            Some(v) => Some((v, Diacritic::None, Tone::None, cp < 97)),
+            None => None,
+        }
+    } else if cp >= 0x1EA0 && cp <= 0x1EF9 {
+        unpack_decomposed_vowel(VOWEL_DECOMPOSE_LUTS.1[(cp - 0x1EA0) as usize])
+    } else if cp >= 0x00C0 && cp <= 0x01B0 {
+        unpack_decomposed_vowel(VOWEL_DECOMPOSE_LUTS.0[(cp - 0x00C0) as usize])
+    } else {
+        None
+    }
+}
+
+/// Decomposes a character into (BaseVowel, Diacritic, Tone) if it is a Vietnamese vowel.
+/// Evaluated in O(1) via compile-time lookup tables (replaces 66-arm match).
+#[inline(always)]
+pub const fn decompose_vowel(c: char) -> Option<(BaseVowel, Diacritic, Tone)> {
+    match decompose_vowel_with_case(c) {
+        Some((v, d, t, _)) => Some((v, d, t)),
+        None => None,
+    }
+}
+
+/// Checks if character is 'đ' (U+0111) or 'Đ' (U+0110) in a single bitwise instruction.
+#[inline(always)]
+pub const fn is_d_stroke(c: char) -> bool {
+    ((c as u32) & !1) == 0x0110
 }

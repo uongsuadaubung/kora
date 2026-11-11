@@ -25,6 +25,15 @@ impl<T: Copy + Default, const N: usize> InlineList<T, N> {
     }
 
     #[inline]
+    pub fn from_slice(slice: &[T]) -> Self {
+        let mut list = Self::default();
+        let copy_len = slice.len().min(N);
+        list.data[..copy_len].copy_from_slice(&slice[..copy_len]);
+        list.len = copy_len as u8;
+        list
+    }
+
+    #[inline]
     pub fn push(&mut self, item: T) {
         if (self.len as usize) < N {
             self.data[self.len as usize] = item;

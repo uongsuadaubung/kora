@@ -40,12 +40,12 @@ Khi chạy benchmark, console sẽ in ra các chỉ số phản ánh các tầng
 ### 2.1. `Pure Engine on_key` (Tốc độ xử lý lõi phím thô)
 - **Bản chất:** Đo đạc thời gian máy trạng thái ngữ âm (`SyllableState`) phân loại phím, chuyển dịch trạng thái, tra cứu ngữ âm học và xác định hành vi (`EngineAction`).
 - **Ý nghĩa:** Phản ánh độ trễ trực tiếp trên luồng chặn bàn phím (`Low-Level Keyboard Hook`).
-- **Thực tế:** Đạt **~26.90 – 27.70 triệu phím/giây** (**36.1 – 37.2 nano-giây / phím**). Nhanh gấp **160.000+ lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
+- **Thực tế:** Đạt **~30.91 – 32.33 triệu phím/giây** (**30.9 – 32.4 nano-giây / phím**), chính thức phá vỡ mốc **30 triệu phím/giây**! Nhanh gấp **190.000+ lần** ngưỡng mắt người có thể cảm nhận (~6 ms).
 
 ### 2.2. `Full Screen Simulation` (Mô phỏng gõ trên màn hình thực tế)
 - **Bản chất:** Đo đạc toàn bộ chu trình hoàn chỉnh từ lúc nhấn phím, máy trạng thái tính toán, chạy thuật toán tiền tố chung (*Common Prefix Optimization*), phát sinh số lượng phím `Backspace` cần xóa lùi, cập nhật bộ đệm và nối chuỗi thay thế vào màn hình ảo.
 - **Ý nghĩa:** Phản ánh trải nghiệm gõ thực tế của người dùng khi gõ các đoạn văn bản tiếng Việt phức tạp với đầy đủ dấu thanh, dấu mũ, dấu móc và từ tiếng Anh.
-- **Thực tế:** Đạt **~25.09 triệu phím/giây** (**39.8 nano-giây / phím**). Chính thức phá vỡ rào cản 40 ns/phím trên mô phỏng thực tế đầy đủ!
+- **Thực tế:** Đạt **~24.84 – 27.83 triệu phím/giây** (**35.9 – 40.3 nano-giây / phím**, lần 3 chuẩn đạt **24.84M keys/s** và đỉnh đạt **27.83M keys/s** — trong đó phần lớn chi phí còn lại thuộc về chính vòng lặp mô phỏng màn hình `String` của test harness).
 
 ---
 
@@ -55,23 +55,24 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 
 | Cột mốc (Milestone) | Nội dung tối ưu hóa trọng tâm | Pure Engine `on_key` | Full Screen Simulation | Tỷ lệ cải thiện |
 | :--- | :--- | :---: | :---: | :---: |
-| **Giai đoạn 1** (`ba0b93a`) | Stack `InlineList<T, N>`, `SyllableState` Copy (24B), ASCII fast-path `decompose_vowel`, `MaybeUninit` Win32 SendInput. | ~10.96M keys/s (91 ns) | ~7.80M keys/s (128 ns) | Mốc nền tảng ban đầu |
+| **Giai đoạn 1** (`ba0b93a`) | Stack `InlineList<T, N>`, `SyllableState` Copy, ASCII fast-path `decompose_vowel`, `MaybeUninit` Win32 SendInput. | ~10.96M keys/s (91 ns) | ~7.80M keys/s (128 ns) | Mốc nền tảng ban đầu |
 | **Giai đoạn 2** (`63eaf08`) | Đưa `raw_keys` sang `InlineList<RawKey, 32>`, `Arc<str>` cho config strings, dọn dẹp các phép clone chuỗi trên hot path. | ~13.70M keys/s (73 ns) | ~10.20M keys/s (98 ns) | **+25.0%** |
 | **Giai đoạn 3** (`8974399`) | Cache bảng macro active (`ensure_active_macro_table`), mượn trực tiếp `&config` thay vì clone, fast-path 1-chu kỳ cho `is_boundary`. | ~21.01M keys/s (48 ns) | ~15.29M keys/s (65 ns) | **+53.3%** |
 | **Giai đoạn 4** | Bảng tra cứu tĩnh `ASCII_VOWELS` ($O(1)$), Bitmask 128-bit cho `is_word_break`, Letter Fast-Path, `is_active_global` cờ nhị phân, Single-Pass Common Prefix Optimization. | **25.43M keys/s** (**39 ns**) | **18.39M keys/s** (**54 ns**) | **+21.0%** |
 | **Giai đoạn 5** | Stack projection `render_chars_to` (0 heap allocation khi fallback Passthrough), Guard `find_tone_position()` khi không có thanh điệu, Early-exit Coda Guard trong `handle_nucleus`, Jump-Table `is_valid_onset_vowel_orthography`, Single-Pass length tracking. | ~20.66M – 25.43M keys/s (39–48 ns) | ~20.30M keys/s (49 ns) | **+10.4% Full Simulation** |
-| **Giai đoạn 6** | **Bitmask Phonotactic Table cho `can_vowels_accept_coda`** (biến 16 nhánh match thành 1 lệnh bitwise AND duy nhất) + **Zero-Heap `CompactString` cho `EngineAction::Replace`** (stack buffer 24 bytes, 100% stack-allocated không tốn `malloc` khi thay thế ký tự/bỏ dấu thanh). | **22.7M – 24.1M keys/s** (**41 ns**) | **20.6M – 22.7M keys/s** (**44 ns**) | **+11.6% Full Simulation** 🚀 |
+| **Giai đoạn 6** | **Bitmask Phonotactic Table cho `can_vowels_accept_coda`** (biến 16 nhánh match thành 1 lệnh bitwise AND duy nhất) + **Zero-Heap `CompactString` cho `EngineAction::Replace`** (100% stack-allocated không tốn `malloc` khi thay thế ký tự/bỏ dấu thanh). | **22.7M – 24.1M keys/s** (**41 ns**) | **20.6M – 22.7M keys/s** (**44 ns**) | **+11.6% Full Simulation** 🚀 |
 | **Giai đoạn 7** (`db34a8c`) | **100% Bitmask Toàn Bộ Quy Tắc Ghép Vần Tiếng Việt**: `is_valid_onset`, `is_valid_onset_extension`, `is_valid_coda_start`, `is_valid_coda_pair`, `is_stop_coda`, `is_valid_onset_vowel_orthography`, `is_valid_coda_start_for_vowels`. Triệt tiêu hoàn toàn mọi chuỗi `match/if-else` trong toàn bộ module chính tả `spelling.rs`. | **20.9M – 24.6M keys/s** (**41–48 ns**) | **18.9M – 22.7M keys/s** (**44–50 ns**) | **100% O(1) Bitwise Zero-Branching** ⚡ |
 | **Giai đoạn 8** (Hoàn tất) | **True 100% Zero-Heap trên cả nhánh Hoàn Tác & Khôi Phục Chính Tả + Thu Gọn L1 Cache**: Đổi `ModifierOutcome::Undone` và Smart English Bypass sang `CompactString` (đẩy English Bypass lên **92.8M keys/s = 10.8 ns**), kiểm tra biên UTF-8 1-chu kỳ trong `CompactString::drain`, gộp các hàm `render_*` xóa 84 dòng code thừa, thu gọn LUT phụ âm đầu từ 1.050B xuống **64B (1 L1 cache line)** không kiểm tra biên (`& 31`). | **21.6M – 24.5M keys/s** (**40.8–46.3 ns**) | **20.35M keys/s** (**49.1 ns**) | **English Bypass: 92.8M keys/s (10.8 ns)** 🔥 |
 | **Giai đoạn 9** (Hoàn tất) | **Zero-Allocation Hook Rule Resolution (`3.8 ns/key`) + `VOWEL_COMPOSE_LUT` (`[u16; 360]`) + Bitmask Macro Pre-filter**: Triệt tiêu cấp phát `Vec` & clone `String` trên mọi nhát phím tại `low_level_keyboard_proc` (`is_key_disabled`, `lookup_key_remap`, `lookup_key_macro`), thay 72 nhánh `compose_vowel` bằng LUT 720B $O(1)$, thêm bitmask lọc nhanh phụ âm đầu/cuối trong `MacroTable::expand_word`. | **25.45M keys/s** (**39.3 ns**) | **22.50M keys/s** (**44.5 ns**) | **Hook Resolution: 261.6M keys/s (3.8 ns — nhanh gấp 39.2x)** ⚡🚀 |
 | **Giai đoạn 10** (Hoàn tất) | **Lazy Evaluation cho Smart English Rollback**: Chuyển việc kiểm tra `is_unambiguous_completed_vietnamese` sang đánh giá lười bên trong `try_smart_english_rollback`, chỉ kích hoạt khi `next_state` thực sự là `Passthrough`. Triệt tiêu hoàn toàn chi phí kiểm tra chính tả thừa trên 99.9% phím gõ bình thường. | **25.06M – 26.24M keys/s** (**38.1–39.9 ns**) | **23.99M keys/s** (**41.7 ns**) | **+11.3% Full Simulation (24.0M keys/s, 41.7 ns)** 🚀⚡ |
 | **Giai đoạn 11** | **Bitmask Telex/VNI Modifier Early Bailout & Hot-Path Memory Access Optimization**: `TELEX_MODIFIER_MASK` (0u32 bitmask) loại bỏ phụ âm không phải phím biến đổi trong 1 chu kỳ CPU; so sánh byte trực tiếp thay vì giải mã UTF-8 trong `is_rendered_identical_to_raw` và `try_smart_english_rollback`; trì hoãn nạp `bracket_w` và `auto_uppercase_first_char` trong `on_key`; trả về sớm khi buffer rỗng trong `handle_word_break`. Đo chuẩn qua `cmd /c benchmark.bat`. | **27.70M keys/s** (**36.1 ns**) | **24.07M keys/s** (**41.6 ns**) | **Hook: 300.4M keys/s (3.3 ns)** 🔥🚀 |
 | **Giai đoạn 12** (Hoàn tất) | **Macro Length Bitmask Filter & Zero-Heap Expansion + Fast ASCII Common Prefix + Bracket-W Short-Circuit**: Thêm `normal_lengths_mask: u32` bỏ qua hashmap lookup cho từ thường có độ dài không trùng macro; chuyển `expand_word` và `apply_case_style` sang 100% stack `CompactString`; tối ưu hóa UTF-16 length check O(1) byte length khi ASCII trong `feed_key`; short-circuit kiểm tra phím `[` và `]` trong `State<Empty>`, `State<Onset>`, `State<Nucleus>` trong 1 chu kỳ clock. Đo chuẩn 3 lần lấy lần 3 qua `cmd /c benchmark.bat`. | **26.90M – 27.08M keys/s** (**36.9–37.2 ns**) | **25.09M keys/s** (**39.8 ns**) | **Macro: 25.5M keys/s (39.3 ns, +29.6%) \| Muted Macro: 30.3M keys/s (33.0 ns) \| Hook: 321.8M keys/s (3.1 ns)** 🚀⚡🔥 |
+| **Giai đoạn 13** (Hoàn tất) | **Data Layout Diet (`SyllableState` 96B $\rightarrow$ 26B, `RawKey` 8B $\rightarrow$ 4B) + `VOWEL_DECOMPOSE_LUTS` + Raw-Byte Common Prefix + $O(1)$ Snapshot Word Restore + Pre-Lowercase Macro Filter + Zero-Pointer-Chase Mute Signature + Win32 Hook Lock/Syscall Diet**: Biến `Passthrough` thành ZST `()`, nén Onset/Coda sang `u8` ASCII, thay 66 nhánh `decompose_vowel` bằng LUT 662B $O(1)$, mã hóa UTF-8 trực tiếp từ `u16` BMP, so khớp tiền tố byte thô kèm đếm UTF-16 hậu tố không rẽ nhánh, khôi phục từ qua dấu cách $O(1)$ không replay máy trạng thái, lọc tiền-lowercase cho gõ tắt, băm chữ ký `(ptr, len)` cho muted macros, và nhả `Mutex` trước `SendInput`/`CallNextHookEx`. | **30.91M – 32.33M keys/s** (**30.9–32.4 ns**) | **24.84M – 27.83M keys/s** (**35.9–40.3 ns**) | **Telex: +20.2% (32.3M keys/s, 30.9 ns) \| English Bypass: 110.5M keys/s (9.0 ns) \| Muted Macro: 32.9M–34.1M keys/s \| Hook: 328.5M–330.9M keys/s (3.0 ns)** 🚀⚡🔥 |
 
 ### 3.1. Chi Tiết Đo Đạc Cột Mốc Hiện Tại (Benchmark Log Record - Lần 3 Chuẩn)
 
-- **Thời gian đo:** Ngày 07 tháng 11 năm 2026.
-- **Lệnh thực thi:** `cmd /c benchmark.bat` (chạy 3 lần, lấy lần 3 làm chuẩn chính thức).
+- **Thời gian đo:** Ngày 11 tháng 11 năm 2026.
+- **Lệnh thực thi:** `cmd /c benchmark.bat` (chạy tuần tự 3 lần độc lập, lấy lần 3 làm chuẩn chính thức).
 - **Môi trường:** Windows 11 x64, Rust toolchain 2024 edition.
 - **Cấu hình Profile Release:** `opt-level = 3`, `lto = true`, `codegen-units = 1`, `panic = "abort"`.
 
@@ -79,25 +80,25 @@ Bảng dưới đây ghi chép lại toàn bộ quá trình tiến hóa về m�
 [1] PURE ENGINE ON_KEY LATENCY & THROUGHPUT (No screen allocation):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Telex (on_key raw)                         |  26902817 keys/s |    37.2 ns/key (0.037 µs)
-  Simple Telex (on_key raw)                  |  27084767 keys/s |    36.9 ns/key (0.037 µs)
-  English Bypass (on_key raw)                | 104461260 keys/s |     9.6 ns/key (0.010 µs)
+  Telex (on_key raw)                         |  32329031 keys/s |    30.9 ns/key (0.031 µs)
+  Simple Telex (on_key raw)                  |  30911249 keys/s |    32.4 ns/key (0.032 µs)
+  English Bypass (on_key raw)                | 110522854 keys/s |     9.0 ns/key (0.009 µs)
 
 [2] FULL SCREEN SIMULATION (Handling Backspace & Replacement):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  End-to-End Vietnamese Typing               |  25094564 keys/s |    39.8 ns/key (0.040 µs)
+  End-to-End Vietnamese Typing               |  24841710 keys/s |    40.3 ns/key (0.040 µs)
 
 [3] MACRO EXPANSION & ZERO-ALLOCATION ROW MUTE BENCHMARK:
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Macro (All Unmuted)                        |  25466677 keys/s |    39.3 ns/key (0.039 µs)
-  Macro with Muted Rows (Cached Zero-Alloc)  |  30339346 keys/s |    33.0 ns/key (0.033 µs)
+  Macro (All Unmuted)                        |  26118185 keys/s |    38.3 ns/key (0.038 µs)
+  Macro with Muted Rows (Cached Zero-Alloc)  |  32942281 keys/s |    30.4 ns/key (0.030 µs)
 
 [4] KEYBOARD HOOK RULE RESOLUTION (Remap, Disable, Key Macro):
   Benchmark Case                             |       Throughput |    Latency per Key
   -------------------------------------------+------------------+-------------------
-  Hook Rule Resolution (4 keys)              | 321827983 keys/s |     3.1 ns/key (0.003 µs)
+  Hook Rule Resolution (4 keys)              | 328461159 keys/s |     3.0 ns/key (0.003 µs)
 ```
 
 ---
@@ -116,12 +117,12 @@ flowchart LR
 
 ---
 
-### Nguyên Tắc 1: Zero-Heap Allocation trên Hot-Path
-- **Vấn đề:** Mọi thao tác cấp phát bộ nhớ động (`malloc`, `String`, `Vec`) đều phải tương tác với bộ quản lý bộ nhớ của hệ điều hành, gây mất ổn định về độ trễ (*jitter*) và tiêu tốn hàng trăm chu kỳ CPU.
+### Nguyên Tắc 1: Zero-Heap Allocation & Compact Stack Layout trên Hot-Path
+- **Vấn đề:** Mọi thao tác cấp phát bộ nhớ động (`malloc`, `String`, `Vec`) đều phải tương tác với bộ quản lý bộ nhớ của hệ điều hành, gây mất ổn định về độ trễ (*jitter*) và tiêu tốn hàng trăm chu kỳ CPU; đồng thời struct trạng thái quá lớn sẽ gây tràn thanh ghi và tốn băng thông `memcpy` mỗi nhát phím.
 - **Giải pháp áp dụng:**
-  - Chuyển toàn bộ các mảng lưu trữ trạng thái (`Onset`, `Nucleus`, `Coda`, `raw_keys`) sang mảng tĩnh kích thước cố định trên Stack: `InlineList<T, N>`.
-  - Biến `SyllableState` và toàn bộ các thành phần con thành kiểu dữ liệu 100% `Copy` (chỉ 24 bytes trên Stack), sao chép trực tiếp qua thanh ghi CPU.
-  - Sử dụng buffer stack `with_lowercase_key` cho bảng gõ tắt và `MaybeUninit` cho mảng `SendInput` ở tầng Win32 Hook.
+  - Chuyển toàn bộ các mảng lưu trữ trạng thái (`Onset`, `Nucleus`, `Coda`, `raw_keys`) sang mảng tĩnh kích thước cố định trên Stack: `InlineList<T, N>` (kèm `InlineList::from_slice` chỉ sao chép phần tử đang hoạt động `..len`).
+  - Biến `SyllableState` và toàn bộ các thành phần con thành kiểu dữ liệu 100% `Copy` siêu gọn (**26 bytes** trên Stack — thu gọn từ 96 bytes nhờ biến `Passthrough` thành ZST `()`, nén `OnsetState` xuống 6B và `CodaState` xuống 25B với `u8` ASCII kèm `#[repr(u8)]` trên các enum ngữ âm), kết hợp đóng gói `RawKey(u32)` **4 bytes** (giảm một nửa `InlineList<RawKey, 32>` từ 260B xuống 132B).
+  - Sử dụng `CompactString` (64 bytes inline stack buffer, tổng 65B) cho cả `EngineAction::Replace`, `ModifierOutcome::Undone`, khôi phục tiếng Anh lẫn hạ chữ thường (`lowercase_to_compact`) trong bảng gõ tắt, và `MaybeUninit` cho mảng `SendInput` ở tầng Win32 Hook.
 
 ---
 
@@ -137,22 +138,22 @@ flowchart LR
 - **Vấn đề:** Các câu lệnh `match` dài và chuỗi `if-else` phức tạp khiến bộ dự đoán nhánh của CPU (*Branch Predictor*) có nguy cơ đoán sai (*branch misprediction penalty*, tốn từ 10–20 chu kỳ máy).
 - **Giải pháp áp dụng:**
   - **Compile-Time Bitmask 128-bit cho Word-Break:** Chuyển 31 ký tự ngắt câu thành 2 hằng số `u128` (`WORD_BREAK_MASK`). Hàm `is_word_break` chỉ tốn đúng **1 phép dịch bit (`1u128 << cp`) và 1 phép `AND`**.
-  - **Bảng tra cứu tĩnh `ASCII_VOWELS: [Option<BaseVowel>; 128]`:** Xác định nguyên âm cơ bản và phân tách nguyên âm thô trong đúng 1 lệnh truy xuất chỉ mục mảng $O(1)$.
+  - **Bảng tra cứu tĩnh `ASCII_VOWELS`, `INITIAL_ASCII_LUT`, `VOWEL_COMPOSE_LUT` & `VOWEL_DECOMPOSE_LUTS`:** Xác định nguyên âm cơ bản, phân loại phím đầu âm tiết, tổng hợp và phân rã 132 nguyên âm tiếng Việt (kèm hoa/thường) trong đúng 1 lệnh truy xuất chỉ mục mảng $O(1)$.
 
 ---
 
-### Nguyên Tắc 4: Thuật Toán Một Lượt (Single-Pass) & Bảo Tồn Vùng Đệm
-- **Vấn đề:** Việc duyệt qua duyệt lại một chuỗi nhiều lần (ví dụ đếm số ký tự, tìm vị trí byte, rồi lại cắt chuỗi) làm suy giảm hiệu năng bộ nhớ đệm L1/L2.
+### Nguyên Tắc 4: Cờ Gia Tăng $O(1)$ & So Khớp Tiền Tố Byte Thô Một Lượt
+- **Vấn đề:** Việc duyệt qua duyệt lại bộ đệm `raw_keys` hay giải mã UTF-8 `chars()` nhiều lần trên mỗi nhát phím làm suy giảm hiệu năng bộ nhớ đệm L1 và tiêu tốn chu kỳ giải mã đa byte.
 - **Giải pháp áp dụng:**
-  - **Single-Pass `is_boundary`:** Gom kiểm tra dấu gạch dưới và phát hiện chữ thường vào 1 vòng lặp duy nhất, trả về sớm ngay khi gặp `_`.
-  - **Tối ưu hóa Common Prefix:** Tích lũy trực tiếp số byte trùng khớp `common_bytes += c1.len_utf8()` ngay trong vòng lặp so sánh đầu tiên. Dùng `last_rendered.truncate(common_bytes)` để tái sử dụng tiền tố cũ thay vì xóa sạch rồi copy lại từ đầu.
+  - **$O(1)$ Incremental `is_boundary`:** Duy trì hai cờ gia tăng `has_underscore` và `has_lower_alpha` ngay khi đẩy phím vào `TypingBuffer`, biến `is_boundary` (phát hiện ranh giới `camelCase`) thành phép kiểm tra boolean $O(1)$ `key.is_upper() && !self.has_underscore && self.has_lower_alpha` không vòng lặp.
+  - **Raw-Byte Common Prefix & Suffix-Only UTF-16 Count:** So sánh trực tiếp hai lát cắt byte UTF-8 (`prev_bytes` vs `out_bytes`), lùi tối đa 1–3 byte nếu điểm khác biệt rơi vào byte tiếp nối UTF-8 (`(b & 0xC0) == 0x80`), rồi chỉ tính độ dài UTF-16 không rẽ nhánh (`(b & 0xC0) != 0x80` + surrogate offset) trên đúng phần hậu tố thay đổi.
 
 ---
 
-### Nguyên Tắc 5: Triệt Tiêu So Sánh Chuỗi (Heap String Comparison)
-- **Vấn đề:** So sánh chuỗi `active_id == "global"` đòi hỏi dereference con trỏ heap và gọi hàm `memcmp`. Trên 25 triệu phím/giây, điều này tạo ra hơn 50 triệu lần so sánh chuỗi vô ích mỗi giây.
+### Nguyên Tắc 5: Triệt Tiêu So Sánh Chuỗi & Đuổi Con Trỏ Heap (Pointer-Chase Elimination)
+- **Vấn đề:** So sánh chuỗi `active_id == "global"` hay duyệt so sánh từng phần tử `Vec<String>` trên hot-path đòi hỏi dereference con trỏ heap và gọi `memcmp` hàng chục triệu lần mỗi giây.
 - **Giải pháp áp dụng:**
-  - Lưu cờ nhị phân `is_active_global: bool` trên struct `VietnameseEngine` và cập nhật khi chuyển đổi profile ứng dụng. Mọi thao tác kiểm tra cấu hình biến thành 1 phép thử cờ thanh ghi máy tính.
+  - Lưu cờ nhị phân `is_active_global: bool` trên struct `VietnameseEngine` (bỏ qua luôn việc nạp `active_profile_id()` trên fast-path toàn cục) và kiểm tra chữ ký FNV-1a 64-bit trên header `(ptr, len)` của slice `muted_macros` kết hợp `MacroTable::mutation_gen()` thay vì đuổi theo dữ liệu chuỗi trên heap.
 
 ---
 
@@ -161,9 +162,9 @@ flowchart LR
 ### 5.1. [ĐÃ HOÀN THÀNH - Giai đoạn 6] Zero-Heap `CompactString` cho `EngineAction::Replace`
 - **Mục tiêu:** Đạt **100% Zero-Allocation** tuyệt đối trên toàn bộ hot-path gõ phím.
 - **Giải pháp đã triển khai:**
-  - Thiết kế `CompactString` với layout `Inline { buf: [u8; 24], len: u8 }` (32 bytes trên Stack, 0 heap allocations cho 100% các âm tiết tiếng Việt như *"nghiêng"*, *"chuyển"*, *"phượng"*).
+  - Thiết kế `CompactString` với vùng đệm nội tuyến trên Stack (`INLINE_CAP = 64` bytes, kích thước struct 65 bytes, 0 heap allocations cho 100% các âm tiết tiếng Việt như *"nghiêng"*, *"chuyển"*, *"phượng"* cũng như các cụm từ gõ tắt ngắn).
   - Triệt tiêu hoàn toàn `malloc` khi bỏ dấu thanh hoặc dấu phụ trên máy trạng thái.
-  - Tự động fallback sang `Heap(String)` an toàn nếu mở rộng các đoạn macro gõ tắt văn bản dài.
+  - Tự động fallback sang `Heap(String)` an toàn nếu mở rộng các đoạn macro gõ tắt văn bản dài (> 64 bytes).
 
 ### 5.2. [ĐÃ HOÀN THÀNH - Giai đoạn 6] Bitmask Bảng Tra Cứu Ngữ Âm Học (`can_vowels_accept_coda`)
 - **Mục tiêu:** Triệt tiêu 16 nhánh so khớp pattern (`match` arms) phức tạp khi xác định khả năng nhận phụ âm cuối.
@@ -263,7 +264,7 @@ flowchart LR
      - Trong `expand_word`: Nếu `word.len() < 32 && (normal_lengths_mask & (1 << word.len())) == 0`, bỏ qua hoàn toàn việc tính mã băm SipHash và tra cứu `HashMap` trong đúng 1 lệnh bitwise CPU.
      - Khi người dùng chỉ bật gõ nhanh phụ âm đầu/cuối mặc định mà không có Normal macro, `normal_lengths_mask == 0`, triệt tiêu 100% việc lookup HashMap.
   2. **100% Zero-Heap Expansion Với `CompactString`:**
-     - Chuyển `expand_word` và `apply_case_style` sang trả về `Option<CompactString>`, thực hiện toàn bộ việc copy/uppercase trên buffer stack 24 bytes, triệt tiêu `malloc` khi gõ tắt. Thêm `impl From<CompactString> for String` phục vụ chuyển đổi không chi phí.
+     - Chuyển `expand_word` và `apply_case_style` sang trả về `Option<CompactString>`, thực hiện toàn bộ việc copy/uppercase trên buffer stack 64 bytes của `CompactString`, triệt tiêu `malloc` khi gõ tắt. Thêm `impl From<CompactString> for String` phục vụ chuyển đổi không chi phí.
   3. **Fast ASCII Length Check trong Common Prefix:**
      - Nếu `output.is_ascii()` (bao gồm tất cả các âm tiết ASCII, phụ âm đầu, chữ hoàn tác), tính ngay độ dài UTF-16 qua $O(1)$ byte length `output.len()`.
   4. **Short-Circuit Phím Ngoặc `[` và `]`:**
@@ -276,11 +277,11 @@ flowchart LR
 
 ---
 
-### 5.10. [ĐÃ HOÀN THÀNH] Win32 App Tracker: Event-Driven Foreground Window & Atomic Caching
-- **Bối cảnh:** Kora hỗ trợ profile cấu hình độc lập cho từng ứng dụng (tự động tắt tiếng Việt khi chơi Game, bật macro riêng khi mở VS Code, Photoshop).
-- **Giải pháp đã triển khai trong `src/platform/win32/app_tracker.rs` & `app_detect.rs`:**
-  1. **Đăng ký `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)`:** Chỉ lắng nghe sự kiện khi người dùng thực sự chuyển đổi qua lại giữa các cửa sổ ứng dụng (Event-Driven 100%, 0% CPU khi đứng yên trong một ứng dụng).
-  2. **Atomic Process & Focus Caching (`CACHED_PID`, `CACHED_APP_KIND`, `CACHED_FOCUS_HWND`, `CACHED_FIX_TYPE`):** Lưu đệm PID và HWND focus bằng các biến `Atomic` không khóa, giúp nhận diện trình duyệt/Omnibox trong $O(1)$ mà không cần mở lại handle tiến trình qua Kernel.
+### 5.10. [ĐÃ HOÀN THÀNH] Win32 App Tracker: Event-Driven Foreground/Focus Hook & Lock-Free Target Strategy
+- **Bối cảnh:** Kora hỗ trợ profile cấu hình độc lập cho từng ứng dụng (tự động tắt tiếng Việt khi chơi Game, bật macro riêng khi mở VS Code, Photoshop) và tự động chọn chiến lược bơm phím phù hợp cho trình duyệt/Omnibox/IDE.
+- **Giải pháp đã triển khai trong `src/platform/win32/app_tracker.rs`, `uia_detect.rs` & `app_detect.rs`:**
+  1. **Đăng ký `SetWinEventHook` (`EVENT_SYSTEM_FOREGROUND` & `EVENT_OBJECT_FOCUS`):** Chỉ kích hoạt khi người dùng thực sự chuyển đổi cửa sổ hoặc vùng nhập liệu (Event-Driven 100%, 0% CPU khi đứng yên gõ phím), đẩy toàn bộ truy vấn UI Automation sang luồng worker nền riêng biệt để không bao giờ chặn luồng giao diện hay luồng hook.
+  2. **Lock-Free Target Strategy (`CURRENT_TARGET_STRATEGY: AtomicU8`):** Lưu chiến lược bơm phím đã phân giải vào biến nguyên tử 1 byte (`get_current_target_strategy_raw` / `set_current_target_strategy_raw`), giúp luồng bàn phím đọc chiến lược trong $O(1)$ không khóa và không gọi lại Win32/UIA trên mỗi nhát phím.
 
 ---
 
@@ -297,4 +298,39 @@ flowchart LR
 - **Giải pháp đã triển khai trong `src/ui/mod.rs` & `src/platform/win32/mod.rs`:**
   1. **Event-Driven GDI Rendering & Double Buffering:** Chỉ vẽ lại khi có sự kiện `WM_PAINT` với `BackBuffer` chống nháy hình, tiêu thụ **0% GPU** khi không tương tác.
   2. **Tự động thu hồi RAM (`SetProcessWorkingSetSize`):** Khi ẩn Control Panel xuống System Tray (`hide_control_panel`), Kora gọi `trim_working_set()` trả toàn bộ trang bộ nhớ đệm về cho Windows, đưa mức tiêu thụ RAM chạy ngầm về **0.5 – 0.9 MB** (vượt xa mục tiêu 15 MB ban đầu).
+
+---
+
+### 5.13. [ĐÃ HOÀN THÀNH - Giai đoạn 13] Data Layout Diet, `VOWEL_DECOMPOSE_LUTS`, Raw-Byte Common Prefix, $O(1)$ Word Snapshot & Win32 Hook Syscall/Lock Diet
+- **Bối cảnh & Điểm nghẽn phát hiện qua rà soát chuyên sâu:**
+  1. **Phình kích thước `SyllableState` (96 bytes) & `RawKey` (8 bytes):** Biến thể `Passthrough(InlineList<char, 16>)` chiếm 68 bytes dù `TypingBuffer` đã có sẵn `raw_keys`/`last_rendered`; `OnsetState` và `CodaState` lưu tuple `(char, bool)` 8 bytes cho các phụ âm thuần ASCII; `RawKey` tốn 8 bytes khiến `InlineList<RawKey, 32>` nặng 260 bytes.
+  2. **Giải mã/Mã hóa UTF-8 lặp lại & 66 nhánh `decompose_vowel`:** `render_compact` phải chuyển từ `u16` BMP sang `char` rồi gọi `encode_utf8`; `decompose_vowel` vẫn dùng `match` 66 nhánh và `Tcvn3Charset::encode_char` phải gọi thêm `char::is_uppercase()` trên bảng Unicode.
+  3. **Chi phí ẩn trên `TypingBuffer` & `WordHistory`:** `is_boundary` quét lại `raw_keys` trên mỗi chữ hoa; Common Prefix giải mã `chars()` hai luồng và đếm lại UTF-16 cho cả phần tiền tố không đổi; `on_backspace` qua dấu cách phải chạy lại máy trạng thái cho từng phím trong từ cũ.
+  4. **Chi phí kiểm tra Macro & Mute Cache:** Từ tiếng Việt có dấu bị gọi `to_lowercase()` cấp phát `String` trên heap trước khi kiểm tra bitmask gõ tắt; `ensure_active_macro_table` duyệt `Vec<String>` đuổi theo từng con trỏ heap trên mọi lần ngắt từ khi có dòng macro bị mute.
+  5. **Độ trễ hệ thống trên luồng Win32 Low-Level Hook:** Giữ `Mutex` trên `ENGINE_INSTANCE` xuyên suốt lời gọi đồng bộ `SendInput` và `CallNextHookEx`; kiểm tra IME `SendMessageTimeoutW` liên tiến trình trên cả `KEYUP` và layout bàn phím Latin/US; lặp lại 11 lần syscall `GetAsyncKeyState` trên mỗi phím nhấn và 5 lần trên mỗi cú click chuột thường; quét hai lượt UTF-16 trong `send_replace`.
+- **Giải pháp kỹ thuật đã triển khai đồng bộ (0 crate phụ thuộc ngoài):**
+  1. **Thu gọn triệt để cấu trúc dữ liệu lõi (`SyllableState`: 96B $\rightarrow$ 26B, `RawKey`: 8B $\rightarrow$ 4B):**
+     - Đổi `Passthrough::Data` thành ZST `()`, nén `OnsetState` xuống **6 bytes** (`InlineList<u8, 4>` + `bool`) và `CodaState` xuống **25 bytes** (`NucleusState` + `InlineList<u8, 2>` + `Option<BaseVowel>`), gắn `#[repr(u8)]` cho `Tone`, `Diacritic`, `BaseVowel`.
+     - Đóng gói `#[repr(transparent)] pub struct RawKey(u32)` (bit 31 lưu `caps`, 21 bit thấp lưu `char`), giảm `InlineList<RawKey, 32>` từ 260B xuống **132B**, bổ sung `InlineList::from_slice` chỉ copy phần tử đang hoạt động `..len`.
+     - Bổ sung hệ hàm chính tả thao tác trực tiếp trên lát cắt byte ASCII (`is_valid_onset_ascii`, `is_valid_onset_vowel_orthography_ascii`, `is_valid_vietnamese_components_ascii`, `is_unambiguous_completed_vietnamese_syllable_ascii`) và bảo toàn tương thích tuyệt đối với bảng mã TCVN3.
+  2. **Bảng hằng Compile-Time `VOWEL_DECOMPOSE_LUTS` (662B), `INITIAL_ASCII_LUT` (128B) & Direct UTF-8 Byte Push:**
+     - Thay 66 nhánh `match` của `decompose_vowel` bằng hai mảng hằng số `([u16; 241], [u16; 90])` đóng gói sẵn cả cờ viết hoa (`decompose_vowel_with_case`), kết hợp `is_d_stroke` không rẽ nhánh `((c as u32) & !1) == 0x0110`.
+     - Bổ sung `INITIAL_ASCII_LUT: [u8; 128]` phân loại phím đầu tiên trong `State<Empty>::feed_key` bằng 1 lần đọc mảng, đánh giá lười closure `has_onset_d`, và thêm `CompactString::push_bmp_u16` / `push_ascii_bytes` ghi thẳng byte UTF-8 từ `compose_vowel_u16`.
+  3. **Cờ gia tăng $O(1)$ `is_boundary`, Raw-Byte Common Prefix & Khôi phục từ $O(1)$ (`restore_snapshot`):**
+     - Theo dõi `has_underscore` và `has_lower_alpha` gia tăng để kiểm tra biên `camelCase` trong $O(1)$.
+     - So khớp tiền tố trực tiếp trên byte UTF-8, lùi về ranh giới codepoint gần nhất và chỉ tính `utf16_len_utf8` không rẽ nhánh trên phần hậu tố thay đổi.
+     - Lưu ảnh chụp trạng thái `(raw_keys, state, rendered, emitted_len, is_raw_restored)` trong `CommittedWord` để `on_backspace` qua dấu cách khôi phục tức thì bằng `restore_snapshot` mà không cần phát lại từng phím.
+  4. **Bộ lọc Macro Tiền-Lowercase, Stack Lowercase & Chữ ký Mute $O(1)$ không đuổi con trỏ:**
+     - Kiểm tra độ dài, ký tự ASCII cuối cùng và nguyên âm liền kề **trước khi** hạ chữ thường trong `MacroTable::expand_word`, loại bỏ tức thì các từ tiếng Việt phổ biến (*"tiếng"*, *"không"*, *"những"*, *"thành"*) trong ~2 chu kỳ CPU; các từ còn lại hạ chữ thường trên stack qua `lowercase_to_compact` (0 heap alloc).
+     - Thay vòng lặp so sánh chuỗi trong `ensure_active_macro_table` bằng chữ ký băm FNV-1a 64-bit trên cặp `(ptr, len)` của slice `muted_macros` kết hợp bộ đếm thế hệ `MacroTable::mutation_gen()`.
+  5. **Tối ưu hóa tầng Win32 Hook & `SendInput` Injector:**
+     - Nhả khóa `Mutex` của `ENGINE_INSTANCE` **trước khi** gọi `send_replace` (`SendInput`), `CallNextHookEx` và `notify_mode_change`.
+     - Bỏ kiểm tra IME trên `WM_KEYUP`/`WM_SYSKEYUP` và chỉ gọi `ImmGetDefaultIMEWnd` + `SendMessageTimeoutW` khi layout bàn phím hiện hành (`GetKeyboardLayout`) thực sự thuộc nhóm CJK (`0x04`, `0x11`, `0x12`).
+     - Gộp các lần đọc trạng thái modifier trùng lặp, giảm `GetAsyncKeyState` từ 11 xuống 5 syscall trên mỗi phím nhấn và xuống **0 syscall** trên các cú click chuột thông thường; gộp mã hóa UTF-16 một lượt duy nhất vào mảng `MaybeUninit<INPUT>` trong `send_replace`.
+- **Kết quả đo đạc chính thức qua `cmd /c benchmark.bat`:**
+  - **`Telex (on_key raw)`:** Bứt phá từ 26.90M lên **32.33M keys/s (30.9 ns/key)** — tăng tốc **+20.2%** (phá vỡ mốc 30 triệu phím/giây!).
+  - **`Simple Telex (on_key raw)`:** Bứt phá từ 27.08M lên **30.91M keys/s (32.4 ns/key)** — tăng tốc **+14.1%**.
+  - **`English Bypass (on_key raw)`:** Vượt mốc 110 triệu phím/giây, đạt **110.52M keys/s (9.0 ns/key)**.
+  - **`Macro with Muted Rows`:** Tăng tốc từ 30.34M lên **32.94M – 34.11M keys/s (29.3 – 30.4 ns/key)**.
+  - **`Hook Rule Resolution (4 keys)`:** Chạm mốc **328.46M – 330.88M keys/s (3.0 ns/key)**.
 

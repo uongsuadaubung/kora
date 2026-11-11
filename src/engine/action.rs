@@ -118,6 +118,49 @@ impl CompactString {
         }
     }
 
+    /// Appends guaranteed valid ASCII bytes (`b < 0x80`) directly without UTF-8 validation overhead.
+    #[inline(always)]
+    pub(crate) fn push_ascii_bytes(&mut self, bytes: &[u8]) {
+        let n = bytes.len();
+        match self {
+            Self::Inline { buf, len } => {
+                let cur = *len as usize;
+                if cur + n <= 24 {
+                    buf[cur..cur + n].copy_from_slice(bytes);
+                    *len = (cur + n) as u8;
+                    return;
+                }
+            }
+            Self::Heap(_) => {}
+        }
+        self.push_str(unsafe { std::str::from_utf8_unchecked(bytes) });
+    }
+
+    /// Encodes a non-surrogate BMP Unicode codepoint (`u16`) directly into the inline UTF-8 buffer.
+    #[inline(always)]
+    pub(crate) fn push_bmp_u16(&mut self, cp: u16) {
+        if let Self::Inline { buf, len } = self {
+            let cur = *len as usize;
+            if cur <= 21 {
+                if cp < 0x80 {
+                    buf[cur] = cp as u8;
+                    *len = (cur + 1) as u8;
+                } else if cp < 0x800 {
+                    buf[cur] = (0xC0 | (cp >> 6)) as u8;
+                    buf[cur + 1] = (0x80 | (cp & 0x3F)) as u8;
+                    *len = (cur + 2) as u8;
+                } else {
+                    buf[cur] = (0xE0 | (cp >> 12)) as u8;
+                    buf[cur + 1] = (0x80 | ((cp >> 6) & 0x3F)) as u8;
+                    buf[cur + 2] = (0x80 | (cp & 0x3F)) as u8;
+                    *len = (cur + 3) as u8;
+                }
+                return;
+            }
+        }
+        self.push(unsafe { char::from_u32_unchecked(cp as u32) });
+    }
+
     #[inline]
     pub fn drain<R: RangeBounds<usize>>(&mut self, range: R) {
         match self {

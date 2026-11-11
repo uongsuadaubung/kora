@@ -46,11 +46,15 @@ const TELEX_MODIFIER_MASK: u32 = {
 
 /// Matches a key character to its modifier effect based on the active input method
 /// and syllable context (present vowels, onset 'd').
+///
+/// `has_onset_d` is evaluated lazily ONLY when `ch_lower == 'd'` (Telex) or `ch == '9'` (VNI),
+/// avoiding onset memory loads on 98% of keystrokes.
+#[inline(always)]
 pub fn match_modifier_key(
     method: InputMethod,
     ch: char,
     has_vowel: impl Fn(BaseVowel) -> bool,
-    has_onset_d: bool,
+    has_onset_d: impl FnOnce() -> bool,
 ) -> Option<KeyEffect> {
     if method.is_telex_family() {
         let cp = ch as u32 | 0x20;
@@ -59,19 +63,18 @@ pub fn match_modifier_key(
             return None;
         }
 
-        let ch_lower = (cp as u8) as char;
-        match ch_lower {
-            's' => Some(KeyEffect::Tone(Tone::Acute)),
-            'f' => Some(KeyEffect::Tone(Tone::Grave)),
-            'r' => Some(KeyEffect::Tone(Tone::HookAbove)),
-            'x' => Some(KeyEffect::Tone(Tone::Tilde)),
-            'j' => Some(KeyEffect::Tone(Tone::DotBelow)),
-            'z' => Some(KeyEffect::RemoveTone),
-            'w' => Some(KeyEffect::HornShortcut),
-            'a' if has_vowel(BaseVowel::A) => Some(KeyEffect::Circumflex(Some(BaseVowel::A))),
-            'e' if has_vowel(BaseVowel::E) => Some(KeyEffect::Circumflex(Some(BaseVowel::E))),
-            'o' if has_vowel(BaseVowel::O) => Some(KeyEffect::Circumflex(Some(BaseVowel::O))),
-            'd' if has_onset_d => Some(KeyEffect::DStroke),
+        match cp as u8 {
+            b's' => Some(KeyEffect::Tone(Tone::Acute)),
+            b'f' => Some(KeyEffect::Tone(Tone::Grave)),
+            b'r' => Some(KeyEffect::Tone(Tone::HookAbove)),
+            b'x' => Some(KeyEffect::Tone(Tone::Tilde)),
+            b'j' => Some(KeyEffect::Tone(Tone::DotBelow)),
+            b'z' => Some(KeyEffect::RemoveTone),
+            b'w' => Some(KeyEffect::HornShortcut),
+            b'a' if has_vowel(BaseVowel::A) => Some(KeyEffect::Circumflex(Some(BaseVowel::A))),
+            b'e' if has_vowel(BaseVowel::E) => Some(KeyEffect::Circumflex(Some(BaseVowel::E))),
+            b'o' if has_vowel(BaseVowel::O) => Some(KeyEffect::Circumflex(Some(BaseVowel::O))),
+            b'd' if has_onset_d() => Some(KeyEffect::DStroke),
             _ => None,
         }
     } else if method.is_vni() {
@@ -81,17 +84,17 @@ pub fn match_modifier_key(
             return None;
         }
 
-        match ch {
-            '1' => Some(KeyEffect::Tone(Tone::Acute)),
-            '2' => Some(KeyEffect::Tone(Tone::Grave)),
-            '3' => Some(KeyEffect::Tone(Tone::HookAbove)),
-            '4' => Some(KeyEffect::Tone(Tone::Tilde)),
-            '5' => Some(KeyEffect::Tone(Tone::DotBelow)),
-            '0' => Some(KeyEffect::RemoveTone),
-            '6' => Some(KeyEffect::Circumflex(None)),
-            '7' => Some(KeyEffect::Horn),
-            '8' => Some(KeyEffect::Breve),
-            '9' if has_onset_d => Some(KeyEffect::DStroke),
+        match cp as u8 {
+            b'1' => Some(KeyEffect::Tone(Tone::Acute)),
+            b'2' => Some(KeyEffect::Tone(Tone::Grave)),
+            b'3' => Some(KeyEffect::Tone(Tone::HookAbove)),
+            b'4' => Some(KeyEffect::Tone(Tone::Tilde)),
+            b'5' => Some(KeyEffect::Tone(Tone::DotBelow)),
+            b'0' => Some(KeyEffect::RemoveTone),
+            b'6' => Some(KeyEffect::Circumflex(None)),
+            b'7' => Some(KeyEffect::Horn),
+            b'8' => Some(KeyEffect::Breve),
+            b'9' if has_onset_d() => Some(KeyEffect::DStroke),
             _ => None,
         }
     } else {

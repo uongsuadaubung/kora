@@ -5,12 +5,11 @@ use std::ops::{Deref, DerefMut};
 use crate::vietnamese::{
     charset::Tone,
     coda::CodaState,
-    inline_list::InlineList,
     nucleus::NucleusState,
     onset::OnsetState,
     spelling::{
-        is_unambiguous_completed_vietnamese_syllable, is_valid_onset,
-        is_valid_vietnamese_components, is_valid_vietnamese_shorthand,
+        is_unambiguous_completed_vietnamese_syllable_ascii, is_valid_onset_ascii,
+        is_valid_vietnamese_components_ascii,
     },
     syllable::Syllable,
 };
@@ -57,7 +56,7 @@ impl Phase for Coda {
 }
 
 impl Phase for Passthrough {
-    type Data = InlineList<char, 16>;
+    type Data = ();
 }
 
 /// Zero-cost Typestate container parameterized over phase marker `S`.
@@ -141,7 +140,7 @@ impl From<State<Passthrough>> for SyllableState {
 }
 
 /// Runtime dispatch sum-type wrapping the compile-time `State<S>` typestates
-/// for storage across OS keystroke callbacks in `TypingBuffer`.
+/// for storage across OS keystroke callbacks in `TypingBuffer` (26 bytes on stack).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SyllableState {
     #[default]
@@ -154,8 +153,8 @@ pub enum SyllableState {
 
 impl SyllableState {
     #[inline(always)]
-    pub const fn passthrough(raw: InlineList<char, 16>) -> Self {
-        SyllableState::Passthrough(State::from_data(raw))
+    pub const fn passthrough() -> Self {
+        SyllableState::Passthrough(State::from_data(()))
     }
 
     /// Returns a compact summary string of the state for debugging
@@ -165,18 +164,16 @@ impl SyllableState {
             SyllableState::Onset(onset) => format!("Onset(\"{onset}\")"),
             SyllableState::Nucleus(nucleus) => format!("Nucleus(\"{nucleus}\")"),
             SyllableState::Coda(coda) => format!("Coda(\"{coda}\")"),
-            SyllableState::Passthrough(raw) => {
-                let s: String = raw.iter().collect();
-                format!("Passthrough(\"{s}\")")
-            }
+            SyllableState::Passthrough(_) => "Passthrough".to_string(),
         }
     }
 
     /// Checks whether this syllable state represents a valid Vietnamese spelling without heap allocations.
+    #[inline]
     pub fn is_valid_spelling(&self) -> bool {
         match self {
             SyllableState::Empty => true,
-            SyllableState::Onset(onset) => is_valid_onset(&onset.chars, onset.is_d_stroke),
+            SyllableState::Onset(onset) => is_valid_onset_ascii(&onset.chars, onset.is_d_stroke),
             SyllableState::Nucleus(nucleus) => {
                 let onset_slice = nucleus
                     .onset
@@ -184,7 +181,7 @@ impl SyllableState {
                     .map(|o| o.chars.as_slice())
                     .unwrap_or(&[]);
                 let d_stroke = nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke);
-                is_valid_vietnamese_components(
+                is_valid_vietnamese_components_ascii(
                     onset_slice,
                     d_stroke,
                     &nucleus.vowels,
@@ -200,7 +197,7 @@ impl SyllableState {
                     .map(|o| o.chars.as_slice())
                     .unwrap_or(&[]);
                 let d_stroke = coda.nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke);
-                is_valid_vietnamese_components(
+                is_valid_vietnamese_components_ascii(
                     onset_slice,
                     d_stroke,
                     &coda.nucleus.vowels,
@@ -208,28 +205,27 @@ impl SyllableState {
                     &coda.coda,
                 )
             }
-            SyllableState::Passthrough(raw) => {
-                raw.iter().all(|c| c.is_ascii()) || is_valid_vietnamese_shorthand(raw)
-            }
+            SyllableState::Passthrough(_) => true,
         }
     }
 
     /// Checks whether this state represents an unambiguous, completed Vietnamese syllable
     /// that must NEVER be destructively rolled back into raw keys when an invalid key arrives.
+    #[inline]
     pub fn is_unambiguous_completed_vietnamese(&self) -> bool {
-        if !self.is_valid_spelling() {
-            return false;
-        }
-
         let (nucleus, coda) = match self {
             SyllableState::Nucleus(n) => (&n.data, &[][..]),
             SyllableState::Coda(c) => (&c.nucleus, c.coda.as_slice()),
             _ => return false,
         };
 
+        if !self.is_valid_spelling() {
+            return false;
+        }
+
         let has_d_stroke = nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke);
         let has_onset = nucleus.onset.is_some();
-        is_unambiguous_completed_vietnamese_syllable(
+        is_unambiguous_completed_vietnamese_syllable_ascii(
             has_d_stroke,
             has_onset,
             &nucleus.vowels,
@@ -243,7 +239,11 @@ impl SyllableState {
         match self {
             SyllableState::Empty => None,
             SyllableState::Onset(onset) => Some(Syllable {
-                onset: onset.chars.to_vec(),
+                onset: onset
+                    .chars
+                    .iter()
+                    .map(|&b| (b as char, b.is_ascii_uppercase()))
+                    .collect(),
                 d_stroke: onset.is_d_stroke,
                 vowels: Vec::new(),
                 tone: Tone::None,

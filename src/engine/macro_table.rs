@@ -71,16 +71,62 @@ pub struct MacroTable {
     start_first_mask: u32,
     end_last_mask: u32,
     normal_lengths_mask: u32,
+    has_non_ascii_start: bool,
+    has_non_ascii_end: bool,
+    max_end_key_len: u8,
+    mutation_gen: u64,
+}
+
+#[inline(always)]
+const fn is_ascii_vowel_byte(b: u8) -> bool {
+    matches!(b | 0x20, b'a' | b'e' | b'i' | b'o' | b'u' | b'y')
+}
+
+/// Zero-allocation stack lowercasing for words up to 60 UTF-8 bytes (covering both ASCII and accented Vietnamese).
+#[inline]
+fn lowercase_to_compact(word: &str) -> Option<CompactString> {
+    if word.len() > 60 {
+        return None;
+    }
+    let mut out = CompactString::new();
+    if word.is_ascii() {
+        let mut buf = [0u8; 60];
+        let bytes = word.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            buf[i] = bytes[i].to_ascii_lowercase();
+            i += 1;
+        }
+        out.push_ascii_bytes(&buf[..bytes.len()]);
+        return Some(out);
+    }
+    for ch in word.chars() {
+        if ch.is_ascii() {
+            out.push_bmp_u16(ch.to_ascii_lowercase() as u16);
+        } else if crate::vietnamese::charset::is_d_stroke(ch) {
+            out.push_bmp_u16(0x0111);
+        } else if let Some((base, diacritic, tone, _)) =
+            crate::vietnamese::charset::decompose_vowel_with_case(ch)
+        {
+            out.push_bmp_u16(crate::vietnamese::charset::compose_vowel_u16(
+                base, diacritic, tone, false,
+            ));
+        } else {
+            for lc in ch.to_lowercase() {
+                if out.len() + lc.len_utf8() > 64 {
+                    return None;
+                }
+                out.push(lc);
+            }
+        }
+    }
+    Some(out)
 }
 
 #[inline]
 fn with_lowercase_key<R>(key: &str, f: impl FnOnce(&str) -> R) -> R {
-    let mut buf = [0u8; 64];
-    if key.len() <= 64 && key.is_ascii() {
-        for (i, b) in key.bytes().enumerate() {
-            buf[i] = b.to_ascii_lowercase();
-        }
-        f(std::str::from_utf8(&buf[..key.len()]).unwrap())
+    if let Some(compact) = lowercase_to_compact(key) {
+        f(compact.as_str())
     } else {
         f(&key.to_lowercase())
     }
@@ -92,7 +138,13 @@ impl MacroTable {
         Self::default()
     }
 
+    #[inline(always)]
+    pub fn mutation_gen(&self) -> u64 {
+        self.mutation_gen
+    }
+
     pub fn rebuild_cache(&mut self) {
+        self.mutation_gen = self.mutation_gen.wrapping_add(1);
         let mut starts: Vec<MacroEntry> = self
             .entries
             .values()
@@ -110,20 +162,31 @@ impl MacroTable {
         ends.sort_by_key(|a| std::cmp::Reverse(a.key.len()));
 
         let mut start_mask = 0u32;
+        let mut non_ascii_start = false;
         for s in &starts {
-            if let Some(&b) = s.key.as_bytes().first()
-                && b.is_ascii_lowercase()
-            {
-                start_mask |= 1u32 << (b - b'a');
+            if let Some(&b) = s.key.as_bytes().first() {
+                if b.is_ascii_lowercase() {
+                    start_mask |= 1u32 << (b - b'a');
+                } else if b >= 128 {
+                    non_ascii_start = true;
+                }
             }
         }
 
         let mut end_mask = 0u32;
+        let mut non_ascii_end = false;
+        let mut max_end_len = 0u8;
         for e in &ends {
-            if let Some(&b) = e.key.as_bytes().last()
-                && b.is_ascii_lowercase()
-            {
-                end_mask |= 1u32 << (b - b'a');
+            let klen = e.key.len().min(255) as u8;
+            if klen > max_end_len {
+                max_end_len = klen;
+            }
+            if let Some(&b) = e.key.as_bytes().last() {
+                if b.is_ascii_lowercase() {
+                    end_mask |= 1u32 << (b - b'a');
+                } else if b >= 128 {
+                    non_ascii_end = true;
+                }
             }
         }
 
@@ -131,6 +194,9 @@ impl MacroTable {
         self.end_consonants = ends;
         self.start_first_mask = start_mask;
         self.end_last_mask = end_mask;
+        self.has_non_ascii_start = non_ascii_start;
+        self.has_non_ascii_end = non_ascii_end;
+        self.max_end_key_len = max_end_len;
 
         let mut normal_mask = 0u32;
         for (k, entry) in &self.entries {
@@ -170,6 +236,7 @@ impl MacroTable {
         value: impl Into<String>,
         macro_type: MacroType,
     ) {
+        self.mutation_gen = self.mutation_gen.wrapping_add(1);
         let key_str = key.into().to_lowercase();
         let value_str = value.into();
         if macro_type == MacroType::Normal && key_str.len() < 32 {
@@ -212,12 +279,16 @@ impl MacroTable {
 
     /// Clear all macro entries
     pub fn clear(&mut self) {
+        self.mutation_gen = self.mutation_gen.wrapping_add(1);
         self.entries.clear();
         self.start_consonants.clear();
         self.end_consonants.clear();
         self.start_first_mask = 0;
         self.end_last_mask = 0;
         self.normal_lengths_mask = 0;
+        self.has_non_ascii_start = false;
+        self.has_non_ascii_end = false;
+        self.max_end_key_len = 0;
     }
 
     /// Number of macro entries
@@ -342,6 +413,7 @@ impl MacroTable {
     /// - EndConsonant macros: coda suffix when preceded by a vowel (e.g. "dag" -> "dang")
     ///
     /// Single-character inputs (e.g. "f", "j", "w", "g") are strictly preserved as literal characters.
+    #[inline]
     pub fn expand_word(
         &self,
         word: &str,
@@ -352,23 +424,60 @@ impl MacroTable {
             return None;
         }
 
-        let mut buf = [0u8; 64];
-        let lower_cow;
-        let lower: &str = if word.len() <= 64 && word.is_ascii() {
-            for (i, b) in word.bytes().enumerate() {
-                buf[i] = b.to_ascii_lowercase();
-            }
-            std::str::from_utf8(&buf[..word.len()]).unwrap()
+        let word_bytes = word.as_bytes();
+        let wlen = word_bytes.len();
+
+        // O(1) Pre-Lowercase Bitmask Rejection Filter:
+        // Rejects non-matching ASCII and accented Vietnamese words in ~2 CPU cycles BEFORE lowercasing!
+        let has_normal_candidate = self.normal_lengths_mask != 0
+            && (wlen >= 32 || (self.normal_lengths_mask & (1u32 << wlen)) != 0);
+
+        let has_start_candidate = allow_start_consonant
+            && !self.start_consonants.is_empty()
+            && wlen > 1
+            && {
+                let b0 = word_bytes[0];
+                if b0 < 128 {
+                    let bl = b0 | 0x20;
+                    bl.is_ascii_lowercase() && (self.start_first_mask & (1u32 << (bl - b'a'))) != 0
+                } else {
+                    self.has_non_ascii_start
+                }
+            };
+
+        let has_end_candidate = allow_end_consonant
+            && !self.end_consonants.is_empty()
+            && wlen > 1
+            && {
+                let bn = word_bytes[wlen - 1];
+                if bn < 128 {
+                    let bl = bn | 0x20;
+                    bl.is_ascii_lowercase()
+                        && (self.end_last_mask & (1u32 << (bl - b'a'))) != 0
+                        && !(self.max_end_key_len == 1
+                            && word_bytes[wlen - 2] < 128
+                            && !is_ascii_vowel_byte(word_bytes[wlen - 2]))
+                } else {
+                    self.has_non_ascii_end
+                }
+            };
+
+        if !has_normal_candidate && !has_start_candidate && !has_end_candidate {
+            return None;
+        }
+
+        let lower_compact = lowercase_to_compact(word);
+        let lower_heap;
+        let lower: &str = if let Some(ref c) = lower_compact {
+            c.as_str()
         } else {
-            lower_cow = word.to_lowercase();
-            &lower_cow
+            lower_heap = word.to_lowercase();
+            &lower_heap
         };
 
         // 1. Exact Normal macro match takes highest priority
-        // O(1) bitmask filter: bypass HashMap hashing if no Normal macro exists with this word length!
-        let has_normal_length =
-            word.len() >= 32 || (self.normal_lengths_mask & (1u32 << word.len())) != 0;
-        if has_normal_length {
+        let lower_len = lower.len();
+        if lower_len >= 32 || (self.normal_lengths_mask & (1u32 << lower_len)) != 0 {
             if let Some(entry) = self.entries.get(lower)
                 && entry.macro_type == MacroType::Normal
             {
@@ -376,47 +485,44 @@ impl MacroTable {
             }
         }
 
+        if !has_start_candidate && !has_end_candidate {
+            return None;
+        }
+
         // 2. Single-character guard: single letters like 'f', 'j', 'w' MUST NOT be modified
-        if word.len() <= 1 || word.chars().nth(1).is_none() {
+        if wlen <= 1 || word.chars().nth(1).is_none() {
             return None;
         }
 
         let mut matched_start: Option<(&str, &str)> = None;
         let mut matched_end: Option<(&str, &str)> = None;
-        let lower_bytes = lower.as_bytes();
 
-        // 3. Quick start consonant match (onset) — O(1) bitmask pre-filter skips loop when first char cannot match
-        if allow_start_consonant && !self.start_consonants.is_empty() {
-            let b0 = lower_bytes[0];
-            if !b0.is_ascii_lowercase() || (self.start_first_mask & (1u32 << (b0 - b'a'))) != 0 {
-                for entry in &self.start_consonants {
-                    if lower.starts_with(&entry.key) {
-                        let rem = &lower[entry.key.len()..];
-                        if let Some(next_char) = rem.chars().next()
-                            && is_vowel(next_char)
-                        {
-                            matched_start = Some((entry.key.as_str(), entry.value.as_str()));
-                            break;
-                        }
+        // 3. Quick start consonant match (onset)
+        if has_start_candidate {
+            for entry in &self.start_consonants {
+                if lower.starts_with(&entry.key) {
+                    let rem = &lower[entry.key.len()..];
+                    if let Some(next_char) = rem.chars().next()
+                        && is_vowel(next_char)
+                    {
+                        matched_start = Some((entry.key.as_str(), entry.value.as_str()));
+                        break;
                     }
                 }
             }
         }
 
-        // 4. Quick end consonant match (coda) — O(1) bitmask pre-filter skips loop when last char cannot match
-        if allow_end_consonant && !self.end_consonants.is_empty() {
-            let bl = lower_bytes[lower_bytes.len() - 1];
-            if !bl.is_ascii_lowercase() || (self.end_last_mask & (1u32 << (bl - b'a'))) != 0 {
-                for entry in &self.end_consonants {
-                    if lower.ends_with(&entry.key) {
-                        let prefix_len = lower.len() - entry.key.len();
-                        let prefix = &lower[..prefix_len];
-                        if let Some(prev_char) = prefix.chars().last()
-                            && is_vowel(prev_char)
-                        {
-                            matched_end = Some((entry.key.as_str(), entry.value.as_str()));
-                            break;
-                        }
+        // 4. Quick end consonant match (coda)
+        if has_end_candidate {
+            for entry in &self.end_consonants {
+                if lower.ends_with(&entry.key) {
+                    let prefix_len = lower.len() - entry.key.len();
+                    let prefix = &lower[..prefix_len];
+                    if let Some(prev_char) = prefix.chars().last()
+                        && is_vowel(prev_char)
+                    {
+                        matched_end = Some((entry.key.as_str(), entry.value.as_str()));
+                        break;
                     }
                 }
             }

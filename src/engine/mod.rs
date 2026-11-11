@@ -15,6 +15,16 @@ use history::{HistoryBackspace, WordHistory};
 use macro_table::MacroTable;
 pub use profile::ProfileManager;
 
+#[inline(always)]
+fn mutes_ptr_len_sig(mutes: &[String]) -> u64 {
+    let mut h = 0xcbf2_9ce4_8422_2325u64;
+    for s in mutes {
+        h = (h ^ (s.as_ptr() as u64)).wrapping_mul(0x0100_0000_01b3);
+        h = (h ^ (s.len() as u64)).wrapping_mul(0x0100_0000_01b3);
+    }
+    h
+}
+
 /// Clean, stateful, thread-safe Vietnamese Input Engine.
 #[derive(Debug, Clone)]
 pub struct VietnameseEngine {
@@ -30,7 +40,7 @@ pub struct VietnameseEngine {
     pub debug_log: Vec<String>,
     log_writer: AsyncLogWriter,
     cached_active_macro_table: Option<MacroTable>,
-    cached_macro_sig: Option<(String, Vec<String>, usize, usize)>,
+    cached_macro_sig: Option<(String, u64, u64, usize, usize)>,
 }
 
 impl Default for VietnameseEngine {
@@ -102,34 +112,37 @@ impl VietnameseEngine {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_key_disabled(&self, vk: u32) -> bool {
-        self.profile_manager.is_vk_disabled(
-            &self.profile_manager.active_id,
-            self.is_active_global,
-            self.active_child_idx,
-            vk,
-        )
+        let id = if self.is_active_global {
+            ""
+        } else {
+            &self.profile_manager.active_id
+        };
+        self.profile_manager
+            .is_vk_disabled(id, self.is_active_global, self.active_child_idx, vk)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn lookup_key_remap(&self, vk: u32) -> Option<u32> {
-        self.profile_manager.lookup_remap_vk(
-            &self.profile_manager.active_id,
-            self.is_active_global,
-            self.active_child_idx,
-            vk,
-        )
+        let id = if self.is_active_global {
+            ""
+        } else {
+            &self.profile_manager.active_id
+        };
+        self.profile_manager
+            .lookup_remap_vk(id, self.is_active_global, self.active_child_idx, vk)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn lookup_key_macro(&self, vk: u32) -> Option<&[profile::MacroAction]> {
-        self.profile_manager.lookup_key_macro_actions(
-            &self.profile_manager.active_id,
-            self.is_active_global,
-            self.active_child_idx,
-            vk,
-        )
+        let id = if self.is_active_global {
+            ""
+        } else {
+            &self.profile_manager.active_id
+        };
+        self.profile_manager
+            .lookup_key_macro_actions(id, self.is_active_global, self.active_child_idx, vk)
     }
 
     pub fn effective_remaps(&self) -> Vec<profile::KeyRemapRule> {
@@ -427,16 +440,20 @@ impl VietnameseEngine {
 
     #[inline]
     fn ensure_active_macro_table(&mut self) {
-        let global_mutes_len = self.profile_manager.global_profile.muted_macros.len();
-        let current_child_sum = if self.is_active_global {
-            0
+        let global_mutes = self.profile_manager.global_profile.muted_macros.as_slice();
+        let global_mutes_len = global_mutes.len();
+        let (current_child_sum, child_mutes_sig) = if self.is_active_global {
+            (0, 0)
         } else {
             match self
                 .profile_manager
                 .resolve_child(&self.profile_manager.active_id, self.active_child_idx)
             {
-                Some(p) => p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len(),
-                None => 0,
+                Some(p) => (
+                    p.muted_macros.len() + p.overridden_macros.len() + p.app_macros.len(),
+                    mutes_ptr_len_sig(&p.muted_macros),
+                ),
+                None => (0, 0),
             }
         };
 
@@ -448,19 +465,25 @@ impl VietnameseEngine {
             return;
         }
 
-        let is_valid =
-            if let Some((ref cached_id, ref cached_global_mutes, cached_global_len, child_sum)) =
-                self.cached_macro_sig
-            {
-                cached_global_len == self.macro_table.len()
-                    && child_sum == current_child_sum
-                    && cached_global_mutes.len() == global_mutes_len
-                    && (self.is_active_global || *cached_id == self.profile_manager.active_id)
-                    && cached_global_mutes.as_slice()
-                        == self.profile_manager.global_profile.muted_macros.as_slice()
-            } else {
-                false
-            };
+        let current_mutes_sig = mutes_ptr_len_sig(global_mutes) ^ child_mutes_sig.rotate_left(17);
+        let current_gen = self.macro_table.mutation_gen();
+
+        let is_valid = if let Some((
+            ref cached_id,
+            cached_mutes_sig,
+            cached_gen,
+            cached_mutes_len,
+            child_sum,
+        )) = self.cached_macro_sig
+        {
+            cached_gen == current_gen
+                && cached_mutes_len == global_mutes_len
+                && child_sum == current_child_sum
+                && cached_mutes_sig == current_mutes_sig
+                && (self.is_active_global || *cached_id == self.profile_manager.active_id)
+        } else {
+            false
+        };
 
         if !is_valid {
             let mut table = MacroTable::new();
@@ -469,9 +492,14 @@ impl VietnameseEngine {
             }
             table.rebuild_cache();
             self.cached_macro_sig = Some((
-                self.profile_manager.active_id.clone(),
-                self.profile_manager.global_profile.muted_macros.clone(),
-                self.macro_table.len(),
+                if self.is_active_global {
+                    String::new()
+                } else {
+                    self.profile_manager.active_id.clone()
+                },
+                current_mutes_sig,
+                current_gen,
+                global_mutes_len,
                 current_child_sum,
             ));
             self.cached_active_macro_table = Some(table);
@@ -479,6 +507,7 @@ impl VietnameseEngine {
     }
 
     /// Macro table of the active profile: borrowed reference without heap allocations
+    #[inline(always)]
     fn active_macro_table(&self) -> &MacroTable {
         if let Some(ref cached) = self.cached_active_macro_table {
             cached
@@ -525,7 +554,7 @@ impl VietnameseEngine {
     /// Reset current word session and history (e.g. on mouse click or navigation keys)
     pub fn reset(&mut self) {
         if self.config.debug && !self.buffer.is_empty() {
-            let prev_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+            let prev_word: String = self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
             self.log_debug(format!(
                 "[DBG][RESET] Session reset. Word in buffer was: {:?}",
                 prev_word
@@ -588,7 +617,7 @@ impl VietnameseEngine {
         if !cfg.enabled {
             if cfg.use_macro && cfg.use_macro_in_english_mode {
                 if ch.is_alphanumeric() || ch == '_' {
-                    self.buffer.raw_keys.push(RawKey { ch, is_upper });
+                    self.buffer.push_raw_key(RawKey::new(ch, is_upper));
                     self.buffer.emitted_len += 1;
                 } else {
                     self.buffer.clear();
@@ -599,33 +628,32 @@ impl VietnameseEngine {
             return EngineAction::Passthrough;
         }
 
-        let raw_key = RawKey { ch, is_upper };
+        let raw_key = RawKey::new(ch, is_upper);
 
         // If the incoming key begins a new CamelCase boundary, save preceding word into history
         if self.buffer.is_boundary(&raw_key) {
             let is_same_as_raw = self.buffer.is_rendered_identical_to_raw();
             let should_restore = cfg.restore_on_wrong_spelling
                 && !is_same_as_raw
-                && !self.buffer.state.is_valid_spelling();
+                && !self.buffer.is_valid_spelling();
 
             if should_restore {
                 let backspaces = self.buffer.emitted_len;
-                let mut output: CompactString = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                let mut output: CompactString =
+                    self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
                 output.push(ch);
-                let current_raw = self.buffer.raw_keys;
-                self.history.commit_word(current_raw, false);
+                self.history.commit_buffer(&self.buffer, false);
                 self.buffer.clear();
-                self.buffer.raw_keys.push(raw_key);
+                self.buffer.push_raw_key(raw_key);
                 let (next_state, _) =
-                    crate::vietnamese::SyllableState::Empty.feed_key(raw_key, 0, &cfg);
+                    crate::vietnamese::SyllableState::Empty.feed_key(raw_key, 0, cfg);
                 self.buffer.state = next_state;
                 self.buffer.last_rendered.push(ch);
                 self.buffer.emitted_len = ch.len_utf16();
                 return EngineAction::Replace { backspaces, output };
             }
 
-            let current_raw = self.buffer.raw_keys;
-            self.history.commit_word(current_raw, false);
+            self.history.commit_buffer(&self.buffer, false);
             self.buffer.clear();
         }
 
@@ -636,22 +664,21 @@ impl VietnameseEngine {
             let (test_state, _) =
                 self.buffer
                     .state
-                    .feed_key(raw_key, self.buffer.emitted_len, &cfg);
+                    .feed_key(raw_key, self.buffer.emitted_len, cfg);
             if matches!(test_state, crate::vietnamese::SyllableState::Passthrough(_))
                 || self.buffer.is_passthrough()
             {
-                let current_raw = self.buffer.raw_keys;
-                self.history.commit_word(current_raw, false);
+                self.history.commit_buffer(&self.buffer, false);
                 self.history.add_space();
                 self.buffer.clear();
             }
         }
 
-        let action = self.buffer.feed_key(raw_key, &cfg);
+        let action = self.buffer.feed_key(raw_key, cfg);
 
         if self.config.debug {
             let next_state_summary = self.buffer.state.summary();
-            let current_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+            let current_word: String = self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
             self.log_debug(format!(
                 "[DBG][KEY] {:?} (shift={}, caps={}, upper={}) | State: {} -> {} | Word: {:?} (screen_len={}) | Action: {:?}",
                 ch,
@@ -726,9 +753,30 @@ impl VietnameseEngine {
                     .expand_word(rendered, allow_start, allow_end)
                     .or_else(|| {
                         if !is_same {
-                            let current_word: CompactString =
-                                self.buffer.raw_keys.iter().map(|k| k.ch).collect();
-                            macro_table.expand_word(&current_word, allow_start, allow_end)
+                            let mut raw_buf = [0u8; 32];
+                            let keys = self.buffer.raw_keys.as_slice();
+                            let mut all_ascii = keys.len() <= 32;
+                            if all_ascii {
+                                for (i, &k) in keys.iter().enumerate() {
+                                    let cp = k.ch() as u32;
+                                    if cp < 128 {
+                                        raw_buf[i] = cp as u8;
+                                    } else {
+                                        all_ascii = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if all_ascii {
+                                // SAFETY: every byte < 128 is valid UTF-8.
+                                let s =
+                                    unsafe { std::str::from_utf8_unchecked(&raw_buf[..keys.len()]) };
+                                macro_table.expand_word(s, allow_start, allow_end)
+                            } else {
+                                let current_word: CompactString =
+                                    keys.iter().map(|k| k.ch()).collect();
+                                macro_table.expand_word(&current_word, allow_start, allow_end)
+                            }
                         } else {
                             None
                         }
@@ -740,7 +788,7 @@ impl VietnameseEngine {
 
                     if self.config.debug {
                         let current_word: String =
-                            self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                            self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
                         self.log_debug(format!(
                             "[DBG][MACRO] Key: {:?} | Expanded {:?} -> {:?} | Replace(bs={}, output={:?})",
                             ch, current_word, output, backspaces, output
@@ -749,8 +797,6 @@ impl VietnameseEngine {
 
                     self.buffer.clear();
                     if ch == ' ' {
-                        self.history
-                            .commit_word(crate::vietnamese::InlineList::new(), false);
                         self.history.add_space();
                     } else {
                         self.history.clear();
@@ -773,14 +819,15 @@ impl VietnameseEngine {
         // Restore raw keys if the word is an invalid Vietnamese syllable
         if restore_on_wrong_spelling {
             let is_invalid = if !is_same {
-                !self.buffer.state.is_valid_spelling()
+                !self.buffer.is_valid_spelling()
             } else {
                 false
             };
 
             if is_invalid {
                 let backspaces = self.buffer.emitted_len;
-                let mut output: CompactString = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                let mut output: CompactString =
+                    self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
                 output.push(ch);
 
                 if self.config.debug {
@@ -789,7 +836,7 @@ impl VietnameseEngine {
                         self.buffer
                             .raw_keys
                             .iter()
-                            .map(|k| k.ch)
+                            .map(|k| k.ch())
                             .collect::<String>(),
                         self.buffer.rendered(),
                         output
@@ -797,7 +844,7 @@ impl VietnameseEngine {
                 }
 
                 if ch == ' ' {
-                    self.history.commit_word(self.buffer.raw_keys, true);
+                    self.history.commit_buffer(&self.buffer, true);
                     self.history.add_space();
                 } else {
                     self.history.clear();
@@ -811,7 +858,7 @@ impl VietnameseEngine {
         // Commit word to history
         if !self.buffer.is_empty() {
             if self.config.debug {
-                let current_raw: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+                let current_raw: String = self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
                 self.log_debug(format!(
                     "[DBG][BREAK] Key: {:?} | Committed word: {:?} | Screen: {:?}",
                     ch,
@@ -820,8 +867,7 @@ impl VietnameseEngine {
                 ));
             }
             if ch == ' ' {
-                let current_raw = self.buffer.raw_keys;
-                self.history.commit_word(current_raw, false);
+                self.history.commit_buffer(&self.buffer, false);
                 self.history.add_space();
             } else {
                 self.history.clear();
@@ -846,6 +892,7 @@ impl VietnameseEngine {
         if !cfg.enabled {
             if cfg.use_macro && cfg.use_macro_in_english_mode && !self.buffer.is_empty() {
                 self.buffer.raw_keys.pop();
+                self.buffer.rebuild_key_flags();
                 if self.buffer.emitted_len > 0 {
                     self.buffer.emitted_len -= 1;
                 }
@@ -860,7 +907,7 @@ impl VietnameseEngine {
             self.buffer
                 .raw_keys
                 .iter()
-                .map(|k| k.ch)
+                .map(|k| k.ch())
                 .collect::<String>()
         } else {
             String::new()
@@ -869,22 +916,21 @@ impl VietnameseEngine {
         if self.buffer.is_empty() {
             let mut restored_word = None;
             if cfg.remember_history_across_space
-                && let HistoryBackspace::RestoredWord {
-                    raw_keys,
-                    is_raw_restored,
-                } = self.history.pop_backspace()
+                && let HistoryBackspace::RestoredWord(word) = self.history.pop_backspace()
             {
                 if self.config.debug {
-                    restored_word = Some(raw_keys.iter().map(|k| k.ch).collect::<String>());
+                    restored_word =
+                        Some(word.raw_keys.iter().map(|k| k.ch()).collect::<String>());
                 }
-                if is_raw_restored {
-                    self.buffer.restore_as_passthrough(raw_keys);
+                if word.is_raw_restored {
+                    self.buffer.restore_as_passthrough(&word.raw_keys);
                 } else {
-                    // Replay previous word into buffer
-                    for &k in &raw_keys {
-                        self.buffer.feed_key(k, cfg);
-                    }
-                    self.buffer.is_restored_across_space = true;
+                    self.buffer.restore_snapshot(
+                        &word.raw_keys,
+                        word.state,
+                        word.rendered.as_str(),
+                        word.emitted_len as usize,
+                    );
                 }
             }
             if self.config.debug {
@@ -896,9 +942,9 @@ impl VietnameseEngine {
             return EngineAction::Passthrough;
         }
 
-        self.buffer.handle_backspace(&cfg);
+        self.buffer.handle_backspace(cfg);
         if self.config.debug {
-            let now_word: String = self.buffer.raw_keys.iter().map(|k| k.ch).collect();
+            let now_word: String = self.buffer.raw_keys.iter().map(|k| k.ch()).collect();
             self.log_debug(format!(
                 "[DBG][BS] Backspaced. Word: {:?} -> {:?} | State: {} (screen_len={})",
                 prev_word,

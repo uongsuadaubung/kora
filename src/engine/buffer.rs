@@ -4,20 +4,64 @@ use super::{
 };
 use crate::vietnamese::{CharsetStrategy, InlineList, state::SyllableState};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct RawKey {
-    pub ch: char,
-    pub is_upper: bool,
+/// Packed 4-byte raw key representation (`8B -> 4B`, shrinking `InlineList<RawKey, 32>` from 260B to 132B):
+/// - Bits `0..21`: Unicode scalar value (`char`)
+/// - Bit `31`: `is_upper` flag
+#[repr(transparent)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub struct RawKey(u32);
+
+impl RawKey {
+    #[inline(always)]
+    pub const fn new(ch: char, is_upper: bool) -> Self {
+        Self((ch as u32) | ((is_upper as u32) << 31))
+    }
+
+    #[inline(always)]
+    pub const fn ch(self) -> char {
+        // SAFETY: Bits 0..31 are always constructed from a valid `char` (or 0 for `Default`).
+        unsafe { char::from_u32_unchecked(self.0 & 0x7FFF_FFFF) }
+    }
+
+    #[inline(always)]
+    pub const fn is_upper(self) -> bool {
+        (self.0 >> 31) != 0
+    }
+}
+
+impl std::fmt::Debug for RawKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawKey")
+            .field("ch", &self.ch())
+            .field("is_upper", &self.is_upper())
+            .finish()
+    }
 }
 
 impl From<char> for RawKey {
-    #[inline]
+    #[inline(always)]
     fn from(ch: char) -> Self {
-        Self {
-            ch,
-            is_upper: ch.is_uppercase(),
-        }
+        let is_upper = if ch.is_ascii() {
+            ch.is_ascii_uppercase()
+        } else {
+            ch.is_uppercase()
+        };
+        Self::new(ch, is_upper)
     }
+}
+
+/// Branchless UTF-16 code unit count directly over valid UTF-8 bytes.
+/// Leading bytes satisfy `(b as i8) >= -0x40`; 4-byte supplementary leads (`b >= 0xF0`) add 1 extra unit.
+#[inline(always)]
+fn utf16_len_utf8(bytes: &[u8]) -> usize {
+    let mut count = 0usize;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        count += ((b as i8) >= -0x40) as usize + (b >= 0xF0) as usize;
+        i += 1;
+    }
+    count
 }
 
 /// Result of evaluating a sequence of raw keys in the typing buffer
@@ -38,12 +82,16 @@ pub struct TypingBuffer {
     pub raw_keys: InlineList<RawKey, 32>,
     /// Projected state in the state machine (Empty, Onset, Nucleus, Coda, Passthrough)
     pub state: SyllableState,
-    /// Length in chars of the rendered text currently emitted to the screen
+    /// Length in UTF-16 code units of the rendered text currently emitted to the screen
     pub emitted_len: usize,
     /// Cached rendered string of the current state on the stack, avoiding re-renders and heap allocations
     pub last_rendered: CompactString,
     /// Whether this buffer was restored from history across a space via backspace
     pub is_restored_across_space: bool,
+    /// Incremental flag tracking whether `raw_keys` contains `'_'` (for O(1) `is_boundary`)
+    has_underscore: bool,
+    /// Incremental flag tracking whether `raw_keys` contains any lowercase alphabetic key (for O(1) `is_boundary`)
+    has_lower_alpha: bool,
 }
 
 impl Default for TypingBuffer {
@@ -54,6 +102,8 @@ impl Default for TypingBuffer {
             emitted_len: 0,
             last_rendered: CompactString::new(),
             is_restored_across_space: false,
+            has_underscore: false,
+            has_lower_alpha: false,
         }
     }
 }
@@ -108,26 +158,103 @@ impl TypingBuffer {
         matches!(self.state, SyllableState::Passthrough(_))
     }
 
+    /// Checks whether the current buffer represents a valid Vietnamese syllable (or valid shorthand/ASCII passthrough).
+    #[inline]
+    pub fn is_valid_spelling(&self) -> bool {
+        if self.is_passthrough() {
+            let s = self.last_rendered.as_str();
+            if s.is_ascii() || crate::vietnamese::spelling::is_valid_vietnamese_shorthand_str(s) {
+                return true;
+            }
+            // TCVN3 encoded "đc" / "Đc" ('\u{00AE}' / '\u{00A7}' + 'c'/'C')
+            let b = s.as_bytes();
+            b.len() == 3 && b[0] == 0xC2 && matches!(b[1], 0xAE | 0xA7) && (b[2] | 0x20) == b'c'
+        } else {
+            self.state.is_valid_spelling()
+        }
+    }
+
+    #[inline(always)]
+    pub fn push_raw_key(&mut self, key: RawKey) {
+        let ch = key.ch();
+        if ch == '_' {
+            self.has_underscore = true;
+        } else if !key.is_upper() {
+            let is_alpha = if ch.is_ascii() {
+                ch.is_ascii_lowercase()
+            } else {
+                ch.is_alphabetic()
+            };
+            if is_alpha {
+                self.has_lower_alpha = true;
+            }
+        }
+        self.raw_keys.push(key);
+    }
+
+    #[inline]
+    pub(crate) fn rebuild_key_flags(&mut self) {
+        let mut has_u = false;
+        let mut has_l = false;
+        for &k in &self.raw_keys {
+            let ch = k.ch();
+            if ch == '_' {
+                has_u = true;
+            } else if !k.is_upper() {
+                let is_alpha = if ch.is_ascii() {
+                    ch.is_ascii_lowercase()
+                } else {
+                    ch.is_alphabetic()
+                };
+                if is_alpha {
+                    has_l = true;
+                }
+            }
+        }
+        self.has_underscore = has_u;
+        self.has_lower_alpha = has_l;
+    }
+
+    #[inline]
     pub fn clear(&mut self) {
         self.raw_keys.clear();
         self.state = SyllableState::Empty;
         self.emitted_len = 0;
         self.last_rendered.clear();
         self.is_restored_across_space = false;
+        self.has_underscore = false;
+        self.has_lower_alpha = false;
     }
 
-    pub fn restore_as_passthrough(&mut self, keys: InlineList<RawKey, 32>) {
+    pub fn restore_as_passthrough(&mut self, keys: &[RawKey]) {
         self.last_rendered.clear();
-        let mut raw_chars = InlineList::new();
         let mut emitted_len = 0;
-        for k in &keys {
-            self.last_rendered.push(k.ch);
-            raw_chars.push(k.ch);
-            emitted_len += k.ch.len_utf16();
+        for &k in keys {
+            let ch = k.ch();
+            self.last_rendered.push(ch);
+            emitted_len += ch.len_utf16();
         }
         self.emitted_len = emitted_len;
-        self.state = SyllableState::passthrough(raw_chars);
-        self.raw_keys = keys;
+        self.state = SyllableState::passthrough();
+        self.raw_keys = InlineList::from_slice(keys);
+        self.rebuild_key_flags();
+        self.is_restored_across_space = true;
+    }
+
+    #[inline]
+    pub fn restore_snapshot(
+        &mut self,
+        keys: &[RawKey],
+        state: SyllableState,
+        rendered: &str,
+        emitted_len: usize,
+    ) {
+        self.raw_keys = InlineList::from_slice(keys);
+        self.state = state;
+        self.last_rendered.clear();
+        self.last_rendered.push_str(rendered);
+        self.emitted_len = emitted_len;
+        self.rebuild_key_flags();
         self.is_restored_across_space = true;
     }
 
@@ -151,7 +278,7 @@ impl TypingBuffer {
             rendered_bytes
                 .iter()
                 .zip(self.raw_keys.iter())
-                .all(|(&b, k)| b as char == k.ch)
+                .all(|(&b, k)| b as char == k.ch())
         }
     }
 
@@ -165,6 +292,7 @@ impl TypingBuffer {
         next_state: &SyllableState,
         action: &EngineAction,
         last_rendered: &str,
+        emitted_len: usize,
         raw_keys_prefix: &[RawKey],
         all_raw_keys: &[RawKey],
     ) -> Option<(SyllableState, EngineAction)> {
@@ -174,26 +302,26 @@ impl TypingBuffer {
             && matches!(action, EngineAction::Passthrough)
             && !current_state.is_unambiguous_completed_vietnamese()
         {
-            let is_same_as_raw = if last_rendered.len() != raw_keys_prefix.len() {
+            let is_same_as_raw = if emitted_len != raw_keys_prefix.len()
+                || last_rendered.len() != raw_keys_prefix.len()
+            {
                 false
             } else {
                 last_rendered
                     .as_bytes()
                     .iter()
                     .zip(raw_keys_prefix.iter())
-                    .all(|(&b, k)| b as char == k.ch)
+                    .all(|(&b, k)| b as char == k.ch())
             };
             if !is_same_as_raw {
-                let mut raw_list = InlineList::new();
                 let mut output = CompactString::new();
-                for k in all_raw_keys {
-                    raw_list.push(k.ch);
-                    output.push(k.ch);
+                for &k in all_raw_keys {
+                    output.push(k.ch());
                 }
                 return Some((
-                    SyllableState::passthrough(raw_list),
+                    SyllableState::passthrough(),
                     EngineAction::Replace {
-                        backspaces: last_rendered.chars().count(),
+                        backspaces: emitted_len,
                         output,
                     },
                 ));
@@ -225,11 +353,27 @@ impl TypingBuffer {
                 &next_state,
                 &action,
                 &last_rendered,
+                current_len,
                 &keys[..idx],
                 &keys[..=idx],
             ) {
                 next_state = rollback_state;
                 action = rollback_action;
+            }
+
+            // Synchronize effective Unicode keys BEFORE TCVN3 encoding mutates `output`.
+            if let EngineAction::Replace { ref output, .. } = action {
+                if matches!(next_state, SyllableState::Passthrough(_)) {
+                    effective.clear();
+                    for c in output.chars() {
+                        effective.push(RawKey::from(c));
+                    }
+                } else if matches!(key.ch(), 'z' | 'Z' | '0') && output.is_ascii() {
+                    effective.clear();
+                    for &b in output.as_bytes() {
+                        effective.push(RawKey::from(b as char));
+                    }
+                }
             }
 
             if config.charset != crate::vietnamese::Charset::Unicode {
@@ -241,21 +385,14 @@ impl TypingBuffer {
             state = next_state;
             match &action {
                 EngineAction::Replace { output, .. } => {
-                    current_len = output.encode_utf16().count();
+                    current_len = utf16_len_utf8(output.as_bytes());
                     last_rendered.clear();
                     last_rendered.push_str(output);
-                    // If an undo toggle transitioned into Passthrough (e.g. toanss -> toans, chuww -> chuw)
-                    // or mark removal ('z' / VNI '0') stripped all marks back to plain ASCII (e.g. lafz -> la),
-                    // synchronize effective keys to match the cancelled output on screen.
-                    if let SyllableState::Passthrough(raw) = state {
-                        effective = raw.iter().map(|&c| RawKey::from(c)).collect();
-                    } else if matches!(key.ch, 'z' | 'Z' | '0') && last_rendered.is_ascii() {
-                        effective = last_rendered.chars().map(RawKey::from).collect();
-                    }
                 }
                 EngineAction::Passthrough => {
-                    current_len += key.ch.len_utf16();
-                    last_rendered.push(key.ch);
+                    let ch = key.ch();
+                    current_len += ch.len_utf16();
+                    last_rendered.push(ch);
                 }
                 EngineAction::Consume => {}
             }
@@ -266,13 +403,11 @@ impl TypingBuffer {
             if matches!(state, SyllableState::Passthrough(_)) && !last_rendered.is_empty() {
                 last_rendered
             } else {
-                {
-                    let s = state.render_compact();
-                    if config.charset != crate::vietnamese::Charset::Unicode {
-                        config.charset.encode_text(s.as_str())
-                    } else {
-                        s
-                    }
+                let s = state.render_compact();
+                if config.charset != crate::vietnamese::Charset::Unicode {
+                    config.charset.encode_text(s.as_str())
+                } else {
+                    s
                 }
             };
 
@@ -285,30 +420,16 @@ impl TypingBuffer {
         }
     }
 
-    /// Checks whether `key` marks a word boundary (e.g. CamelCase / PascalCase boundary).
-    #[inline]
+    /// Checks whether `key` marks a word boundary (e.g. CamelCase / PascalCase boundary) in O(1) time.
+    #[inline(always)]
     pub fn is_boundary(&self, key: &RawKey) -> bool {
-        if !key.is_upper || self.raw_keys.is_empty() {
-            return false;
-        }
-
-        // If the buffer already contains an underscore, it is an identifier or macro (e.g. v_n, v_N, tp_hcm),
-        // not a camelCase word boundary.
-        let mut has_lower = false;
-        for k in &self.raw_keys {
-            if k.ch == '_' {
-                return false;
-            }
-            if !k.is_upper && k.ch.is_alphabetic() {
-                has_lower = true;
-            }
-        }
-        has_lower
+        key.is_upper() && !self.has_underscore && self.has_lower_alpha
     }
 
     /// Feeds a new key into the state machine and returns the resulting EngineAction.
+    #[inline]
     pub fn feed_key(&mut self, key: RawKey, config: &EngineConfig) -> EngineAction {
-        self.raw_keys.push(key);
+        self.push_raw_key(key);
 
         let current_state = self.state;
         let was_nucleus_or_coda = matches!(
@@ -319,7 +440,6 @@ impl TypingBuffer {
         let (mut next_state, mut action) = current_state.feed_key(key, self.emitted_len, config);
 
         // Smart English Word Bypass / Instant Restore on Wrong Spelling:
-
         if let Some((rollback_state, rollback_action)) = Self::try_smart_english_rollback(
             config,
             was_nucleus_or_coda,
@@ -327,11 +447,30 @@ impl TypingBuffer {
             &next_state,
             &action,
             &self.last_rendered,
+            self.emitted_len,
             &self.raw_keys[..self.raw_keys.len() - 1],
             &self.raw_keys,
         ) {
             next_state = rollback_state;
             action = rollback_action;
+        }
+
+        // Synchronize `raw_keys` from full Unicode `output` BEFORE TCVN3 encoding or Common Prefix truncation
+        // when an undo toggle / English rollback enters Passthrough or mark removal strips back to ASCII.
+        if let EngineAction::Replace { ref output, .. } = action {
+            if matches!(next_state, SyllableState::Passthrough(_)) {
+                self.raw_keys.clear();
+                for c in output.chars() {
+                    self.raw_keys.push(RawKey::from(c));
+                }
+                self.rebuild_key_flags();
+            } else if matches!(key.ch(), 'z' | 'Z' | '0') && output.is_ascii() {
+                self.raw_keys.clear();
+                for &b in output.as_bytes() {
+                    self.raw_keys.push(RawKey::from(b as char));
+                }
+                self.rebuild_key_flags();
+            }
         }
 
         if config.charset != crate::vietnamese::Charset::Unicode {
@@ -342,86 +481,68 @@ impl TypingBuffer {
 
         self.state = next_state;
 
-        // Common Prefix Optimization:
-        // If the unchanged prefix of the word (e.g. onset 'g' in "go" -> "gõ") remains identical,
-        // do not backspace and re-emit it. Only backspace the changed suffix ("o") and emit ("õ").
-        // This eliminates duplicate characters ("ggõ") on browser address bars (Firefox, Chrome).
+        // Raw-Byte Single-Pass Common Prefix Optimization:
+        // Compares raw UTF-8 bytes directly, rewinds at most 1-3 continuation bytes if split inside
+        // a multi-byte scalar (e.g. 'ấ' vs 'ầ'), and counts UTF-16 length ONLY on the changed suffix!
         let (action, new_emitted_len) = match action {
             EngineAction::Replace {
                 backspaces,
                 mut output,
             } => {
-                // Thuật toán so khớp tiền tố chung một lượt (Single-Pass Common Prefix Optimization):
-                // 1. Nếu chuỗi là ASCII, tính nhanh UTF-16 length bằng O(1) byte length, tránh duyệt UTF-8 lặp.
-                // 2. Duyệt đồng thời chuỗi đã render cũ và chuỗi mới để đếm số ký tự trùng khớp và số byte UTF-8 tương ứng.
-                // 3. Tích lũy trực tiếp common_bytes để cắt ngắn buffer mà không cần duyệt lại char_indices().
-                // 4. Số phím Backspace tối ưu: nếu có ký tự không khớp, chỉ cần xóa lùi (1 + phần còn lại của prev_iter).
-                // 5. Tái sử dụng vùng đệm cũ bằng truncate(common_bytes) thay vì clear() rồi sao chép lại toàn bộ.
-                let full_output_utf16 = if output.is_ascii() {
-                    output.len()
-                } else {
-                    output.chars().map(|c| c.len_utf16()).sum()
-                };
-                let mut prev_iter = self.last_rendered.chars();
-                let mut new_iter = output.chars();
-                let mut common = 0;
-                let mut common_bytes = 0;
-                let mut had_mismatch = false;
-                while let (Some(c1), Some(c2)) = (prev_iter.next(), new_iter.next()) {
-                    if c1 == c2 {
-                        common += 1;
-                        common_bytes += c1.len_utf8();
-                    } else {
-                        had_mismatch = true;
-                        break;
-                    }
+                let prev_bytes = self.last_rendered.as_bytes();
+                let new_bytes = output.as_bytes();
+                let min_len = prev_bytes.len().min(new_bytes.len());
+                let mut common_bytes = 0usize;
+                while common_bytes < min_len && prev_bytes[common_bytes] == new_bytes[common_bytes]
+                {
+                    common_bytes += 1;
                 }
 
-                let final_action = if common > 0 {
-                    let opt_backspaces = if had_mismatch {
-                        1 + prev_iter.count()
-                    } else {
-                        0
-                    };
+                if common_bytes > 0
+                    && ((common_bytes < prev_bytes.len()
+                        && (prev_bytes[common_bytes] as i8) < -0x40)
+                        || (common_bytes < new_bytes.len()
+                            && (new_bytes[common_bytes] as i8) < -0x40))
+                {
+                    while common_bytes > 0 && (prev_bytes[common_bytes - 1] as i8) < -0x40 {
+                        common_bytes -= 1;
+                    }
+                    common_bytes = common_bytes.saturating_sub(1);
+                }
+
+                if common_bytes > 0 {
+                    let opt_backspaces = utf16_len_utf8(&prev_bytes[common_bytes..]);
+                    let added_utf16 = utf16_len_utf8(&new_bytes[common_bytes..]);
+                    let updated_len = self.emitted_len - opt_backspaces + added_utf16;
                     output.drain(..common_bytes);
-                    EngineAction::Replace {
-                        backspaces: opt_backspaces,
-                        output,
-                    }
+                    self.last_rendered.truncate(common_bytes);
+                    self.last_rendered.push_str(&output);
+                    (
+                        EngineAction::Replace {
+                            backspaces: opt_backspaces,
+                            output,
+                        },
+                        updated_len,
+                    )
                 } else {
-                    EngineAction::Replace { backspaces, output }
-                };
-
-                self.last_rendered.truncate(common_bytes);
-                if let EngineAction::Replace { ref output, .. } = final_action {
-                    self.last_rendered.push_str(output);
+                    let full_output_utf16 = utf16_len_utf8(new_bytes);
+                    self.last_rendered.clear();
+                    self.last_rendered.push_str(&output);
+                    (
+                        EngineAction::Replace { backspaces, output },
+                        full_output_utf16,
+                    )
                 }
-
-                (final_action, full_output_utf16)
             }
             EngineAction::Passthrough => {
-                self.last_rendered.push(key.ch);
-                (
-                    EngineAction::Passthrough,
-                    self.emitted_len + key.ch.len_utf16(),
-                )
+                let ch = key.ch();
+                self.last_rendered.push(ch);
+                (EngineAction::Passthrough, self.emitted_len + ch.len_utf16())
             }
             EngineAction::Consume => (EngineAction::Consume, self.emitted_len),
         };
 
         self.emitted_len = new_emitted_len;
-
-        if let SyllableState::Passthrough(raw) = self.state {
-            if matches!(&action, EngineAction::Replace { .. }) {
-                self.raw_keys = raw.iter().map(|&c| RawKey::from(c)).collect();
-            }
-        } else if matches!(key.ch, 'z' | 'Z' | '0')
-            && matches!(&action, EngineAction::Replace { .. })
-            && self.last_rendered.is_ascii()
-        {
-            self.raw_keys = self.last_rendered.chars().map(RawKey::from).collect();
-        }
-
         action
     }
 
@@ -435,7 +556,7 @@ impl TypingBuffer {
         if self.is_passthrough() {
             self.raw_keys.pop();
             self.last_rendered.pop();
-            self.emitted_len = self.last_rendered.encode_utf16().count();
+            self.emitted_len = utf16_len_utf8(self.last_rendered.as_bytes());
 
             if self.raw_keys.is_empty() {
                 self.clear();
@@ -449,10 +570,9 @@ impl TypingBuffer {
                     self.emitted_len = eval.emitted_len;
                     self.last_rendered = eval.rendered;
                 } else {
-                    let raw_chars: InlineList<char, 16> =
-                        self.raw_keys.iter().map(|k| k.ch).collect();
-                    self.state = SyllableState::passthrough(raw_chars);
+                    self.state = SyllableState::passthrough();
                 }
+                self.rebuild_key_flags();
             }
             return true;
         }
@@ -469,6 +589,8 @@ impl TypingBuffer {
 
         if self.raw_keys.is_empty() {
             self.clear();
+        } else {
+            self.rebuild_key_flags();
         }
 
         true

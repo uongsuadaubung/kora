@@ -119,19 +119,26 @@ pub unsafe extern "system" fn low_level_mouse_proc(
         if n_code >= 0
             && (w_param == WM_LBUTTONDOWN || w_param == WM_RBUTTONDOWN || w_param == WM_MBUTTONDOWN)
         {
-            if (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0 {
-                capture::TRACKED_CTRL.store(false, Ordering::SeqCst);
+            if capture::TRACKED_CTRL.load(Ordering::Relaxed)
+                && (GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) == 0
+            {
+                capture::TRACKED_CTRL.store(false, Ordering::Relaxed);
             }
-            if (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0 {
-                capture::TRACKED_SHIFT.store(false, Ordering::SeqCst);
+            if capture::TRACKED_SHIFT.load(Ordering::Relaxed)
+                && (GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) == 0
+            {
+                capture::TRACKED_SHIFT.store(false, Ordering::Relaxed);
             }
-            if (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0 {
-                capture::TRACKED_ALT.store(false, Ordering::SeqCst);
+            if capture::TRACKED_ALT.load(Ordering::Relaxed)
+                && (GetAsyncKeyState(VK_MENU) as u16 & 0x8000) == 0
+            {
+                capture::TRACKED_ALT.store(false, Ordering::Relaxed);
             }
-            if ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
+            if capture::TRACKED_WIN.load(Ordering::Relaxed)
+                && ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) == 0)
                 && ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) == 0)
             {
-                capture::TRACKED_WIN.store(false, Ordering::SeqCst);
+                capture::TRACKED_WIN.store(false, Ordering::Relaxed);
             }
 
             if let Ok(mut guard) = ENGINE_INSTANCE.lock()
@@ -168,28 +175,38 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 return CallNextHookEx(0, n_code, w_param, l_param);
             }
 
-            // 2. Ignore keystrokes if an IME pad (Japanese, Chinese, etc.) is currently active
-            let fg_hwnd = GetForegroundWindow();
-            if fg_hwnd != 0 {
-                let ime_hwnd = ImmGetDefaultIMEWnd(fg_hwnd);
-                if ime_hwnd != 0 {
-                    let mut is_ime_on: usize = 0;
-                    let ok = SendMessageTimeoutW(
-                        ime_hwnd,
-                        WM_IME_CONTROL,
-                        IMC_GETOPENSTATUS,
-                        0,
-                        SMTO_ABORTIFHUNG,
-                        5,
-                        &mut is_ime_on,
-                    );
-                    if ok != 0 && is_ime_on != 0 {
-                        return CallNextHookEx(0, n_code, w_param, l_param);
+            let vk = hook_struct.vk_code;
+            let is_up = w_param == WM_KEYUP || w_param == WM_SYSKEYUP;
+            let is_down = w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN;
+
+            // 2. Ignore key-down keystrokes only when a CJK IME (Chinese/Japanese/Korean) is active & open.
+            // Key-up events and non-CJK keyboard layouts (English, Vietnamese, etc.) skip cross-process IPC completely!
+            if is_down {
+                let fg_hwnd = GetForegroundWindow();
+                if fg_hwnd != 0 {
+                    let tid = GetWindowThreadProcessId(fg_hwnd, null_mut());
+                    let lang_id = (GetKeyboardLayout(tid) as usize) & 0xFFFF;
+                    // PRIMARYLANGID: 0x04 = Chinese, 0x11 = Japanese, 0x12 = Korean
+                    if matches!(lang_id & 0x03FF, 0x04 | 0x11 | 0x12) {
+                        let ime_hwnd = ImmGetDefaultIMEWnd(fg_hwnd);
+                        if ime_hwnd != 0 {
+                            let mut is_ime_on: usize = 0;
+                            let ok = SendMessageTimeoutW(
+                                ime_hwnd,
+                                WM_IME_CONTROL,
+                                IMC_GETOPENSTATUS,
+                                0,
+                                SMTO_ABORTIFHUNG,
+                                5,
+                                &mut is_ime_on,
+                            );
+                            if ok != 0 && is_ime_on != 0 {
+                                return CallNextHookEx(0, n_code, w_param, l_param);
+                            }
+                        }
                     }
                 }
             }
-
-            let vk = hook_struct.vk_code;
 
             // ========================================================================
             // EXCLUSIVE CAPTURE SANDBOX:
@@ -211,6 +228,7 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
             let (
                 is_disabled,
                 remap_target,
+                has_key_macro,
                 macro_actions,
                 switch_key_enabled,
                 switch_key,
@@ -220,16 +238,25 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 if let Some(ref engine) = *guard {
                     let eff_cfg = engine.effective_config();
                     let disabled = engine.is_key_disabled(vk);
-                    let remap = engine.lookup_key_remap(vk);
-                    let key_macro = if eff_cfg.key_macro_enabled {
-                        engine.lookup_key_macro(vk).map(|s| s.to_vec())
-                    } else {
+                    let remap = if disabled {
                         None
+                    } else {
+                        engine.lookup_key_remap(vk)
                     };
+                    let (has_km, km_actions) =
+                        if !disabled && remap.is_none() && eff_cfg.key_macro_enabled {
+                            match engine.lookup_key_macro(vk) {
+                                Some(s) => (true, if is_down { Some(s.to_vec()) } else { None }),
+                                None => (false, None),
+                            }
+                        } else {
+                            (false, None)
+                        };
                     (
                         disabled,
                         remap,
-                        key_macro,
+                        has_km,
+                        km_actions,
                         eff_cfg.switch_key_enabled,
                         eff_cfg.switch_key,
                         eff_cfg.target_capture_enabled,
@@ -239,6 +266,7 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                     (
                         false,
                         None,
+                        false,
                         None,
                         true,
                         crate::engine::config::Hotkey::default(),
@@ -250,6 +278,7 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 (
                     false,
                     None,
+                    false,
                     None,
                     true,
                     crate::engine::config::Hotkey::default(),
@@ -265,87 +294,85 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
 
             // 2. Intercept Key Remapping: swallow original event and dispatch target key
             if let Some(target_vk) = remap_target {
-                let is_up = w_param == WM_KEYUP || w_param == WM_SYSKEYUP;
                 send_vk_event(target_vk, is_up);
                 return 1;
             }
 
-            // 3. Intercept Key Macro: swallow original event and trigger macro asynchronously
-            if let Some(actions) = macro_actions {
-                let is_down = w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN;
-                if is_down {
+            // 3. Intercept Key Macro: swallow original event and trigger macro asynchronously on key-down
+            if has_key_macro {
+                if let Some(actions) = macro_actions {
                     macro_executor::execute_actions(actions);
                 }
                 return 1;
             }
 
             // Handle key-up events for modifier-only hotkey triggers (e.g. Ctrl + Shift toggle)
-            if w_param == WM_KEYUP || w_param == WM_SYSKEYUP {
+            if is_up {
                 capture::update_modifier_tracking_keyup(vk);
 
                 release_key_sound(vk);
                 if switch_key_enabled
                     && switch_key.vk == 0
                     && is_modifier_vk(vk)
-                    && HOTKEY_MOD_ARMED.swap(false, Ordering::SeqCst)
-                    && let Ok(mut guard) = ENGINE_INSTANCE.lock()
-                    && let Some(ref mut engine) = *guard
+                    && HOTKEY_MOD_ARMED.swap(false, Ordering::AcqRel)
                 {
-                    let new_state = engine.toggle_enabled();
-                    crate::engine::config_store::save_config_all_debounced(
-                        engine.config(),
-                        &engine.macro_table,
-                        &engine.profile_manager,
-                    );
-                    if new_state {
-                        engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
-                    } else {
-                        engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
+                    let mut toggled = None;
+                    if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                        && let Some(ref mut engine) = *guard
+                    {
+                        let new_state = engine.toggle_enabled();
+                        crate::engine::config_store::save_config_all_debounced(
+                            engine.config(),
+                            &engine.macro_table,
+                            &engine.profile_manager,
+                        );
+                        if new_state {
+                            engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
+                        } else {
+                            engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
+                        }
+                        toggled = Some(new_state);
                     }
-                    notify_mode_change(new_state);
+                    if let Some(new_state) = toggled {
+                        notify_mode_change(new_state);
+                    }
                 }
                 return CallNextHookEx(0, n_code, w_param, l_param);
             }
 
             // Only process key-down events
-            if w_param == WM_KEYDOWN || w_param == WM_SYSKEYDOWN {
+            if is_down {
                 if is_ctrl_vk(vk) {
-                    TRACKED_CTRL.store(true, Ordering::SeqCst);
+                    TRACKED_CTRL.store(true, Ordering::Relaxed);
                 }
                 if is_shift_vk(vk) {
-                    TRACKED_SHIFT.store(true, Ordering::SeqCst);
+                    TRACKED_SHIFT.store(true, Ordering::Relaxed);
                 }
                 if is_alt_vk(vk) {
-                    TRACKED_ALT.store(true, Ordering::SeqCst);
+                    TRACKED_ALT.store(true, Ordering::Relaxed);
                 }
                 if is_win_vk(vk) {
-                    TRACKED_WIN.store(true, Ordering::SeqCst);
+                    TRACKED_WIN.store(true, Ordering::Relaxed);
                 }
 
                 trigger_key_sound(vk);
 
-                // 2. Query hardware modifier states cleanly and reliably
+                // Query hardware modifier states cleanly (Win32 VK_SHIFT/VK_CONTROL/VK_MENU aggregate L+R)
                 let is_caps = (GetKeyState(VK_CAPITAL) & 1) != 0;
 
                 let is_shift = is_shift_vk(vk)
                     || ((GetAsyncKeyState(VK_SHIFT) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(0xA0) as u16 & 0x8000) != 0) // VK_LSHIFT
-                    || ((GetAsyncKeyState(0xA1) as u16 & 0x8000) != 0) // VK_RSHIFT
-                    || TRACKED_SHIFT.load(Ordering::SeqCst);
+                    || TRACKED_SHIFT.load(Ordering::Relaxed);
                 let is_ctrl = is_ctrl_vk(vk)
                     || ((GetAsyncKeyState(VK_CONTROL) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(0xA2) as u16 & 0x8000) != 0) // VK_LCONTROL
-                    || ((GetAsyncKeyState(0xA3) as u16 & 0x8000) != 0) // VK_RCONTROL
-                    || TRACKED_CTRL.load(Ordering::SeqCst);
+                    || TRACKED_CTRL.load(Ordering::Relaxed);
                 let is_alt = is_alt_vk(vk)
                     || ((GetAsyncKeyState(VK_MENU) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(0xA4) as u16 & 0x8000) != 0) // VK_LMENU
-                    || ((GetAsyncKeyState(0xA5) as u16 & 0x8000) != 0) // VK_RMENU
-                    || TRACKED_ALT.load(Ordering::SeqCst);
+                    || TRACKED_ALT.load(Ordering::Relaxed);
                 let is_win = is_win_vk(vk)
                     || ((GetAsyncKeyState(VK_LWIN) as u16 & 0x8000) != 0)
                     || ((GetAsyncKeyState(VK_RWIN) as u16 & 0x8000) != 0)
-                    || TRACKED_WIN.load(Ordering::SeqCst);
+                    || TRACKED_WIN.load(Ordering::Relaxed);
 
                 // Check modifier-only hotkey arming (e.g. Ctrl + Shift)
                 if switch_key_enabled {
@@ -356,43 +383,44 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                             let match_alt = is_alt == switch_key.alt;
                             let match_win = is_win == switch_key.win;
                             if match_ctrl && match_shift && match_alt && match_win {
-                                HOTKEY_MOD_ARMED.store(true, Ordering::SeqCst);
+                                HOTKEY_MOD_ARMED.store(true, Ordering::Release);
                             }
                             return CallNextHookEx(0, n_code, w_param, l_param);
                         } else {
-                            HOTKEY_MOD_ARMED.store(false, Ordering::SeqCst);
+                            HOTKEY_MOD_ARMED.store(false, Ordering::Relaxed);
                         }
-                    } else {
-                        // Check modifier + key hotkey (e.g. Ctrl + Space, Alt + Z, Shift + Space, Win + Z)
-                        if vk == switch_key.vk
-                            && is_ctrl == switch_key.ctrl
-                            && is_shift == switch_key.shift
-                            && is_alt == switch_key.alt
-                            && is_win == switch_key.win
+                    } else if vk == switch_key.vk
+                        && is_ctrl == switch_key.ctrl
+                        && is_shift == switch_key.shift
+                        && is_alt == switch_key.alt
+                        && is_win == switch_key.win
+                    {
+                        let mut toggled = None;
+                        if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                            && let Some(ref mut engine) = *guard
                         {
-                            if let Ok(mut guard) = ENGINE_INSTANCE.lock()
-                                && let Some(ref mut engine) = *guard
-                            {
-                                let new_state = engine.toggle_enabled();
-                                crate::engine::config_store::save_config_all_debounced(
-                                    engine.config(),
-                                    &engine.macro_table,
-                                    &engine.profile_manager,
-                                );
-                                if new_state {
-                                    engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
-                                } else {
-                                    engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
-                                }
-                                notify_mode_change(new_state);
-                                if is_win {
-                                    send_vk_event(0xFF, false);
-                                    send_vk_event(0xFF, true);
-                                }
-                                return 1;
+                            let new_state = engine.toggle_enabled();
+                            crate::engine::config_store::save_config_all_debounced(
+                                engine.config(),
+                                &engine.macro_table,
+                                &engine.profile_manager,
+                            );
+                            if new_state {
+                                engine.log_debug("[Kora] >> Chế độ gõ: [V] TIẾNG VIỆT");
+                            } else {
+                                engine.log_debug("[Kora] >> Chế độ gõ: [E] TIẾNG ANH");
                             }
-                            return CallNextHookEx(0, n_code, w_param, l_param);
+                            toggled = Some(new_state);
                         }
+                        if let Some(new_state) = toggled {
+                            notify_mode_change(new_state);
+                            if is_win {
+                                send_vk_event(0xFF, false);
+                                send_vk_event(0xFF, true);
+                            }
+                            return 1;
+                        }
+                        return CallNextHookEx(0, n_code, w_param, l_param);
                     }
                 }
 
@@ -471,16 +499,8 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 GetKeyboardState(key_state.as_mut_ptr());
 
                 // Synchronize Shift / CapsLock in the keyboard state array for ToUnicode
-                if is_shift {
-                    key_state[VK_SHIFT as usize] = 0x80;
-                } else {
-                    key_state[VK_SHIFT as usize] = 0;
-                }
-                if is_caps {
-                    key_state[VK_CAPITAL as usize] = 0x01;
-                } else {
-                    key_state[VK_CAPITAL as usize] = 0;
-                }
+                key_state[VK_SHIFT as usize] = if is_shift { 0x80 } else { 0 };
+                key_state[VK_CAPITAL as usize] = if is_caps { 0x01 } else { 0 };
 
                 let mut buff = [0u16; 4];
                 let count = ToUnicode(
@@ -493,26 +513,30 @@ pub unsafe extern "system" fn low_level_keyboard_proc(
                 );
 
                 if count > 0
-                    && let Some(ch) = char::decode_utf16(buff[0..count as usize].iter().cloned())
+                    && let Some(ch) = char::decode_utf16(buff[0..count as usize].iter().copied())
                         .next()
                         .and_then(|r| r.ok())
                 {
-                    if let Ok(mut guard) = ENGINE_INSTANCE.lock()
+                    let action = if let Ok(mut guard) = ENGINE_INSTANCE.lock()
                         && let Some(ref mut engine) = *guard
                     {
-                        let action = engine.on_key(ch, is_shift, is_caps);
+                        Some(engine.on_key(ch, is_shift, is_caps))
+                    } else {
+                        None
+                    };
+
+                    if let Some(action) = action {
                         match action {
                             EngineAction::Passthrough => {
-                                // Let OS handle original keystroke
                                 return CallNextHookEx(0, n_code, w_param, l_param);
                             }
                             EngineAction::Replace { backspaces, output } => {
-                                // Consume this key, send backspaces and replacement string in a single atomic SendInput call
+                                // Lock is ALREADY released before SendInput!
                                 send_replace(backspaces, &output);
-                                return 1; // Intercept: do not pass to target window
+                                return 1;
                             }
                             EngineAction::Consume => {
-                                return 1; // Drop key entirely
+                                return 1;
                             }
                         }
                     }

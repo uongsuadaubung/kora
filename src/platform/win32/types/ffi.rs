@@ -65,6 +65,7 @@ unsafe extern "system" {
     pub fn GetForegroundWindow() -> isize;
     pub fn GetAncestor(hWnd: isize, gaFlags: u32) -> isize;
     pub fn GetWindowThreadProcessId(hWnd: isize, lpdwProcessId: *mut u32) -> u32;
+    pub fn GetKeyboardLayout(idThread: u32) -> isize;
     pub fn GetGUIThreadInfo(idThread: u32, pgui: *mut GUITHREADINFO) -> i32;
     pub fn GetClassNameW(hWnd: isize, lpClassName: *mut u16, nMaxCount: i32) -> i32;
     pub fn MessageBoxW(hWnd: isize, lpText: *const u16, lpCaption: *const u16, uType: u32) -> i32;

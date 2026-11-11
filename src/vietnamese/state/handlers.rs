@@ -9,17 +9,53 @@ use crate::engine::{
 use crate::vietnamese::{
     charset::{BaseVowel, Diacritic, Tone, decompose_vowel, is_d_stroke},
     coda::CodaState,
-    inline_list::InlineList,
     modifier::{KeyEffect, match_modifier_key},
     nucleus::{ModifierOutcome, NucleusState},
     onset::OnsetState,
     spelling::{
-        can_vowels_accept_coda, is_special_k_coda_allowed_during_typing, is_valid_coda_pair,
+        can_vowels_accept_coda, is_special_k_coda_allowed_during_typing_ascii, is_valid_coda_pair,
         is_valid_coda_start, is_valid_coda_start_for_vowels,
-        is_valid_intermediate_vowel_combination, is_valid_onset_extension,
-        is_valid_onset_vowel_orthography, is_valid_vowel_combination,
+        is_valid_intermediate_vowel_combination, is_valid_onset_extension_ascii,
+        is_valid_onset_vowel_orthography_ascii, is_valid_vowel_combination,
     },
     syllable::VowelLetter,
+};
+
+// ============================================================================
+// Compile-Time ASCII Initial Dispatch Table for State<Empty>
+// ============================================================================
+
+const INIT_PASSTHROUGH: u8 = 0;
+const INIT_BRACKET_OPEN: u8 = 1;
+const INIT_BRACKET_CLOSE: u8 = 2;
+const INIT_W: u8 = 3;
+const INIT_NON_VI_CONSONANT: u8 = 4;
+const INIT_VI_CONSONANT: u8 = 5;
+const INIT_VOWEL_BASE: u8 = 10;
+
+const INITIAL_ASCII_LUT: [u8; 128] = {
+    let mut lut = [INIT_PASSTHROUGH; 128];
+    lut[b'[' as usize] = INIT_BRACKET_OPEN;
+    lut[b']' as usize] = INIT_BRACKET_CLOSE;
+
+    let mut c = b'a';
+    while c <= b'z' {
+        let tag = match c {
+            b'a' => INIT_VOWEL_BASE + BaseVowel::A as u8,
+            b'e' => INIT_VOWEL_BASE + BaseVowel::E as u8,
+            b'i' => INIT_VOWEL_BASE + BaseVowel::I as u8,
+            b'o' => INIT_VOWEL_BASE + BaseVowel::O as u8,
+            b'u' => INIT_VOWEL_BASE + BaseVowel::U as u8,
+            b'y' => INIT_VOWEL_BASE + BaseVowel::Y as u8,
+            b'w' => INIT_W,
+            b'f' | b'j' | b'z' => INIT_NON_VI_CONSONANT,
+            _ => INIT_VI_CONSONANT,
+        };
+        lut[c as usize] = tag;
+        lut[(c - 32) as usize] = tag;
+        c += 1;
+    }
+    lut
 };
 
 // ============================================================================
@@ -60,93 +96,149 @@ impl State<Empty> {
         }
     }
 
-    /// Consumes `State<Empty>` and transitions into `State<Passthrough>`
-    #[inline(always)]
-    pub fn into_passthrough(self, ch: char) -> State<Passthrough> {
-        State {
-            data: InlineList::from_single(ch),
-            _state: PhantomData,
-        }
-    }
-
-    #[inline(always)]
-    fn try_bracket_w_shortcut(
-        self,
-        key: RawKey,
-        config: &EngineConfig,
-    ) -> Option<(SyllableState, EngineAction)> {
-        if key.ch != '[' && key.ch != ']' {
-            return None;
-        }
-        if config.bracket_w && config.method.has_bracket_shortcuts() {
-            let base = match key.ch {
-                '[' => BaseVowel::U,
-                ']' => BaseVowel::O,
-                _ => return None,
-            };
-            let nucleus = self.into_nucleus(
-                VowelLetter {
-                    base,
-                    diacritic: Diacritic::Horn,
-                    is_upper: key.is_upper,
-                },
-                Tone::None,
-                true,
-            );
-            let output = nucleus.render_compact();
-            return Some((
-                nucleus.into(),
-                EngineAction::Replace {
-                    backspaces: 0,
-                    output,
-                },
-            ));
-        }
-        None
-    }
-
     /// Feeds a key into `State<Empty>`, consuming `self` and transitioning to the next state.
     #[inline(always)]
     pub fn feed_key(self, key: RawKey, config: &EngineConfig) -> (SyllableState, EngineAction) {
-        let ch_lower = key.ch.to_ascii_lowercase();
+        let ch = key.ch();
+        let is_upper = key.is_upper();
+        let cp = ch as u32;
 
-        // 1. Bracket W shortcuts: [ -> ư, ] -> ơ
-        if let Some(res) = self.try_bracket_w_shortcut(key, config) {
-            return res;
+        // O(1) ASCII Initial Fast-Path (>99% of initial keystrokes)
+        if cp < 128 {
+            let b_ch = cp as u8;
+            match INITIAL_ASCII_LUT[cp as usize] {
+                INIT_VI_CONSONANT => {
+                    if is_upper && b_ch.is_ascii_lowercase() {
+                        let upper = (b_ch - 32) as char;
+                        return (
+                            self.into_onset(upper, true, false).into(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output: upper.into(),
+                            },
+                        );
+                    }
+                    return (
+                        self.into_onset(ch, is_upper, false).into(),
+                        EngineAction::Passthrough,
+                    );
+                }
+                tag if tag >= INIT_VOWEL_BASE => {
+                    let base = match tag - INIT_VOWEL_BASE {
+                        0 => BaseVowel::A,
+                        1 => BaseVowel::E,
+                        2 => BaseVowel::I,
+                        3 => BaseVowel::O,
+                        4 => BaseVowel::U,
+                        _ => BaseVowel::Y,
+                    };
+                    let nucleus = self.into_nucleus(
+                        VowelLetter {
+                            base,
+                            diacritic: Diacritic::None,
+                            is_upper,
+                        },
+                        Tone::None,
+                        false,
+                    );
+                    if is_upper && b_ch.is_ascii_lowercase() {
+                        let upper = (b_ch - 32) as char;
+                        return (
+                            nucleus.into(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output: upper.into(),
+                            },
+                        );
+                    }
+                    return (nucleus.into(), EngineAction::Passthrough);
+                }
+                INIT_NON_VI_CONSONANT => {
+                    if is_upper && b_ch.is_ascii_lowercase() {
+                        let upper = (b_ch - 32) as char;
+                        return (
+                            SyllableState::passthrough(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output: upper.into(),
+                            },
+                        );
+                    }
+                    return (SyllableState::passthrough(), EngineAction::Passthrough);
+                }
+                INIT_W => {
+                    if config.method.has_standalone_w() {
+                        let nucleus = self.into_nucleus(
+                            VowelLetter {
+                                base: BaseVowel::U,
+                                diacritic: Diacritic::Horn,
+                                is_upper,
+                            },
+                            Tone::None,
+                            true,
+                        );
+                        let output = nucleus.render_compact();
+                        return (
+                            nucleus.into(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output,
+                            },
+                        );
+                    }
+                    if is_upper && b_ch == b'w' {
+                        return (
+                            SyllableState::passthrough(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output: 'W'.into(),
+                            },
+                        );
+                    }
+                    return (SyllableState::passthrough(), EngineAction::Passthrough);
+                }
+                tag @ (INIT_BRACKET_OPEN | INIT_BRACKET_CLOSE) => {
+                    if config.bracket_w && config.method.has_bracket_shortcuts() {
+                        let base = if tag == INIT_BRACKET_OPEN {
+                            BaseVowel::U
+                        } else {
+                            BaseVowel::O
+                        };
+                        let nucleus = self.into_nucleus(
+                            VowelLetter {
+                                base,
+                                diacritic: Diacritic::Horn,
+                                is_upper,
+                            },
+                            Tone::None,
+                            true,
+                        );
+                        let output = nucleus.render_compact();
+                        return (
+                            nucleus.into(),
+                            EngineAction::Replace {
+                                backspaces: 0,
+                                output,
+                            },
+                        );
+                    }
+                    return (SyllableState::passthrough(), EngineAction::Passthrough);
+                }
+                _ => return (SyllableState::passthrough(), EngineAction::Passthrough),
+            }
         }
 
-        // 2. Standalone 'w' -> 'ư'
-        if config.method.has_standalone_w() && ch_lower == 'w' {
-            let nucleus = self.into_nucleus(
-                VowelLetter {
-                    base: BaseVowel::U,
-                    diacritic: Diacritic::Horn,
-                    is_upper: key.is_upper,
-                },
-                Tone::None,
-                true,
-            );
-            let output = nucleus.render_compact();
-            return (
-                nucleus.into(),
-                EngineAction::Replace {
-                    backspaces: 0,
-                    output,
-                },
-            );
-        }
-
-        // 3. Auto-uppercased first letter (key.is_upper is true, but key.ch is lowercase)
-        if key.is_upper && key.ch.is_lowercase() && key.ch.is_alphabetic() {
-            let upper_char = key.ch.to_uppercase().next().unwrap_or(key.ch);
-            if let Some(base_vowel) = BaseVowel::from_char(key.ch) {
+        // Non-ASCII initial characters (pre-composed Vietnamese vowels, 'đ'/'Đ', or foreign Unicode)
+        if is_upper && ch.is_lowercase() && ch.is_alphabetic() {
+            let upper_char = ch.to_uppercase().next().unwrap_or(ch);
+            if let Some((base_vowel, diacritic, tone)) = decompose_vowel(upper_char) {
                 let nucleus = self.into_nucleus(
                     VowelLetter {
                         base: base_vowel,
-                        diacritic: Diacritic::None,
+                        diacritic,
                         is_upper: true,
                     },
-                    Tone::None,
+                    tone,
                     false,
                 );
                 return (
@@ -156,25 +248,31 @@ impl State<Empty> {
                         output: upper_char.into(),
                     },
                 );
-            } else {
-                let onset = self.into_onset(upper_char, true, false);
+            }
+            if is_d_stroke(upper_char) {
                 return (
-                    onset.into(),
+                    self.into_onset('d', true, true).into(),
                     EngineAction::Replace {
                         backspaces: 0,
                         output: upper_char.into(),
                     },
                 );
             }
+            return (
+                SyllableState::passthrough(),
+                EngineAction::Replace {
+                    backspaces: 0,
+                    output: upper_char.into(),
+                },
+            );
         }
 
-        // 4. Vowel -> Transition Empty -> Nucleus
-        if let Some((base_vowel, diacritic, tone)) = decompose_vowel(key.ch) {
+        if let Some((base_vowel, diacritic, tone)) = decompose_vowel(ch) {
             let nucleus = self.into_nucleus(
                 VowelLetter {
                     base: base_vowel,
                     diacritic,
-                    is_upper: key.is_upper,
+                    is_upper,
                 },
                 tone,
                 false,
@@ -182,37 +280,14 @@ impl State<Empty> {
             return (nucleus.into(), EngineAction::Passthrough);
         }
 
-        // 5. 'đ' or 'Đ' -> Transition Empty -> Onset
-        if is_d_stroke(key.ch) {
+        if is_d_stroke(ch) {
             return (
-                self.into_onset('d', key.is_upper, true).into(),
+                self.into_onset('d', is_upper, true).into(),
                 EngineAction::Passthrough,
             );
         }
 
-        // 6. Non-Vietnamese initial consonants: 'f', 'j', 'z', and non-standalone 'w'
-        let is_non_vi_consonant = matches!(ch_lower, 'f' | 'j' | 'z')
-            || (!config.method.has_standalone_w() && ch_lower == 'w');
-        if is_non_vi_consonant {
-            return (
-                self.into_passthrough(key.ch).into(),
-                EngineAction::Passthrough,
-            );
-        }
-
-        // 7. Standard consonant -> Transition Empty -> Onset
-        if key.ch.is_alphabetic() {
-            return (
-                self.into_onset(key.ch, key.is_upper, false).into(),
-                EngineAction::Passthrough,
-            );
-        }
-
-        // 8. Anything else -> Transition Empty -> Passthrough
-        (
-            self.into_passthrough(key.ch).into(),
-            EngineAction::Passthrough,
-        )
+        (SyllableState::passthrough(), EngineAction::Passthrough)
     }
 }
 
@@ -237,18 +312,6 @@ impl State<Onset> {
         }
     }
 
-    /// Consumes `State<Onset>` and transitions into `State<Passthrough>` with trailing `ch`
-    #[inline(always)]
-    pub fn into_passthrough(self, ch: char) -> State<Passthrough> {
-        let mut raw = InlineList::new();
-        self.data.render_chars_to(&mut raw);
-        raw.push(ch);
-        State {
-            data: raw,
-            _state: PhantomData,
-        }
-    }
-
     #[inline(always)]
     fn try_bracket_w_shortcut(
         self,
@@ -256,20 +319,21 @@ impl State<Onset> {
         current_len: usize,
         config: &EngineConfig,
     ) -> Option<(SyllableState, EngineAction)> {
-        if key.ch != '[' && key.ch != ']' {
+        let ch = key.ch();
+        if ch != '[' && ch != ']' {
             return None;
         }
         if config.bracket_w && config.method.has_bracket_shortcuts() {
-            let base = match key.ch {
-                '[' => BaseVowel::U,
-                ']' => BaseVowel::O,
-                _ => return None,
+            let base = if ch == '[' {
+                BaseVowel::U
+            } else {
+                BaseVowel::O
             };
             let nucleus = self.into_nucleus(
                 VowelLetter {
                     base,
                     diacritic: Diacritic::Horn,
-                    is_upper: key.is_upper,
+                    is_upper: key.is_upper(),
                 },
                 Tone::None,
                 true,
@@ -294,7 +358,9 @@ impl State<Onset> {
         current_len: usize,
         config: &EngineConfig,
     ) -> (SyllableState, EngineAction) {
-        let ch_lower = key.ch.to_ascii_lowercase();
+        let ch = key.ch();
+        let is_upper = key.is_upper();
+        let ch_lower = ch.to_ascii_lowercase();
 
         // 1. Bracket W shortcuts: [ -> ư, ] -> ơ
         if let Some(res) = self.try_bracket_w_shortcut(key, current_len, config) {
@@ -302,21 +368,20 @@ impl State<Onset> {
         }
 
         // 2. D-Stroke in Onset (Telex 'dd' or VNI 'd9' -> 'đ')
-        let has_onset_d = !self.chars.is_empty() && self.chars[0].0.eq_ignore_ascii_case(&'d');
-        if let Some(KeyEffect::DStroke) =
-            match_modifier_key(config.method, key.ch, |_| false, has_onset_d)
-        {
+        if let Some(KeyEffect::DStroke) = match_modifier_key(
+            config.method,
+            ch,
+            |_| false,
+            || !self.chars.is_empty() && (self.chars[0] | 0x20) == b'd',
+        ) {
             if config.method.is_telex_family() && self.is_d_stroke {
                 // 3rd 'd' cancels 'đ' and restores double 'dd' into Passthrough!
-                let first_d = if self.chars[0].1 { 'D' } else { 'd' };
+                let first_d = self.chars[0] as char;
                 let mut output = CompactString::new();
                 output.push(first_d);
-                output.push(key.ch);
-                let mut raw = InlineList::new();
-                raw.push(first_d);
-                raw.push(key.ch);
+                output.push(ch);
                 return (
-                    SyllableState::passthrough(raw),
+                    SyllableState::passthrough(),
                     EngineAction::Replace {
                         backspaces: current_len,
                         output,
@@ -337,17 +402,15 @@ impl State<Onset> {
 
         // 3. Incoming shorthand 'w' -> Transition Onset -> Nucleus!
         if config.method.has_standalone_w() && ch_lower == 'w' {
-            if !is_valid_onset_vowel_orthography(&self.chars, self.is_d_stroke, BaseVowel::U) {
-                return (
-                    self.into_passthrough(key.ch).into(),
-                    EngineAction::Passthrough,
-                );
+            if !is_valid_onset_vowel_orthography_ascii(&self.chars, self.is_d_stroke, BaseVowel::U)
+            {
+                return (SyllableState::passthrough(), EngineAction::Passthrough);
             }
             let nucleus = self.into_nucleus(
                 VowelLetter {
                     base: BaseVowel::U,
                     diacritic: Diacritic::Horn,
-                    is_upper: key.is_upper,
+                    is_upper,
                 },
                 Tone::None,
                 true,
@@ -363,19 +426,16 @@ impl State<Onset> {
         }
 
         // 4. Incoming vowel -> Transition Onset -> Nucleus!
-        if let Some((base_vowel, diacritic, tone)) = decompose_vowel(key.ch) {
-            if !is_valid_onset_vowel_orthography(&self.chars, self.is_d_stroke, base_vowel) {
-                return (
-                    self.into_passthrough(key.ch).into(),
-                    EngineAction::Passthrough,
-                );
+        if let Some((base_vowel, diacritic, tone)) = decompose_vowel(ch) {
+            if !is_valid_onset_vowel_orthography_ascii(&self.chars, self.is_d_stroke, base_vowel) {
+                return (SyllableState::passthrough(), EngineAction::Passthrough);
             }
             // Promote entire onset to uppercase for ALL CAPS words (e.g. "QUA", "PHONG")
             let mut onset_promoted = false;
-            if key.is_upper && !self.chars.is_empty() && self.chars[0].1 {
-                for c in &mut self.chars {
-                    if !c.1 {
-                        c.1 = true;
+            if is_upper && !self.chars.is_empty() && self.chars[0].is_ascii_uppercase() {
+                for b in &mut self.chars {
+                    if b.is_ascii_lowercase() {
+                        *b -= 32;
                         onset_promoted = true;
                     }
                 }
@@ -385,7 +445,7 @@ impl State<Onset> {
                 VowelLetter {
                     base: base_vowel,
                     diacritic,
-                    is_upper: key.is_upper,
+                    is_upper,
                 },
                 tone,
                 false,
@@ -407,16 +467,13 @@ impl State<Onset> {
         }
 
         // 5. Additional consonant in Onset
-        if key.ch.is_alphabetic() && is_valid_onset_extension(&self.chars, key.ch) {
-            self.chars.push((key.ch, key.is_upper));
+        if ch.is_ascii_alphabetic() && is_valid_onset_extension_ascii(&self.chars, ch) {
+            self.push_ascii(ch, is_upper);
             return (self.into(), EngineAction::Passthrough);
         }
 
         // 6. Invalid onset combo -> Transition Onset -> Passthrough
-        (
-            self.into_passthrough(key.ch).into(),
-            EngineAction::Passthrough,
-        )
+        (SyllableState::passthrough(), EngineAction::Passthrough)
     }
 }
 
@@ -434,27 +491,6 @@ impl State<Nucleus> {
         }
     }
 
-    /// Consumes `State<Nucleus>` and transitions into `State<Passthrough>` with trailing `ch`
-    #[inline(always)]
-    pub fn into_passthrough(self, ch: char) -> State<Passthrough> {
-        let mut raw = InlineList::new();
-        self.data.render_chars_to(&mut raw);
-        raw.push(ch);
-        State {
-            data: raw,
-            _state: PhantomData,
-        }
-    }
-
-    /// Consumes `State<Nucleus>` and transitions into `State<Passthrough>` from undone raw string
-    #[inline(always)]
-    pub fn into_passthrough_raw(self, raw: &str) -> State<Passthrough> {
-        State {
-            data: InlineList::from(raw),
-            _state: PhantomData,
-        }
-    }
-
     /// Feeds a key into `State<Nucleus>`, consuming `self` and transitioning to the next state.
     #[inline(always)]
     pub fn feed_key(
@@ -463,34 +499,36 @@ impl State<Nucleus> {
         current_len: usize,
         config: &EngineConfig,
     ) -> (SyllableState, EngineAction) {
+        let ch = key.ch();
+        let is_upper = key.is_upper();
         let is_telex = config.method.is_telex_family();
 
         // 1. Bracket W shortcuts: [[ -> [, ]] -> ]
-        if (key.ch == '[' || key.ch == ']')
+        if (ch == '[' || ch == ']')
             && config.bracket_w
             && config.method.has_bracket_shortcuts()
             && self.onset.is_none()
             && self.vowels.len() == 1
             && self.is_shorthand
         {
-            if key.ch == '['
+            if ch == '['
                 && self.vowels[0].base == BaseVowel::U
                 && self.vowels[0].diacritic == Diacritic::Horn
             {
                 return (
-                    SyllableState::passthrough(InlineList::from_single('[')),
+                    SyllableState::passthrough(),
                     EngineAction::Replace {
                         backspaces: current_len,
                         output: "[".into(),
                     },
                 );
             }
-            if key.ch == ']'
+            if ch == ']'
                 && self.vowels[0].base == BaseVowel::O
                 && self.vowels[0].diacritic == Diacritic::Horn
             {
                 return (
-                    SyllableState::passthrough(InlineList::from_single(']')),
+                    SyllableState::passthrough(),
                     EngineAction::Replace {
                         backspaces: current_len,
                         output: "]".into(),
@@ -500,15 +538,15 @@ impl State<Nucleus> {
         }
 
         // 2. Unified Modifiers (Tone, Circumflex, Horn, Breve, D-stroke, Undo Toggle)
-        let has_onset_d = self
-            .onset
-            .as_ref()
-            .is_some_and(|o| !o.chars.is_empty() && o.chars[0].0.eq_ignore_ascii_case(&'d'));
         if let Some(effect) = match_modifier_key(
             config.method,
-            key.ch,
+            ch,
             |b| self.vowels.iter().any(|v| v.base == b),
-            has_onset_d,
+            || {
+                self.onset
+                    .as_ref()
+                    .is_some_and(|o| !o.chars.is_empty() && (o.chars[0] | 0x20) == b'd')
+            },
         ) {
             match self.apply_modifier(effect, key, None, None, config) {
                 ModifierOutcome::Applied => {
@@ -523,7 +561,7 @@ impl State<Nucleus> {
                 }
                 ModifierOutcome::Undone(raw) => {
                     return (
-                        self.into_passthrough_raw(raw.as_str()).into(),
+                        SyllableState::passthrough(),
                         EngineAction::Replace {
                             backspaces: current_len,
                             output: raw,
@@ -535,24 +573,24 @@ impl State<Nucleus> {
         }
 
         // 3. Additional vowel in Nucleus (up to 3 vowels)
-        if let Some((base_vowel, mut diacritic, tone)) = decompose_vowel(key.ch) {
+        if let Some((base_vowel, mut diacritic, tone)) = decompose_vowel(ch) {
             // Glide absorption: "gi" or "qu" followed by another vowel
             if self.vowels.len() == 1
                 && let Some(ref mut onset) = self.data.onset
                 && onset.chars.len() == 1
             {
-                let c0 = onset.chars[0].0.to_ascii_lowercase();
-                if c0 == 'g'
+                let c0 = onset.chars[0] | 0x20;
+                if c0 == b'g'
                     && self.data.vowels[0].base == BaseVowel::I
                     && self.data.vowels[0].diacritic == Diacritic::None
                 {
-                    onset.chars.push(('i', self.data.vowels[0].is_upper));
+                    onset.push_ascii('i', self.data.vowels[0].is_upper);
                     self.data.vowels.clear();
-                } else if c0 == 'q'
+                } else if c0 == b'q'
                     && self.data.vowels[0].base == BaseVowel::U
                     && self.data.vowels[0].diacritic == Diacritic::None
                 {
-                    onset.chars.push(('u', self.data.vowels[0].is_upper));
+                    onset.push_ascii('u', self.data.vowels[0].is_upper);
                     self.data.vowels.clear();
                 }
             }
@@ -583,35 +621,23 @@ impl State<Nucleus> {
                     upgraded_u_horn = true;
                 }
 
-                let mut candidate_vowels = self.vowels;
-                candidate_vowels.push(VowelLetter {
-                    base: base_vowel,
-                    diacritic,
-                    is_upper: key.is_upper,
-                });
-
-                let is_valid = if self.tone != Tone::None {
-                    is_valid_vowel_combination(candidate_vowels.as_slice())
-                } else {
-                    is_valid_intermediate_vowel_combination(candidate_vowels.as_slice())
-                };
-
-                if !is_valid {
-                    if upgraded_u_horn {
-                        self.vowels[0].diacritic = Diacritic::None;
-                    }
-                    return (
-                        self.into_passthrough(key.ch).into(),
-                        EngineAction::Passthrough,
-                    );
-                }
-
-                let prev_has_tone = self.tone != Tone::None;
                 self.vowels.push(VowelLetter {
                     base: base_vowel,
                     diacritic,
-                    is_upper: key.is_upper,
+                    is_upper,
                 });
+
+                let is_valid = if self.tone != Tone::None {
+                    is_valid_vowel_combination(self.vowels.as_slice())
+                } else {
+                    is_valid_intermediate_vowel_combination(self.vowels.as_slice())
+                };
+
+                if !is_valid {
+                    return (SyllableState::passthrough(), EngineAction::Passthrough);
+                }
+
+                let prev_has_tone = self.tone != Tone::None;
                 if tone != Tone::None && self.tone == Tone::None {
                     self.tone = tone;
                 }
@@ -637,13 +663,10 @@ impl State<Nucleus> {
         }
 
         // 4. Consonant -> Transition from Nucleus to Coda!
-        let is_valid_start = is_valid_coda_start(key.ch);
-        let is_k = key.ch.eq_ignore_ascii_case(&'k');
+        let is_valid_start = is_valid_coda_start(ch);
+        let is_k = ch.eq_ignore_ascii_case(&'k');
         if !is_valid_start && !is_k {
-            return (
-                self.into_passthrough(key.ch).into(),
-                EngineAction::Passthrough,
-            );
+            return (SyllableState::passthrough(), EngineAction::Passthrough);
         }
 
         // Upgrade "uơ" to "ươ" when a coda arrives (e.g. "thước", "thương")
@@ -661,21 +684,19 @@ impl State<Nucleus> {
 
         let is_special_k = is_k
             && self.onset.as_ref().is_some_and(|o| {
-                is_special_k_coda_allowed_during_typing(&o.chars, o.is_d_stroke, &self.vowels)
+                is_special_k_coda_allowed_during_typing_ascii(&o.chars, o.is_d_stroke, &self.vowels)
             });
         let is_onset_qu = self.onset.as_ref().is_some_and(|o| {
-            o.chars.len() == 2
-                && o.chars[0].0.eq_ignore_ascii_case(&'q')
-                && o.chars[1].0.eq_ignore_ascii_case(&'u')
+            o.chars.len() == 2 && (o.chars[0] | 0x20) == b'q' && (o.chars[1] | 0x20) == b'u'
         });
         let can_accept_coda = can_vowels_accept_coda(&self.vowels)
-            && is_valid_coda_start_for_vowels(is_onset_qu, &self.vowels, key.ch);
-        let is_stop = matches!(key.ch.to_ascii_lowercase(), 'c' | 'p' | 't' | 'k');
+            && is_valid_coda_start_for_vowels(is_onset_qu, &self.vowels, ch);
+        let is_stop = matches!(ch.to_ascii_lowercase(), 'c' | 'p' | 't' | 'k');
         let tone_incompatible = config.restore_on_wrong_spelling
             && is_stop
             && matches!(self.tone, Tone::Grave | Tone::HookAbove | Tone::Tilde);
         if can_accept_coda && (is_valid_start || is_special_k) && !tone_incompatible {
-            let coda = self.into_coda(key.ch, key.is_upper);
+            let coda = self.into_coda(ch, is_upper);
 
             // Fast path: if horn was not upgraded and there is no tone mark to shift
             if !upgraded_u_horn && coda.nucleus.tone == Tone::None {
@@ -693,10 +714,7 @@ impl State<Nucleus> {
         }
 
         // Non-coda consonant or non-alphabetic -> Transition Nucleus -> Passthrough
-        (
-            self.into_passthrough(key.ch).into(),
-            EngineAction::Passthrough,
-        )
+        (SyllableState::passthrough(), EngineAction::Passthrough)
     }
 }
 
@@ -705,27 +723,6 @@ impl State<Nucleus> {
 // ============================================================================
 
 impl State<Coda> {
-    /// Consumes `State<Coda>` and transitions into `State<Passthrough>` with trailing `ch`
-    #[inline(always)]
-    pub fn into_passthrough(self, ch: char) -> State<Passthrough> {
-        let mut raw = InlineList::new();
-        self.data.render_chars_to(&mut raw);
-        raw.push(ch);
-        State {
-            data: raw,
-            _state: PhantomData,
-        }
-    }
-
-    /// Consumes `State<Coda>` and transitions into `State<Passthrough>` from undone raw string
-    #[inline(always)]
-    pub fn into_passthrough_raw(self, raw: &str) -> State<Passthrough> {
-        State {
-            data: InlineList::from(raw),
-            _state: PhantomData,
-        }
-    }
-
     /// Feeds a key into `State<Coda>`, consuming `self` and transitioning to the next state.
     #[inline(always)]
     pub fn feed_key(
@@ -734,24 +731,25 @@ impl State<Coda> {
         current_len: usize,
         config: &EngineConfig,
     ) -> (SyllableState, EngineAction) {
+        let ch = key.ch();
         // 1. Unified Modifiers across Coda (Telex & VNI)
-        let has_onset_d = self
-            .nucleus
-            .onset
-            .as_ref()
-            .is_some_and(|o| !o.chars.is_empty() && o.chars[0].0.eq_ignore_ascii_case(&'d'));
         if let Some(effect) = match_modifier_key(
             config.method,
-            key.ch,
+            ch,
             |b| self.nucleus.vowels.iter().any(|v| v.base == b),
-            has_onset_d,
+            || {
+                self.nucleus
+                    .onset
+                    .as_ref()
+                    .is_some_and(|o| !o.chars.is_empty() && (o.chars[0] | 0x20) == b'd')
+            },
         ) {
             let coda_copy = self.data.coda;
             let across_coda = self.data.circumflex_across_coda;
             match self.data.nucleus.apply_modifier(
                 effect,
                 key,
-                Some(&coda_copy),
+                Some(coda_copy.as_slice()),
                 across_coda,
                 config,
             ) {
@@ -772,7 +770,7 @@ impl State<Coda> {
                 }
                 ModifierOutcome::Undone(raw) => {
                     return (
-                        self.into_passthrough_raw(raw.as_str()).into(),
+                        SyllableState::passthrough(),
                         EngineAction::Replace {
                             backspaces: current_len,
                             output: raw,
@@ -784,16 +782,15 @@ impl State<Coda> {
         }
 
         // 2. Additional consonant in Coda (only "ng", "nh", "ch" are valid 2-letter codas in Vietnamese)
-        if self.coda.len() == 1 && is_valid_coda_pair(self.coda[0].0, key.ch) {
-            self.coda.push((key.ch, key.is_upper));
+        if self.coda.len() == 1 && is_valid_coda_pair(self.coda[0] as char, ch) {
+            let b = (ch as u8).to_ascii_lowercase();
+            self.coda
+                .push(if key.is_upper() { b.to_ascii_uppercase() } else { b });
             return (self.into(), EngineAction::Passthrough);
         }
 
         // 3. Otherwise -> Transition Coda -> Passthrough
-        (
-            self.into_passthrough(key.ch).into(),
-            EngineAction::Passthrough,
-        )
+        (SyllableState::passthrough(), EngineAction::Passthrough)
     }
 }
 
@@ -803,8 +800,7 @@ impl State<Coda> {
 
 impl State<Passthrough> {
     #[inline(always)]
-    pub fn feed_key(mut self, key: RawKey) -> (SyllableState, EngineAction) {
-        self.data.push(key.ch);
+    pub fn feed_key(self, _key: RawKey) -> (SyllableState, EngineAction) {
         (self.into(), EngineAction::Passthrough)
     }
 }

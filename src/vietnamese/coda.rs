@@ -1,16 +1,17 @@
 //! Vietnamese Coda (Phụ âm cuối) State Representation
 
-use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel};
+use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel, compose_vowel_u16};
 use super::inline_list::InlineList;
 use super::nucleus::NucleusState;
 use super::syllable::Syllable;
 use std::fmt;
 
-/// Coda (Phụ âm cuối)
+/// Coda (Phụ âm cuối) — compact 25-byte stack representation.
+/// Vietnamese codas have at most 2 ASCII consonants (`ng`, `nh`, `ch`), stored with exact case in `[u8; 2]`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct CodaState {
     pub nucleus: NucleusState,
-    pub coda: InlineList<(char, bool), 4>,
+    pub coda: InlineList<u8, 2>,
     pub circumflex_across_coda: Option<BaseVowel>,
 }
 
@@ -20,11 +21,13 @@ impl CodaState {
         Self::default()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn from_single(nucleus: NucleusState, ch: char, is_upper: bool) -> Self {
+        let b = (ch as u8).to_ascii_lowercase();
+        let cased = if is_upper { b.to_ascii_uppercase() } else { b };
         Self {
             nucleus,
-            coda: InlineList::from_single((ch, is_upper)),
+            coda: InlineList::from_single(cased),
             circumflex_across_coda: None,
         }
     }
@@ -75,17 +78,13 @@ impl CodaState {
             ));
         }
 
-        for &(c, is_upper) in &self.coda {
-            if is_upper {
-                out.push(c.to_ascii_uppercase());
-            } else {
-                out.push(c.to_ascii_lowercase());
-            }
+        for &b in &self.coda {
+            out.push(b as char);
         }
     }
 
     /// Renders coda state directly into a stack-allocated CompactString (0 heap allocations).
-    #[inline]
+    #[inline(always)]
     pub fn render_compact(&self) -> crate::engine::action::CompactString {
         let mut s = crate::engine::action::CompactString::new();
         if let Some(ref onset) = self.nucleus.onset {
@@ -99,7 +98,7 @@ impl CodaState {
             } else {
                 Tone::None
             };
-            s.push(compose_vowel(
+            s.push_bmp_u16(compose_vowel_u16(
                 v.base,
                 v.diacritic,
                 tone_for_vowel,
@@ -107,13 +106,7 @@ impl CodaState {
             ));
         }
 
-        for &(c, is_upper) in &self.coda {
-            if is_upper {
-                s.push(c.to_ascii_uppercase());
-            } else {
-                s.push(c.to_ascii_lowercase());
-            }
-        }
+        s.push_ascii_bytes(self.coda.as_slice());
         s
     }
 
@@ -141,12 +134,21 @@ impl From<&CodaState> for Syllable {
                 .nucleus
                 .onset
                 .as_ref()
-                .map(|o| o.chars.to_vec())
+                .map(|o| {
+                    o.chars
+                        .iter()
+                        .map(|&b| (b as char, b.is_ascii_uppercase()))
+                        .collect()
+                })
                 .unwrap_or_default(),
             d_stroke: coda.nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke),
             vowels: coda.nucleus.vowels.to_vec(),
             tone: coda.nucleus.tone,
-            coda: coda.coda.to_vec(),
+            coda: coda
+                .coda
+                .iter()
+                .map(|&b| (b as char, b.is_ascii_uppercase()))
+                .collect(),
         }
     }
 }

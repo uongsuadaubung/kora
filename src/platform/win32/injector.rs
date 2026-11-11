@@ -132,8 +132,7 @@ fn copy_to_clipboard_utf16(text: &str) -> bool {
 /// - In browser Omnibox / Excel: collapses inline autocomplete selection cleanly without polluting document text.
 /// - In configured target controls: applies the surgical injection strategy bound to that control.
 pub fn send_replace(backspaces: usize, text: &str) {
-    let utf16_count = text.encode_utf16().count();
-    if backspaces == 0 && utf16_count == 0 {
+    if backspaces == 0 && text.is_empty() {
         return;
     }
 
@@ -157,23 +156,25 @@ pub fn send_replace(backspaces: usize, text: &str) {
     }
 
     let is_autocomplete = target_strat == 1; // Strategy 1: AutocompleteGuard (forces U+202F fix)
+    let has_text = !text.is_empty();
 
-    let extra = if is_autocomplete && backspaces > 0 && utf16_count > 0 {
+    let extra = if is_autocomplete && backspaces > 0 && has_text {
         4
     } else {
         0
     };
 
-    let total_needed = extra + backspaces * 2 + utf16_count * 2;
+    // Since `utf16_count <= text.len()` holds for every valid UTF-8 string, `max_needed` bounds
+    // stack capacity in O(1) without an extra pre-pass over `text.encode_utf16()`.
+    let max_needed = extra + backspaces * 2 + text.len() * 2;
 
-    if total_needed <= STACK_INPUT_LIMIT {
-        // Fast path: Zero heap allocations on the Windows low-level hook thread.
-        // Use MaybeUninit to completely eliminate zeroing 2.5 KB on the stack every keystroke.
+    if max_needed <= STACK_INPUT_LIMIT {
+        // Fast path: Zero heap allocations & single-pass UTF-16 encoding on the low-level hook thread.
         let mut inputs: [std::mem::MaybeUninit<INPUT>; STACK_INPUT_LIMIT] =
             [std::mem::MaybeUninit::uninit(); STACK_INPUT_LIMIT];
         let mut count = 0;
 
-        if is_autocomplete && backspaces > 0 && utf16_count > 0 {
+        if extra != 0 {
             inputs[count].write(make_unicode_down(0x202F));
             count += 1;
             inputs[count].write(make_unicode_up(0x202F));
@@ -198,34 +199,73 @@ pub fn send_replace(backspaces: usize, text: &str) {
             count += 1;
         }
 
-        unsafe {
-            SendInput(
-                count as u32,
-                inputs.as_ptr() as *const INPUT,
-                std::mem::size_of::<INPUT>() as i32,
-            );
+        if count > 0 {
+            unsafe {
+                SendInput(
+                    count as u32,
+                    inputs.as_ptr() as *const INPUT,
+                    std::mem::size_of::<INPUT>() as i32,
+                );
+            }
         }
     } else {
-        // Fallback for massive macro expansion strings (>64 inputs)
-        let mut inputs = Vec::with_capacity(total_needed);
+        let utf16_count = text.encode_utf16().count();
+        let total_needed = extra + backspaces * 2 + utf16_count * 2;
+        if total_needed <= STACK_INPUT_LIMIT {
+            let mut inputs: [std::mem::MaybeUninit<INPUT>; STACK_INPUT_LIMIT] =
+                [std::mem::MaybeUninit::uninit(); STACK_INPUT_LIMIT];
+            let mut count = 0;
+            if extra != 0 {
+                inputs[count].write(make_unicode_down(0x202F));
+                count += 1;
+                inputs[count].write(make_unicode_up(0x202F));
+                count += 1;
+                inputs[count].write(make_backspace_down());
+                count += 1;
+                inputs[count].write(make_backspace_up());
+                count += 1;
+            }
+            for _ in 0..backspaces {
+                inputs[count].write(make_backspace_down());
+                count += 1;
+                inputs[count].write(make_backspace_up());
+                count += 1;
+            }
+            for ch in text.encode_utf16() {
+                inputs[count].write(make_unicode_down(ch));
+                count += 1;
+                inputs[count].write(make_unicode_up(ch));
+                count += 1;
+            }
+            unsafe {
+                SendInput(
+                    count as u32,
+                    inputs.as_ptr() as *const INPUT,
+                    std::mem::size_of::<INPUT>() as i32,
+                );
+            }
+        } else {
+            // Fallback for massive macro expansion strings (>64 inputs)
+            let mut inputs = Vec::with_capacity(total_needed);
 
-        if is_autocomplete && backspaces > 0 && utf16_count > 0 {
-            push_unicode_char(&mut inputs, 0x202F);
-            push_backspace(&mut inputs);
-        }
-        for _ in 0..backspaces {
-            push_backspace(&mut inputs);
-        }
-        for ch in text.encode_utf16() {
-            push_unicode_char(&mut inputs, ch);
-        }
+            if extra != 0 {
+                push_unicode_char(&mut inputs, 0x202F);
+                push_backspace(&mut inputs);
+            }
+            for _ in 0..backspaces {
+                push_backspace(&mut inputs);
+            }
+            for ch in text.encode_utf16() {
+                push_unicode_char(&mut inputs, ch);
+            }
 
-        unsafe {
-            SendInput(
-                inputs.len() as u32,
-                inputs.as_ptr(),
-                std::mem::size_of::<INPUT>() as i32,
-            );
+            unsafe {
+                SendInput(
+                    inputs.len() as u32,
+                    inputs.as_ptr(),
+                    std::mem::size_of::<INPUT>() as i32,
+                );
+            }
         }
     }
 }

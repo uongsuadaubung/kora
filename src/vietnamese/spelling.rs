@@ -377,7 +377,7 @@ pub fn is_valid_intermediate_vowel_combination(vowels: &[VowelLetter]) -> bool {
 }
 
 /// Bitmask for valid 1-letter Vietnamese onsets: b, c, d, g, h, k, l, m, n, p, q, r, s, t, v, x.
-const SINGLE_ONSET_MASK: u32 = {
+pub(crate) const SINGLE_ONSET_MASK: u32 = {
     let mut mask = 0u32;
     let chars = b"bcdghklmnpqrstvx";
     let mut i = 0;
@@ -1097,5 +1097,310 @@ pub fn is_unambiguous_completed_vietnamese_syllable(
         }
     }
 
+    false
+}
+
+/// Validates whether a UTF-8 string forms a commonly accepted Vietnamese colloquial shorthand
+/// ("đc", "Đc", "ĐC", "đC" — 3 UTF-8 bytes: `[0xC4, 0x90 | 0x91, b'c' | b'C']`).
+#[inline(always)]
+pub fn is_valid_vietnamese_shorthand_str(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 3 && b[0] == 0xC4 && (b[1] & !1) == 0x90 && (b[2] | 0x20) == b'c'
+}
+
+#[inline(always)]
+pub(crate) fn is_valid_onset_ascii(onset: &[u8], is_d_stroke: bool) -> bool {
+    if onset.is_empty() {
+        return true;
+    }
+    if is_d_stroke {
+        return onset.len() == 1 && (onset[0] | 0x20) == b'd';
+    }
+    match onset.len() {
+        1 => {
+            let d = (onset[0] | 0x20).wrapping_sub(b'a');
+            d < 26 && (SINGLE_ONSET_MASK & (1u32 << d)) != 0
+        }
+        2 => {
+            let d0 = (onset[0] | 0x20).wrapping_sub(b'a');
+            let d1 = (onset[1] | 0x20).wrapping_sub(b'a');
+            if d0 < 26 && d1 < 26 {
+                let idx = ((d0 as usize) << 5) | (d1 as usize);
+                (ONSET_2LETTERS_MASK[idx >> 6] & (1u64 << (idx & 63))) != 0
+            } else {
+                false
+            }
+        }
+        3 => (onset[0] | 0x20) == b'n' && (onset[1] | 0x20) == b'g' && (onset[2] | 0x20) == b'h',
+        _ => false,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn is_valid_onset_extension_ascii(current_onset: &[u8], next_ch: char) -> bool {
+    let cp = next_ch as u32 | 0x20;
+    let d_next = cp.wrapping_sub('a' as u32);
+    if d_next >= 26 {
+        return false;
+    }
+    match current_onset.len() {
+        1 => {
+            let d0 = (current_onset[0] | 0x20).wrapping_sub(b'a');
+            if d0 < 26 {
+                let idx = ((d0 as usize) << 5) | (d_next as usize);
+                (ONSET_2LETTERS_MASK[idx >> 6] & (1u64 << (idx & 63))) != 0
+            } else {
+                false
+            }
+        }
+        2 => {
+            (current_onset[0] | 0x20) == b'n'
+                && (current_onset[1] | 0x20) == b'g'
+                && cp as u8 == b'h'
+        }
+        _ => false,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn is_valid_onset_vowel_orthography_ascii(
+    onset: &[u8],
+    d_stroke: bool,
+    first_vowel_base: BaseVowel,
+) -> bool {
+    if onset.is_empty() || d_stroke {
+        return true;
+    }
+    let allowed_mask = match onset.len() {
+        1 => {
+            let d = (onset[0] | 0x20).wrapping_sub(b'a');
+            if d < 26 {
+                SINGLE_ONSET_ALLOWED_VOWELS[(d as usize) & 31]
+            } else {
+                VOWEL_ALL
+            }
+        }
+        2 => {
+            let c0 = onset[0] | 0x20;
+            let c1 = onset[1] | 0x20;
+            if c1 == b'h' && c0.wrapping_sub(b'a') < 26 {
+                ONSET_H_ALLOWED_VOWELS[((c0 - b'a') as usize) & 31]
+            } else if c0 == b'n' && c1 == b'g' {
+                VOWEL_NG
+            } else {
+                VOWEL_ALL
+            }
+        }
+        3 => {
+            if (onset[0] | 0x20) == b'n' && (onset[1] | 0x20) == b'g' && (onset[2] | 0x20) == b'h'
+            {
+                VOWEL_GH_NGH
+            } else {
+                VOWEL_ALL
+            }
+        }
+        _ => VOWEL_ALL,
+    };
+    (allowed_mask & (1u8 << (first_vowel_base as u8))) != 0
+}
+
+#[inline(always)]
+pub(crate) fn is_stop_coda_ascii(coda: &[u8]) -> bool {
+    match coda.len() {
+        1 => {
+            let d = (coda[0] | 0x20).wrapping_sub(b'a');
+            d < 26 && (STOP_CODA_CHARS_MASK & (1u32 << d)) != 0
+        }
+        2 => (coda[0] | 0x20) == b'c' && (coda[1] | 0x20) == b'h',
+        _ => false,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn is_special_k_coda_allowed_during_typing_ascii(
+    onset_chars: &[u8],
+    is_d_stroke: bool,
+    vowels: &[VowelLetter],
+) -> bool {
+    if vowels.len() != 1 || vowels[0].base != BaseVowel::A {
+        return false;
+    }
+    is_d_stroke
+        || (!onset_chars.is_empty() && (onset_chars[0] | 0x20) == b'd')
+        || (onset_chars.len() == 1 && (onset_chars[0] | 0x20) == b'l')
+}
+
+#[inline(always)]
+fn is_special_k_coda_allowed_completed_ascii(
+    onset_chars: &[u8],
+    is_d_stroke: bool,
+    vowels: &[VowelLetter],
+) -> bool {
+    if vowels.len() != 1 || vowels[0].base != BaseVowel::A {
+        return false;
+    }
+    if is_d_stroke {
+        vowels[0].diacritic == Diacritic::Breve || vowels[0].diacritic == Diacritic::None
+    } else if onset_chars.len() == 1 && (onset_chars[0] | 0x20) == b'l' {
+        vowels[0].diacritic == Diacritic::Breve
+    } else {
+        false
+    }
+}
+
+#[inline]
+pub(crate) fn is_valid_vietnamese_components_ascii(
+    onset: &[u8],
+    d_stroke: bool,
+    vowels: &[VowelLetter],
+    tone: Tone,
+    coda: &[u8],
+) -> bool {
+    if !is_valid_onset_ascii(onset, d_stroke) {
+        return false;
+    }
+    if vowels.is_empty() {
+        return true;
+    }
+    if !is_valid_onset_vowel_orthography_ascii(onset, d_stroke, vowels[0].base) {
+        return false;
+    }
+
+    let last_onset = onset.last().map(|&b| b | 0x20);
+    let vowels_to_check = if vowels.len() >= 2
+        && ((last_onset == Some(b'g') && vowels[0].base == BaseVowel::I)
+            || (last_onset == Some(b'q') && vowels[0].base == BaseVowel::U))
+    {
+        &vowels[1..]
+    } else {
+        vowels
+    };
+
+    if !is_valid_vowel_combination(vowels_to_check) {
+        return false;
+    }
+
+    if !coda.is_empty() {
+        if !can_vowels_accept_coda(vowels_to_check) {
+            return false;
+        }
+        let is_qu = (onset.len() == 2
+            && (onset[0] | 0x20) == b'q'
+            && (onset[1] | 0x20) == b'u')
+            || (onset.len() == 1 && (onset[0] | 0x20) == b'q' && vowels[0].base == BaseVowel::U);
+
+        match coda.len() {
+            1 => {
+                let c = (coda[0] | 0x20) as char;
+                if !is_valid_coda_start_for_vowels(is_qu, vowels_to_check, c) {
+                    return false;
+                }
+                if vowels_to_check.len() == 1 && vowels_to_check[0].base == BaseVowel::I && c == 'c'
+                {
+                    return false;
+                }
+                if c == 'k' {
+                    if !is_special_k_coda_allowed_completed_ascii(onset, d_stroke, vowels_to_check)
+                    {
+                        return false;
+                    }
+                } else if !matches!(c, 'c' | 'm' | 'n' | 'p' | 't' | 'g' | 'h') {
+                    return false;
+                }
+            }
+            2 => {
+                if !is_valid_coda_pair(coda[0] as char, coda[1] as char) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+
+        if is_stop_coda_ascii(coda) && !matches!(tone, Tone::None | Tone::Acute | Tone::DotBelow) {
+            return false;
+        }
+    }
+
+    true
+}
+
+#[inline]
+pub(crate) fn is_unambiguous_completed_vietnamese_syllable_ascii(
+    has_d_stroke: bool,
+    has_onset: bool,
+    vowels: &[VowelLetter],
+    tone: Tone,
+    coda: &[u8],
+) -> bool {
+    if has_d_stroke {
+        return true;
+    }
+    if vowels
+        .iter()
+        .any(|v| matches!(v.diacritic, Diacritic::Horn | Diacritic::Breve))
+    {
+        if !has_onset && vowels[0].base == BaseVowel::U && vowels[0].diacritic == Diacritic::Horn {
+            if coda.is_empty() {
+                let is_ua = vowels.len() == 2 && vowels[1].base == BaseVowel::A;
+                let is_valid_standalone_u =
+                    vowels.len() == 1 && matches!(tone, Tone::Grave | Tone::Acute);
+                if !is_ua && !is_valid_standalone_u {
+                    return false;
+                }
+            }
+        } else {
+            let is_bare_uo_horn = vowels.len() == 2
+                && vowels[0].base == BaseVowel::U
+                && vowels[0].diacritic == Diacritic::Horn
+                && vowels[1].base == BaseVowel::O
+                && vowels[1].diacritic == Diacritic::Horn;
+
+            if is_bare_uo_horn && coda.is_empty() {
+                return false;
+            }
+        }
+        return true;
+    }
+    if vowels
+        .iter()
+        .any(|v| v.base == BaseVowel::A && v.diacritic == Diacritic::Circumflex)
+    {
+        return true;
+    }
+    if tone == Tone::DotBelow {
+        return true;
+    }
+    if vowels.iter().any(|v| {
+        matches!(v.base, BaseVowel::E | BaseVowel::O) && v.diacritic == Diacritic::Circumflex
+    }) && (tone != Tone::None || !coda.is_empty())
+    {
+        return true;
+    }
+    if vowels.len() >= 2 && tone != Tone::None {
+        if !has_onset
+            && vowels[0].base == BaseVowel::U
+            && coda.is_empty()
+            && vowels[1].base != BaseVowel::A
+        {
+            return false;
+        }
+        let is_bare_uo =
+            vowels.len() == 2 && vowels[0].base == BaseVowel::U && vowels[1].base == BaseVowel::O;
+
+        if !(is_bare_uo && coda.is_empty()) {
+            return true;
+        }
+    }
+    if !coda.is_empty() && tone != Tone::None {
+        let is_english_st_pattern = vowels.len() == 1
+            && vowels[0].diacritic == Diacritic::None
+            && tone == Tone::Acute
+            && coda.len() == 1
+            && (coda[0] | 0x20) == b't';
+
+        if !is_english_st_pattern {
+            return true;
+        }
+    }
     false
 }

@@ -18,15 +18,10 @@ impl SyllableState {
     #[inline]
     pub fn render_chars_to(&self, out: &mut crate::vietnamese::InlineList<char, 16>) {
         match self {
-            SyllableState::Empty => {}
+            SyllableState::Empty | SyllableState::Passthrough(_) => {}
             SyllableState::Onset(onset) => onset.render_chars_to(out),
             SyllableState::Nucleus(nucleus) => nucleus.render_chars_to(out),
             SyllableState::Coda(coda) => coda.render_chars_to(out),
-            SyllableState::Passthrough(raw) => {
-                for &ch in raw.iter() {
-                    out.push(ch);
-                }
-            }
         }
     }
 
@@ -34,11 +29,12 @@ impl SyllableState {
     #[inline]
     pub fn render_compact(&self) -> crate::engine::action::CompactString {
         match self {
-            SyllableState::Empty => crate::engine::action::CompactString::new(),
+            SyllableState::Empty | SyllableState::Passthrough(_) => {
+                crate::engine::action::CompactString::new()
+            }
             SyllableState::Onset(onset) => onset.render_compact(),
             SyllableState::Nucleus(nucleus) => nucleus.render_compact(),
             SyllableState::Coda(coda) => coda.render_compact(),
-            SyllableState::Passthrough(raw) => raw.iter().copied().collect(),
         }
     }
 

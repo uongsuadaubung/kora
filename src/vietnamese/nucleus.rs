@@ -1,11 +1,11 @@
 //! Vietnamese Nucleus (Nguyên âm & Dấu thanh) State Representation
 
 use super::VowelLetter;
-use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel};
+use super::charset::{BaseVowel, Diacritic, Tone, compose_vowel, compose_vowel_u16};
 use super::inline_list::InlineList;
 use super::modifier::KeyEffect;
 use super::onset::OnsetState;
-use super::spelling::is_stop_coda;
+use super::spelling::is_stop_coda_ascii;
 use super::syllable::Syllable;
 use crate::engine::action::CompactString;
 use crate::engine::buffer::RawKey;
@@ -66,7 +66,7 @@ impl NucleusState {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn render_compact(&self) -> CompactString {
         let mut s = CompactString::new();
         if let Some(ref onset) = self.onset {
@@ -80,7 +80,7 @@ impl NucleusState {
         };
         for (i, v) in self.vowels.iter().enumerate() {
             let tone_for_vowel = if i == tone_pos { self.tone } else { Tone::None };
-            s.push(compose_vowel(
+            s.push_bmp_u16(compose_vowel_u16(
                 v.base,
                 v.diacritic,
                 tone_for_vowel,
@@ -163,7 +163,7 @@ impl NucleusState {
     pub fn toggle_d_stroke(&mut self) -> bool {
         if let Some(ref mut onset) = self.onset
             && !onset.chars.is_empty()
-            && onset.chars[0].0.eq_ignore_ascii_case(&'d')
+            && (onset.chars[0] | 0x20) == b'd'
         {
             onset.is_d_stroke = !onset.is_d_stroke;
             return true;
@@ -220,10 +220,8 @@ impl NucleusState {
                     {
                         let is_thuo_or_huo = !has_coda
                             && self.onset.as_ref().is_some_and(|o| match o.chars.as_slice() {
-                                [(c, _)] => c.eq_ignore_ascii_case(&'h'),
-                                [(c0, _), (c1, _)] => {
-                                    c0.eq_ignore_ascii_case(&'t') && c1.eq_ignore_ascii_case(&'h')
-                                }
+                                [c] => (*c | 0x20) == b'h',
+                                [c0, c1] => (*c0 | 0x20) == b't' && (*c1 | 0x20) == b'h',
                                 _ => false,
                             });
                         if is_thuo_or_huo {
@@ -314,22 +312,16 @@ impl NucleusState {
         &mut self,
         effect: KeyEffect,
         key: RawKey,
-        coda: Option<&[(char, bool)]>,
+        coda: Option<&[u8]>,
         can_undo_circumflex: Option<BaseVowel>,
         config: &EngineConfig,
     ) -> ModifierOutcome {
         let make_raw = |n: &NucleusState| -> CompactString {
             let mut s = n.render_compact();
             if let Some(coda_chars) = coda {
-                for &(c, is_upper) in coda_chars {
-                    if is_upper {
-                        s.push(c.to_ascii_uppercase());
-                    } else {
-                        s.push(c.to_ascii_lowercase());
-                    }
-                }
+                s.push_ascii_bytes(coda_chars);
             }
-            s.push(key.ch);
+            s.push(key.ch());
             s
         };
 
@@ -341,11 +333,11 @@ impl NucleusState {
                     if self.tone == Tone::None
                         && target == Some(BaseVowel::A)
                         && coda_chars.len() == 1
-                        && coda_chars[0].0.eq_ignore_ascii_case(&'t')
+                        && (coda_chars[0] | 0x20) == b't'
                         && self.onset.as_ref().is_some_and(|o| {
                             !o.is_d_stroke
                                 && o.chars.len() == 1
-                                && o.chars[0].0.eq_ignore_ascii_case(&'d')
+                                && (o.chars[0] | 0x20) == b'd'
                         })
                     {
                         return ModifierOutcome::NotApplied;
@@ -417,7 +409,7 @@ impl NucleusState {
 
             KeyEffect::DStroke => {
                 if let Some(ref mut onset) = self.onset {
-                    if !onset.chars.is_empty() && onset.chars[0].0.eq_ignore_ascii_case(&'d') {
+                    if !onset.chars.is_empty() && (onset.chars[0] | 0x20) == b'd' {
                         if onset.is_d_stroke {
                             // D-stroke is already active
                             if coda.is_none() {
@@ -456,7 +448,7 @@ impl NucleusState {
                     if let Some(ref onset) = self.onset {
                         onset.render_compact_to(&mut raw);
                     }
-                    raw.push(if key.is_upper { 'W' } else { 'w' });
+                    raw.push(if key.is_upper() { 'W' } else { 'w' });
                     return ModifierOutcome::Undone(raw);
                 }
 
@@ -513,7 +505,7 @@ impl NucleusState {
                 } else {
                     self.tone = tone;
                     if let Some(coda_chars) = coda
-                        && is_stop_coda(coda_chars)
+                        && is_stop_coda_ascii(coda_chars)
                         && !matches!(self.tone, Tone::Acute | Tone::DotBelow)
                     {
                         self.tone = Tone::None;
@@ -567,7 +559,12 @@ impl From<&NucleusState> for Syllable {
             onset: nucleus
                 .onset
                 .as_ref()
-                .map(|o| o.chars.to_vec())
+                .map(|o| {
+                    o.chars
+                        .iter()
+                        .map(|&b| (b as char, b.is_ascii_uppercase()))
+                        .collect()
+                })
                 .unwrap_or_default(),
             d_stroke: nucleus.onset.as_ref().is_some_and(|o| o.is_d_stroke),
             vowels: nucleus.vowels.to_vec(),
