@@ -3,7 +3,8 @@ use kora::vietnamese::{
     charset::{BaseVowel, Diacritic, Tone},
     spelling::{
         is_valid_coda_pair, is_valid_coda_start, is_valid_onset, is_valid_onset_extension,
-        is_valid_vietnamese_shorthand, is_valid_vietnamese_syllable,
+        is_valid_vietnamese_shorthand, is_valid_vietnamese_shorthand_str,
+        is_valid_vietnamese_syllable,
     },
     syllable::Syllable,
 };
@@ -318,14 +319,32 @@ fn test_onset_vowel_orthography() {
 
 #[test]
 fn test_vietnamese_shorthand() {
-    assert!(is_valid_vietnamese_shorthand(&['đ', 'c']));
-    assert!(is_valid_vietnamese_shorthand(&['Đ', 'c']));
-    assert!(is_valid_vietnamese_shorthand(&['Đ', 'C']));
-    assert!(is_valid_vietnamese_shorthand(&['đ', 'C']));
+    for shorthand in ["đc", "đt", "đk", "đx", "Đc", "ĐT", "đK"] {
+        assert!(is_valid_vietnamese_shorthand_str(shorthand), "{shorthand}");
+        let chars: Vec<char> = shorthand.chars().collect();
+        assert!(is_valid_vietnamese_shorthand(&chars), "{shorthand}");
+    }
 
-    assert!(!is_valid_vietnamese_shorthand(&['đ']));
-    assert!(!is_valid_vietnamese_shorthand(&['c']));
-    assert!(!is_valid_vietnamese_shorthand(&['d', 'c']));
-    assert!(!is_valid_vietnamese_shorthand(&['đ', 'c', 's']));
-    assert!(!is_valid_vietnamese_shorthand(&['đ', 'k']));
+    for text in ["đ", "đab", "dc", "đ1", "đé", "dđ"] {
+        assert!(!is_valid_vietnamese_shorthand_str(text), "{text}");
+        let chars: Vec<char> = text.chars().collect();
+        assert!(!is_valid_vietnamese_shorthand(&chars), "{text}");
+    }
+}
+
+#[test]
+fn test_d_stroke_shorthands_remain_valid_in_passthrough() {
+    use kora::engine::{EngineConfig, buffer::{RawKey, TypingBuffer}};
+
+    let config = EngineConfig::default();
+    for (input, expected) in [("ddc", "đc"), ("ddt", "đt"), ("ddk", "đk"), ("ddx", "đx")] {
+        let mut buffer = TypingBuffer::new();
+        for ch in input.chars() {
+            buffer.feed_key(RawKey::from(ch), &config);
+        }
+
+        assert_eq!(buffer.rendered(), expected, "input: {input}");
+        assert!(buffer.is_passthrough(), "input: {input}");
+        assert!(buffer.is_valid_spelling(), "input: {input}");
+    }
 }

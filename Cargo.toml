@@ -1,6 +1,6 @@
 [package]
 name = "kora"
-version = "0.12.0"
+version = "0.14.0"
 edition = "2024"
 
 authors = ["Mạnh Kiên <manhkien13041997@gmail.com>"]

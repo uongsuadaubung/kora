@@ -991,15 +991,15 @@ pub fn is_valid_coda_start_for_vowels(
     }
 }
 
-/// Validates whether a sequence of characters forms a commonly accepted Vietnamese colloquial shorthand
-/// (e.g. "đc", "Đc", "ĐC", "đC" as an abbreviation for "được").
+/// Validates shorthand formed by `đ`/`Đ` followed by one ASCII letter
+/// (e.g. "đc", "đt", "đk").
 ///
 /// While these shorthands do not conform to classical Vietnamese phonotactic syllable structure
 /// (onset without vowel nucleus), they are universally recognized in modern communication and
 /// must be protected from destructive raw-key rollback during word-break / spelling checks.
 #[inline]
 pub fn is_valid_vietnamese_shorthand(chars: &[char]) -> bool {
-    chars.len() == 2 && matches!(chars[0], 'đ' | 'Đ') && matches!(chars[1], 'c' | 'C')
+    chars.len() == 2 && matches!(chars[0], 'đ' | 'Đ') && chars[1].is_ascii_alphabetic()
 }
 
 /// Checks whether a combination of onset, vowels, tone, and coda represents an unambiguous,
@@ -1100,12 +1100,14 @@ pub fn is_unambiguous_completed_vietnamese_syllable(
     false
 }
 
-/// Validates whether a UTF-8 string forms a commonly accepted Vietnamese colloquial shorthand
-/// ("đc", "Đc", "ĐC", "đC" — 3 UTF-8 bytes: `[0xC4, 0x90 | 0x91, b'c' | b'C']`).
+/// Validates UTF-8 shorthand formed by `đ`/`Đ` followed by one ASCII letter.
 #[inline(always)]
 pub fn is_valid_vietnamese_shorthand_str(s: &str) -> bool {
     let b = s.as_bytes();
-    b.len() == 3 && b[0] == 0xC4 && (b[1] & !1) == 0x90 && (b[2] | 0x20) == b'c'
+    b.len() == 3
+        && b[0] == 0xC4
+        && (b[1] & !1) == 0x90
+        && b[2].is_ascii_alphabetic()
 }
 
 #[inline(always)]

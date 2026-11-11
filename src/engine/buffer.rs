@@ -166,9 +166,12 @@ impl TypingBuffer {
             if s.is_ascii() || crate::vietnamese::spelling::is_valid_vietnamese_shorthand_str(s) {
                 return true;
             }
-            // TCVN3 encoded "đc" / "Đc" ('\u{00AE}' / '\u{00A7}' + 'c'/'C')
+            // TCVN3 encoded `đ`/`Đ` followed by one ASCII letter.
             let b = s.as_bytes();
-            b.len() == 3 && b[0] == 0xC2 && matches!(b[1], 0xAE | 0xA7) && (b[2] | 0x20) == b'c'
+            b.len() == 3
+                && b[0] == 0xC2
+                && matches!(b[1], 0xAE | 0xA7)
+                && b[2].is_ascii_alphabetic()
         } else {
             self.state.is_valid_spelling()
         }
@@ -596,3 +599,4 @@ impl TypingBuffer {
         true
     }
 }
+
